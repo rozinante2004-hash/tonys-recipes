@@ -7695,6 +7695,15 @@ window.SELF_TESTS = [
         window._fbUser=user('google.com', 60, async function(){ throw err; });
         used=null;
         if(await ownerFresh()!==true || !used) throw new Error('a re-sign-in that asks for the code is finished with it');
+        // v38.42 — Tony: "the authenticator request even before it lets me sign in" (Google took the account it
+        // knew). Google's account chooser every time, and the code box has a way to another account.
+        var cp=real.prov && typeof real.prov.getCustomParameters==='function' ? real.prov.getCustomParameters() : null;
+        if(real.prov && (!cp || cp.prompt!=='select_account')) throw new Error('Google sign-in does not show its account chooser: '+JSON.stringify(cp));
+        var outBox=null; window.askConfirm=async function(o){ outBox=o; return null; };
+        var out=null; try{ await mfaResolve(err); }catch(e){ out=e; }
+        if(!outBox || outBox.cancelLabel!=='Use another account' || !out || !out.otherAccount || out.code!=='auth/popup-closed-by-user') throw new Error('the code box has no way to another account: '+JSON.stringify([outBox && outBox.cancelLabel, out && out.code]));
+        if(String(startGoogleSignIn).indexOf('otherAccount')===-1) throw new Error('the sign-in screen does not say to choose the other account');
+        window.askConfirm=async function(o){ asked.push(o.title); return o.input!==undefined ? ' 123 456 ' : true; };
         var other={ code:'auth/multi-factor-auth-required', resolver:{ hints:[{ factorId:'phone', uid:'p1' }] } };
         var threw=false; try{ await mfaResolve(other); }catch(e){ threw=(e===other); }
         if(!threw) throw new Error('a second step the app does not know is passed on, not guessed');
@@ -8192,6 +8201,76 @@ window.SELF_TESTS = [
         showCollectionsOnly=real.coll; showRecentOnly=real.recent; showNoPhotoOnly=real.nophoto; showOneAwayOnly=real.away;
         if(real.rv===null) localStorage.removeItem('recent_views'); else localStorage.setItem('recent_views', real.rv);
         renderFilters(); renderGrid();
+      }
+    } },
+
+  { id:'invite_testers', group:'Sharing', name:'✉️ The owner’s Invite testers: English or Hebrew with this copy’s link, his own wording kept, every address found once, one Gmail e-mail to each from the app’s address, the already-invited asked about, a failure said, and no address in the log (v38.42)',
+    test: async()=>{
+      var item=document.querySelector('#settingsDrop [onclick*="openInviteTesters"]');
+      if(!item || !item.hasAttribute('data-owner-only') || !item.closest('[data-group="owner"]')) throw new Error('no owner-only ✉️ Invite testers in ⚙️ → 👑');
+      var real={ owner:window.isAppOwner, send:window.sendViaGmailApi, ask:window.askConfirm, choice:window.askChoice, log:window.syncLog, toast:window.toast, find:window.gmailClientIdFind,
+                 ins:window.insightCount, tok:window.getGmailToken, fetch:window.fetch, drafts:localStorage.getItem(INVITE_DRAFTS_KEY), sent:localStorage.getItem(INVITE_SENT_KEY), lang:_inviteLang };
+      var logs=[];
+      try{
+        window.toast=function(){}; window.insightCount=function(){}; window.gmailClientIdFind=async function(){ return ''; };
+        window.syncLog=function(){ logs.push(JSON.stringify(Array.prototype.slice.call(arguments))); };
+        localStorage.removeItem(INVITE_DRAFTS_KEY); localStorage.removeItem(INVITE_SENT_KEY); _inviteLang='en';
+        window.isAppOwner=function(){ return false; };
+        if(openInviteTesters()!==false || document.getElementById('inviteOverlay')) throw new Error('it opens for someone who is not the owner');
+        window.isAppOwner=function(){ return true; };
+        var got=inviteAddresses('Ann <Ann@X.Example>, b@y.example; not-an-address\nann@x.example  c.d@e-f.example.com');
+        if(JSON.stringify(got)!==JSON.stringify(['ann@x.example','b@y.example','c.d@e-f.example.com'])) throw new Error('the addresses found: '+JSON.stringify(got));
+        var h=inviteHtml('Open https://a.example/?ref=MKN-AAAA-BBBB. <b>&', 'he');
+        if(h.indexOf('<a href="https://a.example/?ref=MKN-AAAA-BBBB">')===-1 || h.indexOf('</a>.')===-1 || h.indexOf('<b>')>-1 || !/dir="rtl"/.test(h)) throw new Error('the e-mail’s HTML: '+h);
+        if(openInviteTesters()!==true) throw new Error('it does not open for the owner');
+        var body=document.getElementById('invBody'), subj=document.getElementById('invSubject'), link=inviteLink();
+        if(link.indexOf(APP_CONFIG.siteOrigin)!==0) throw new Error('the link is not this copy’s address: '+link);
+        if(typeof _household!=='undefined' && _household && _household.code && link.indexOf('?ref='+_household.code)===-1) throw new Error('the link does not say who invited: '+link);
+        if(body.value.indexOf(link)===-1 || body.dir!=='ltr' || !/test My Kitchen Notes/.test(subj.value)) throw new Error('English: '+body.value.slice(0,120));
+        body.value=body.value.replace('Hi!','Hello friend!'); body.dispatchEvent(new Event('change'));
+        document.querySelector('#inviteOverlay .inv-lang[data-lang="he"]').click();
+        if(body.dir!=='rtl' || body.value.indexOf(link)===-1 || !/שלום/.test(body.value)) throw new Error('Hebrew: '+body.value.slice(0,80));
+        document.querySelector('#inviteOverlay .inv-lang[data-lang="en"]').click();
+        if(!/^Hello friend!/.test(body.value)) throw new Error('his wording was not kept');
+        var kept=JSON.parse(localStorage.getItem(INVITE_DRAFTS_KEY)||'{}');
+        if(!kept.en || kept.en.body.indexOf('{link}')===-1 || kept.en.body.indexOf(link)>-1 || kept.he) throw new Error('what is kept: '+JSON.stringify(kept).slice(0,200));
+        // One e-mail to each person, from the app's address.
+        var calls=[];
+        window.sendViaGmailApi=async function(to, s, html, plain, o){ calls.push({ to:to, s:s, html:html, plain:plain, o:o }); if(to==='bad@x.example') throw new Error('Gmail API error 400: refused'); return {}; };
+        window.askConfirm=async function(){ return true; };
+        document.getElementById('invTo').value='Ann <ann@x.example>, ben@y.example';
+        var r=await inviteSendGmail();
+        if(!r || r.sent!==2 || calls.length!==2 || calls[0].to!=='ann@x.example' || calls[1].to!=='ben@y.example') throw new Error('one e-mail each: '+JSON.stringify(r)+' '+calls.map(function(c){ return c.to; }));
+        var sup=appSupportEmail();
+        if(!calls[0].o.owner || (sup && (calls[0].o.from!=='My Kitchen Notes <'+sup+'>' || calls[0].o.replyTo!==sup))) throw new Error('not from the app’s address: '+JSON.stringify(calls[0].o));
+        if(calls[0].plain.indexOf(link)===-1 || calls[0].html.indexOf('href="'+link+'"')===-1 || !/^Hello friend!/.test(calls[0].plain)) throw new Error('the e-mail lacks his words or the link');
+        if(document.getElementById('invTo').value!=='') throw new Error('the addresses sent to stay in To');
+        // Already invited: asked, and "only the new" sends only to them.
+        calls=[]; var asked=null; window.askChoice=async function(m){ asked=m; return 'new'; };
+        document.getElementById('invTo').value='ann@x.example, cat@z.example';
+        r=await inviteSendGmail();
+        if(!asked || asked.indexOf('ann@x.example')===-1 || calls.length!==1 || calls[0].to!=='cat@z.example') throw new Error('the already invited: '+JSON.stringify([asked, calls.map(function(c){ return c.to; })]));
+        // A failure is said, the others still go, and the address stays in To.
+        calls=[]; document.getElementById('invTo').value='bad@x.example, dan@z.example';
+        r=await inviteSendGmail();
+        if(r.sent!==1 || r.notSent!==1 || document.getElementById('invTo').value!=='bad@x.example' || !/Not sent/.test(document.getElementById('invStatus').textContent)) throw new Error('a failure: '+JSON.stringify(r)+' / '+document.getElementById('invTo').value);
+        if(!logs.some(function(l){ return /Tester invitations/.test(l); })) throw new Error('nothing in the log');
+        if(logs.some(function(l){ return /@/.test(l); })) throw new Error('an address reached the log: '+logs.join(' | '));
+        // The e-mail itself: From and Reply-To the app's, each header once, before the body.
+        window.sendViaGmailApi=real.send; var raw=null;
+        window.getGmailToken=async function(){ return 'tok'; };
+        window.fetch=async function(u, init){ raw=JSON.parse(init.body).raw; return { ok:true, json:async function(){ return {}; } }; };
+        await sendViaGmailApi('ann@x.example', 'Subj', '<b>h</b>', 'p', { from:'My Kitchen Notes <c@d.example>', replyTo:'c@d.example\r\nBcc: x@y.example', owner:true });
+        var mime=decodeURIComponent(escape(atob(raw.replace(/-/g,'+').replace(/_/g,'/'))));
+        var head=mime.slice(0, mime.indexOf('\r\n\r\n')).split('\r\n');
+        ['From: My Kitchen Notes <c@d.example>', 'To: ann@x.example', 'Reply-To: c@d.example Bcc: x@y.example'].forEach(function(l){ if(head.indexOf(l)===-1) throw new Error('the headers lack “'+l+'”: '+head.join(' | ')); });
+        if(!head.some(function(l){ return /^Content-Type: multipart/.test(l); }) || head.some(function(l){ return /^Bcc:/.test(l); })) throw new Error('the headers: '+head.join(' | '));
+      } finally {
+        var ov=document.getElementById('inviteOverlay'); if(ov) ov.remove();
+        window.isAppOwner=real.owner; window.sendViaGmailApi=real.send; window.askConfirm=real.ask; window.askChoice=real.choice; window.syncLog=real.log; window.toast=real.toast;
+        window.gmailClientIdFind=real.find; window.insightCount=real.ins; window.getGmailToken=real.tok; window.fetch=real.fetch; _inviteLang=real.lang;
+        if(real.drafts===null) localStorage.removeItem(INVITE_DRAFTS_KEY); else localStorage.setItem(INVITE_DRAFTS_KEY, real.drafts);
+        if(real.sent===null) localStorage.removeItem(INVITE_SENT_KEY); else localStorage.setItem(INVITE_SENT_KEY, real.sent);
       }
     } },
 
@@ -12112,8 +12191,14 @@ window.SELF_TESTS = [
       // recipe, the beta's error reports, feature counts and welcome, What can
       // this app do and Contact us, the end-of-beta question, the key check)
       // and the page reached 1902 KB.
+      // Raised to 2100 in v38.42, the same way: v38.19–v38.42 added ~100 KB of
+      // real features (the owner's authenticator and its code box, the family's
+      // move into the community copy, a shared link that survives a reload, the
+      // device copy kept to its own account, the recipe badge, the phone's
+      // 🗂 Show, Google's account chooser, the owner's ✉️ Invite testers in two
+      // languages) and the page reached 2006 KB.
       var kb = Math.round(src.length/1024);
-      if(kb > 2000) throw new Error('index.html is '+kb+' KB. The suite itself is NOT inlined — that is '
+      if(kb > 2100) throw new Error('index.html is '+kb+' KB. The suite itself is NOT inlined — that is '
         + 'checked above — so this is the app growing. Either something large went in that should not '
         + 'have, or the budget needs raising on purpose rather than by accident.');
 

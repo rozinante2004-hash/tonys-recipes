@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v38.41 -->
+<!-- Tony's Recipes Collection v38.42 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -557,6 +557,11 @@
         window._fbEmulated = true;
       }
       _fbProvider = new firebase.auth.GoogleAuthProvider();
+      // v38.42 — Tony, 16 Oct 2026, on his phone: "I am getting the authenticator request even before it
+      // lets me sign in … I plan to sign in with my secondary address". Without this, Google signs in the
+      // account it already knows on that browser (there, the owner's) with no question, and the app went
+      // straight to that account's authenticator code. Now Google always shows its account chooser.
+      _fbProvider.setCustomParameters({ prompt: 'select_account' });
       // v36.59 — no Gmail scope at sign-in. It made every family member's consent
       // screen say the app could send e-mail as them, and the token it produced
       // was never used: "Send Email" asks for its own, at the moment it is
@@ -7591,7 +7596,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v38.41';
+var APP_VERSION = 'v38.42';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -8029,13 +8034,32 @@ async function openGmailSetup() {
 window.openGmailSetup = openGmailSetup;
 
 // ─── GMAIL API DIRECT SEND ────────────────────────────────────────────────────
-async function getGmailToken() {
-  if (!featureOn('gmail')) return featureOffNotice('gmail');   // v36.70
+// v38.42 — the copy's own Google sign-in client, asked of Firebase when this device has none set in
+// ⚙️ → 👑 → 📧 Gmail Setup: the owner's ✉️ Invite testers works in the community copy with no setting.
+async function gmailClientIdFind() {
+  if (window._gmailOAuthClientId) return window._gmailOAuthClientId;
+  if (window._fbEmulated) return '';
+  try {
+    var r = await fetch('https://identitytoolkit.googleapis.com/v1/accounts:createAuthUri?key=' + encodeURIComponent(APP_CONFIG.firebase.apiKey), {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ providerId: 'google.com', continueUri: location.origin + '/' }) });
+    var d = await r.json(), m = String((d && d.authUri) || '').match(/[?&]client_id=([^&#]+)/);
+    var id = m ? decodeURIComponent(m[1]) : '';
+    if (/^[\w.-]+\.apps\.googleusercontent\.com$/.test(id)) { window._gmailOAuthClientId = id; return id; }
+  } catch (e) {}
+  return '';
+}
+window.gmailClientIdFind = gmailClientIdFind;
+async function getGmailToken(opts) {
+  // v38.42 — the owner's invitations (opts.owner) go out in any copy, Gmail on for households or not.
+  var ownerUse = !!(opts && opts.owner && isAppOwner());
+  if (!featureOn('gmail') && !ownerUse) return featureOffNotice('gmail');   // v36.70
   // v38.29 — Google's script is fetched only now, when a recipe is sent by Gmail (it used to load
   // with every opening of the app). A failure falls through to the message below.
   // v38.33 — and only when it is not here yet: no wait between the tap and Google's window when it is
   // (the e-mail window fetched it — gmailPreload), or an iPhone blocks that window.
   if (!(window.google && window.google.accounts)) { try { await loadScriptOnce(GSI_CLIENT_URL, 'google'); } catch (e) {} }
+  if (!window._gmailOAuthClientId) await gmailClientIdFind();   // v38.42
   return new Promise(function(resolve, reject) {
     if(!window.google || !window.google.accounts) {
       reject(new Error('Google Identity Services not loaded. Please refresh the page.'));
@@ -8056,6 +8080,10 @@ async function getGmailToken() {
           window._googleAccessToken = response.access_token;
           resolve(response.access_token);
         }
+      },
+      // v38.42 — Google's window closed (or never opened): said, instead of waiting for ever.
+      error_callback: function(e) {
+        reject(new Error('Gmail auth error: ' + ((e && e.type) || 'the window was closed')));
       }
     });
     client.requestAccessToken({prompt: window._googleAccessToken ? '' : 'consent'});
@@ -8063,26 +8091,32 @@ async function getGmailToken() {
 }
 window.getGmailToken = getGmailToken;
 
-async function sendViaGmailApi(to, subject, htmlBody, plainText) {
-  if (!featureOn('gmail')) return featureOffNotice('gmail');   // v36.70
-  var token = await getGmailToken();
+// v38.42 — opts: { from, replyTo } (the app's address; Gmail keeps it only when the account may send as it,
+// otherwise it puts the account's own), and { owner } — see getGmailToken.
+async function sendViaGmailApi(to, subject, htmlBody, plainText, opts) {
+  opts = opts || {};
+  if (!featureOn('gmail') && !(opts.owner && isAppOwner())) return featureOffNotice('gmail');   // v36.70
+  var token = await getGmailToken(opts);
   if(!token) throw new Error('Gmail access token not received. Please try again.');
 
   // Build RFC 2822 MIME email. Body parts are base64-encoded (not quoted-printable)
   // so UTF-8 content — e.g. Hebrew — renders correctly in strict mail clients.
   var boundary = 'tony_recipes_' + Date.now();
-  var toLine   = to ? 'To: ' + to + '\r\n' : '';
-  var from     = window._fbUser ? window._fbUser.email : '';
+  var oneLine  = function(v) { return String(v || '').replace(/[\r\n]+/g, ' ').trim(); };
+  var from     = oneLine(opts.from) || (window._fbUser ? window._fbUser.email : '');
   var b64part  = function(s) {
     // UTF-8 → base64, wrapped at 76 chars per RFC 2045
     return btoa(unescape(encodeURIComponent(String(s || '')))).replace(/(.{76})/g, '$1\r\n');
   };
+  // (an empty header line would end the headers early: only the ones there are)
   var mime = [
     'MIME-Version: 1.0',
-    'From: ' + from,
-    toLine.trim(),
+    from ? 'From: ' + from : '',
+    to ? 'To: ' + oneLine(to) : '',
+    opts.replyTo ? 'Reply-To: ' + oneLine(opts.replyTo) : '',
     'Subject: =?UTF-8?B?' + btoa(unescape(encodeURIComponent(subject))) + '?=',
-    'Content-Type: multipart/alternative; boundary="' + boundary + '"',
+    'Content-Type: multipart/alternative; boundary="' + boundary + '"'
+  ].filter(Boolean).concat([
     '',
     '--' + boundary,
     'Content-Type: text/plain; charset=UTF-8',
@@ -8097,7 +8131,7 @@ async function sendViaGmailApi(to, subject, htmlBody, plainText) {
     b64part(htmlBody),
     '',
     '--' + boundary + '--'
-  ].join('\r\n');
+  ]).join('\r\n');
 
   // Base64url encode
   var encoded = btoa(unescape(encodeURIComponent(mime)))
@@ -9000,6 +9034,13 @@ body.i18n-harvesting #serviceErrorOverlay, body.i18n-harvesting #emailModalOverl
 :root[data-theme="dark"] .ask-quote { background: rgba(212,168,67,0.12); border-color: rgba(232,120,74,0.45); border-inline-start-color: var(--terracotta); }
 .ask-input { width: 100%; padding: 10px 12px; border: 1.5px solid var(--border); border-radius: 8px; font-family: 'DM Sans', 'Heebo', sans-serif; font-size: 14px; color: var(--ink); background: var(--card-bg); margin-bottom: 14px; box-sizing: border-box; unicode-bidi: plaintext; text-align: start; }
 .ask-actions { display: flex; flex-direction: column; gap: 8px; }
+/* v38.42 — ✉️ Invite testers (the owner's) */
+.inv-card { max-width: 560px; max-height: 92vh; overflow-y: auto; text-align: start; }
+.inv-note { font-size: 12px; color: var(--muted); line-height: 1.5; margin: 0 0 8px; }
+.inv-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.inv-row .ask-btn { width: auto; flex: 0 1 auto; padding: 9px 14px; }
+.inv-row .ask-btn.inv-lang[aria-pressed="true"] { border-color: var(--terracotta); color: var(--ink); font-weight: 700; }
+.inv-card details summary { cursor: pointer; }
 /* v38.15 — the testers' welcome */
 .tw-h { font-size: 13px; font-weight: 700; color: var(--heading); margin: 2px 0 6px; }
 .tw-list { margin: 0 0 14px; padding-inline-start: 4px; list-style: none; font-size: 13px; line-height: 1.6; color: var(--ink); }
@@ -10513,7 +10554,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.41</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.42</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -10613,6 +10654,8 @@ body.banner-shown .header {
             <button type="button" class="drop-item set-head" aria-expanded="false" title="Households, payments, deployments, and the Gmail and Bring! connections — the app&#39;s owner only." onclick="settingsGroup('owner')">👑 App owner</button>
             <div class="set-body">
               <button class="drop-item" data-owner-only data-layout-only="households" title="Every household in this copy: members, AI spending and allowances, links, shares, last use. Only you can open it." onclick="closeDrop('settingsDrop');openManagement()">📊 Households (management)</button>
+              <!-- v38.42 — Tony: "Let's make the invitations sendable from the app, from the Admin account." -->
+              <button class="drop-item" data-owner-only title="The tester invitation, in English or Hebrew, with this copy's link — sent through your Gmail, one e-mail to each person, or by WhatsApp or the mail app (the app's owner only)." onclick="closeDrop('settingsDrop');openInviteTesters()">✉️ Invite testers</button>
               <button class="drop-item" title="The app's running costs and billing (the app's owner only)." data-owner-only onclick="closeDrop('settingsDrop');openPayments()">💳 Payments</button>
               <button class="drop-item" title="Where each copy of the app runs, with links (the app's owner only)." data-owner-only onclick="closeDrop('settingsDrop');openDeployments()">🚀 Deployments</button>
               <button class="drop-item" data-owner-only title="Checks that the key in this copy's page still works for every Firebase service the app uses — before and after you restrict it in Google Cloud (the app's owner only)." onclick="closeDrop('settingsDrop');openKeyCheck()">🔑 Check the app's key</button>
@@ -11239,7 +11282,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.41</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.42</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -15301,10 +15344,15 @@ async function mfaResolve(err) {
     // v38.38 — Tony, signing the spare owner in from the sign-in screen: "stuck on Signing in…". This box
     // opened at z-index 1300, BEHIND the sign-in screen (9999), and waited there unseen. Now above it; and a
     // wrong code is said in the box itself (a toast is under the sign-in screen too).
+    // v38.42 — and a way out when Google chose an account with an authenticator that was not meant.
     var code = await askConfirm({ icon: '\u{1F510}', title: 'The code from your authenticator', z: 10070,
-      message: again + 'Open your authenticator app (or the iPhone\u2019s Passwords) and type the 6-digit code for My Kitchen Notes.',
-      input: '', placeholder: '123 456', okLabel: 'Continue' });
-    if (typeof code !== 'string') { var c = new Error('The sign-in was not finished.'); c.code = 'auth/popup-closed-by-user'; throw c; }
+      message: again + 'This Google account has an authenticator. Open it (or the iPhone\u2019s Passwords) and type the 6-digit code for My Kitchen Notes.'
+        + '\n\nMeant to sign in with another account? Press \u201cUse another account\u201d.',
+      input: '', placeholder: '123 456', okLabel: 'Continue', cancelLabel: 'Use another account' });
+    if (typeof code !== 'string') {
+      syncLog('auth', 'Another account chosen instead of typing the authenticator\u2019s code');
+      var c = new Error('The sign-in was not finished.'); c.code = 'auth/popup-closed-by-user'; c.otherAccount = true; throw c;
+    }
     try {
       var done = await resolver.resolveSignIn(totpApi().assertionForSignIn(hint.uid, code.replace(/\D+/g, '')));
       syncLog('auth', 'The authenticator\u2019s code was accepted');
@@ -25069,7 +25117,8 @@ async function startGoogleSignIn() {
   } catch(err) {
     window._justSignedIn = false;
     if (btn) { btn.textContent = 'Sign in with Google'; btn.disabled = false; }
-    var msg = err.code === 'auth/popup-closed-by-user' ? 'Sign-in was cancelled.' :
+    var msg = err.otherAccount ? 'Press Sign in with Google again and choose the other account.' :   // v38.42
+              err.code === 'auth/popup-closed-by-user' ? 'Sign-in was cancelled.' :
               err.code === 'auth/popup-blocked' ? 'Popup was blocked. Please allow popups.' :
               err.code === 'auth/unauthorized-domain' ? 'Domain not authorized in Firebase.' :
               err.message;
@@ -27238,6 +27287,222 @@ function copyAppLink() {
   const url = appShareUrl();
   navigator.clipboard.writeText(url).then(function() { toast('Link copied!'); });
 }
+
+// v38.42 — Tony, 16 Oct 2026: "Let's make the invitations sendable from the app, from the Admin
+// account." ⚙️ → 👑 App owner → ✉️ Invite testers: the tester invitation in English or Hebrew, with this
+// copy's link (its ?ref= marks the households it brings in, under 📊 Households), sent through the
+// owner's Gmail — one e-mail to each person, so nobody sees the others, from the app's address when his
+// Gmail may send as it — or by the mail app, WhatsApp, or a copy. His own wording is kept on this device.
+// Whom he invited stays on this device too: never in the log, a report or the database.
+var INVITE_DRAFTS_KEY = 'mkn_invite_drafts', INVITE_SENT_KEY = 'mkn_invite_sent';
+var INVITE_TEXTS = {
+  en: { subject: 'Would you help me test My Kitchen Notes?', body: [
+    'Hi! I’d love your help testing My Kitchen Notes, a recipe app I’ve been building.',
+    '',
+    '1. Open {link} and sign in with Google (or your e-mail address).',
+    '2. Start your own collection. It’s private to you and anyone you invite.',
+    '3. Add recipes any way you like: paste a link, share from Instagram or Facebook, type one in, or photograph a page.',
+    '4. Something odd, or an idea? Tap the \u{1F4AC} button at the bottom left and tell me. I read every note.',
+    '',
+    'On an iPhone, the app will offer a one-tap "Save to My Kitchen Notes" shortcut for the Share menu. On a computer, it will offer the Save-recipe button for Chrome or Firefox.'
+  ].join('\n') },
+  he: { subject: 'תעזרו לי לבדוק את My Kitchen Notes?', body: [
+    'שלום! אשמח לעזרתכם בבדיקת My Kitchen Notes, אפליקציית מתכונים שאני בונה.',
+    '',
+    '1. היכנסו ל־{link} והתחברו עם Google (או עם כתובת המייל שלכם).',
+    '2. פתחו אוסף מתכונים משלכם. הוא פרטי, רק לכם ולמי שתזמינו.',
+    '3. הוסיפו מתכונים איך שנוח לכם: הדביקו קישור, שתפו מאינסטגרם או מפייסבוק, הקלידו מתכון, או צלמו דף מספר בישול.',
+    '4. נתקלתם במשהו מוזר, או יש לכם רעיון? לחצו על כפתור ה־\u{1F4AC} בפינה השמאלית התחתונה וכתבו לי. כל הערה נקראת.',
+    '',
+    'באייפון, האפליקציה תציע קיצור דרך בלחיצה אחת, "Save to My Kitchen Notes", לתפריט השיתוף. במחשב, היא תציע את כפתור שמירת המתכונים ל־Chrome או ל־Firefox.'
+  ].join('\n') }
+};
+// The copy's own address (not the page's: an installed app may be open at /index.html), with the ?ref=.
+function inviteLink() {
+  var site = appConfigValue('siteUrl') || (location.origin + '/');
+  var code = (typeof _household !== 'undefined' && _household && _household.code) || '';
+  return code ? site.replace(/\/?$/, '/') + '?ref=' + encodeURIComponent(code) : site;
+}
+function inviteJson(key) { try { return JSON.parse(localStorage.getItem(key) || '{}') || {}; } catch (e) { return {}; } }
+// The wording for one language: his own if he changed it on this device, with this copy's link in it.
+function inviteText(lang) {
+  var o = INVITE_TEXTS[lang] || INVITE_TEXTS.en, d = inviteJson(INVITE_DRAFTS_KEY)[lang] || {}, link = inviteLink();
+  return { subject: typeof d.subject === 'string' ? d.subject : o.subject,
+           body: String(typeof d.body === 'string' ? d.body : o.body).split('{link}').join(link) };
+}
+function inviteDraftSave(lang, subject, body) {
+  var o = INVITE_TEXTS[lang]; if (!o) return;
+  var all = inviteJson(INVITE_DRAFTS_KEY), b = String(body || '').split(inviteLink()).join('{link}');
+  if (subject === o.subject && b === o.body) delete all[lang]; else all[lang] = { subject: String(subject || ''), body: b };
+  try { if (Object.keys(all).length) localStorage.setItem(INVITE_DRAFTS_KEY, JSON.stringify(all)); else localStorage.removeItem(INVITE_DRAFTS_KEY); } catch (e) {}
+}
+// Every address in what was typed or pasted ("Ann <ann@…>", commas, new lines), each once, lower-case.
+function inviteAddresses(text) {
+  var seen = {}, out = [];
+  (String(text || '').match(/[^\s<>()[\]",;:@]+@[^\s<>()[\]",;:@]+\.[A-Za-z]{2,}/g) || []).forEach(function (a) {
+    a = a.toLowerCase(); if (!seen[a]) { seen[a] = 1; out.push(a); }
+  });
+  return out;
+}
+function inviteSentNote(addr) {
+  var s = inviteJson(INVITE_SENT_KEY); s[addr] = Date.now();
+  try { localStorage.setItem(INVITE_SENT_KEY, JSON.stringify(s)); } catch (e) {}
+}
+// The e-mail's HTML: the same words, the link a link, right-to-left for Hebrew.
+function inviteHtml(text, lang) {
+  var h = escA(text).replace(/https?:\/\/[^\s<]+/g, function (u) {
+    var tail = (u.match(/[.,;:!?)\]]+$/) || [''])[0]; u = u.slice(0, u.length - tail.length);
+    return '<a href="' + u + '">' + u + '</a>' + tail;
+  }).replace(/\n/g, '<br>');
+  return '<div dir="' + (lang === 'he' ? 'rtl' : 'ltr') + '" style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.55;">' + h + '</div>';
+}
+function inviteFrom() {
+  var a = appSupportEmail();
+  return a ? { from: 'My Kitchen Notes <' + a + '>', replyTo: a, owner: true } : { owner: true };
+}
+var _inviteLang = 'en';
+function inviteEl(id) { return document.getElementById(id); }
+function inviteKeep() { var s = inviteEl('invSubject'), b = inviteEl('invBody'); if (s && b) inviteDraftSave(_inviteLang, s.value, b.value); }
+function inviteShowLang(lang) {
+  _inviteLang = INVITE_TEXTS[lang] ? lang : 'en';
+  var t = inviteText(_inviteLang), dir = _inviteLang === 'he' ? 'rtl' : 'ltr';
+  var s = inviteEl('invSubject'), b = inviteEl('invBody');
+  if (!s || !b) return;
+  s.value = t.subject; b.value = t.body; s.dir = b.dir = dir;
+  Array.prototype.forEach.call(document.querySelectorAll('#inviteOverlay .inv-lang'), function (x) {
+    x.setAttribute('aria-pressed', x.getAttribute('data-lang') === _inviteLang ? 'true' : 'false');
+  });
+}
+function inviteCountShow() {
+  var n = inviteAddresses((inviteEl('invTo') || {}).value).length, el = inviteEl('invCount');
+  if (el) el.textContent = n ? n + (n === 1 ? ' address' : ' addresses') : '';
+}
+function inviteSentShow() {
+  var box = inviteEl('invSent'); if (!box) return;
+  var s = inviteJson(INVITE_SENT_KEY), keys = Object.keys(s).sort(function (a, b) { return s[b] - s[a]; });
+  box.hidden = !keys.length;
+  box.innerHTML = keys.length ? '<summary>Invited by Gmail from this device: ' + keys.length + '</summary>'
+    + '<div dir="ltr" style="margin:6px 0;line-height:1.6;">' + keys.map(function (k) {
+      return escH(k) + ' <span style="color:var(--muted);">— ' + escH(new Date(s[k]).toLocaleDateString()) + '</span>'; }).join('<br>') + '</div>'
+    + '<button type="button" class="ask-btn ghost" id="invForget" style="width:auto;">Forget this list</button>' : '';
+  var f = inviteEl('invForget');
+  if (f) f.onclick = function () { try { localStorage.removeItem(INVITE_SENT_KEY); } catch (e) {} inviteSentShow(); };
+}
+function inviteSay(html) { var el = inviteEl('invStatus'); if (el) el.innerHTML = html; }
+function openInviteTesters() {
+  if (!isAppOwner()) { toast('Only the app’s owner can send invitations.'); return false; }
+  var prev = inviteEl('inviteOverlay'); if (prev) prev.remove();
+  var ov = document.createElement('div');
+  ov.id = 'inviteOverlay'; ov.className = 'modal-overlay open'; ov.setAttribute('data-no-i18n', '');
+  var lab = 'display:block;font-size:13px;font-weight:600;color:var(--ink);margin:10px 0 4px;';
+  ov.innerHTML = '<div class="ask-card inv-card" role="dialog" aria-modal="true" aria-labelledby="invTitle">'
+    + '<div class="ask-title" id="invTitle">✉️ Invite testers</div>'
+    + '<p class="inv-note">Its link is this copy’s, so the households it brings in show under \u{1F4CA} Households as shared by you. Change the words as you like: this device keeps your version.</p>'
+    + '<div class="inv-row" role="group" aria-label="Language">'
+    +   '<button type="button" class="ask-btn ghost inv-lang" data-lang="en" aria-pressed="true">English</button>'
+    +   '<button type="button" class="ask-btn ghost inv-lang" data-lang="he" lang="he" aria-pressed="false">עברית</button>'
+    +   '<button type="button" class="ask-btn ghost" id="invReset" style="margin-inline-start:auto;">The original words</button></div>'
+    + '<label style="' + lab + '" for="invSubject">Subject</label><input id="invSubject" class="form-input" type="text">'
+    + '<label style="' + lab + '" for="invBody">Message</label><textarea id="invBody" class="form-textarea" rows="10" style="resize:vertical;line-height:1.5;"></textarea>'
+    + '<label style="' + lab + '" for="invTo">To — e-mail addresses, separated by commas or new lines</label>'
+    + '<textarea id="invTo" class="form-textarea" rows="2" dir="ltr" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea>'
+    + '<div id="invCount" class="inv-note" style="margin:3px 0 0;"></div>'
+    + '<div class="inv-row" style="margin-top:12px;">'
+    +   '<button type="button" class="ask-btn" id="invGmail">\u{1F4E7} Send with Gmail</button>'
+    +   '<button type="button" class="ask-btn ghost" id="invMail">✉️ Mail app</button>'
+    +   '<button type="button" class="ask-btn ghost" id="invWa">\u{1F4AC} WhatsApp</button>'
+    +   '<button type="button" class="ask-btn ghost" id="invCopy">\u{1F4CB} Copy</button>'
+    +   '<button type="button" class="ask-btn ghost" id="invClose">Close</button></div>'
+    + '<div id="invStatus" aria-live="polite" style="margin-top:10px;font-size:13px;line-height:1.5;color:var(--ink);"></div>'
+    + '<p class="inv-note" style="margin-top:10px;">Gmail sends each person their own e-mail'
+    + (appSupportEmail() ? ', from the app’s address when your Gmail may send as it (Gmail → Settings → Accounts → Send mail as), otherwise from yours' : '')
+    + '. The first time, Google asks you to allow sending. If it warns that it has not verified the app, that is expected for your own use: choose Advanced, then continue.</p>'
+    + '<details id="invSent" class="inv-note" hidden></details></div>';
+  document.body.appendChild(ov);
+  function close() { inviteKeep(); ov.remove(); }
+  ov.onclick = function (e) { if (e.target === ov) close(); };
+  inviteEl('invClose').onclick = close;
+  Array.prototype.forEach.call(ov.querySelectorAll('.inv-lang'), function (x) {
+    x.onclick = function () { inviteKeep(); inviteShowLang(x.getAttribute('data-lang')); };
+  });
+  inviteEl('invReset').onclick = function () {
+    var all = inviteJson(INVITE_DRAFTS_KEY); delete all[_inviteLang];
+    try { localStorage.setItem(INVITE_DRAFTS_KEY, JSON.stringify(all)); } catch (e) {}
+    inviteShowLang(_inviteLang);
+  };
+  inviteEl('invSubject').onchange = inviteEl('invBody').onchange = inviteKeep;
+  inviteEl('invTo').oninput = inviteCountShow;
+  inviteEl('invGmail').onclick = function () { inviteSendGmail(); };
+  inviteEl('invMail').onclick = inviteMailApp;
+  inviteEl('invWa').onclick = function () {
+    inviteKeep(); window.open('https://wa.me/?text=' + encodeURIComponent(inviteEl('invBody').value), '_blank', 'noopener');
+  };
+  inviteEl('invCopy').onclick = function () {
+    inviteKeep();
+    var t = inviteEl('invBody').value;
+    try { navigator.clipboard.writeText(t).then(function () { inviteSay('\u{1F4CB} Copied — paste it wherever you like.'); }, function () { inviteSay('Could not copy here: select the message and copy it.'); }); }
+    catch (e) { inviteSay('Could not copy here: select the message and copy it.'); }
+  };
+  inviteShowLang(_inviteLang);
+  inviteSentShow();
+  // Google's sending window must open straight from the tap: what it needs is fetched now.
+  gmailClientIdFind().then(function (id) { if (id && !(window.google && window.google.accounts)) loadScriptOnce(GSI_CLIENT_URL, 'google').catch(function () {}); });
+  return true;
+}
+// The mail app: one message to everyone, the addresses hidden from each other (Bcc).
+function inviteMailApp() {
+  inviteKeep();
+  var to = inviteAddresses(inviteEl('invTo').value);
+  location.href = 'mailto:?' + (to.length ? 'bcc=' + encodeURIComponent(to.join(',')) + '&' : '')
+    + 'subject=' + encodeURIComponent(inviteEl('invSubject').value) + '&body=' + encodeURIComponent(inviteEl('invBody').value);
+}
+async function inviteSendGmail() {
+  inviteKeep();
+  var to = inviteAddresses(inviteEl('invTo').value), subject = String(inviteEl('invSubject').value || '').trim(), body = inviteEl('invBody').value, lang = _inviteLang;
+  if (!to.length) { inviteSay('Type at least one e-mail address in To.'); inviteEl('invTo').focus(); return null; }
+  if (!subject || !String(body).trim()) { inviteSay('The subject and the message must not be empty.'); return null; }
+  var sent = inviteJson(INVITE_SENT_KEY), again = to.filter(function (a) { return sent[a]; });
+  if (again.length) {
+    var pick = await askChoice('Already invited by Gmail from this device: ' + again.join(', ') + '.', [
+      { value: 'all', label: 'Send to all ' + to.length + ' again' },
+      { value: 'new', label: to.length > again.length ? 'Only the ' + (to.length - again.length) + ' new' : 'Send none' }]);
+    if (pick === 'new') to = to.filter(function (a) { return !sent[a]; });
+    else if (pick !== 'all') return null;
+    if (!to.length) return null;
+  } else if (await askConfirm({ icon: '✉️', title: 'Send the invitation?',
+      message: to.length === 1 ? 'To ' + to[0] + '.' : 'To ' + to.length + ' people, each their own e-mail.', okLabel: 'Send' }) !== true) return null;
+  var html = inviteHtml(body, lang), opts = inviteFrom(), ok = [], bad = [], stop = '';
+  var btn = inviteEl('invGmail'); if (btn) btn.disabled = true;
+  for (var i = 0; i < to.length; i++) {
+    inviteSay('⏳ Sending ' + (i + 1) + ' of ' + to.length + '…');
+    try { await sendViaGmailApi(to[i], subject, html, body, opts); ok.push(to[i]); inviteSentNote(to[i]); }
+    catch (e) {
+      var m = String((e && e.message) || e);
+      bad.push(to[i]);
+      if (/has not been used|is disabled|SERVICE_DISABLED|accessNotConfigured/i.test(m)) { stop = 'api'; break; }
+      if (/auth error|expired|not configured|not received|not loaded/i.test(m)) { stop = m; break; }
+      stop = stop || m;
+    }
+  }
+  if (btn) btn.disabled = false;
+  var left = to.filter(function (a) { return ok.indexOf(a) === -1; });
+  var out = ok.length ? '✅ Sent to ' + ok.length + (ok.length === 1 ? ' person' : ' people') + '.' : '';
+  if (left.length) {
+    out += (out ? '<br>' : '') + '❌ Not sent: ' + escH(left.join(', ')) + '<br>'
+      + (stop === 'api' ? 'Gmail sending is not switched on for this copy’s Google Cloud project yet. Once: <a href="https://console.cloud.google.com/apis/library/gmail.googleapis.com?project='
+          + encodeURIComponent(APP_CONFIG.firebase.projectId) + '" target="_blank" rel="noopener">open the Gmail API page</a>, press Enable, wait a minute, and send again.'
+        : escH(stop));
+    inviteEl('invTo').value = left.join(', '); inviteCountShow();
+  } else { inviteEl('invTo').value = ''; inviteCountShow(); }
+  inviteSay(out);
+  inviteSentShow();
+  // counts only — never an address
+  syncLog(left.length ? 'error' : 'save', 'Tester invitations by Gmail', { sent: ok.length, notSent: left.length, language: lang });
+  if (ok.length && typeof insightCount === 'function') insightCount('invite-testers');
+  return { sent: ok.length, notSent: left.length };
+}
+window.openInviteTesters = openInviteTesters; window.inviteAddresses = inviteAddresses; window.inviteHtml = inviteHtml; window.inviteLink = inviteLink;
+window.inviteSendGmail = inviteSendGmail; window.INVITE_TEXTS = INVITE_TEXTS;
 
 function openCameraImport() {
   document.getElementById('cameraChoiceOverlay').classList.add('open');
