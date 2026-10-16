@@ -115,6 +115,30 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
   chrome budget passes (35.2% on live). Self-test `mobile_more_filters`.
 - **Released: v38.41 (16 Oct 2026, 01:17 Israel time, Tony's "Please move it to the Family and beta when green", CI
   green on 2abe320).** All jobs success (beta live 01:19; Self Tests on main 01:30).
+- **v38.42**: (1) **Google's account chooser at every Google sign-in** (`_fbProvider.setCustomParameters({prompt:
+  'select_account'})`). Tony, 16 Oct, on his phone: "I am getting the authenticator request even before it lets me
+  sign in … I plan to sign in with my secondary address … There should be an authenticator challenge only if I login
+  with the Admin address". Google signed in the account that browser already knew (the owner's) with no question, so
+  Firebase asked for that account's TOTP code at once. The code box (mfaResolve) now says "This Google account has an
+  authenticator" and has **Use another account** (err.otherAccount → "Press Sign in with Google again and choose the
+  other account."). NB: the spare owner account has its own authenticator (Ente, 15 Oct) on purpose — it is asked
+  for its code too; only an ordinary account signs in with Google alone. (2) **⚙️ → 👑 → ✉️ Invite testers**
+  (Tony: "Let's make the invitations sendable from the app, from the Admin account"): the tester invitation
+  (INVITE_TEXTS en/he, Tony's texts of 16 Oct) with `inviteLink()` = the copy's siteUrl + `?ref=<household code>`
+  (households it brings in show as referred); his edits kept per language on the device (`mkn_invite_drafts`, the link
+  stored as {link}); **📧 Send with Gmail** = one e-mail per address (sendViaGmailApi with opts {from: "My Kitchen
+  Notes <contact@…>", replyTo, owner}) — Gmail keeps that From only if the signed-in account has contact@ under Send
+  mail as; already-invited addresses (`mkn_invite_sent`, device only) are asked about; failures stay in To; the log gets
+  counts only. Also ✉️ Mail app (mailto, Bcc), 💬 WhatsApp, 📋 Copy. Gmail: owner use in any copy (the beta has
+  gmail off); the Google client ID found from Firebase (`gmailClientIdFind`: accounts:createAuthUri → client_id) when
+  none is set; `error_callback` (a closed Google window no longer waits for ever); header lines filtered and kept to
+  one line. **One-time for Tony:** enable the Gmail API in my-kitchen-notes-beta
+  (https://console.cloud.google.com/apis/library/gmail.googleapis.com?project=my-kitchen-notes-beta); the first send
+  asks Google's permission and may say the app is unverified (Advanced → continue). Self-tests `invite_testers`,
+  `owner_protections` extended; page budget 2000 → 2100 KB (2006 KB).
+- **Released: v38.42 (16 Oct 2026, 03:52 Israel time, Tony's "Please include both the invitation and the fix in the
+  upcoming version and release it to family and Beta once it clears CI", CI green on f620221).** All jobs success (beta
+  live 03:54; Self Tests on main 04:03).
 - **Before the testers, Tony's steps (16 Oct 2026):** (1) Cloudflare Email Routing destination addresses — done.
   (2) **The community app's browser key is restricted, both stages:** API restrictions = Identity Toolkit API, Token
   Service API, Cloud Firestore API (Google warned of "active usage" of eight Maps APIs — scanners; updated anyway);
