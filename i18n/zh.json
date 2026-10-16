@@ -1,7 +1,7 @@
 {
  "lang": "zh",
- "updatedAt": 1792161559500,
- "count": 2250,
+ "updatedAt": 1792163384065,
+ "count": 2253,
  "strings": {
   "\"Add to Home Screen\"": "添加到主屏幕",
   "\"Open Bring!\"": "打开 Bring!",
@@ -717,6 +717,7 @@
   "Pexels API": "Pexels API",
   "Photo (optional)": "照片（可选）",
   "Photo libraries (Pixabay, Pexels, Unsplash, Openverse)": "图库（Pixabay、Pexels、Unsplash、Openverse）",
+  "Photo libraries (Pixabay, Pexels, Unsplash, Wikimedia Commons)": "图片库（Pixabay、Pexels、Unsplash、Wikimedia Commons）",
   "Photo services (Pixabay, Pexels, Unsplash, Openverse)": "图片服务（Pixabay、Pexels、Unsplash、Openverse）",
   "Photo sync reported local photos that the cloud does not have, or that differ from it. The cloud copy wins on every load, so a photo that only exists here can be replaced by an older one.": "照片同步发现本地照片在云端不存在，或与云端不一致。每次加载都以云端版本为准，因此仅存在于本地的照片可能会被旧版本替换。",
   "Photo updated!": "照片已更新！",
@@ -1407,6 +1408,7 @@
   "ml — millilitres": "ml — 毫升",
   "mm — millimetres": "mm — 毫米",
   "never": "从未",
+  "no key needed · free · the photographer is credited": "无需密钥 · 免费 · 注明摄影师",
   "none": "无",
   "not checked yet": "尚未检查",
   "not in use — you are signed out": "未使用 — 你已退出登录",
@@ -2186,6 +2188,7 @@
   "🛡 Full (incl. delete)": "🛡 完全权限（含删除）",
   "🛡 Full access": "🛡 完全权限",
   "🟢 Pixabay — get API key": "🟢 Pixabay — 获取 API 密钥",
+  "🟣 Wikimedia Commons — asked last": "🟣 Wikimedia Commons — 最后询问",
   "🤍 Favourite": "🤍 收藏",
   "🤍 Removed from favourites": "🤍 已取消收藏",
   "🤔 Loading...": "🤔 加载中…",

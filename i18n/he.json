@@ -1,7 +1,7 @@
 {
  "lang": "he",
- "updatedAt": 1792161559500,
- "count": 2764,
+ "updatedAt": 1792163384065,
+ "count": 2767,
  "strings": {
   "\"Add to Home Screen\"": "הוספה למסך הבית",
   "\"One item away\" filter ({1}f.{2})": "פילטר \"פריט אחד חסר\" ({1}f.{2})",
@@ -922,6 +922,7 @@
   "Photo (optional)": "תמונה (אופציונלי)",
   "Photo hydrate/offload functions present": "פונקציות טעינה/פריקה של תמונות קיימות",
   "Photo libraries (Pixabay, Pexels, Unsplash, Openverse)": "ספריות תמונות (Pixabay, Pexels, Unsplash, Openverse)",
+  "Photo libraries (Pixabay, Pexels, Unsplash, Wikimedia Commons)": "ספריות תמונות (Pixabay, Pexels, Unsplash, Wikimedia Commons)",
   "Photo search (Pixabay)": "חיפוש תמונות (Pixabay)",
   "Photo search failed. Check Worker photo-search action is implemented and PIXABAY_API_KEY is set.": "חיפוש התמונות נכשל. בדוק שפעולת photo-search ב-Worker מוגדרת ושמשתנה PIXABAY_API_KEY מוגדר.",
   "Photo search wires multiple sources": "חיפוש תמונות מחבר מספר מקורות",
@@ -1816,6 +1817,7 @@
   "name, method differ": "השם וההכנה שונים",
   "never": "אף פעם",
   "nextId never regresses": "nextId לעולם לא נסוג לאחור",
+  "no key needed · free · the photographer is credited": "לא נדרש מפתח · חינם · הצלם מקבל קרדיט",
   "no visible differences": "אין הבדלים נראים לעין",
   "none": "ללא",
   "not checked yet": "עדיין לא נבדק",
@@ -2703,6 +2705,7 @@
   "🛡 Full (incl. delete)": "🛡 מלא (כולל מחיקה)",
   "🛡 Full access": "🛡 גישה מלאה",
   "🟢 Pixabay — get API key": "🟢 Pixabay — קבל מפתח API",
+  "🟣 Wikimedia Commons — asked last": "🟣 Wikimedia Commons — נשאל אחרון",
   "🤍 Favourite": "🤍 מועדף",
   "🤔 Loading...": "🤔 טוען...",
   "🤔 Thinking...": "🤔 חושב...",

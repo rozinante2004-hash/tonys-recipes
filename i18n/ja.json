@@ -1,7 +1,7 @@
 {
  "lang": "ja",
- "updatedAt": 1792161559500,
- "count": 2564,
+ "updatedAt": 1792163384065,
+ "count": 2567,
  "strings": {
   "\"Add to Home Screen\"": "ホーム画面に追加",
   "\"One item away\" filter ({1}f.{2})": "「あと1品」フィルター（{1}f.{2}）",
@@ -879,6 +879,7 @@
   "Photo (optional)": "写真（任意）",
   "Photo hydrate/offload functions present": "写真の読み込み・解放機能あり",
   "Photo libraries (Pixabay, Pexels, Unsplash, Openverse)": "写真ライブラリ（Pixabay、Pexels、Unsplash、Openverse）",
+  "Photo libraries (Pixabay, Pexels, Unsplash, Wikimedia Commons)": "写真ライブラリ（Pixabay、Pexels、Unsplash、Wikimedia Commons）",
   "Photo search (Pixabay)": "写真検索（Pixabay）",
   "Photo search wires multiple sources": "写真検索は複数のサービスと連携",
   "Photo services (Pixabay, Pexels, Unsplash, Openverse)": "写真サービス（Pixabay、Pexels、Unsplash、Openverse）",
@@ -1691,6 +1692,7 @@
   "name, ingredients, method differ": "名前・材料・手順が異なる",
   "never": "なし",
   "nextId never regresses": "nextIdは後退しない",
+  "no key needed · free · the photographer is credited": "キー不要・無料・撮影者をクレジット表記",
   "no visible differences": "見た目の違いなし",
   "none": "なし",
   "not checked yet": "未確認",
@@ -2500,6 +2502,7 @@
   "🛡 Full (incl. delete)": "🛡 フルアクセス（削除を含む）",
   "🛡 Full access": "🛡 フルアクセス",
   "🟢 Pixabay — get API key": "🟢 Pixabay — APIキーを取得",
+  "🟣 Wikimedia Commons — asked last": "🟣 Wikimedia Commons — 最後に確認",
   "🤍 Favourite": "🤍 お気に入り",
   "🤔 Loading...": "🤔 読み込み中…",
   "🤔 Thinking...": "🤔 考え中…",
