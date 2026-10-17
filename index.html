@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v38.51 -->
+<!-- Tony's Recipes Collection v38.52 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -5432,6 +5432,7 @@ var _live = { hid: '', unsubs: [], talk: {}, mine: {} };
 function linkLiveStop() {
   _live.unsubs.forEach(function(u){ try { u(); } catch(e) {} });
   Object.keys(_live.talk).forEach(function(k){ try { _live.talk[k](); } catch(e) {} });
+  Object.keys(_live.recipes || {}).forEach(function(k){ try { _live.recipes[k](); } catch(e) {} if (_linkCache[k]) _linkCache[k].live = false; });   // v38.52
   _live = { hid: '', unsubs: [], talk: {}, mine: {} };
 }
 function linkLiveStart(force) {
@@ -5448,8 +5449,71 @@ function linkLiveStart(force) {
     } catch(e) {}
   }
   linkLiveTalk();
+  linkLiveRecipes();                                              // v38.52 — their recipes, live
   return true;
 }
+// v38.52 — Tony: "Tester1 has updated its recipes, but Admin, who is joined to their kitchen cannot see the changes
+// until they refresh the page." Each linked kitchen's recipes are listened to as well: its first answer fills the
+// list (the one-off read and its 5-minute renewal are not needed then), and every later change — an edit, a new
+// recipe, one deleted — redraws the list at once, the changed cards glowing for a moment. A changed recipe's photo is
+// asked again when its card is next on screen; a recipe open in the read-only view is redrawn too. The rules let a
+// linked kitchen read only once `homes/<uid>` names the household looked from, so that is written first.
+function linkLiveRecipes() {
+  if (!_household || !_live.hid || _live.hid !== _household.hid) return;
+  _live.recipes = _live.recipes || {};
+  var want = {};
+  hhLinks().forEach(function(l){ want[l.hid] = 1; });
+  Object.keys(_live.recipes).forEach(function(h){
+    if (!want[h]) { try { _live.recipes[h](); } catch(e) {} delete _live.recipes[h]; if (_linkCache[h]) _linkCache[h].live = false; }
+  });
+  var hid0 = _live.hid;
+  Object.keys(want).forEach(function(h){
+    if (_live.recipes[h]) return;
+    _live.recipes[h] = function(){};                              // claimed while the household is noted
+    Promise.resolve(typeof hhSetHome === 'function' ? hhSetHome() : null).then(function(){
+      if (_live.hid !== hid0 || !_live.recipes[h]) return;
+      try {
+        var q = hhRef(h).collection('recipes');
+        if (typeof q.onSnapshot !== 'function') { delete _live.recipes[h]; return; }
+        var first = true;
+        _live.recipes[h] = q.onSnapshot(function(snap){
+          var c = _linkCache[h] = _linkCache[h] || { at: 0, list: [], photos: {} };
+          var changed = [];
+          try { (typeof snap.docChanges === 'function' ? snap.docChanges() : []).forEach(function(ch){
+            var id = String(ch.doc && ch.doc.id || '');
+            if (!id) return;
+            if (c.photos) delete c.photos[id];
+            if (c.photoAsk) delete c.photoAsk[id];
+            if (ch.type !== 'removed') changed.push(id);
+          }); } catch(e) {}
+          c.list = linkedRecipesFrom(snap); c.error = ''; c.at = Date.now(); c.loading = null; c.live = true;
+          linkLiveRecipesShown(h, first ? [] : changed);
+          first = false;
+        }, function(){
+          if (_linkCache[h]) _linkCache[h].live = false;
+          delete _live.recipes[h];                                // refused (a link just made or removed): asked again shortly
+          if (_live.hid === hid0) setTimeout(linkLiveRecipes, 8000);
+        });
+      } catch(e) { delete _live.recipes[h]; }
+    });
+  });
+}
+function linkLiveRecipesShown(h, changed) {
+  if (typeof linkedInAllOn === 'function' && linkedInAllOn() && hhShown(h)) {
+    renderGrid();
+    changed.forEach(function(id){
+      var el = document.querySelector('#linkedAll section[data-hid="' + h + '"] .linked-card[data-rid="' + id + '"]');
+      if (el) { el.classList.add('linked-fresh'); setTimeout(function(){ el.classList.remove('linked-fresh'); }, 2600); }
+    });
+  }
+  // The read-only view of a recipe that just changed: drawn again, from the new version.
+  var ov = document.getElementById('linkedViewOverlay');
+  if (_linkedViewing && _linkedViewing.hid === h && ov && ov.classList.contains('open') && changed.indexOf(String(_linkedViewing.r.id)) !== -1) {
+    var i = (_linkedAllShown[h] || []).map(function(r){ return String(r.id); }).indexOf(String(_linkedViewing.r.id));
+    if (i !== -1) { var top = ov.scrollTop; openLinkedRecipe(i, h); ov.scrollTop = top; }
+  }
+}
+window.linkLiveRecipes = linkLiveRecipes;
 function linkLiveTalk() {
   if (!_household || !_live.hid || _live.hid !== _household.hid) return;
   var db = hhDb();
@@ -5493,6 +5557,7 @@ async function linkLiveLinks() {
   if (typeof renderFilters === 'function') { renderFilters(); renderGrid(); }
   householdRenderBar();
   linkLiveTalk();
+  linkLiveRecipes();                                              // v38.52 — a new link's recipes listened to; a removed one's no longer
   if (document.getElementById('lrBody')) renderLinkRequestsPage();
   if (added.length) toast('\u{1F91D} ' + hhLinkName(added[0]) + ' accepted — their recipes are now in your list.', 8000);
 }
@@ -5570,21 +5635,23 @@ async function hhFetchLinked(hid) {
   if (c.loading) return c.loading;
   return (c.loading = hhFetchLinkedNow(hid, c));
 }
+// v38.49 — a recipe's document is { r: <the recipe as JSON>, updatedAt, id } (v28.0), unpacked here as
+// parseCloudRecipeDocs does. Read as it stood, every linked recipe came out "Untitled recipe" with nothing in it.
+function linkedRecipesFrom(q) {
+  var list = [];
+  q.forEach(function(d) {
+    var x = d.data() || {}, r = x;
+    if (typeof x.r === 'string') { try { r = JSON.parse(x.r); } catch(e) { r = null; } }
+    if (!r || typeof r !== 'object') return;
+    if (r.id == null) r.id = /^\d+$/.test(d.id) ? +d.id : d.id;
+    list.push(normalizeRecipe(r));
+  });
+  return list.sort(function(a, b){ return String(a.name).localeCompare(String(b.name)); });
+}
 async function hhFetchLinkedNow(hid, c) {
   try {
     await hhSetHome();
-    var q = await hhRef(hid).collection('recipes').get(), list = [];
-    q.forEach(function(d) {
-      // v38.49 — a recipe's document is { r: <the recipe as JSON>, updatedAt, id } (v28.0), unpacked here as
-      // parseCloudRecipeDocs does. Read as it stood, every linked recipe came out "Untitled recipe" with nothing in it.
-      var x = d.data() || {}, r = x;
-      if (typeof x.r === 'string') { try { r = JSON.parse(x.r); } catch(e) { r = null; } }
-      if (!r || typeof r !== 'object') return;
-      if (r.id == null) r.id = /^\d+$/.test(d.id) ? +d.id : d.id;
-      list.push(normalizeRecipe(r));
-    });
-    list.sort(function(a, b){ return String(a.name).localeCompare(String(b.name)); });
-    c.list = list; c.error = '';
+    c.list = linkedRecipesFrom(await hhRef(hid).collection('recipes').get()); c.error = '';
   } catch(e) {
     c.error = 'Their recipes could not be opened — ' + ((e && e.code === 'permission-denied')
       ? 'the link may have been removed, or the new database rules are not published yet.' : (e && e.message) || 'no connection.');
@@ -5609,7 +5676,7 @@ function linkedCardsInto(g, list, c, hid, lazy, name) {
   if (viewMode === 'list') {
     g.className = 'recipe-list';
     g.innerHTML = list.map(function(r, i) {
-      return '<div class="recipe-list-item linked-card" data-no-i18n' + tip + wants(r) + ' onclick="' + open(i) + '">'
+      return '<div class="recipe-list-item linked-card" data-no-i18n data-rid="' + escA(String(r.id)) + '"' + tip + wants(r) + ' onclick="' + open(i) + '">'
         + '<div class="recipe-list-thumb" style="background:' + escA(r.bg) + ';position:relative;overflow:hidden;">' + pic(r, 26)
         + listBadgesHtml(r, !!(c.photos[r.id] || r._ph || /^https?:/i.test(r.photo || ''))) + '</div>'
         + '<div class="recipe-list-info"><div class="recipe-list-name" dir="auto"><button type="button" class="card-open">' + escH(r.name) + '</button></div>'
@@ -5620,7 +5687,7 @@ function linkedCardsInto(g, list, c, hid, lazy, name) {
   } else {
     g.className = 'recipe-grid';
     g.innerHTML = list.map(function(r, i) {
-      return '<div class="recipe-card linked-card" data-no-i18n' + tip + wants(r) + ' onclick="' + open(i) + '">'
+      return '<div class="recipe-card linked-card" data-no-i18n data-rid="' + escA(String(r.id)) + '"' + tip + wants(r) + ' onclick="' + open(i) + '">'
         + '<div class="card-image" style="background:' + escA(r.bg) + '">' + pic(r, 52)
         + '<div class="card-category-badge">' + escH(T(r.category)) + '</div>' + gridBadgesHtml(r) + '</div>'
         + '<div class="card-body"><div class="card-title" dir="auto"><button type="button" class="card-open">' + escH(r.name) + '</button></div>'
@@ -5657,7 +5724,7 @@ function renderLinkedInAll(q) {
   box.innerHTML = '';
   hhLinks().filter(function(l){ return hhShown(l.hid); }).forEach(function(l) {
     var c = _linkCache[l.hid];
-    if (!c || (!c.loading && Date.now() - c.at > 5 * 60e3)) hhFetchLinked(l.hid);
+    if (!c || (!c.loading && !c.live && Date.now() - c.at > 5 * 60e3)) hhFetchLinked(l.hid);   // v38.52 — not when listened to
     c = _linkCache[l.hid];
     if (!c || !c.list.length) return;
     var list = c.list.filter(function(r){ return linkedMatches(r, q); });
@@ -8053,7 +8120,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v38.51';
+var APP_VERSION = 'v38.52';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -10123,6 +10190,10 @@ li.line-sub-indent { padding-inline-start: 22px; }
 /* v38.49 — a linked household's recipes, after your own: a faint blue, never taken for yours. */
 .recipe-card.linked-card, .recipe-list-item.linked-card { background: var(--linked-bg); border: 1.5px solid var(--linked-border); }
 .linked-all { margin-top: 28px; }
+/* v38.52 — a linked kitchen's recipe that just changed, glowing for a moment */
+.linked-card.linked-fresh { animation: linkedFresh 2.4s ease-out; }
+@keyframes linkedFresh { 0%, 30% { box-shadow: 0 0 0 3px var(--terracotta-fill), 0 4px 14px rgba(193,68,14,0.25); } 100% { box-shadow: none; } }
+@media (prefers-reduced-motion: reduce) { .linked-card.linked-fresh { animation: none; outline: 3px solid var(--terracotta-fill); } }
 .kitchen-filter { position: relative; display: inline-flex; }
 .kitchen-menu { position: absolute; top: calc(100% + 6px); inset-inline-start: 0; z-index: 160; min-width: 240px; max-width: 320px; max-height: 60vh; overflow-y: auto;
   background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 8px 26px rgba(0,0,0,0.18); padding: 8px; }
@@ -11054,7 +11125,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.51</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.52</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -11791,7 +11862,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.51</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.52</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -29237,7 +29308,7 @@ var HELP_SYSTEM_PROMPT = [
   "- ROLES: Read only (sees), Read + Write (adds and changes), Full access (also deletes and manages people). The owner can also 👑 hand the household over, or 🗑 delete it.",
   "- A new person is asked whether to start their own collection or join one they were invited to (paste the link).",
   "- LINK WITH ANOTHER HOUSEHOLD: ⋯ More → 🤝 Connect with another household (the owner, or someone with full access). Type that household's identifier (MKN-…; yours is in ⚙️ → 🏠 My household → 🪪 Display my personal identifier) or the e-mail address of anyone in it. Its owner or an admin is asked at once if the app is open (otherwise the next time they open it): Accept, Reject or Remind me later — with the note that came with it. A refusal is never shown to the sender.",
-  "- Once linked, each household sees the other's recipes, read-only: after its own in the main list, under that household's name, on a faint blue (hover one: 'A recipe from …'). 🏠 Kitchens ▾ in the filter bar chooses whose recipes show — tick one, several or all. 📥 Save a copy to my recipes makes one your own. Links do not chain: a third household linked to theirs is not seen. Links are listed, and removed, in ⚙️ → 🏠 My household → 👥 Family Access. ⚙️ → 🏠 My household → 🤝 Link requests through the app: blocked stops requests by identifier; requests by e-mail always arrive.",
+  "- Once linked, each household sees the other's recipes, read-only — and live: a change in their kitchen shows in yours within seconds, the changed card glowing for a moment: after its own in the main list, under that household's name, on a faint blue (hover one: 'A recipe from …'). 🏠 Kitchens ▾ in the filter bar chooses whose recipes show — tick one, several or all. 📥 Save a copy to my recipes makes one your own. Links do not chain: a third household linked to theirs is not seen. Links are listed, and removed, in ⚙️ → 🏠 My household → 👥 Family Access. ⚙️ → 🏠 My household → 🤝 Link requests through the app: blocked stops requests by identifier; requests by e-mail always arrive.",
   "- 📬 LINK REQUESTS: ⚙️ → 🏠 My household → 📬 Link requests — every request in one place: Waiting (Accept / Reject / 🚫 Block), Sent by your household (Withdraw), Linked now (Revoke access), and earlier answers. A request may carry a note, and the two households can write to each other there — the latest message shows, highlighted, with ↩ Reply; earlier ones are under 💬 Conversation. Only the household's name is shown, never a person's. A new message or request arrives while the app is open: a red dot (and a short notice with Open) within seconds, no reload needed. A red dot on ⚙️ leads to anything new. The switch there decides whether other households may ask through the app at all.",
   "- 💬 CHATS WITH LINKED KITCHENS: ⋯ More → 💬 Chats with linked kitchens — or 💬 Chat beside a linked kitchen's name in your recipe list, or in 👥 Family Access. Every conversation, newest first, with what is new; open one to read it all and write (Enter sends, Shift+Enter starts a new line). The same conversations are also on 📬 Link requests. A red dot on ⋯ More and on ⚙️ says something new arrived.",
   "- A household's identifier works only within the same copy of the app: the family's copy and My Kitchen Notes keep their households apart.",

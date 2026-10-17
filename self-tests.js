@@ -7398,16 +7398,34 @@ window.SELF_TESTS = [
       var fake={ collection:function(c){
         if(c==='linkRequests') return { where:function(){ return { onSnapshot:listen('req') }; } };
         if(c==='linkTalk') return { doc:function(pair){ return { collection:function(){ return { orderBy:function(){ return { limit:function(){ return { onSnapshot:listen('talk:'+pair) }; } }; } }; } }; } };
-        if(c==='households') return { doc:function(){ return { collection:function(sub){ return { onSnapshot:listen(sub), get:async function(){ return snap([]); } }; } }; } };
+        if(c==='households') return { doc:function(h){ return { collection:function(sub){ return { onSnapshot:listen(sub==='recipes' ? 'recipes:'+h : sub), get:async function(){ return snap([]); } }; } }; } };
         return { get:async function(){ return snap([]); } }; } };
+      // v38.52 — a linked kitchen's recipes as the database hands them: { r: <JSON> }, with what changed.
+      function rsnap(list, changes){ return { forEach:function(f){ list.forEach(function(x){ f({ id:String(x.id), data:function(){ return { r:JSON.stringify(x), id:x.id }; } }); }); },
+        docChanges:function(){ return (changes||[]).map(function(c){ return { type:c[0], doc:{ id:String(c[1]) } }; }); } }; }
       try{
-        linkLiveStop();
+        linkLiveStop(); hiddenHouseholds.clear();
         window._fbDb=fake; window._fbUser={ uid:'uL' };
         window._household={ hid:'hL1', role:'owner', name:'Live Kitchen', links:[{ hid:'hL2', name:'Other Kitchen', code:'', at:1 }], asking:[] };
         window.toastAction=function(m){ toasts.push(m); }; window.toast=function(m){ toasts.push(m); };
         window.hhCheckLinkRequests=async function(){ checked++; return 0; };
         window.hhSetHome=async function(){};
         if(!linkLiveStart(true) || !subs.req || !subs.links || !subs['talk:hL1_hL2']) throw new Error('not listening: '+Object.keys(subs).join());
+        // v38.52 — Tony: their recipe changes "until they refresh the page". Their recipes are listened to as well.
+        await wait(20);
+        if(!subs['recipes:hL2']) throw new Error('a linked kitchen\u2019s recipes are not listened to: '+Object.keys(subs).join());
+        var lz={ id:31, name:'Lasagne', category:'Dinner', ingredients:[{ a:'1', n:'sheet' }], steps:['Bake'] }, pie={ id:32, name:'Apple pie', category:'Dessert', ingredients:[], steps:[] };
+        subs['recipes:hL2'](rsnap([lz, pie], [['added',31],['added',32]]));
+        if(!_linkCache.hL2 || !_linkCache.hL2.live || _linkCache.hL2.list.map(function(r){ return r.name; }).join()!=='Apple pie,Lasagne') throw new Error('their first answer did not fill the list');
+        if(document.getElementById('linkedAll').textContent.indexOf('Lasagne')===-1) throw new Error('their recipes are not in the list');
+        lz.name='Lasagne, extra cheesy';
+        subs['recipes:hL2'](rsnap([lz, pie], [['modified',31]]));
+        var shown=document.getElementById('linkedAll');
+        if(shown.textContent.indexOf('Lasagne, extra cheesy')===-1) throw new Error('their change did not show without a reload');
+        var fresh=shown.querySelector('.linked-card[data-rid="31"]');
+        if(!fresh || !fresh.classList.contains('linked-fresh') || shown.querySelector('.linked-card[data-rid="32"]').classList.contains('linked-fresh')) throw new Error('the changed card does not glow (or the unchanged one does)');
+        subs['recipes:hL2'](rsnap([lz], [['removed',32]]));
+        if(document.getElementById('linkedAll').textContent.indexOf('Apple pie')!==-1) throw new Error('a recipe they deleted stays');
         var pair='hL1_hL2', older={ from:'hL2', name:'Other Kitchen', text:'Hello', at:Date.now()-6e4 }, map={};
         map[pair]=older.at; localStorage.setItem(TALK_SEEN_KEY+'hL1', JSON.stringify(map));
         subs['talk:'+pair](snap([older]));

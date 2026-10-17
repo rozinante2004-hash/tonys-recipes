@@ -303,6 +303,14 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
   #9DB9DC; dark #1C2638 / #44628A — grey text 4.67:1).
 - **Released: v38.51 (17 Oct 2026, 03:35 Israel time, CI green on 5a1723d).** All jobs success (Pages deploy,
   Cloudflare beta and test, Self Tests on main and test, Translate new phrases, Publish languages).
+- **v38.52** (Tony: Admin saw Tester 1's edits only after a reload): each linked kitchen's `recipes` collection is
+  listened to (`linkLiveRecipes`, `_live.recipes[hid]`, after `hhSetHome` — the rules need homes/<uid>); the first
+  answer fills `_linkCache` (`c.live` stops the 5-minute re-read), later ones redraw the list, a changed card glows
+  (`.linked-fresh`, cards carry `data-rid`), its cached photo is dropped to be asked again, an open read-only view is
+  redrawn. Started with linkLiveStart, re-synced in linkLiveLinks (new/removed links), stopped in linkLiveStop; a
+  refused listener retries after 8 s. One reader `linkedRecipesFrom` for get and snapshot. Emulator with the real
+  rules (`$S/e2e/liverecipes.mjs`): an edit, an addition and a deletion each seen in 1.8 s (mostly the editor's own
+  save delay).
 - **Before the testers, Tony's steps (16 Oct 2026):** (1) Cloudflare Email Routing destination addresses — done.
   (2) **The community app's browser key is restricted, both stages:** API restrictions = Identity Toolkit API, Token
   Service API, Cloud Firestore API (Google warned of "active usage" of eight Maps APIs — scanners; updated anyway);
