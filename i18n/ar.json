@@ -1,7 +1,7 @@
 {
  "lang": "ar",
- "updatedAt": 1792186190134,
- "count": 2256,
+ "updatedAt": 1792195943528,
+ "count": 2259,
  "strings": {
   "\"Add to Home Screen\"": "إضافة إلى الشاشة الرئيسية",
   "\"Open Bring!\"": "فتح Bring!",
@@ -518,6 +518,7 @@
   "Ketogenic": "كيتوجينك",
   "Keys ↗": "المفاتيح ↗",
   "Keywords / must-include ingredients (optional)": "كلمات مفتاحية / مكوّنات لا بد منها (اختياري)",
+  "Kitchens to show": "المطابخ المعروضة",
   "Kosher": "كوشير",
   "Last backup": "آخر نسخة احتياطية",
   "Last backup: today": "آخر نسخة احتياطية: اليوم",
@@ -1968,6 +1969,7 @@
   "💬 Ask my WhatsApp groups": "💬 اسأل مجموعات WhatsApp الخاصة بي",
   "💬 Ask my WhatsApp groups ({1})": "💬 اسأل مجموعات WhatsApp الخاصة بي ({1})",
   "💬 Ask my WhatsApp groups{1}": "💬 اسأل مجموعات WhatsApp الخاصة بي{1}",
+  "💬 Chats with linked kitchens": "💬 المحادثات مع المطابخ المرتبطة",
   "💬 Conversation": "💬 محادثة",
   "💬 Conversation ({1})": "💬 محادثة ({1})",
   "💬 Feedback button: hidden": "💬 زر الملاحظات: مخفي",
@@ -2251,6 +2253,7 @@
   "🧹 Clean up orphaned photos": "🧹 تنظيف الصور اليتيمة",
   "🧹 Removed {1} orphaned photo document{2}": "🧹 تمت إزالة {1} مستند صورة يتيم{2}",
   "🧹 {1} removed. Press Save to keep the change.": "🧹 تمت إزالة {1}. اضغط حفظ للاحتفاظ بالتغيير.",
+  "🧹 {1} repeated example recipe{2} removed": "🧹 تمت إزالة {1} وصفة تجريبية مكررة{2}",
   "🧺 Recipes hiding in my chats": "🧺 وصفات مختبئة في محادثاتي",
   "🧽 Reset this device…": "🧽 إعادة ضبط هذا الجهاز…",
   "🪪 Display my personal identifier": "🪪 عرض معرّفي الشخصي",

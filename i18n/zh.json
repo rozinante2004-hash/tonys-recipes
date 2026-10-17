@@ -1,7 +1,7 @@
 {
  "lang": "zh",
- "updatedAt": 1792186190134,
- "count": 2283,
+ "updatedAt": 1792195943528,
+ "count": 2286,
  "strings": {
   "\"Add to Home Screen\"": "添加到主屏幕",
   "\"Open Bring!\"": "打开 Bring!",
@@ -521,6 +521,7 @@
   "Ketogenic": "生酮饮食",
   "Keys ↗": "密钥 ↗",
   "Keywords / must-include ingredients (optional)": "关键词 / 必含食材（可选）",
+  "Kitchens to show": "显示的厨房",
   "Kosher": "洁食",
   "Last backup": "上次备份",
   "Last backup: today": "上次备份：今天",
@@ -1985,6 +1986,7 @@
   "💬 Ask my WhatsApp groups": "💬 询问我的 WhatsApp 群组",
   "💬 Ask my WhatsApp groups ({1})": "💬 询问我的 WhatsApp 群组（{1}）",
   "💬 Ask my WhatsApp groups{1}": "💬 询问我的 WhatsApp 群组{1}",
+  "💬 Chats with linked kitchens": "💬 已关联厨房的聊天",
   "💬 Conversation": "💬 对话",
   "💬 Conversation ({1})": "💬 对话（{1}）",
   "💬 Feedback button: hidden": "💬 反馈按钮：已隐藏",
@@ -2278,6 +2280,7 @@
   "🧹 Clean up orphaned photos": "🧹 清理孤立照片",
   "🧹 Removed {1} orphaned photo document{2}": "🧹 已移除 {1} 份孤立照片记录{2}",
   "🧹 {1} removed. Press Save to keep the change.": "🧹 {1} 已移除。点击“保存”以保留更改。",
+  "🧹 {1} repeated example recipe{2} removed": "🧹 已移除 {1} 个重复的示例食谱{2}",
   "🧺 Recipes hiding in my chats": "🧺 藏在聊天记录里的食谱",
   "🧽 Reset this device…": "🧽 重置此设备…",
   "🪪 Display my personal identifier": "🪪 显示我的个人标识符",

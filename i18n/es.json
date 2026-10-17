@@ -1,7 +1,7 @@
 {
  "lang": "es",
- "updatedAt": 1792186190134,
- "count": 2251,
+ "updatedAt": 1792195943528,
+ "count": 2254,
  "strings": {
   "\"Add to Home Screen\"": "Añadir a pantalla de inicio",
   "\"Open Bring!\"": "Abrir Bring!",
@@ -516,6 +516,7 @@
   "Ketogenic": "Cetogénica",
   "Keys ↗": "Claves ↗",
   "Keywords / must-include ingredients (optional)": "Palabras clave / ingredientes obligatorios (opcional)",
+  "Kitchens to show": "Cocinas para mostrar",
   "Kosher": "Kosher",
   "Last backup": "Última copia de seguridad",
   "Last backup: today": "Última copia de seguridad: hoy",
@@ -1962,6 +1963,7 @@
   "💬 Ask my WhatsApp groups": "💬 Preguntar a mis grupos de WhatsApp",
   "💬 Ask my WhatsApp groups ({1})": "💬 Preguntar a mis grupos de WhatsApp ({1})",
   "💬 Ask my WhatsApp groups{1}": "💬 Preguntar a mis grupos de WhatsApp{1}",
+  "💬 Chats with linked kitchens": "💬 Chats con cocinas vinculadas",
   "💬 Conversation": "💬 Conversación",
   "💬 Conversation ({1})": "💬 Conversación ({1})",
   "💬 Feedback button: hidden": "💬 Botón de comentarios: oculto",
@@ -2246,6 +2248,7 @@
   "🧹 Clean up orphaned photos": "🧹 Limpiar fotos huérfanas",
   "🧹 Removed {1} orphaned photo document{2}": "🧹 Se eliminó {1} documento{2} de foto huérfana",
   "🧹 {1} removed. Press Save to keep the change.": "🧹 {1} eliminado(a). Pulsa Guardar para conservar el cambio.",
+  "🧹 {1} repeated example recipe{2} removed": "🧹 Se eliminaron {1} receta{2} de ejemplo repetida{2}",
   "🧺 Recipes hiding in my chats": "🧺 Recetas escondidas en mis chats",
   "🧽 Reset this device…": "🧽 Restablecer este dispositivo…",
   "🪪 Display my personal identifier": "🪪 Mostrar mi identificador personal",

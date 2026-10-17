@@ -1,7 +1,7 @@
 {
  "lang": "fr",
- "updatedAt": 1792186190134,
- "count": 2255,
+ "updatedAt": 1792195943528,
+ "count": 2258,
  "strings": {
   "\"Add to Home Screen\"": "Ajouter à l'écran d'accueil",
   "\"Open Bring!\"": "Ouvrir Bring!",
@@ -517,6 +517,7 @@
   "Ketogenic": "Cétogène",
   "Keys ↗": "Clés ↗",
   "Keywords / must-include ingredients (optional)": "Mots-clés / ingrédients indispensables (facultatif)",
+  "Kitchens to show": "Cuisines à afficher",
   "Kosher": "Kasher",
   "Last backup": "Dernière sauvegarde",
   "Last backup: today": "Dernière sauvegarde : aujourd'hui",
@@ -1966,6 +1967,7 @@
   "💬 Ask my WhatsApp groups": "💬 Demander à mes groupes WhatsApp",
   "💬 Ask my WhatsApp groups ({1})": "💬 Demander à mes groupes WhatsApp ({1})",
   "💬 Ask my WhatsApp groups{1}": "💬 Demander à mes groupes WhatsApp{1}",
+  "💬 Chats with linked kitchens": "💬 Discussions avec cuisines liées",
   "💬 Conversation": "💬 Conversation",
   "💬 Conversation ({1})": "💬 Conversation ({1})",
   "💬 Feedback button: hidden": "💬 Bouton de retour : masqué",
@@ -2250,6 +2252,7 @@
   "🧹 Clean up orphaned photos": "🧹 Nettoyer les photos orphelines",
   "🧹 Removed {1} orphaned photo document{2}": "🧹 {1} document(s) photo orphelin(s) supprimé(s)",
   "🧹 {1} removed. Press Save to keep the change.": "🧹 {1} supprimé. Appuyez sur Enregistrer pour conserver la modification.",
+  "🧹 {1} repeated example recipe{2} removed": "🧹 {1} recette{2} exemple répétée supprimée",
   "🧺 Recipes hiding in my chats": "🧺 Recettes cachées dans mes conversations",
   "🧽 Reset this device…": "🧽 Réinitialiser cet appareil…",
   "🪪 Display my personal identifier": "🪪 Afficher mon identifiant personnel",

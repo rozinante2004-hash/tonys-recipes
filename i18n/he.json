@@ -1,7 +1,7 @@
 {
  "lang": "he",
- "updatedAt": 1792186190134,
- "count": 2797,
+ "updatedAt": 1792195943528,
+ "count": 2800,
  "strings": {
   "\"Add to Home Screen\"": "הוספה למסך הבית",
   "\"One item away\" filter ({1}f.{2})": "פילטר \"פריט אחד חסר\" ({1}f.{2})",
@@ -694,6 +694,7 @@
   "Ketogenic": "קטוגני",
   "Keys ↗": "מפתחות ↗",
   "Keywords / must-include ingredients (optional)": "מילות מפתח / רכיבי חובה (אופציונלי)",
+  "Kitchens to show": "מטבחים להצגה",
   "Kosher": "כשר",
   "Last backup": "גיבוי אחרון",
   "Last backup: today": "גיבוי אחרון: היום",
@@ -2493,6 +2494,7 @@
   "💬 Ask my WhatsApp groups": "💬 שאל בקבוצות ה-WhatsApp שלי",
   "💬 Ask my WhatsApp groups ({1})": "💬 לשאול בקבוצות הוואטסאפ שלי ({1})",
   "💬 Ask my WhatsApp groups{1}": "💬 שאל את קבוצות ה-WhatsApp שלי{1}",
+  "💬 Chats with linked kitchens": "💬 צ'אטים עם מטבחים מקושרים",
   "💬 Conversation": "💬 שיחה",
   "💬 Conversation ({1})": "💬 שיחה ({1})",
   "💬 Feedback button: hidden": "💬 כפתור משוב: מוסתר",
@@ -2792,6 +2794,7 @@
   "🧹 Clean up orphaned photos": "🧹 נקה תמונות יתומות",
   "🧹 Removed {1} orphaned photo document{2}": "🧹 הוסרו {1} מסמכי תמונה{2} יתומים",
   "🧹 {1} removed. Press Save to keep the change.": "🧹 {1} הוסר. לחץ על שמירה כדי לשמור את השינוי.",
+  "🧹 {1} repeated example recipe{2} removed": "🧹 {1} מתכוני דוגמה כפולים{2} הוסרו",
   "🧺 Recipes hiding in my chats": "🧺 מתכונים שמסתתרים בצ׳אטים שלי",
   "🧽 Reset this device…": "🧽 איפוס המכשיר הזה…",
   "🪪 Display my personal identifier": "🪪 הצג את המזהה האישי שלי",

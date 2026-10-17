@@ -1,7 +1,7 @@
 {
  "lang": "ja",
- "updatedAt": 1792186190134,
- "count": 2597,
+ "updatedAt": 1792195943528,
+ "count": 2600,
  "strings": {
   "\"Add to Home Screen\"": "ホーム画面に追加",
   "\"One item away\" filter ({1}f.{2})": "「あと1品」フィルター（{1}f.{2}）",
@@ -660,6 +660,7 @@
   "Ketogenic": "ケトジェニック",
   "Keys ↗": "キー ↗",
   "Keywords / must-include ingredients (optional)": "キーワード／必須材料（任意）",
+  "Kitchens to show": "表示するキッチン",
   "Kosher": "コーシャ",
   "Last backup": "最終バックアップ",
   "Last backup: today": "最終バックアップ：今日",
@@ -2297,6 +2298,7 @@
   "💬 Ask my WhatsApp groups": "💬 WhatsAppグループに聞く",
   "💬 Ask my WhatsApp groups ({1})": "💬 WhatsAppグループに聞く（{1}）",
   "💬 Ask my WhatsApp groups{1}": "💬 WhatsAppグループに聞く{1}",
+  "💬 Chats with linked kitchens": "💬 連携キッチンとのチャット",
   "💬 Conversation": "💬 会話",
   "💬 Conversation ({1})": "💬 会話（{1}）",
   "💬 Feedback button: hidden": "💬 フィードバックボタン: 非表示",
@@ -2592,6 +2594,7 @@
   "🧹 Clean up orphaned photos": "🧹 孤立した写真を整理",
   "🧹 Removed {1} orphaned photo document{2}": "🧹 孤立した写真データ{1}件を削除しました",
   "🧹 {1} removed. Press Save to keep the change.": "🧹 {1}を削除しました。保存を押すと変更が反映されます。",
+  "🧹 {1} repeated example recipe{2} removed": "🧹 重複するサンプルレシピを{1}件削除しました{2}",
   "🧺 Recipes hiding in my chats": "🧺 チャットに埋もれたレシピ",
   "🧽 Reset this device…": "🧽 この端末をリセット…",
   "🪪 Display my personal identifier": "🪪 自分の個人識別子を表示",

@@ -1,7 +1,7 @@
 {
  "lang": "ru",
- "updatedAt": 1792186190134,
- "count": 2587,
+ "updatedAt": 1792195943528,
+ "count": 2590,
  "strings": {
   "\"Add to Home Screen\"": "Добавить на главный экран",
   "\"One item away\" filter ({1}f.{2})": "Фильтр «Не хватает одного» ({1}ф.{2})",
@@ -659,6 +659,7 @@
   "Ketogenic": "Кетогенная",
   "Keys ↗": "Ключи ↗",
   "Keywords / must-include ingredients (optional)": "Ключевые слова / обязательные ингредиенты (необязательно)",
+  "Kitchens to show": "Кухни для отображения",
   "Kosher": "Кошерная",
   "Last backup": "Последний бэкап",
   "Last backup: today": "Последний бэкап: сегодня",
@@ -2291,6 +2292,7 @@
   "💬 Ask my WhatsApp groups": "💬 Спросить мои группы WhatsApp",
   "💬 Ask my WhatsApp groups ({1})": "💬 Спросить мои группы WhatsApp ({1})",
   "💬 Ask my WhatsApp groups{1}": "💬 Спросить мои группы WhatsApp{1}",
+  "💬 Chats with linked kitchens": "💬 Чаты с подключёнными кухнями",
   "💬 Conversation": "💬 Переписка",
   "💬 Conversation ({1})": "💬 Переписка ({1})",
   "💬 Feedback button: hidden": "💬 Кнопка обратной связи: скрыта",
@@ -2582,6 +2584,7 @@
   "🧹 Clean up orphaned photos": "🧹 Удалить неиспользуемые фото",
   "🧹 Removed {1} orphaned photo document{2}": "🧹 Удалено {1} неиспользуемых фото-документ{2}",
   "🧹 {1} removed. Press Save to keep the change.": "🧹 {1} удалено. Нажмите «Сохранить», чтобы применить изменение.",
+  "🧹 {1} repeated example recipe{2} removed": "🧹 Удалено {1} повторяющихся примеров рецепта{2}",
   "🧺 Recipes hiding in my chats": "🧺 Рецепты, спрятанные в моих чатах",
   "🧽 Reset this device…": "🧽 Сбросить это устройство…",
   "🪪 Display my personal identifier": "🪪 Показать мой личный идентификатор",

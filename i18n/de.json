@@ -1,7 +1,7 @@
 {
  "lang": "de",
- "updatedAt": 1792186190134,
- "count": 2253,
+ "updatedAt": 1792195943528,
+ "count": 2256,
  "strings": {
   "\"Add to Home Screen\"": "Zum Home-Bildschirm hinzufügen",
   "\"Open Bring!\"": "Bring! öffnen",
@@ -517,6 +517,7 @@
   "Ketogenic": "Ketogen",
   "Keys ↗": "Schlüssel ↗",
   "Keywords / must-include ingredients (optional)": "Schlüsselwörter / Pflichtzutaten (optional)",
+  "Kitchens to show": "Anzuzeigende Küchen",
   "Kosher": "Koscher",
   "Last backup": "Letztes Backup",
   "Last backup: today": "Letztes Backup: heute",
@@ -1964,6 +1965,7 @@
   "💬 Ask my WhatsApp groups": "💬 Meine WhatsApp-Gruppen fragen",
   "💬 Ask my WhatsApp groups ({1})": "💬 Meine WhatsApp-Gruppen fragen ({1})",
   "💬 Ask my WhatsApp groups{1}": "💬 Meine WhatsApp-Gruppen fragen{1}",
+  "💬 Chats with linked kitchens": "💬 Chats mit verknüpften Küchen",
   "💬 Conversation": "💬 Unterhaltung",
   "💬 Conversation ({1})": "💬 Unterhaltung ({1})",
   "💬 Feedback button: hidden": "💬 Feedback-Button: ausgeblendet",
@@ -2248,6 +2250,7 @@
   "🧹 Clean up orphaned photos": "🧹 Verwaiste Fotos aufräumen",
   "🧹 Removed {1} orphaned photo document{2}": "🧹 {1} verwaiste Fotodokument{2} entfernt",
   "🧹 {1} removed. Press Save to keep the change.": "🧹 {1} entfernt. Tippe auf Speichern, um die Änderung zu übernehmen.",
+  "🧹 {1} repeated example recipe{2} removed": "🧹 {1} wiederholtes Beispielrezept{2} entfernt",
   "🧺 Recipes hiding in my chats": "🧺 Rezepte, die sich in meinen Chats verstecken",
   "🧽 Reset this device…": "🧽 Dieses Gerät zurücksetzen …",
   "🪪 Display my personal identifier": "🪪 Meine persönliche Kennung anzeigen",
