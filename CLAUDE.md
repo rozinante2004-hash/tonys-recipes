@@ -327,6 +327,7 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
   Requests by e-mail arrive live (onSnapshot linkRequests where email == my verified address). Emulator: popped up in
   A's open app 0.6 s with the note; ‹ Back kept address and note. **Farm**: a tapped animal stays facing you through
   the puff (`farmOuch(el, a, keepFacing)`; turns back only if grabbed). Self-test `link_request_back_and_mail`.
+- **Released: v38.53 (17 Oct 2026, 23:05 Israel time, CI green on 9a1ae9a).** All jobs success.
 - **Before the testers, Tony's steps (16 Oct 2026):** (1) Cloudflare Email Routing destination addresses — done.
   (2) **The community app's browser key is restricted, both stages:** API restrictions = Identity Toolkit API, Token
   Service API, Cloud Firestore API (Google warned of "active usage" of eight Maps APIs — scanners; updated anyway);
