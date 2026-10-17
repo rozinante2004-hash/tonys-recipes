@@ -296,6 +296,13 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
   ✦ All ticks all; phone: `#mobileKitchenPanel`. `activeHouseholds`, `householdChipHtml` gone. (4) farm_visitors:
   the three voices one at a time (Firefox still speaking → farmSay cancels and waits → only the child heard).
   Page 2108 KB; budget raised to 2200 KB (written reason). Self-tests `kitchen_chats`, `example_twins_removed` (388).
+- **Released: v38.50 (17 Oct 2026, 03:10 Israel time, CI green on b4c76f2).** All jobs success (Pages deploy,
+  Cloudflare beta and test, Self Tests on main and test, Translate new phrases, Publish languages).
+- **v38.51** (Tony): a linked kitchen's cards show 🎬 and 📚 n like your own (`listBadgesHtml`/`gridBadgesHtml`, one
+  source; the list view now shows 📚 for your own collections too); the linked blue a shade deeper (#E7F0FA /
+  #9DB9DC; dark #1C2638 / #44628A — grey text 4.67:1).
+- **Released: v38.51 (17 Oct 2026, 03:35 Israel time, CI green on 5a1723d).** All jobs success (Pages deploy,
+  Cloudflare beta and test, Self Tests on main and test, Translate new phrases, Publish languages).
 - **Before the testers, Tony's steps (16 Oct 2026):** (1) Cloudflare Email Routing destination addresses — done.
   (2) **The community app's browser key is restricted, both stages:** API restrictions = Identity Toolkit API, Token
   Service API, Cloud Firestore API (Google warned of "active usage" of eight Maps APIs — scanners; updated anyway);
