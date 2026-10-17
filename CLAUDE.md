@@ -311,6 +311,22 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
   refused listener retries after 8 s. One reader `linkedRecipesFrom` for get and snapshot. Emulator with the real
   rules (`$S/e2e/liverecipes.mjs`): an edit, an addition and a deletion each seen in 1.8 s (mostly the editor's own
   save delay).
+- **Released: v38.52 (17 Oct 2026, 22:32 Israel time, CI green on 6c10055).** All jobs success.
+- **v38.53** (Tony: the "Tell them" window after a request by e-mail — Gmail/Outlook/mail app/WhatsApp mostly useless on
+  his Linux; Cancel lost what was typed): **‹ Back** (askConfirm/askChoice `opts.backLabel`, top left, answers
+  `ASK_BACK` = '\u0000back' — defined at the TOP of the first script: a load-time reference in an earlier block than
+  its definition threw ReferenceError and stopped that block (APP_VERSION undefined) — caught on the emulator, not by
+  the one-test runner). `openConnectHousehold` is a stepped loop keeping what was typed (address → note → by e-mail
+  "Send the request"); nothing is sent before the last step, Cancel there sends nothing; `connectSend` sends once
+  (unchanged: not again; changed: the first withdrawn). Last step: **📨 Send via My Kitchen Notes (recommended)** first,
+  highlighted (`o.primary`), tool tip (`o.title`) "Use this when the owner of <address> is already a member …"; then
+  "Send, and tell them by Gmail / Outlook / my mail app / WhatsApp" and "Send, and copy a message". Tony chose (17 Oct,
+  asked) that **the app never says whether an address has an account** (no enumeration). **My mail app**:
+  `mailOpened` (blur/visibility within 1.6 s) else "Select mail application": Gmail, Outlook.com, Yahoo (compose
+  link), Proton (message copied + inbox opened), Copy; ‹ Back. `shareOptions`/`shareDo` split out of shareMessage.
+  Requests by e-mail arrive live (onSnapshot linkRequests where email == my verified address). Emulator: popped up in
+  A's open app 0.6 s with the note; ‹ Back kept address and note. **Farm**: a tapped animal stays facing you through
+  the puff (`farmOuch(el, a, keepFacing)`; turns back only if grabbed). Self-test `link_request_back_and_mail`.
 - **Before the testers, Tony's steps (16 Oct 2026):** (1) Cloudflare Email Routing destination addresses — done.
   (2) **The community app's browser key is restricted, both stages:** API restrictions = Identity Toolkit API, Token
   Service API, Cloud Firestore API (Google warned of "active usage" of eight Maps APIs — scanners; updated anyway);

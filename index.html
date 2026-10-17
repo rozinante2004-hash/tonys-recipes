@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v38.52 -->
+<!-- Tony's Recipes Collection v38.53 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -705,6 +705,9 @@ try {
   _debugMode = _dbgv === null ? !!(window.APP_CONFIG && APP_CONFIG.diagnostics && APP_CONFIG.diagnostics.debug) : _dbgv === '1';
 } catch(e) {}
 
+// v38.53 — what ‹ Back answers (opts.backLabel, top left), in askChoice and askConfirm alike: never something typed.
+// Here, at the top of the first script: code that runs as the page loads, in this script, refers to it.
+var ASK_BACK = '\u0000back';
 function dlog() {
   if (!_debugMode) return;
   try { console.log.apply(console, arguments); } catch(e) {}
@@ -4787,7 +4790,7 @@ async function hhSendLinkRequest(text, note) {
     var had = hhLinks().filter(function(l){ return l.hid === to; })[0];
     if (had) return { ok: false, msg: 'You are already linked with ' + hhLinkName(had) + '.' };
     var ref = db.collection('linkRequests').doc(me.hid + '_' + to);
-    try { if ((await ref.get()).exists) return { ok: true, via: 'code', again: true, label: tg.code }; } catch(e) {}
+    try { if ((await ref.get()).exists) return { ok: true, via: 'code', again: true, label: tg.code, id: ref.id }; } catch(e) {}
     try {
       // v37.81 — the note is also the conversation's first message (same batch:
       // the rules let a message through only between households with a request).
@@ -4800,17 +4803,17 @@ async function hhSendLinkRequest(text, note) {
     catch(e) { return { ok: false, blocked: true,
       msg: 'This household does not take requests through the app. Ask them by e-mail instead: type the address of anyone in it.' }; }
     syncLog('save', 'Asked to link with a household', tg.code);
-    return { ok: true, via: 'code', label: tg.code };
+    return { ok: true, via: 'code', label: tg.code, id: ref.id };
   }
   var mine = String(_fbUser.email || '').toLowerCase();
   if (tg.email === mine || getAccessMembers().some(function(m){ return String(m.email || '').toLowerCase() === tg.email; }))
     return { ok: false, msg: 'That address is in your own household.' };
   var ref2 = db.collection('linkRequests').doc(me.hid + ':' + tg.email);
-  try { if ((await ref2.get()).exists) return { ok: true, via: 'email', again: true, email: tg.email, label: tg.email }; } catch(e) {}
+  try { if ((await ref2.get()).exists) return { ok: true, via: 'email', again: true, email: tg.email, label: tg.email, id: ref2.id }; } catch(e) {}
   try { await ref2.set(Object.assign({ email: tg.email, via: 'email', toLabel: tg.email }, base)); }
   catch(e) { return { ok: false, msg: 'Could not send it: ' + (e && e.message) }; }
   syncLog('save', 'Asked to link with a household, by e-mail', tg.email);
-  return { ok: true, via: 'email', email: tg.email, label: tg.email };
+  return { ok: true, via: 'email', email: tg.email, label: tg.email, id: ref2.id };
 }
 async function openConnectHousehold() {
   if (!_household || !window._fbUser) { toast('Sign in first — then you can link your kitchen with another.', 6000); return null; }
@@ -4818,31 +4821,77 @@ async function openConnectHousehold() {
     toast('Only your household’s owner or an admin can link it with another — ask ' + (_household.ownerName || 'its owner') + '.', 7000);
     return null;
   }
-  var t = await askConfirm({ icon: '\u{1F91D}', title: 'Connect with another household',
-    message: 'Once they agree, each of you sees the other’s recipes — read-only. Nothing is copied or changed.\n\n'
-      + 'Type their household’s identifier (MKN-…), or the e-mail address of anyone in it.',
-    input: '', placeholder: 'MKN-XXXX-XXXX  /  name@example.com', okLabel: 'Send' });
-  if (typeof t !== 'string' || !t.trim()) return null;
-  // v37.81 — Tony: "an option to add a note to the request".
-  var note = await askConfirm({ icon: '\u{1F4AC}', title: 'Add a note? (optional)',
-    message: 'A few words for them — who you are, why you\u2019d like to link. They see it with your request, signed with your household\u2019s name.',
-    input: '', placeholder: 'e.g. Hi, it\u2019s Dana from the cooking class!', okLabel: 'Send the request' });
-  if (typeof note !== 'string') return null;
-  if (!await talkPrivacyOk(note)) return null;
-  var r = await hhSendLinkRequest(t, note);
-  if (!r.ok) { await askConfirm({ icon: '\u{1F91D}', title: 'Not sent', message: r.msg, okLabel: 'OK' }); return r; }
-  await hhLoadLinks(); householdRenderBar();
-  if (r.via === 'code') {
-    toast(r.again ? '⏳ Already asked — waiting for them.' : '\u{1F91D} Sent. It pops up in their app the next time they open it.', 7000);
-    return r;
+  // v38.53 — Tony: "Add a '<- Back' icon at the top left of the modal, to include the recipients' address and notes
+  // entered on the previous screen", and Cancel on the last step "closes the modal and deleting everything the user has
+  // written". Each step has ‹ Back, with what was typed still there. Nothing is sent before the last step; there,
+  // Cancel sends nothing. Sent, then changed (‹ Back from the mail choices): the first request is withdrawn.
+  var t = '', note = '', sent = null, step = 1;
+  for (var guard = 0; guard < 30; guard++) {
+    if (step === 1) {
+      var a1 = await askConfirm({ icon: '\u{1F91D}', title: 'Connect with another household',
+        message: 'Once they agree, each of you sees the other’s recipes — read-only. Nothing is copied or changed.\n\n'
+          + 'Type their household’s identifier (MKN-…), or the e-mail address of anyone in it.',
+        input: t, placeholder: 'MKN-XXXX-XXXX  /  name@example.com', okLabel: 'Next ›' });
+      if (typeof a1 !== 'string' || !a1.trim()) { if (sent) toast('The request you sent stays — ⚙️ → \u{1F3E0} My household → \u{1F4EC} Link requests to withdraw it.', 7000); return sent ? sent.r : null; }
+      t = a1.trim(); step = 2; continue;
+    }
+    if (step === 2) {
+      // v37.81 — Tony: "an option to add a note to the request".
+      var a2 = await askConfirm({ icon: '\u{1F4AC}', title: 'Add a note? (optional)', backLabel: '‹ Back',
+        message: 'A few words for them — who you are, why you’d like to link. They see it with your request, signed with your household’s name.',
+        input: note, placeholder: 'e.g. Hi, it’s Dana from the cooking class!', okLabel: /@/.test(t) ? 'Next \u203A' : 'Send the request' });
+      if (a2 === ASK_BACK) { step = 1; continue; }
+      if (typeof a2 !== 'string') { if (sent) toast('The request you sent stays — ⚙️ → \u{1F3E0} My household → \u{1F4EC} Link requests to withdraw it.', 7000); return sent ? sent.r : null; }
+      note = a2;
+      if (!await talkPrivacyOk(note)) continue;
+      var tg = hhLinkTarget(t);
+      if (!tg) { await askConfirm({ icon: '\u{1F91D}', title: 'Not sent', message: 'That is neither an identifier (MKN-…) nor an e-mail address.', okLabel: 'OK' }); step = 1; continue; }
+      if (tg.code) {                                              // by identifier: through the app, nothing to choose
+        if (!await connectSend()) { step = 1; continue; }
+        toast(sent.r.again ? '⏳ Already asked — waiting for them.' : '\u{1F91D} Sent. It pops up in their app right away if it is open, or the next time they open it.', 7000);
+        return sent.r;
+      }
+      step = 3; continue;
+    }
+    // v38.53 — By e-mail: how to send it. Tony: "Add a 'Send via My Kitchen Notes' … highlighting [it] and adding
+    // (recommended) … a tool tip … 'use this option only if the owner of the destination address is a member'". The
+    // request always goes through the app (that is what they accept); the other ways ALSO tell them, and need it too.
+    // Tony chose (17 Oct 2026) that the app never says whether an address has an account: nobody can use it to find
+    // out who uses My Kitchen Notes. Cancel here sends nothing.
+    var em = t.toLowerCase(), url = APP_CONFIG.siteOrigin + APP_CONFIG.sitePath;
+    var msg = { to: em, subject: 'Let’s link our kitchens',
+      text: 'Hi! I’d like to link our kitchens on My Kitchen Notes, so we can see each other’s recipes.\n\n'
+        + 'Open the app (signed in as ' + em + ') and accept:\n' + url };
+    var opts3 = [{ value: 'app', primary: true, label: '\u{1F4E8} Send via My Kitchen Notes (recommended)',
+      title: 'Use this when the owner of ' + em + ' is already a member of My Kitchen Notes: it pops up in their app. If they are not a member yet, it waits until they join with this address — tell them below as well.' }]
+      .concat(shareOptions(msg).map(function(o){
+        var icon = o.label.split(' ')[0], name = { gmail: 'Gmail', outlook: 'Outlook', mail: 'my mail app', wa: 'WhatsApp', share: 'another app' }[o.value];
+        return { value: o.value, label: o.value === 'copy' ? icon + ' Send, and copy a message for them' : icon + ' Send, and tell them by ' + name,
+          title: 'Sends it through the app, and opens this to tell them too' }; }));
+    var how = await askChoice('To ' + em + '.\n\nThrough the app, it pops up for them if they are a member, or waits until they join with that address. Or tell them yourself as well:',
+      opts3, { icon: '\u{1F4E8}', title: 'Send the request', backLabel: '‹ Back', cancelLabel: 'Cancel — send nothing' });
+    if (how === ASK_BACK) { step = 2; continue; }
+    if (!how) { if (!sent) toast('Not sent.', 4000); return sent ? sent.r : null; }
+    if (!await connectSend()) { step = 1; continue; }
+    if (how === 'app') { toast(sent.r.again ? '⏳ Already asked — waiting for them.' : '\u{1F4E8} Sent through My Kitchen Notes.', 7000); return sent.r; }
+    var did = await shareDo(how, msg);
+    if (did === ASK_BACK) continue;                               // no mail program: back to these choices (sent once only)
+    toast('\u{1F4E8} Sent through My Kitchen Notes — and you are telling them too.', 7000);
+    return sent.r;
   }
-  // By e-mail the app sends nothing itself: offer to tell them.
-  var url = APP_CONFIG.siteOrigin + APP_CONFIG.sitePath;
-  await shareMessage({ to: r.email, title: 'Tell them', intro: 'Asked. It pops up in their app the next time they open it — let them know.',
-    subject: 'Let’s link our kitchens',
-    text: 'Hi! I’d like to link our kitchens on My Kitchen Notes, so we can see each other’s recipes.\n\n'
-      + 'Open the app (signed in as ' + r.email + ') and accept:\n' + url });
-  return r;
+  return sent ? sent.r : null;
+  // Sends what is in the boxes — once: unchanged, it is not sent again; changed, the first one is withdrawn.
+  async function connectSend() {
+    if (sent && sent.t === t.toLowerCase() && sent.note === note.trim()) return true;
+    if (sent && sent.r && sent.r.id) {
+      try { await hhDb().collection('linkRequests').doc(sent.r.id).delete(); syncLog('save', 'Withdrew a link request, sent again changed', sent.r.label || ''); } catch(e) {}
+    }
+    var r = await hhSendLinkRequest(t, note);
+    if (!r.ok) { await askConfirm({ icon: '\u{1F91D}', title: 'Not sent', message: r.msg, okLabel: 'OK' }); sent = null; return false; }
+    sent = { t: t.toLowerCase(), note: note.trim(), r: r };
+    await hhLoadLinks(); householdRenderBar();
+    return true;
+  }
 }
 // Someone asked by e-mail: whoever signs in with that (confirmed) address
 // passes it on to the household they are in, without a word — only its owner
@@ -5445,6 +5494,12 @@ function linkLiveStart(force) {
     try {
       var q1 = db.collection('linkRequests').where('to', '==', hid), q2 = hhRef(hid).collection('links');
       if (typeof q1.onSnapshot === 'function') _live.unsubs.push(q1.onSnapshot(quietFirst(linkLiveRequests), function(){}));
+      // v38.53 — and those asked by THIS person's e-mail address (passed on to their household, then asked)
+      var myMail = String((window._fbUser && _fbUser.email) || '').toLowerCase();
+      if (myMail && _fbUser.emailVerified !== false) {
+        var q4 = db.collection('linkRequests').where('email', '==', myMail);
+        if (typeof q4.onSnapshot === 'function') _live.unsubs.push(q4.onSnapshot(quietFirst(linkLiveRequests), function(){}));
+      }
       if (typeof q2.onSnapshot === 'function') _live.unsubs.push(q2.onSnapshot(quietFirst(linkLiveLinks), function(){}));
     } catch(e) {}
   }
@@ -6706,19 +6761,59 @@ function shareTargets(opts) {
     // v37.09 — on a computer without a mail program, mailto: does nothing at all
     gmail: 'https://mail.google.com/mail/?view=cm&fs=1&to=' + encodeURIComponent(to) + '&su=' + encodeURIComponent(opts.subject || '') + '&body=' + encodeURIComponent(opts.text || ''),
     outlook: 'https://outlook.live.com/mail/0/deeplink/compose?to=' + encodeURIComponent(to) + '&subject=' + encodeURIComponent(opts.subject || '') + '&body=' + encodeURIComponent(opts.text || ''),
-    wa: 'https://wa.me/?text=' + encodeURIComponent(opts.text || '')
+    wa: 'https://wa.me/?text=' + encodeURIComponent(opts.text || ''),
+    yahoo: 'https://compose.mail.yahoo.com/?to=' + encodeURIComponent(to) + '&subject=' + encodeURIComponent(opts.subject || '') + '&body=' + encodeURIComponent(opts.text || ''),   // v38.53
+    proton: 'https://mail.proton.me/u/0/inbox'
   };
 }
-async function shareMessage(opts) {
+// v38.53 — Tony: "My Mail App — if one is defined, great, use it. If none is defined then present a 'Select mail
+// application' menu." A page cannot ask whether a mail program is set up; it can notice that none opened — the window
+// keeps the focus — and then offer e-mail on the web, ready to send (Proton has no ready-to-send link: the message is
+// copied to paste).
+function mailOpened(href, waitMs) {
+  return new Promise(function(resolve) {
+    var gone = false, off = function(){ gone = true; };
+    window.addEventListener('blur', off); document.addEventListener('visibilitychange', off);
+    try { location.href = href; } catch(e) {}
+    setTimeout(function(){
+      window.removeEventListener('blur', off); document.removeEventListener('visibilitychange', off);
+      resolve(gone || document.hidden);
+    }, waitMs || 1600);
+  });
+}
+async function mailOrWebmail(opts, t) {
+  if (await mailOpened(t.mail)) return 'mail';
+  var pick = await askChoice('No mail program opened on this device. Write it in your e-mail on the web instead \u2014 it opens ready to send:',
+    [{ value: 'gmail', label: '\u2709\uFE0F Gmail' }, { value: 'outlook', label: '\u2709\uFE0F Outlook.com / Hotmail' },
+     { value: 'yahoo', label: '\u2709\uFE0F Yahoo Mail' }, { value: 'proton', label: '\u2709\uFE0F Proton Mail (the message is copied \u2014 paste it)' },
+     { value: 'copy', label: '\u{1F4CB} Copy the message' }],
+    { icon: '\u2709\uFE0F', title: 'Select mail application', backLabel: '\u2039 Back', cancelLabel: 'Close' });
+  if (pick === ASK_BACK) return ASK_BACK;
+  if (pick === 'proton') {
+    try { await navigator.clipboard.writeText((opts.subject ? opts.subject + '\n\n' : '') + (opts.text || '')); } catch(e) {}
+    window.open(t.proton, '_blank', 'noopener');
+    toast('\u{1F4CB} The message is copied \u2014 in Proton Mail press New message, then paste it' + (opts.to ? ' (to ' + opts.to + ')' : ''), 9000);
+  } else if (pick === 'gmail' || pick === 'outlook' || pick === 'yahoo') window.open(t[pick], '_blank', 'noopener');
+  else if (pick === 'copy') {
+    try { await navigator.clipboard.writeText(opts.copyText || opts.text); toast('\u{1F4CB} Copied \u2014 paste it wherever you like', 6000); }
+    catch(e) { await askConfirm({ icon: '\u{1F4CB}', title: 'The message', message: opts.copyText || opts.text, okLabel: 'OK' }); }
+  }
+  return pick || null;
+}
+window.mailOrWebmail = mailOrWebmail; window.mailOpened = mailOpened;
+function shareOptions(opts) {
   var options = [{ value: 'gmail', label: '✉️ Gmail' }, { value: 'outlook', label: '✉️ Outlook' },
                  { value: 'mail', label: '✉️ My mail app' }, { value: 'wa', label: '\u{1F4AC} WhatsApp' }];
   if (navigator.share) options.push({ value: 'share', label: '\u{1F4E4} Another app…' });
   options.push({ value: 'copy', label: opts.copyLabel || '\u{1F4CB} Copy the message' });
   if (opts.omit) options = options.filter(function(o){ return opts.omit.indexOf(o.value) === -1; });   // v37.47
-  var how = await askChoice(opts.intro || '', options, { icon: '\u{1F4E3}', title: opts.title || 'Let them know' });
+  return options;
+}
+// One way of telling them, done. ASK_BACK when "My mail app" found no mail program and they went ‹ Back.
+async function shareDo(how, opts) {
   var t = shareTargets(opts);
-  if (how === 'mail') location.href = t.mail;
-  else if (how === 'gmail' || how === 'outlook') window.open(t[how], '_blank', 'noopener');
+  if (how === 'mail') return await mailOrWebmail(opts, t);
+  if (how === 'gmail' || how === 'outlook') window.open(t[how], '_blank', 'noopener');
   else if (how === 'wa') window.open(t.wa, '_blank', 'noopener');
   else if (how === 'share') { try { await navigator.share({ title: opts.subject || '', text: opts.text }); } catch(e) {} }
   else if (how === 'copy') {
@@ -6727,6 +6822,19 @@ async function shareMessage(opts) {
     catch(e) { await askConfirm({ icon: '\u{1F4CB}', title: 'The message', message: ct, okLabel: 'OK' }); }
   }
   return how || null;
+}
+window.shareOptions = shareOptions; window.shareDo = shareDo;
+async function shareMessage(opts) {
+  var options = shareOptions(opts);
+  for (var round = 0; round < 10; round++) {
+  var how = await askChoice(opts.intro || '', options, { icon: '\u{1F4E3}', title: opts.title || 'Let them know',
+    backLabel: opts.backLabel, cancelLabel: opts.cancelLabel });                 // v38.53
+  if (how === ASK_BACK) return ASK_BACK;
+  var done = await shareDo(how, opts);
+  if (done === ASK_BACK) continue;                               // v38.53 — no mail program: back to the choices
+  return done;
+  }
+  return null;
 }
 function letThemKnow(email, note) {
   return shareMessage({ to: email, title: 'Let ' + email + ' know?',
@@ -8120,7 +8228,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v38.52';
+var APP_VERSION = 'v38.53';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -9559,6 +9667,10 @@ body.i18n-harvesting #serviceErrorOverlay, body.i18n-harvesting #emailModalOverl
 .ask-quote { font-size: 15px; line-height: 1.55; color: var(--ink); text-align: start; white-space: pre-wrap; unicode-bidi: plaintext;
   background: rgba(212,168,67,0.16); border: 1.5px solid rgba(193,68,14,0.35); border-inline-start: 5px solid var(--terracotta, #C1440E);
   border-radius: 10px; padding: 10px 14px; margin: 4px 0 12px; max-height: 40vh; overflow-y: auto; }
+.ask-card:has(> .ask-back) { position: relative; padding-top: 34px; }
+.ask-opt-hint { font-size: 11.5px; color: var(--muted); line-height: 1.45; margin: -4px 6px 8px; text-align: center; }
+.ask-back { position: absolute; top: 10px; inset-inline-start: 10px; background: none; border: none; color: var(--terracotta); font-weight: 700; font-size: 13.5px; cursor: pointer; padding: 6px 8px; border-radius: 8px; font-family: inherit; }
+.ask-back:hover { background: var(--bg); }
 .ask-quote-label { font-size: 12px; font-weight: 700; color: var(--heading); text-align: start; margin: 2px 0 4px; }
 /* v38.49 — Tony: of a conversation, the last message shows, highlighted; the rest fold away. */
 .talk-last { border: 1.5px solid rgba(193,68,14,0.35) !important; border-inline-start: 4px solid var(--terracotta) !important; background: rgba(212,168,67,0.16) !important; }
@@ -11125,7 +11237,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.52</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.53</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -11862,7 +11974,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.52</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.53</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -18677,12 +18789,14 @@ function askChoice(message, options, opts) {
     ov.id = 'askOverlay'; ov.className = 'modal-overlay';
     ov.style.cssText = 'display:flex;z-index:1300;';
     ov.innerHTML = '<div class="ask-card">'
+      + (opts.backLabel ? '<button type="button" class="ask-back" id="askBack">' + escH(opts.backLabel) + '</button>' : '')   // v38.53
       + (opts.icon ? '<div class="ask-icon">' + escH(opts.icon) + '</div>' : '')
       + (opts.title ? '<div class="ask-title">' + escH(opts.title) + '</div>' : '')
       + '<div class="ask-body" dir="auto">' + escH(message || '') + '</div>'
       + '<div class="ask-actions" id="askChoices">'
-      + options.map(function(o, i) {
-          return '<button class="ask-btn ghost" data-i="' + i + '" dir="auto">' + escH(o.label) + '</button>';
+      + options.map(function(o, i) {   // v38.53 — o.primary: highlighted (the recommended one); o.title: its tool tip
+          return '<button class="ask-btn' + (o.primary ? '' : ' ghost') + '" data-i="' + i + '" dir="auto"' + (o.title ? ' title="' + escA(o.title) + '"' : '') + '>' + escH(o.label) + '</button>'
+            + (o.hint ? '<div class="ask-opt-hint" dir="auto">' + escH(o.hint) + '</div>' : '');
         }).join('')
       // v38.47 — opts.cancelLabel: say what Cancel does (Tony: on the welcome it signed people out unannounced).
       + '<button class="ask-btn ghost" id="askCancel" dir="auto">' + escH(opts.cancelLabel || 'Cancel') + '</button>'
@@ -18694,6 +18808,7 @@ function askChoice(message, options, opts) {
       b.onclick = function(){ done(options[+b.getAttribute('data-i')].value); };
     });
     ov.querySelector('#askCancel').onclick = function(){ done(null); };
+    var bk = ov.querySelector('#askBack'); if (bk) bk.onclick = function(){ done(ASK_BACK); };
     ov.onclick = function(e){ if (e.target === ov && !opts.noBackdrop) done(null); };   // v38.47 — noBackdrop: only a button decides
     document.addEventListener('keydown', onKey, true);
   });
@@ -21622,6 +21737,7 @@ function askConfirm(opts) {
     var danger = !!opts.danger;
     ov.innerHTML =
       '<div class="ask-card">'
+      + (opts.backLabel ? '<button type="button" class="ask-back" id="askBack">' + escH(opts.backLabel) + '</button>' : '')   // v38.53
       + (opts.icon ? '<div class="ask-icon">' + escH(opts.icon) + '</div>' : '')
       + (opts.title ? '<div class="ask-title">' + escH(opts.title) + '</div>' : '')
       // v38.03 — someone's own words (an answer to a note), framed, never translated.
@@ -21658,6 +21774,7 @@ function askConfirm(opts) {
     var check = ov.querySelector('#askCheck');
     var alt   = ov.querySelector('#askAlt');
     if (alt) alt.onclick = function(){ done('alt'); };
+    var back = ov.querySelector('#askBack'); if (back) back.onclick = function(){ done(ASK_BACK); };   // v38.53
     function refused() { return input ? null : (check ? { ok:false, checked:false } : false); }
     function done(v) {
       ov.remove();
@@ -27242,10 +27359,11 @@ function farmWalk(el, a, style, opts) {
     // v37.94 — Tony: "When stopping and looking at me, its legs should stop
     // moving." The whole walk stops (not only some parts paused) and starts again after.
     art.classList.remove('walking'); el.classList.remove('fv-look');
-    farmOuch(el, a).then(function(){
+    farmOuch(el, a, true).then(function(){
       // v38.19 — then gone in a puff of smoke, where it stands (not on across the screen) —
-      // unless it was grabbed meanwhile: then it walks on from where it is put, as before.
-      if (held && held.moving) { last = performance.now(); tapped = false; return; }
+      // unless it was grabbed meanwhile: then it turns back and walks on from where it is put, as before.
+      // v38.53 — the puff comes while it still faces you (Tony: "say what it has to say, and then puff").
+      if (held && held.moving) { art.classList.remove('turned'); last = performance.now(); tapped = false; return; }
       return farmPoof(el);
     });
   });
@@ -27277,7 +27395,10 @@ function farmWalk(el, a, style, opts) {
   }
   requestAnimationFrame(frame);
 }
-function farmOuch(el, a) {
+// v38.53 — Tony: "make the clicked barn animal go up in a puff of smoke before they turn their heads away. It should
+// look at the user, say what it has to say, and then puff." keepFacing: still looking at you when the bubble goes;
+// the caller turns it back only if it walks on (grabbed while it spoke).
+function farmOuch(el, a, keepFacing) {
   if (typeof insightCount === 'function') insightCount('farm', 'farm');
   var art = el.querySelector('.fv-art'), bubble = el.querySelector('.fv-bubble');
   var said = farmPickSaying();
@@ -27286,8 +27407,9 @@ function farmOuch(el, a) {
   return new Promise(function(resolve) {
     setTimeout(function(){ el.classList.add('fv-said'); farmSay(said, a.pitch); }, 180);
     setTimeout(function(){
-      el.classList.remove('fv-said'); art.classList.remove('turned');
-      setTimeout(resolve, 260);
+      el.classList.remove('fv-said');
+      if (!keepFacing) art.classList.remove('turned');
+      setTimeout(resolve, keepFacing ? 140 : 260);
     }, 1300 + Math.min(2200, said.length * 60));
   });
 }
@@ -29307,7 +29429,7 @@ var HELP_SYSTEM_PROMPT = [
   "- Someone with Read only can tap ✋ Ask to add and change recipes; the owner (or someone with full access) sees it in Family Access and taps ✅ Allow or Decline.",
   "- ROLES: Read only (sees), Read + Write (adds and changes), Full access (also deletes and manages people). The owner can also 👑 hand the household over, or 🗑 delete it.",
   "- A new person is asked whether to start their own collection or join one they were invited to (paste the link).",
-  "- LINK WITH ANOTHER HOUSEHOLD: ⋯ More → 🤝 Connect with another household (the owner, or someone with full access). Type that household's identifier (MKN-…; yours is in ⚙️ → 🏠 My household → 🪪 Display my personal identifier) or the e-mail address of anyone in it. Its owner or an admin is asked at once if the app is open (otherwise the next time they open it): Accept, Reject or Remind me later — with the note that came with it. A refusal is never shown to the sender.",
+  "- LINK WITH ANOTHER HOUSEHOLD: ⋯ More → 🤝 Connect with another household (the owner, or someone with full access). Type that household's identifier (MKN-…; yours is in ⚙️ → 🏠 My household → 🪪 Display my personal identifier) or the e-mail address of anyone in it. Its owner or an admin is asked at once if the app is open (otherwise the next time they open it): Accept, Reject or Remind me later — with the note that came with it. By e-mail address the request also goes through the app — it pops up for that person if they use My Kitchen Notes, or waits until they join with that address (the app never says whether an address has an account); you may also tell them yourself (Gmail, Outlook, your mail app — if none opens, choose your e-mail on the web — WhatsApp, or copy). Every step has ‹ Back, with what you typed kept. A refusal is never shown to the sender.",
   "- Once linked, each household sees the other's recipes, read-only — and live: a change in their kitchen shows in yours within seconds, the changed card glowing for a moment: after its own in the main list, under that household's name, on a faint blue (hover one: 'A recipe from …'). 🏠 Kitchens ▾ in the filter bar chooses whose recipes show — tick one, several or all. 📥 Save a copy to my recipes makes one your own. Links do not chain: a third household linked to theirs is not seen. Links are listed, and removed, in ⚙️ → 🏠 My household → 👥 Family Access. ⚙️ → 🏠 My household → 🤝 Link requests through the app: blocked stops requests by identifier; requests by e-mail always arrive.",
   "- 📬 LINK REQUESTS: ⚙️ → 🏠 My household → 📬 Link requests — every request in one place: Waiting (Accept / Reject / 🚫 Block), Sent by your household (Withdraw), Linked now (Revoke access), and earlier answers. A request may carry a note, and the two households can write to each other there — the latest message shows, highlighted, with ↩ Reply; earlier ones are under 💬 Conversation. Only the household's name is shown, never a person's. A new message or request arrives while the app is open: a red dot (and a short notice with Open) within seconds, no reload needed. A red dot on ⚙️ leads to anything new. The switch there decides whether other households may ask through the app at all.",
   "- 💬 CHATS WITH LINKED KITCHENS: ⋯ More → 💬 Chats with linked kitchens — or 💬 Chat beside a linked kitchen's name in your recipe list, or in 👥 Family Access. Every conversation, newest first, with what is new; open one to read it all and write (Enter sends, Shift+Enter starts a new line). The same conversations are also on 📬 Link requests. A red dot on ⋯ More and on ⚙️ says something new arrived.",
@@ -29328,7 +29450,7 @@ var HELP_SYSTEM_PROMPT = [
   "- 📲 The share icon next to the language picker sends a link to the app to someone else",
   "",
   "=== THE FARM VISITORS ===",
-  "- Now and then a cartoon farm animal strolls across the screen. Tap it and it turns and says something; then it vanishes in a puff of smoke",
+  "- Now and then a cartoon farm animal strolls across the screen. Tap it and it turns to you and says something; then, still looking at you, it vanishes in a puff of smoke",
   "- You can pick an animal up and move it (press and drag)",
   "- Switch them off or on: ⚙️ → 🎨 How it looks → 🐑 Farm guests? (this device only)",
   "",

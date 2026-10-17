@@ -2615,13 +2615,14 @@ window.SELF_TESTS = [
         var q=store['linkRequests/hA_hB'];
         if(!r.ok || !q || q.to!=='hB' || q.fromName!=='Kitchen A' || q.fromCode!=='MKN-AAAA-2222' || q.via!=='code') throw new Error('the request was not written: '+JSON.stringify(q));
         // By e-mail, to Jo, who only reads in Kitchen B: the app offers to tell her.
-        var told=null; window.shareMessage=async function(o){ told=o; };
-        // (v37.81 — then "Add a note?", left empty.)
+        // (v37.81 — then "Add a note?", left empty; v38.53 — then how to send it: 📨 through the app, recommended.)
+        var offered3=null, choiceWas=window.askChoice; window.askChoice=async function(m, o){ offered3=o; return 'app'; };
         var prompts=[]; window.askConfirm=async function(o){ prompts.push(o); return prompts.length===1 ? 'jo@example.com' : ''; };
         _household={ hid:'hC', role:'owner', name:'Kitchen C', code:'MKN-CCCC-4444' };
-        r=await openConnectHousehold();
+        try{ r=await openConnectHousehold(); } finally { window.askChoice=choiceWas; }
         if(prompts.length<2 || !/note/i.test(prompts[1].title)) throw new Error('no chance to add a note to the request');
-        if(!r || !r.ok || !store['linkRequests/hC:jo@example.com'] || !told || told.to!=='jo@example.com') throw new Error('asking by e-mail: '+JSON.stringify(r));
+        if(!offered3 || offered3[0].value!=='app' || !offered3[0].primary || !/recommended/.test(offered3[0].label)) throw new Error('📨 Send via My Kitchen Notes is not the recommended first choice');
+        if(!r || !r.ok || !store['linkRequests/hC:jo@example.com']) throw new Error('asking by e-mail: '+JSON.stringify(r));
         window.askConfirm=async function(o){ asked.push(o); return answers.length?answers.shift():false; };
         // Jo opens the app: the request is passed on to Kitchen B, without a word to her.
         window._fbUser={ uid:'uJ', email:'jo@example.com', emailVerified:true };
@@ -7532,6 +7533,68 @@ window.SELF_TESTS = [
       }
     } },
 
+  { id:'link_request_back_and_mail', group:'Sharing', name:'🤝 Asking a household by e-mail: ‹ Back on every step with what was typed kept; 📨 Send via My Kitchen Notes first, highlighted and recommended, with its tool tip; the other ways send it too and tell them; Cancel sends nothing; "My mail app" offers e-mail on the web when no mail program opens (v38.53)',
+    test: async()=>{
+      // ‹ Back is a real button in both windows, and answers ASK_BACK (never something typed).
+      var p1=askConfirm({ title:'x', input:'kept', backLabel:'‹ Back' }); await wait(20);
+      var b=document.querySelector('#askOverlay #askBack'); if(!b) throw new Error('askConfirm has no ‹ Back');
+      b.click(); if(await p1!==ASK_BACK) throw new Error('‹ Back did not answer ASK_BACK');
+      var p2=askChoice('m', [{ value:'a', label:'A', primary:true, title:'tip' }, { value:'b', label:'B' }], { backLabel:'‹ Back' }); await wait(20);
+      var first=document.querySelector('#askOverlay #askChoices button[data-i="0"]'), second=document.querySelector('#askOverlay #askChoices button[data-i="1"]');
+      if(first.classList.contains('ghost') || !second.classList.contains('ghost') || first.title!=='tip') throw new Error('a recommended choice is not highlighted, or has no tool tip');
+      document.querySelector('#askOverlay #askBack').click(); if(await p2!==ASK_BACK) throw new Error('askChoice has no working ‹ Back');
+      var real={ ask:window.askConfirm, choice:window.askChoice, send:window.hhSendLinkRequest, links:window.hhLoadLinks, bar:window.householdRenderBar,
+                 db:window._fbDb, hh:window._household, user:window._fbUser, toast:window.toast, opened:window.mailOpened, open:window.open, log:window.syncLog,
+                 clip:navigator.clipboard && navigator.clipboard.writeText };
+      try{
+        window._fbUser={ uid:'uQ', email:'q@example.com', emailVerified:true };
+        window._household={ hid:'hQ', role:'owner', name:'Q Kitchen', code:'MKN-QQQQ-1111' };
+        window.toast=function(){}; window.syncLog=function(){}; window.hhLoadLinks=async function(){ return []; }; window.householdRenderBar=function(){};
+        if(navigator.clipboard) navigator.clipboard.writeText=async function(){};
+        var deleted=[], sentTo=[], seen=[], choices=[], opened=[];
+        window.open=function(u){ opened.push(u); return null; };
+        window._fbDb={ collection:function(){ return { doc:function(id){ return { delete:async function(){ deleted.push(id); } }; } }; } };
+        window.hhSendLinkRequest=async function(t, n){ sentTo.push([t, n]); return { ok:true, via:'email', email:t.toLowerCase(), label:t, id:'hQ:'+t.toLowerCase() }; };
+        function run(answers, picks){ window.askConfirm=async function(o){ seen.push({ title:o.title, input:o.input, back:o.backLabel }); return answers.shift(); };
+          window.askChoice=async function(m, o, op){ choices.push({ m:m, o:o, op:op }); return picks.shift(); }; return openConnectHousehold(); }
+        // 1. address → note → (the ways) ‹ Back → ‹ Back → a new address → the same note → 📨 through the app
+        var r=await run(['jo@example.com', 'Hi there', ASK_BACK, 'kim@example.com', 'Hi there'], [ASK_BACK, 'app']);
+        if(sentTo.length!==1 || sentTo[0][0]!=='kim@example.com' || sentTo[0][1]!=='Hi there' || deleted.length) throw new Error('what was sent: '+JSON.stringify(sentTo)+' withdrawn: '+deleted);
+        if(seen[0].back || !seen[1].back || seen[2].input!=='Hi there' || seen[3].input!=='jo@example.com') throw new Error('‹ Back lost what was typed: '+JSON.stringify(seen));
+        var c=choices[0];
+        if(!c || c.o[0].value!=='app' || !c.o[0].primary || !/Send via My Kitchen Notes \(recommended\)/.test(c.o[0].label) || !/already a member/.test(c.o[0].title)) throw new Error('the recommended way: '+JSON.stringify(c && c.o[0]));
+        if(c.o.slice(1).some(function(x){ return x.primary; }) || !c.o.some(function(x){ return x.value==='mail'; }) || c.op.backLabel!=='‹ Back' || !/send nothing/.test(c.op.cancelLabel)) throw new Error('the other ways, ‹ Back or Cancel: '+JSON.stringify(c.op));
+        if(/not registered|no account|isn.t registered/i.test(c.m+JSON.stringify(c.o))) throw new Error('the app says whether an address has an account (Tony chose not to)');
+        if(!r || r.email!=='kim@example.com') throw new Error('the request returned: '+JSON.stringify(r));
+        // 2. Gmail: sent through the app AND Gmail opened, ready.
+        sentTo=[]; opened=[]; await run(['lee@example.com', ''], ['gmail']);
+        if(sentTo.length!==1 || !opened.length || opened[0].indexOf('mail.google.com')===-1 || opened[0].indexOf('lee%40example.com')===-1) throw new Error('Gmail: '+JSON.stringify(sentTo)+' '+opened.join());
+        // 3. Cancel on the last step sends nothing.
+        sentTo=[]; await run(['max@example.com', 'x'], [null]);
+        if(sentTo.length) throw new Error('Cancel sent it');
+        // 4. "My mail app", none opens → the web choices → ‹ Back → Copy: sent ONCE.
+        sentTo=[]; window.mailOpened=async function(){ return false; };
+        var picks=['mail', ASK_BACK, 'copy'];
+        window.askConfirm=async function(o){ return ['ana@example.com', ''][seen.push(o) % 2 === 1 ? 0 : 1]; };
+        var n=0; window.askConfirm=async function(){ n++; return n===1 ? 'ana@example.com' : ''; };
+        window.askChoice=async function(m, o, op){ choices.push({ m:m, o:o, op:op }); return picks.shift(); };
+        await openConnectHousehold();
+        if(sentTo.length!==1) throw new Error('going back from the mail choices sent it again: '+sentTo.length);
+        if(!/Select mail application/.test(choices[choices.length-2].op.title||'')) throw new Error('no mail program, yet no choice of e-mail on the web');
+        // 5. shareMessage elsewhere (adding a member): the same fallback, ready to send in Yahoo.
+        opened=[]; var a5=0; window.askChoice=async function(){ a5++; return a5===1 ? 'mail' : 'yahoo'; };
+        if(await shareMessage({ to:'kim@example.com', subject:'Hi', text:'Body' })!=='yahoo' || opened[0].indexOf('compose.mail.yahoo.com')===-1) throw new Error('no mail program (adding a member): '+opened.join());
+        window.mailOpened=async function(){ return true; }; a5=0; window.askChoice=async function(){ a5++; return 'mail'; };
+        if(await shareMessage({ to:'kim@example.com', text:'Body' })!=='mail' || a5!==1) throw new Error('a mail program opened, yet webmail was offered');
+        if(String(linkLiveStart).indexOf("where('email', '=='")===-1) throw new Error('a request by e-mail does not arrive live');
+      } finally {
+        window.askConfirm=real.ask; window.askChoice=real.choice; window.hhSendLinkRequest=real.send; window.hhLoadLinks=real.links; window.householdRenderBar=real.bar;
+        window._fbDb=real.db; window._household=real.hh; window._fbUser=real.user; window.toast=real.toast; window.mailOpened=real.opened; window.open=real.open; window.syncLog=real.log;
+        if(navigator.clipboard && real.clip) navigator.clipboard.writeText=real.clip;
+        var o2=document.getElementById('askOverlay'); if(o2) o2.remove();
+      }
+    } },
+
   { id:'beta_moved_to_its_domain', group:'Core', name:'🌐 The beta lives at mykitchennotes.community: its old address and www. send visitors on with the shared link and the extension’s text; nothing else moves; the family links to it there (v38.17)',
     test: async()=>{
       var olds=['https://my-kitchen-notes-beta.pages.dev', 'https://www.mykitchennotes.community'], site='https://mykitchennotes.community';
@@ -8191,11 +8254,12 @@ window.SELF_TESTS = [
         // v37.94 — Tony: its legs stop too while it looks at you.
         var legNow=el.querySelector('.fv-art .leg');
         if(el.querySelector('.fv-art').classList.contains('walking') || (legNow && getComputedStyle(legNow).animationName!=='none')) throw new Error('its legs kept moving while it stood and spoke');
-        for(i=0;i<40 && el.isConnected && el.querySelector('.fv-art').classList.contains('turned');i++) await wait(100);
-        if(el.querySelector('.fv-art').classList.contains('turned')) throw new Error('it did not turn back');
         // v38.19 — Tony: once the bubble goes, it "disappears in a puff of smoke instead of walking away".
-        for(i=0;i<40 && el.isConnected && !el.classList.contains('fv-poof');i++) await wait(50);
+        // v38.53 — and still looking at you: "say what it has to say, and then puff" — never turning its head away first.
+        var turnedAway=false;
+        for(i=0;i<80 && el.isConnected && !el.classList.contains('fv-poof');i++){ await wait(50); if(!el.querySelector('.fv-art').classList.contains('turned')) turnedAway=true; }
         if(!el.classList.contains('fv-poof') || el.querySelectorAll('.fv-smoke i').length<5) throw new Error('it did not vanish in a puff of smoke');
+        if(turnedAway || !el.querySelector('.fv-art').classList.contains('turned')) throw new Error('it turned its head away before the puff');
         if(el.classList.contains('fv-said')) throw new Error('the smoke came before the bubble went');
         if(el.querySelector('.fv-art').classList.contains('walking')) throw new Error('it walked away instead');
         var poofAt=el.getBoundingClientRect().left; await wait(200);

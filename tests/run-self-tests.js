@@ -141,6 +141,9 @@ const NETWORK_DEPENDENT = id => /^net_/.test(id) || id === 'stor_firebase';
     process.exit(2);
   }
 
+  // v38.53 — an error while the app LOADS means part of it never started (ASK_BACK, used in an earlier script than
+  // its definition, stopped a whole block: APP_VERSION undefined). Counted here, before any test can raise one on purpose.
+  const loadErrors = pageErrors.slice();
   const ready = await page.evaluate(() => Array.isArray(window.SELF_TESTS) && window.SELF_TESTS.length > 0);
   if (!ready) {
     // A single-file app fails silently and completely on a syntax error, so this
@@ -318,7 +321,11 @@ const NETWORK_DEPENDENT = id => /^net_/.test(id) || id === 'stor_firebase';
     console.log(`\nUncaught page errors (${pageErrors.length}):`);
     pageErrors.slice(0, 5).forEach(e => console.log('  ' + e));
   }
+  if (loadErrors.length) {
+    console.log(`\n✗ THE APP THREW WHILE LOADING (${loadErrors.length}) — part of it never started:`);
+    loadErrors.slice(0, 5).forEach(e => console.log('  ' + e));
+  }
 
   await browser.close();
-  process.exit(failed.length || hygiene ? 1 : 0);
+  process.exit(failed.length || hygiene || loadErrors.length ? 1 : 0);
 })();
