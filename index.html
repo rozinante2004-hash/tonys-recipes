@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v38.50 -->
+<!-- Tony's Recipes Collection v38.51 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -5610,7 +5610,8 @@ function linkedCardsInto(g, list, c, hid, lazy, name) {
     g.className = 'recipe-list';
     g.innerHTML = list.map(function(r, i) {
       return '<div class="recipe-list-item linked-card" data-no-i18n' + tip + wants(r) + ' onclick="' + open(i) + '">'
-        + '<div class="recipe-list-thumb" style="background:' + escA(r.bg) + ';position:relative;overflow:hidden;">' + pic(r, 26) + '</div>'
+        + '<div class="recipe-list-thumb" style="background:' + escA(r.bg) + ';position:relative;overflow:hidden;">' + pic(r, 26)
+        + listBadgesHtml(r, !!(c.photos[r.id] || r._ph || /^https?:/i.test(r.photo || ''))) + '</div>'
         + '<div class="recipe-list-info"><div class="recipe-list-name" dir="auto"><button type="button" class="card-open">' + escH(r.name) + '</button></div>'
         + '<div class="recipe-list-meta"><span>' + escH(T(r.category)) + '</span><bdi>⏱ ' + escH(r.prep) + '</bdi>'
         + '<span class="difficulty ' + escA(String(r.difficulty || '').toLowerCase()) + '" style="padding:1px 6px;">' + escH(T(r.difficulty)) + '</span></div></div>'
@@ -5621,7 +5622,7 @@ function linkedCardsInto(g, list, c, hid, lazy, name) {
     g.innerHTML = list.map(function(r, i) {
       return '<div class="recipe-card linked-card" data-no-i18n' + tip + wants(r) + ' onclick="' + open(i) + '">'
         + '<div class="card-image" style="background:' + escA(r.bg) + '">' + pic(r, 52)
-        + '<div class="card-category-badge">' + escH(T(r.category)) + '</div></div>'
+        + '<div class="card-category-badge">' + escH(T(r.category)) + '</div>' + gridBadgesHtml(r) + '</div>'
         + '<div class="card-body"><div class="card-title" dir="auto"><button type="button" class="card-open">' + escH(r.name) + '</button></div>'
         + '<div class="card-meta"><bdi>⏱ ' + escH(r.prep) + '</bdi></div></div>'
         + '<div class="card-footer"><span class="difficulty ' + escA(String(r.difficulty || '').toLowerCase()) + '">' + escH(T(r.difficulty)) + '</span>'
@@ -5700,7 +5701,7 @@ async function linkedPhotoLoad(el) {
   }
   var src = c.photos[rid], holder = el.querySelector('.card-image, .recipe-list-thumb');
   if (!src || !holder || holder.querySelector('img')) return;
-  var em = holder.querySelector('.linked-emoji'); if (em) em.remove();
+  var em = holder.querySelector('.linked-emoji'); if (em) em.remove();   // (the photo goes in first: under the badges)
   var img = document.createElement('img'); img.src = src; img.alt = ''; img.decoding = 'async';
   holder.insertBefore(img, holder.firstChild);
   el.removeAttribute('data-lph');
@@ -8052,7 +8053,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v38.50';
+var APP_VERSION = 'v38.51';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -8717,7 +8718,7 @@ window.addEventListener('unhandledrejection', function(e) {
   --card-bg:    #FFFFFF;
   --bg:         #FAF7F2;
   --green:      #2E7D32;
-  --linked-bg:     #F1F6FC;  --linked-border: #A9C3E3;   /* v38.49 — a linked household's recipes */
+  --linked-bg:     #E7F0FA;  --linked-border: #9DB9DC;   /* v38.49 — a linked household's recipes; v38.51 a shade deeper */
   /* --warm-brown does double duty as a *surface* (header, bars, active pills)
      and as heading *text*. Those two have to move in opposite directions when
      the theme flips, so headings get their own variable — identical in light
@@ -8755,7 +8756,7 @@ window.addEventListener('unhandledrejection', function(e) {
   --card-bg:    #211B16;
   --bg:         #17140F;
   --green:      #6FBF73;
-  --linked-bg:     #1A2230;  --linked-border: #3E5A80;
+  --linked-bg:     #1C2638;  --linked-border: #44628A;
   --heading:    #F0E3D2;   /* headings invert; --warm-brown stays a surface */
   --note-bg:     #2B2416;  --note-border: #B8923A;  --note-label: #E3BC63;
   --bad-bg:      #3A1D1D;  --bad-border:  #6E3434;  --bad-text:   #F4A3A3;
@@ -8930,6 +8931,8 @@ window.addEventListener('unhandledrejection', function(e) {
   display: flex; align-items: center; justify-content: center;
   font-size: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.3);
 }
+.collection-badge-sm { width: 26px; height: 26px; font-size: 13px; box-shadow: 0 2px 6px rgba(0,0,0,0.3); }
+.collection-badge-sm .collection-count { min-width: 14px; height: 14px; font-size: 9px; line-height: 14px; bottom: -2px; inset-inline-end: -2px; }
 .collection-badge .collection-count {
   position: absolute; bottom: -3px; inset-inline-end: -3px;
   /* -fill, not --terracotta: that one is LIFTED in dark mode for use as text,
@@ -11051,7 +11054,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.50</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.51</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -11788,7 +11791,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.50</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.51</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -17630,6 +17633,23 @@ function hlMatch(text, q) {
 }
 window.matchReason = matchReason; window.hlMatch = hlMatch;
 
+// v38.51 — the 🎬 clip and 📚 collection badges, one source for your cards and a linked kitchen's (Tony: "there
+// are no indicators for clips or collections on any of the recipe cards" of the other kitchen). The list view
+// gains the 📚 too — it had only the 🎬.
+function listBadgesHtml(r, hasPhoto) {
+  return (r.isClip ? (hasPhoto
+      /* Over a photo the badge moves to a corner: centred, it covered the
+         picture the clip now finally gets to have. Over the emoji
+         placeholder it stays centred, which is the long-standing look. */
+      ? '<div class="clip-badge clip-badge-sm" style="position:absolute;bottom:4px;right:4px;">\u{1F3AC}</div>'
+      : '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;"><div class="clip-badge clip-badge-sm">\u{1F3AC}</div></div>') : '')
+    + (isCollection(r) ? '<div class="collection-badge collection-badge-sm" style="position:absolute;top:4px;right:4px;">\u{1F4DA}<span class="collection-count">' + recipeParts(r).length + '</span></div>' : '');
+}
+function gridBadgesHtml(r) {
+  return (r.isClip ? '<div class="clip-badge" style="position:absolute;top:8px;right:8px;">\u{1F3AC}</div>' : '')
+    + (isCollection(r) ? '<div class="collection-badge" style="position:absolute;top:8px;right:8px;">\u{1F4DA}<span class="collection-count">' + recipeParts(r).length + '</span></div>' : '');
+}
+window.listBadgesHtml = listBadgesHtml; window.gridBadgesHtml = gridBadgesHtml;
 function renderGrid() {
   if (typeof recipeBadgeUpdate === 'function') try { recipeBadgeUpdate(); } catch(e) {}   // v38.40
   const q = document.getElementById('searchInput').value.toLowerCase();
@@ -17790,12 +17810,7 @@ function renderGrid() {
         ${selectHtml(r)}
         <div class="recipe-list-thumb" style="background:${escA(r.bg)};position:relative;overflow:hidden;">
           ${r.photo ? `<img src="${escA(thumbSrc(r))}" alt="" loading="lazy" decoding="async">` : `<span style="font-size:26px;">${escH(r.emoji)}</span>`}
-          ${r.isClip ? (r.photo
-            /* Over a photo the badge moves to a corner: centred, it covered the
-               picture the clip now finally gets to have. Over the emoji
-               placeholder it stays centred, which is the long-standing look. */
-            ? `<div class="clip-badge clip-badge-sm" style="position:absolute;bottom:4px;right:4px;">🎬</div>`
-            : `<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;"><div class="clip-badge clip-badge-sm">🎬</div></div>`) : ''}
+          ${listBadgesHtml(r, !!r.photo)}
         </div>
         <div class="recipe-list-info">
           <div class="recipe-list-name" dir="auto"><button type="button" class="card-open">${escH(r.name)}</button>${r.cookCount>=3?` <span title="${escA(T('Cooked ' + r.cookCount + ' times'))}" style="font-size:12px;">🔥</span>`:''}</div>
@@ -17819,8 +17834,7 @@ function renderGrid() {
         <div class="card-image" style="background:${escA(r.bg)}">
           ${r.photo ? `<img src="${escA(thumbSrc(r))}" alt="" loading="lazy" decoding="async">` : `<span style="font-size:52px;line-height:1;">${escH(r.emoji)}</span>`}
           <div class="card-category-badge">${escH(T(r.category))}</div>
-          ${r.isClip ? `<div class="clip-badge" style="position:absolute;top:8px;right:8px;">🎬</div>` : ''}
-          ${isCollection(r) ? `<div class="collection-badge" style="position:absolute;top:8px;right:8px;">📚<span class="collection-count">${recipeParts(r).length}</span></div>` : ''}
+          ${gridBadgesHtml(r)}
         </div>
         <div class="card-body">
           <div class="card-title" dir="auto"><button type="button" class="card-open">${escH(r.name)}</button></div>

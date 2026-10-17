@@ -2652,6 +2652,9 @@ window.SELF_TESTS = [
         // v38.49 — the shape a recipe really has in the cloud (saveRecipeDoc): its JSON under r. A plain object here
         // let the reader pass while every real linked recipe came out "Untitled recipe".
         store['households/hA/recipes/1']={ r:JSON.stringify({ id:1, name:'Soup from A', category:'Soup', ingredients:[{ a:'2', n:'onions' }], steps:['Cook slowly'], _ph:1 }), updatedAt:1, id:1 };
+        // v38.51 — Tony: their clips and collections had no 🎬 / 📚 on the cards.
+        store['households/hA/recipes/2']={ r:JSON.stringify({ id:2, name:'Toast clip from A', isClip:true, source:'https://www.instagram.com/reel/x', ingredients:[], steps:[] }), updatedAt:1, id:2 };
+        store['households/hA/recipes/3']={ r:JSON.stringify({ id:3, name:'Vegetable round-up from A', parts:[{ uid:'p1', name:'Leeks', ingredients:[{ a:'1', n:'leek' }], steps:['Fry'] }, { uid:'p2', name:'Beans', ingredients:[{ a:'1', n:'bean' }], steps:['Boil'] }] }), updatedAt:1, id:3 };
         renderFilters();
         if(!document.querySelector('#filterBar .kitchen-btn') || kitchenMenuHtml().indexOf('Kitchen A')===-1) throw new Error('no 🤝 Kitchen A in 🏠 Kitchens');
         // v38.49 — Tony: "Admin's recipes are not visible in Tester1's list." Now in the main list, after this
@@ -2662,6 +2665,15 @@ window.SELF_TESTS = [
           throw new Error('their recipes are not in the main list: '+(all && all.textContent.slice(0,160)));
         if(document.getElementById('recipeGrid').textContent.indexOf('Soup from A')!==-1) throw new Error('their recipe is drawn among this household\'s own');
         if(!/A recipe from Kitchen A/.test(all.querySelector('.linked-card').title||'')) throw new Error('no tool tip naming their household: '+all.querySelector('.linked-card').title);
+        var card=function(re){ return Array.prototype.filter.call(all.querySelectorAll('.linked-card'), function(c){ return re.test(c.textContent); })[0]; };
+        var vWas=viewMode;
+        try{ ['list','grid'].forEach(function(mode){
+          setView(mode); all=document.getElementById('linkedAll');
+          var clip=card(/Toast clip from A/), coll=card(/Vegetable round-up from A/);
+          if(!clip || !clip.querySelector('.clip-badge')) throw new Error('their clip has no 🎬 ('+mode+')');
+          if(!coll || !coll.querySelector('.collection-badge .collection-count') || coll.querySelector('.collection-count').textContent!=='2') throw new Error('their collection has no 📚 2 ('+mode+')');
+        }); } finally { setView(vWas); all=document.getElementById('linkedAll'); }
+        if(listBadgesHtml({ parts:[{},{},{}] }, false).indexOf('collection-badge')===-1) throw new Error('the list view still shows no 📚 for a collection');
         var ownCard=document.querySelector('#recipeGrid .recipe-card, #recipeGrid .recipe-list-item');
         if(ownCard && getComputedStyle(ownCard).backgroundColor===getComputedStyle(all.querySelector('.linked-card')).backgroundColor) throw new Error('their cards look just like yours');
         showFavOnly=true; renderGrid(); var favHides=document.getElementById('linkedAll').style.display==='none'; showFavOnly=false; renderGrid();

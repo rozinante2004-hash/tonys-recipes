@@ -280,6 +280,22 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
   feature needs room (move a block out, or raise it with a reason).
 - **Released: v38.49 (17 Oct 2026, 00:27 Israel time, CI green on bee29fa).** All jobs success (Pages deploy,
   Cloudflare beta and test, Self Tests on main and test, Translate new phrases, Publish languages).
+- **v38.50** (Tony, 17 Oct ~02:30): (1) **Tester 1 had each example recipe twice** (10, cloud 10). NOT reproduced
+  on the emulator (examples → link → full Self Test from the window → reload stayed 5, `$S/e2e/dblflow.mjs`); cause
+  unknown. `exampleTwinsRemove` (after every cloud read, 2.5 s): an untouched copy of one of SAMPLE_RECIPES already
+  present goes (keeper = the touched one, else the lowest id; touched = photo, cooked, note, heart differs from the
+  example's, parts); viewers change nothing; logged with ids/uids. `addSampleRecipes` now logs "Added the 5 example
+  recipes" with ids — read Tester 1's log if it recurs. (2) **💬 Chats with linked kitchens** (`openKitchenChats`,
+  `renderKitchenChats`, `kitchenChatSend`, Enter sends): ⋯ More item `#kitchenChatsItem`, 💬 Chat in the linked
+  heading and Family Access; list (newest first, last line, n new) → thread; one conversation opens straight in;
+  shown = seen; live via linkLiveTalkArrived; the toast's Open opens the chat; PATH_DOTS `chats` (⋯ More + item).
+  `talkSend(other, given)`; a message sent on 📬 Link requests now leaves its box (v38.49's redraw kept it).
+  Tony's question "where are my chats": ⚙️ → 🏠 My household → 📬 Link requests (still there too). (3) **🏠 Kitchens
+  ▾** (Tony: chips "messy very fast"): `hiddenHouseholds` (unticked), `kitchenMenuHtml`/`kitchenItemsHtml`, stays
+  open while ticking (`_kitchenMenuOpen`, closes on a click elsewhere), (n/m) on the button, "No kitchen is ticked",
+  ✦ All ticks all; phone: `#mobileKitchenPanel`. `activeHouseholds`, `householdChipHtml` gone. (4) farm_visitors:
+  the three voices one at a time (Firefox still speaking → farmSay cancels and waits → only the child heard).
+  Page 2108 KB; budget raised to 2200 KB (written reason). Self-tests `kitchen_chats`, `example_twins_removed` (388).
 - **Before the testers, Tony's steps (16 Oct 2026):** (1) Cloudflare Email Routing destination addresses — done.
   (2) **The community app's browser key is restricted, both stages:** API restrictions = Identity Toolkit API, Token
   Service API, Cloud Firestore API (Google warned of "active usage" of eight Maps APIs — scanners; updated anyway);
