@@ -1,4 +1,13 @@
-// Tony's Recipes — Cloudflare Worker v78
+// Tony's Recipes — Cloudflare Worker v79
+// v79: EVERY ALLOWANCE, TOLD TO THE OWNER (Tony, 19 Oct 2026: "Please make sure the Admin gets a notification if any
+// allowance is exceeded or blocked"). `raiseNotice` keeps a notice (D1 `allowance_notices`; KV `notice:d1` when D1
+// is what ran out), shows it in the apps (health: everyone in that copy, scope 'all'; the owner's notes-new: all) and
+// e-mails the owner the first time, then at most once a day for the same thing. Sources: KV/D1 writes refused; the
+// AI day/month ceilings; Anthropic refusing for credit or key; Google's video allowance; a household's AI
+// allowance (owner only); `limit-report` from the apps (Firestore's daily allowance — signed in, everyone in that
+// copy; Firebase's 5 sign-in e-mails a day — owner only); `usage-report` from the hourly usage watch
+// (.github/workflows/cf-usage.yml, key USAGE_KEY derived from the Cloudflare token by deploy-worker.yml) — warned at
+// 70% of a free allowance. meter-admin `allowances`: the watch's last reading and the notices running.
 // v78: AN IDLE APP NO LONGER USES UP THE FREE ALLOWANCE, AND A USED-UP ONE IS SAID (Tony, 19 Oct 2026:
 // "[Alert] KV daily operation limit exceeded … I have barely touched the application … How can I expect
 // 20 beta testers to run on the same application if only my own limited use triggers blocking?").
@@ -354,7 +363,7 @@
 //   AI_MAX_TOKENS   – the longest answer one call may ask for (32000; the
 //                     app's largest, reading several recipes at once, asks 8000).
 
-const WORKER_VERSION = 'v78';
+const WORKER_VERSION = 'v79';
 const VIDEO_MAX_MB_DEFAULT = 50;
 const GEMINI_API = 'https://generativelanguage.googleapis.com';
 const GEMINI_MODEL_DEFAULT = 'gemini-2.5-flash';
@@ -592,8 +601,16 @@ async function rateLimited(request, env, action) {
       + 'are paused rather than run unmetered. Everything that does not call the AI still works.',
       rateLimited: true, paused: true }, 429);
   }
-  if (day.used >= dayMax) return ceilingResp('daily', day.used, dayMax);
-  if (mon.used >= monMax) return ceilingResp('monthly', mon.used, monMax);
+  if (day.used >= dayMax || mon.used >= monMax) {
+    const daily = day.used >= dayMax;
+    await raiseNotice(env, { what: daily ? 'ai-day' : 'ai-month', kind: 'paused', scope: 'all', self: true,   // v79
+      until: daily ? nextUtcMidnight(now) : nextUtcMonth(now),
+      title: 'The server\'s ' + (daily ? 'daily' : 'monthly') + ' ceiling on AI calls (' + (daily ? dayMax : monMax) + ') was reached',
+      affects: 'AI features (reading recipes, translating, suggestions)',
+      detail: 'This is the guard rail on the Anthropic bill. Raise ' + (daily ? 'AI_DAILY_MAX' : 'AI_MONTHLY_MAX')
+        + ' in the Worker\'s variables if the use is real, or wait for it to reset (' + (daily ? '00:00 UTC' : 'the 1st, UTC') + ').' });
+    return daily ? ceilingResp('daily', day.used, dayMax) : ceilingResp('monthly', mon.used, monMax);
+  }
   await day.credit();
   await mon.credit();
   return null;
@@ -617,64 +634,223 @@ async function spendStatus(env) {
   return out;
 }
 
-// ─── A USED-UP ALLOWANCE IS SAID, NOT SWALLOWED (v78) ───────────────────────
+// ─── ALLOWANCES: SAID IN THE APP, E-MAILED TO THE OWNER (v78, v79) ──────────
 // Tony, 19 Oct 2026: "I did not receive any indication from the application that
 // there is a problem or that any service is denied. I should get such
-// notification from the app itself." Cloudflare's free daily allowances (KV
-// writes, D1 rows) end at 00:00 UTC. When a write fails because one is used up,
-// that is remembered — in the OTHER store (a KV failure in D1, a D1 failure in
-// KV), read before written so many isolates do not each write it — until the
-// allowance comes back. Every app hears it: `health` (keyed) lists it, the
-// owner's `notes-new` carries it, and a refusal names it with its end time.
-// What stops, in words a person can act on. With D1 bound the AI counters are
-// there, so a used-up KV allowance only touches Bring!.
-function noticeAffects(env, what) {
-  if (what === 'd1') return 'AI features, notes to the app owner and their replies, and usage statistics';
-  return env.METER_DB ? 'sending a shopping list to Bring!'
-    : 'AI features (reading recipes, translating, suggestions) and sending to Bring!';
+// notification from the app itself." And: "Please make sure the Admin gets a
+// notification if any allowance is exceeded or blocked."
+//
+// A notice is { what, kind: 'paused'|'warning', scope: 'all'|'owner', project,
+// since, until, title, affects, detail, self }. It is kept where it survives the
+// thing that ran out — D1 `allowance_notices`, or KV `notice:d1` when D1 is what
+// ran out — read before it is written, so many isolates do not each write it.
+// Everyone in that copy hears a 'all' one (health), the owner hears all of them
+// (notes-new, every few minutes while he is about), and the owner is e-mailed
+// (ALERT_TO) the first time — then at most once a day for the same thing.
+// Sources: KV and D1 writes refused (v78); the AI ceilings; Anthropic refusing
+// (credit, key); Google's video allowance; a household's AI allowance; the apps'
+// own reports of Firebase's daily limits (limit-report); the hourly usage watch
+// (usage-report, .github/workflows/cf-usage.yml), which warns at 70%.
+const NOTICE_MAIL_GAP_MS = 20 * 3600e3;
+// what → notice + savedAt, in this isolate, per store (a test's databases do not share it)
+const _noticeMem = new WeakMap(), NO_STORE = {};
+function noticeMem(env) {
+  const k = env.METER_DB || env.BRING_KV || NO_STORE;
+  let m = _noticeMem.get(k);
+  if (!m) { m = {}; _noticeMem.set(k, m); }
+  return m;
 }
-const _notices = {};   // what → { since, until, savedAt }
 function isLimitError(e) { return /limit|exceed|quota|too many|429/i.test(String((e && e.message) || e || '')); }
+function nextUtcMonth(now) { const d = new Date(now); return Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1); }
+// Firebase's daily limits end at midnight in California.
+function nextPacificMidnight(now) {
+  try {
+    const p = {};
+    new Intl.DateTimeFormat('en-US', { timeZone: 'America/Los_Angeles', hourCycle: 'h23', year: 'numeric', month: 'numeric',
+      day: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric' }).formatToParts(new Date(now))
+      .forEach(function (x) { p[x.type] = x.value; });
+    const wall = Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute, +p.second);
+    const offset = wall - Math.floor(now / 1000) * 1000;                     // the Pacific wall clock minus UTC
+    return Date.UTC(+p.year, +p.month - 1, +p.day + 1) - offset;
+  } catch (e) { return nextUtcMidnight(now) + 8 * 3600e3; }
+}
+function ilTime(t) {
+  try { return new Date(t).toLocaleString('en-GB', { timeZone: 'Asia/Jerusalem', weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }); }
+  catch (e) { return new Date(t).toUTCString(); }
+}
+// What a used-up store stops, in words a person can act on. With D1 bound the AI
+// counters are there, so a used-up KV allowance only touches Bring!.
+function storeNotice(env, what, err) {
+  const d1 = what === 'd1';
+  return { what, kind: 'paused', scope: 'all', until: nextUtcMidnight(Date.now()), self: true,
+    title: d1 ? 'Cloudflare\'s free daily allowance for the database (D1) is used up'
+              : 'Cloudflare\'s free daily allowance of 1,000 storage (KV) writes is used up',
+    affects: d1 ? 'AI features, notes to the app owner and their replies, and usage statistics'
+         : env.METER_DB ? 'sending a shopping list to Bring!'
+         : 'AI features (reading recipes, translating, suggestions) and sending to Bring!',
+    detail: 'It comes back by itself at 00:00 UTC (03:00 Israel time in summer). ' + String((err && err.message) || err || '').slice(0, 160) };
+}
 async function noteServerLimit(env, what, err) {
   if (!isLimitError(err)) return;          // a passing fault is not "used up until midnight"
-  const now = Date.now(), until = nextUtcMidnight(now), cur = _notices[what];
-  if (cur && cur.until === until && now - cur.savedAt < 10 * 60e3) return;
-  const since = (cur && cur.until === until && cur.since) || now;
-  _notices[what] = { since, until, savedAt: now };
-  const detail = String((err && err.message) || err || '').slice(0, 200);
-  try {
-    if (what === 'kv' && env.METER_DB) {
-      const db = env.METER_DB;
-      await tableOnce(db, 'server_notices', 'CREATE TABLE IF NOT EXISTS server_notices (what TEXT PRIMARY KEY, since INTEGER, until INTEGER, detail TEXT)');
-      const have = await db.prepare('SELECT until FROM server_notices WHERE what = ?1').bind(what).first();
-      if (!have || Number(have.until) !== until)
-        await db.prepare('INSERT INTO server_notices (what, since, until, detail) VALUES (?1, ?2, ?3, ?4) '
-          + 'ON CONFLICT (what) DO UPDATE SET since = excluded.since, until = excluded.until, detail = excluded.detail')
-          .bind(what, since, until, detail).run();
-    } else if (what === 'd1' && env.BRING_KV) {
-      const have = JSON.parse(await env.BRING_KV.get('notice:d1') || 'null');
-      if (!have || have.until !== until)
-        await env.BRING_KV.put('notice:d1', JSON.stringify({ since, until, detail }), { expiration: Math.floor(until / 1000) + 60 });
-    }
-  } catch (e) { /* the notice stays in this isolate's memory */ }
+  await raiseNotice(env, storeNotice(env, what, err));
 }
-async function serverNotices(env) {
-  const now = Date.now(), out = {};
-  Object.keys(_notices).forEach(function (w) { if (_notices[w].until > now) out[w] = { since: _notices[w].since, until: _notices[w].until }; });
-  if (env.METER_DB && !out.kv) {
+async function raiseNotice(env, n) {
+  const now = Date.now();
+  n = Object.assign({ kind: 'paused', scope: 'all', project: '', since: now, title: '', affects: '', detail: '', self: true }, n);
+  n.until = Number(n.until) || nextUtcMidnight(now);
+  const _notices = noticeMem(env), cur = _notices[n.what];
+  if (cur && cur.until === n.until && now - cur.savedAt < 10 * 60e3) return false;
+  if (cur && cur.until > now) n.since = cur.since;
+  _notices[n.what] = Object.assign({}, n, { savedAt: now });
+  let mail = false, kept = false;
+  const db = n.what !== 'd1' ? env.METER_DB : null;
+  if (db) {
     try {
-      const r = await env.METER_DB.prepare('SELECT since, until FROM server_notices WHERE what = ?1 AND until > ?2').bind('kv', now).first();
-      if (r) out.kv = { since: Number(r.since), until: Number(r.until) };
+      await tableOnce(db, 'allowance_notices', 'CREATE TABLE IF NOT EXISTS allowance_notices (what TEXT PRIMARY KEY, kind TEXT, scope TEXT, '
+        + 'project TEXT, since INTEGER, until INTEGER, title TEXT, affects TEXT, detail TEXT, self INTEGER, mailed_at INTEGER)');
+      const have = await db.prepare('SELECT since, until, mailed_at FROM allowance_notices WHERE what = ?1').bind(n.what).first();
+      if (have && Number(have.until) === n.until) { _notices[n.what].since = Number(have.since); return false; }
+      if (have && Number(have.until) > now) n.since = Number(have.since);   // the same episode, now ending later
+      mail = !(have && Number(have.mailed_at) > now - NOTICE_MAIL_GAP_MS);
+      await db.prepare('INSERT INTO allowance_notices (what, kind, scope, project, since, until, title, affects, detail, self, mailed_at) '
+        + 'VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11) ON CONFLICT (what) DO UPDATE SET kind = excluded.kind, scope = excluded.scope, '
+        + 'project = excluded.project, since = excluded.since, until = excluded.until, title = excluded.title, affects = excluded.affects, '
+        + 'detail = excluded.detail, self = excluded.self, mailed_at = excluded.mailed_at')
+        .bind(n.what, n.kind, n.scope, n.project, n.since, n.until, n.title, n.affects, n.detail, n.self ? 1 : 0,
+              mail ? now : (have ? have.mailed_at : null)).run();
+      kept = true;
+    } catch (e) { mail = false; }
+  }
+  if (!kept && env.BRING_KV && (n.what === 'd1' || !db)) {
+    try {
+      const key = 'notice:' + n.what;
+      const have = JSON.parse(await env.BRING_KV.get(key) || 'null');
+      if (have && have.until === n.until) { _notices[n.what].since = have.since; return false; }
+      if (have && have.until > now) n.since = have.since;
+      mail = !(have && have.mailedAt > now - NOTICE_MAIL_GAP_MS);
+      await env.BRING_KV.put(key, JSON.stringify(Object.assign({}, n, { mailedAt: mail ? now : (have && have.mailedAt) || 0 })),
+        { expiration: Math.floor(Math.max(n.until, now + 120e3) / 1000) + 60 });
+      kept = true;
+    } catch (e) { mail = false; }
+  }
+  if (mail) {
+    try {
+      await ownerAlert(env, 'My Kitchen Notes: ' + (n.kind === 'paused' ? 'paused' : 'warning') + ' - ' + n.title,
+        [n.title + '.', '',
+         n.affects ? (n.kind === 'paused' ? 'What stops: ' : 'What it touches: ') + n.affects + '.' : '',
+         n.detail, '',
+         'Since: ' + ilTime(n.since) + ' (Israel time)',
+         n.kind === 'warning' ? 'Resets: ' + ilTime(n.until)
+           : n.self ? 'Comes back by itself: ' + ilTime(n.until) : 'Looked at again: ' + ilTime(n.until) + ' — it needs you to act (see above).',
+         n.project ? 'Copy: ' + n.project : '', '',
+         'The app shows this too (a bar at the top). You will not be e-mailed about this again for a day.'
+        ].join('\n').replace(/\n{3,}/g, '\n\n'));
+    } catch (e) {}
+  }
+  return true;
+}
+// The notices that are still running. `owner` sees every one; anyone else only
+// those for everyone, in their own copy (or the server's own).
+async function serverNotices(env, opts) {
+  opts = opts || {};
+  const now = Date.now(), out = {}, _notices = noticeMem(env);
+  const take = function (n) {
+    if (!n || !(Number(n.until) > now) || out[n.what]) return;
+    if (!opts.owner && (n.scope !== 'all' || (n.project && opts.project && n.project !== opts.project))) return;
+    out[n.what] = { what: n.what, kind: n.kind || 'paused', scope: n.scope || 'all', project: n.project || '', since: Number(n.since),
+      until: Number(n.until), title: n.title || '', affects: n.affects || '', detail: opts.owner ? (n.detail || '') : '', self: !!(n.self === true || n.self === 1) };
+  };
+  Object.keys(_notices).forEach(function (w) { take(_notices[w]); });
+  if (env.METER_DB) {
+    try {
+      const r = await env.METER_DB.prepare('SELECT what, kind, scope, project, since, until, title, affects, detail, self FROM allowance_notices WHERE until > ?1')
+        .bind(now).all();
+      ((r && r.results) || []).forEach(take);
     } catch (e) { /* no table yet: nothing has ever run out */ }
   }
   if (env.BRING_KV && !out.d1) {
+    try { take(JSON.parse(await env.BRING_KV.get('notice:d1') || 'null')); } catch (e) {}
+  }
+  return Object.keys(out).map(function (w) { return out[w]; });
+}
+
+// The apps' own word on Firebase's daily limits (v79). A Firestore refusal comes
+// from a signed-in person and is told to everyone in that copy; "no more sign-in
+// e-mails today" comes before anyone is signed in, so it goes to the owner only.
+const LIMIT_REPORTS = {
+  firestore: { scope: 'all', needSignIn: true, title: 'Firebase\'s free daily allowance for the database (Firestore) is used up',
+    affects: 'saving to and reading from the cloud (changes stay on each device and go up when it comes back)',
+    detail: 'Firestore\'s free plan allows 50,000 reads, 20,000 writes and 20,000 deletes a day; it comes back at midnight California time. '
+      + 'If it happens again, look at Firebase → Usage, or move the project to the Blaze plan.' },
+  'auth-email': { scope: 'owner', needSignIn: false, kind: 'warning',
+    title: 'Firebase sent its last sign-in e-mail for today',
+    affects: 'signing in with an e-mailed link (Google and passwords still work)',
+    detail: 'Firebase\'s free plan sends 5 sign-in-link e-mails a day for the whole project (Blaze: 25,000); it comes back at midnight California time.' }
+};
+async function limitReport(request, env, body) {
+  const kind = LIMIT_REPORTS[String(body.what || '')];
+  const project = String(body.project || '').slice(0, 64);
+  if (!kind || !csvList(env.METER_PROJECTS, METER_PROJECTS_DEFAULT).includes(project)) return jsonResp({ error: 'LIMIT: what, and which copy?' }, 400);
+  if (kind.needSignIn) {
+    let claims = null;
+    try { claims = await verifyIdToken(body.idToken, env); } catch (e) {}
+    if (!claims || claims.aud !== project) return jsonResp({ error: 'LIMIT: sign in first.' }, 401);
+  }
+  const n = { what: body.what + ':' + project, kind: kind.kind || 'paused', scope: kind.scope, project, until: nextPacificMidnight(Date.now()),
+    title: kind.title + ' (' + project + ')', affects: kind.affects, detail: kind.detail, self: true };
+  await raiseNotice(env, n);
+  // Told back to the app only when it is everyone's to know; "sign-in e-mails" is the owner's.
+  const told = kind.scope === 'all' ? (await serverNotices(env, { project })).filter(function (x) { return x.what === n.what; })[0] || null : null;
+  return jsonResp({ ok: true, notice: told });
+}
+
+// The hourly usage watch (v79). The workflow measures the account's day so far
+// and says it here; at 70% of a free allowance the owner is warned. Its key is
+// derived from the Cloudflare token both sides already hold (deploy-worker.yml
+// sets USAGE_KEY), so nothing new has to be kept anywhere.
+const USAGE_NAMES = {
+  workerRequests: 'Worker requests', kvWrites: 'KV writes', kvReads: 'KV reads', kvDeletes: 'KV deletes', kvLists: 'KV lists',
+  d1RowsWritten: 'D1 rows written', d1RowsRead: 'D1 rows read', pagesBuilds: 'Pages builds'
+};
+function sameText(a, b) {
+  a = String(a || ''); b = String(b || '');
+  if (!a || a.length !== b.length) return false;
+  let x = 0; for (let i = 0; i < a.length; i++) x |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return x === 0;
+}
+async function usageReport(env, body) {
+  if (!env.USAGE_KEY || !sameText(body.key, env.USAGE_KEY)) return jsonResp({ error: 'FORBIDDEN' }, 403);
+  const now = Date.now(), m = body.metrics || {}, warned = [];
+  for (const k of Object.keys(USAGE_NAMES)) {
+    const x = m[k];
+    if (!x || !(Number(x.limit) > 0)) continue;
+    const used = Math.max(0, Number(x.used) || 0), limit = Number(x.limit), pct = Math.round(100 * used / limit);
+    if (pct < 70) continue;
+    const month = x.period === 'month';
+    await raiseNotice(env, { what: 'usage:' + k, kind: used >= limit ? 'paused' : 'warning', scope: 'owner',
+      until: month ? nextUtcMonth(now) : nextUtcMidnight(now), self: true,
+      title: USAGE_NAMES[k] + ' at ' + pct + '% of the free allowance ' + (month ? 'this month' : 'today'),
+      affects: k === 'pagesBuilds' ? 'publishing new versions of the app' : k.indexOf('d1') === 0 ? 'the server\'s database' : 'the server',
+      detail: used.toLocaleString('en-US') + ' of ' + limit.toLocaleString('en-US') + (month ? ' this month.' : ' today (Cloudflare\'s day ends 00:00 UTC).') });
+    warned.push(k);
+  }
+  if (env.METER_DB) {
     try {
-      const v = JSON.parse(await env.BRING_KV.get('notice:d1') || 'null');
-      if (v && v.until > now) out.d1 = { since: v.since, until: v.until };
+      await tableOnce(env.METER_DB, 'usage_snapshot', 'CREATE TABLE IF NOT EXISTS usage_snapshot (id INTEGER PRIMARY KEY, at INTEGER, metrics TEXT)');
+      await env.METER_DB.prepare('INSERT INTO usage_snapshot (id, at, metrics) VALUES (1, ?1, ?2) ON CONFLICT (id) DO UPDATE SET at = excluded.at, metrics = excluded.metrics')
+        .bind(now, JSON.stringify(m).slice(0, 20000)).run();
     } catch (e) {}
   }
-  return Object.keys(out).map(function (w) { return Object.assign({ what: w, affects: noticeAffects(env, w) }, out[w]); });
+  return jsonResp({ ok: true, warned });
 }
+async function usageSnapshot(env) {
+  if (!env.METER_DB) return null;
+  try {
+    const r = await env.METER_DB.prepare('SELECT at, metrics FROM usage_snapshot WHERE id = 1').first();
+    return r ? { at: Number(r.at), metrics: JSON.parse(r.metrics || '{}') } : null;
+  } catch (e) { return null; }
+}
+
 
 // ── Bring! recipe import (v42) ────────────────────────────────────────────────
 const BRING_PAGE_TTL = 900;                   // seconds a page lives (KV expiry)
@@ -813,7 +989,7 @@ async function handleRequest(request, env) {
         ok: true,
         spend: keyed ? await spendStatus(env) : undefined,
         // v78 — a used-up daily allowance (KV writes, D1 rows), with when it comes back.
-        notices: keyed ? await serverNotices(env) : undefined,
+        notices: keyed ? await serverNotices(env, { project: String(body.project || '').slice(0, 64) }) : undefined,
         // Keep in step with the header at the top of this file. It said v34 on a
         // v36 Worker, which made `health` — the one endpoint whose entire job is
         // to report the truth about this Worker — quietly wrong about it.
@@ -822,6 +998,7 @@ async function handleRequest(request, env) {
         appKeyRequired: !!env.APP_SHARED_KEY,
         appKeyAccepted: keyed,
         rateLimiting: !!(env.BRING_KV || env.METER_DB),
+        usageWatch: !!env.USAGE_KEY,  // v79 — the hourly usage watch can report here
         // v78 — where the counters live: per minute in memory; the AI day/month in D1 (else KV).
         limits: { minute: 'memory', ceilings: env.METER_DB ? 'd1' : env.BRING_KV ? 'kv' : 'off' },
         // v60 — the app sends its sign-in and household only to a Worker that
@@ -1322,6 +1499,8 @@ async function handleRequest(request, env) {
     // refuses a body with no messages.
 
     // ── meter-me / meter-admin (v60) ─────────────────────────────────────────
+    if (body.action === 'limit-report') return await limitReport(request, env, body);   // v79
+    if (body.action === 'usage-report') return await usageReport(env, body);            // v79
     if (body.action === 'meter-me' || body.action === 'meter-admin') return await meterAction(request, env, body);
     if (body.action === 'feedback-send') return await feedbackSend(request, env, body);   // v61
     if (body.action === 'feedback-replies') return await feedbackReplies(request, env, body);   // v68
@@ -1358,6 +1537,18 @@ async function handleRequest(request, env) {
         body: JSON.stringify(forwarded),
       });
       const data = await r.json();
+      // v79 — Anthropic refusing for want of credit, or the key: the owner hears of it.
+      if (!r.ok) {
+        const et = String((data && data.error && data.error.type) || ''), em = String((data && data.error && data.error.message) || '');
+        if (r.status === 402 || et === 'billing_error' || /credit balance/i.test(em))
+          await raiseNotice(env, { what: 'anthropic', kind: 'paused', scope: 'all', self: false, until: Date.now() + 3 * 3600e3,
+            title: 'Anthropic refused the AI calls: the API credit balance is used up', affects: 'AI features (reading recipes, translating, suggestions)',
+            detail: 'Top up at https://console.anthropic.com/settings/billing — the AI works again at once. (' + em.slice(0, 160) + ')' });
+        else if (r.status === 401 || et === 'authentication_error')
+          await raiseNotice(env, { what: 'anthropic-key', kind: 'paused', scope: 'all', self: false, until: Date.now() + 3 * 3600e3,
+            title: 'Anthropic refused the Worker\'s API key', affects: 'AI features (reading recipes, translating, suggestions)',
+            detail: 'Check ANTHROPIC_API_KEY in the Worker\'s settings (https://console.anthropic.com/settings/keys). (' + em.slice(0, 160) + ')' });
+      }
       // v60 — what it cost, counted against the household; the app shows it.
       if (metered.ctx && data && data.usage) data._meter = await meterAdd(env, metered.ctx, forwarded.model, data.usage);
       // CORS is applied centrally by the fetch wrapper (v36); it overwrites
@@ -1644,6 +1835,11 @@ async function meterStart(request, env, body) {
     const spent = row.usd || 0, cap = capFor(row, month, env, claims.aud);
     const ctx = { db, project: claims.aud, hid, month, capped, cap, spent, name: hh.name, code: hh.code, created: hh.created };
     if (capped && spent >= cap) {
+      await raiseNotice(env, { what: 'household-ai:' + claims.aud + ':' + hid, kind: 'warning', scope: 'owner', project: claims.aud,   // v79
+        until: nextUtcMonth(Date.now()), self: true,
+        title: 'The household "' + String(hh.name || hid).slice(0, 60) + '" used its AI allowance for ' + month,
+        affects: 'AI features in that household (everything else keeps working)',
+        detail: '$' + spent.toFixed(2) + ' of $' + cap.toFixed(2) + '. It renews on the 1st; you can change it in 👑 App owner → 📊 Households.' });
       return { resp: allowanceResp('this month\'s AI allowance for your household is used up ($' + spent.toFixed(2)
         + ' of $' + cap.toFixed(2) + '). It renews on the 1st; everything that does not use the AI keeps working.') };
     }
@@ -1734,6 +1930,10 @@ async function meterAction(request, env, body) {
   if (/^note|^notes/.test(String(body.op || ''))) { const fr = await feedbackAdmin(env, db, body, claims); if (fr) return fr; }
   if (/^error/.test(String(body.op || ''))) { const er = await signalsAdmin(env, db, body); if (er) return er; }   // v69
   // v76 — every copy's counts, added up by month and name, with how many households each came from.
+  // v79 — the owner's 🩺 Server allowances: the usage watch's last reading and every notice running.
+  if (body.op === 'allowances') {
+    return jsonResp({ ok: true, usage: await usageSnapshot(env), notices: await serverNotices(env, { owner: true }), watch: !!env.USAGE_KEY });
+  }
   if (body.op === 'trends') {
     await signalsTable(db);
     const d = new Date(); d.setUTCDate(1); d.setUTCMonth(d.getUTCMonth() - 23);
@@ -1983,7 +2183,7 @@ async function feedbackAdmin(env, db, body, claims) {
   }
   if (body.op === 'notes-new') {
     const r = await db.prepare("SELECT COUNT(*) AS n FROM feedback WHERE status = 'new'").first();
-    return jsonResp({ new: (r && r.n) || 0, server: await serverNotices(env) });   // v78 — the owner hears of a used-up allowance
+    return jsonResp({ new: (r && r.n) || 0, server: await serverNotices(env, { owner: true }) });   // v78/v79 — every allowance notice
   }
   const id = parseInt(body.id, 10);
   if (!(id > 0)) return jsonResp({ error: 'FEEDBACK: which note?' }, 400);
@@ -2771,6 +2971,15 @@ export default {
           notice: (await serverNotices(env)).filter(function (n) { return n.what === 'd1'; })[0] || null }, 503);
       } else resp = jsonResp({ error: 'Worker error: ' + msg }, 500);
     }
+    // v79 — Google's free allowance for videos, said wherever it was met.
+    if (resp.status === 429) {
+      try { const j = await resp.clone().json();
+        if (j && /^VIDEO_QUOTA/.test(String(j.error || '')))
+          await raiseNotice(env, { what: 'gemini', kind: 'paused', scope: 'all', self: true, until: nextPacificMidnight(Date.now()),
+            title: 'Google\'s free allowance for reading videos (Gemini) is used up', affects: 'reading a recipe from a video',
+            detail: 'It comes back at midnight California time.' });
+      } catch (e) {}
+    }
     // Stamp CORS on EVERY response, whatever produced it — including the binary
     // download path and anything that throws. Handlers no longer decide this.
     const h = new Headers(resp.headers);
@@ -2779,4 +2988,4 @@ export default {
   }
 };
 
-// ── END OF WORKER v78 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
+// ── END OF WORKER v79 ── If this is the last line in the Cloudflare editor, the whole file was pasted.

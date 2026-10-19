@@ -65,6 +65,15 @@ jobs:
         if: steps.token.outputs.ok == 'true'
         run: npx --yes wrangler@4 deploy --config worker/wrangler.jsonc
 
+      # v79 — the hourly usage watch (cf-usage.yml) reports to the Worker with a key DERIVED from the
+      # Cloudflare token both jobs already hold, so there is nothing new to keep; never printed.
+      - name: The usage watch's key
+        if: steps.token.outputs.ok == 'true'
+        run: |
+          node -e "process.stdout.write(require('crypto').createHmac('sha256', process.env.CLOUDFLARE_API_TOKEN).update('mkn-usage-watch-v1').digest('hex'))" \
+            | npx --yes wrangler@4 secret put USAGE_KEY --config worker/wrangler.jsonc >/dev/null
+          echo "the usage watch's key is set"
+
       # v73 — where the owner's alerts go (Tony's second address, verified in
       # Cloudflare Email Routing): the GitHub secret ALERT_EMAIL becomes the
       # Worker's secret ALERT_TO. Never printed; without it, no alerts.

@@ -346,6 +346,31 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
   closable, remembered per notice) fed by health, the owner's count and a fetch hook on Worker 429/503 with `notice`;
   the AI refusal names the local time it comes back. Self-test `idle_quiet_and_server_notice`; Worker tests: no KV
   writes on ordinary requests, D1 ceilings, notices, owner device hourly.
+- **Released: v38.54 + Worker v78 (20 Oct 2026, 01:14 Israel time, CI green on d315674).**
+- **v38.55 + Worker v79 — every allowance told to the owner** (Tony, 19 Oct: "Please make sure the Admin gets a
+  notification if any allowance is exceeded or blocked"). Worker: `raiseNotice` {what, kind paused|warning, scope
+  all|owner, project, since, until, title, affects, detail, self} kept in D1 `allowance_notices` (KV `notice:<what>` when
+  D1 is what ran out / is absent), memory per store (`noticeMem`), e-mailed via `ownerAlert` the first time then at
+  most once per 20 h per what (Israel times in the mail). Sources: KV/D1 writes refused; `ai-day`/`ai-month` ceilings;
+  Anthropic 402/billing_error/"credit balance" (`anthropic`, self:false, +3 h) and 401 (`anthropic-key`); Gemini
+  VIDEO_QUOTA (central hook in the fetch wrapper); `household-ai:<project>:<hid>` (owner, until the 1st); action
+  `limit-report` {what firestore (sign-in required, scope all) | auth-email (no sign-in, owner)}, until midnight
+  California (`nextPacificMidnight`); action `usage-report` {key = HMAC-SHA256(CLOUDFLARE_API_TOKEN,
+  'mkn-usage-watch-v1') = Worker secret USAGE_KEY set by deploy-worker.yml, metrics} → owner warnings at 70%, snapshot in
+  D1 `usage_snapshot`. health `notices` takes `project` (scope all, that copy); notes-new `server` = all (owner);
+  meter-admin `allowances`. **Usage watch**: cf-usage.yml hourly (`41 * * * *`, runs only once on main) `--report`.
+  App: `serverNoticeText` per kind (a tester: "comes back by itself" / "the app's owner has been told"; the owner:
+  title + detail); `firebaseLimitHit` (Firestore RESOURCE_EXHAUSTED in handleFirestoreSaveError and unhandled
+  rejections → bar + report; `auth/quota-exceeded` → plain words + report); ⚙️ → 👑 App owner → **🩺 Server
+  allowances** (`openServerAllowances`, `serverAllowanceLines`). Self-tests `firebase_limits_told`; Worker tests v79.
+- **Found in the pre-beta scan (19–20 Oct):** (1) **Cloudflare Pages: 905 builds in October** (free plan 500/month,
+  one at a time) — both projects build a **preview of every branch** (`preview_deployment_setting: all`): 553 previews
+  nobody opens (beta project ← test/main pushes; test project ← main/beta pushes). Fix ready but NOT run (the auto-mode
+  classifier stopped a job changing Cloudflare settings): `$S/parked/cf-pages-previews.js` + workflow, or Tony in the
+  dashboard: Workers & Pages → each project → Settings → Builds → Branch control → Preview branches: None.
+  (2) **Firebase Spark limits sign-in-link e-mails to 5 a day per project** (Blaze 25,000); the beta offers email-link
+  sign-in and an empty password sends a link. Password reset 150/day, verification 1,000/day. (3) Worker CPU p99.9
+  16.5 ms vs the free 10 ms (no errors seen). (4) The CLOUDFLARE_API_TOKEN reads account analytics and Pages, not D1.
 - **Before the testers, Tony's steps (16 Oct 2026):** (1) Cloudflare Email Routing destination addresses — done.
   (2) **The community app's browser key is restricted, both stages:** API restrictions = Identity Toolkit API, Token
   Service API, Cloud Firestore API (Google warned of "active usage" of eight Maps APIs — scanners; updated anyway);

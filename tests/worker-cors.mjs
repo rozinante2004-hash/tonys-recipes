@@ -1591,6 +1591,100 @@ console.log('\nA used-up allowance is said, not swallowed (v78):');
   }
 }
 
+// v79 — Tony: "Please make sure the Admin gets a notification if any allowance is exceeded or blocked."
+console.log('\nEvery allowance, told to the owner (v79):');
+{
+  const { DatabaseSync } = await import('node:sqlite');
+  function d1() {
+    const raw = new DatabaseSync(':memory:');
+    const st = (sql, args) => ({ bind: (...a) => st(sql, a),
+      first: async () => raw.prepare(sql).get(...(args || [])) || null,
+      all: async () => ({ results: raw.prepare(sql).all(...(args || [])) }),
+      run: async () => { const x = raw.prepare(sql).run(...(args || [])); return { success: true, meta: { changes: Number(x.changes) } }; } });
+    return { raw, prepare: (sql) => st(sql, []) };
+  }
+  class FakeEmail { constructor(from, to, raw) { this.from = from; this.to = to; this.raw = raw; } }
+  const mails = [];
+  const base = () => ({ APP_SHARED_KEY: 'secret-k', ALERTS: { send: async m => { mails.push(m); } }, ALERT_TO: 'owner@example.com', __EmailMessage: FakeEmail });
+  const ai = () => ({ model: 'claude-haiku-4-5', max_tokens: 10, messages: [], appKey: 'secret-k' });
+  const stub = async (reply, fn) => {
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = async () => new Response(JSON.stringify(reply.body), { status: reply.status, headers: { 'Content-Type': 'application/json' } });
+    try { return await fn(); } finally { globalThis.fetch = realFetch; }
+  };
+  const ok200 = { status: 200, body: { stub: true } };
+
+  // (a) The daily AI ceiling reached: a notice for everyone, one e-mail, not one per refusal.
+  {
+    const db = d1(), e = Object.assign(base(), { METER_DB: db, AI_DAILY_MAX: '2', ANTHROPIC_API_KEY: 'sk-test' });
+    mails.length = 0;
+    await stub(ok200, async () => { for (let i = 0; i < 5; i++) await worker.fetch(post(ai()), e); });
+    const row = db.raw.prepare("SELECT * FROM allowance_notices WHERE what = 'ai-day'").get();
+    expect('the daily AI ceiling raises a notice for everyone', row && row.kind === 'paused' && row.scope === 'all' && /ceiling on AI calls \(2\)/.test(row.title), JSON.stringify(row));
+    expect('…and the owner is e-mailed once, not once per refusal', mails.length === 1 && /Subject: My Kitchen Notes: paused - The server's daily ceiling/.test(mails[0].raw)
+      && /What stops: AI features/.test(mails[0].raw) && /Israel time/.test(mails[0].raw), mails.length + ' ' + (mails[0] && mails[0].raw.slice(0, 400)));
+    const h = await (await worker.fetch(post({ action: 'health', appKey: 'secret-k', project: 'tonys-recipes-test' }), e)).json();
+    expect('every app hears it (health)', (h.notices || []).some(n => n.what === 'ai-day' && n.detail === ''), JSON.stringify(h.notices));
+  }
+
+  // (b) Anthropic refusing for want of credit: the owner hears of it, and it is not "comes back by itself".
+  {
+    const kv = { store: new Map(), async get(k) { return this.store.get(k) ?? null; }, async put(k, v) { this.store.set(k, v); } };
+    const e = Object.assign(base(), { BRING_KV: kv, ANTHROPIC_API_KEY: 'sk-test' });
+    mails.length = 0;
+    const bill = { status: 400, body: { type: 'error', error: { type: 'invalid_request_error', message: 'Your credit balance is too low to access the Anthropic API.' } } };
+    await stub(bill, async () => { await worker.fetch(post(ai()), e); await worker.fetch(post(ai()), e); });
+    expect('no credit at Anthropic: one e-mail, saying to top up', mails.length === 1 && /credit balance is used up/.test(mails[0].raw) && /console\.anthropic\.com\/settings\/billing/.test(mails[0].raw)
+      && /needs you to act/.test(mails[0].raw), mails.length + ' ' + (mails[0] && mails[0].raw.slice(0, 300)));
+  }
+
+  // (c) The apps' reports of Firebase's limits.
+  {
+    const db = d1(), e = Object.assign(base(), { METER_DB: db });
+    mails.length = 0;
+    const fs = await worker.fetch(post({ action: 'limit-report', what: 'firestore', project: 'tonys-recipes-test', appKey: 'secret-k' }), e);
+    expect('"Firestore is used up" needs a sign-in (it is told to everyone)', fs.status === 401, 'got ' + fs.status);
+    const odd = await worker.fetch(post({ action: 'limit-report', what: 'anything', project: 'tonys-recipes-test', appKey: 'secret-k' }), e);
+    expect('…and only known limits, in copies this server serves', odd.status === 400, 'got ' + odd.status);
+    const realNow = Date.now;
+    Date.now = () => Date.parse('2026-10-19T22:00:00Z');                    // 15:00 in California (summer time)
+    let ae;
+    try { ae = await (await worker.fetch(post({ action: 'limit-report', what: 'auth-email', project: 'tonys-recipes-test', appKey: 'secret-k' }), e)).json(); }
+    finally { Date.now = realNow; }
+    const row = db.raw.prepare("SELECT * FROM allowance_notices WHERE what = 'auth-email:tonys-recipes-test'").get();
+    expect('"no more sign-in e-mails today": kept for the owner, until midnight in California', ae.ok === true && ae.notice === null && row && row.scope === 'owner'
+      && row.until === Date.parse('2026-10-20T07:00:00Z'), JSON.stringify([ae, row && row.until, row && new Date(row.until).toISOString()]));
+    expect('…and e-mailed to the owner', mails.length === 1 && /sign-in e-mail/.test(mails[0].raw), mails.length + '');
+    Date.now = () => Date.parse('2026-12-01T10:00:00Z');                    // 02:00 in California (winter time)
+    try { await worker.fetch(post({ action: 'limit-report', what: 'auth-email', project: 'my-kitchen-notes-beta', appKey: 'secret-k' }), e); }
+    finally { Date.now = realNow; }
+    const w = db.raw.prepare("SELECT until FROM allowance_notices WHERE what = 'auth-email:my-kitchen-notes-beta'").get();
+    expect('…in winter time too', w && w.until === Date.parse('2026-12-02T08:00:00Z'), w && new Date(w.until).toISOString());
+    const h = await (await worker.fetch(post({ action: 'health', appKey: 'secret-k', project: 'tonys-recipes-test' }), e)).json();
+    expect('a tester\'s app is not shown the owner\'s notices', !(h.notices || []).some(n => n.scope === 'owner'), JSON.stringify(h.notices));
+  }
+
+  // (d) The hourly usage watch: its key, a warning at 70%, the last reading kept for the owner.
+  {
+    const db = d1(), e = Object.assign(base(), { METER_DB: db, USAGE_KEY: 'k'.repeat(64) });
+    mails.length = 0;
+    const metrics = { kvWrites: { used: 812, limit: 1000 }, workerRequests: { used: 6000, limit: 100000 }, pagesBuilds: { used: 497, limit: 500, period: 'month' } };
+    const bad = await worker.fetch(post({ action: 'usage-report', key: 'nope', metrics, appKey: 'secret-k' }), e);
+    expect('the usage watch needs its key', bad.status === 403, 'got ' + bad.status);
+    const none = await worker.fetch(post({ action: 'usage-report', key: 'k'.repeat(64), metrics, appKey: 'secret-k' }), Object.assign(base(), { METER_DB: d1() }));
+    expect('…and without USAGE_KEY set, nobody may report', none.status === 403, 'got ' + none.status);
+    const r = await (await worker.fetch(post({ action: 'usage-report', key: 'k'.repeat(64), metrics, appKey: 'secret-k' }), e)).json();
+    expect('70% or more is warned, below is not', JSON.stringify(r.warned) === '["kvWrites","pagesBuilds"]', JSON.stringify(r));
+    const kvw = db.raw.prepare("SELECT * FROM allowance_notices WHERE what = 'usage:kvWrites'").get();
+    expect('…for the owner, saying the numbers', kvw && kvw.scope === 'owner' && kvw.kind === 'warning' && /KV writes at 81%/.test(kvw.title) && /812 of 1,000 today/.test(kvw.detail), JSON.stringify(kvw));
+    expect('…by e-mail, once each', mails.length === 2, mails.length + '');
+    await worker.fetch(post({ action: 'usage-report', key: 'k'.repeat(64), metrics, appKey: 'secret-k' }), e);
+    expect('the next hour\'s same reading is not e-mailed again', mails.length === 2, mails.length + '');
+    const snap = db.raw.prepare('SELECT metrics FROM usage_snapshot').get();
+    expect('the last reading is kept for the owner\'s page', snap && JSON.parse(snap.metrics).kvWrites.used === 812, JSON.stringify(snap));
+  }
+}
+
 if (failures.length) {
   console.log(`\n${failures.length} failure(s):`);
   failures.forEach(f => console.log('  - ' + f));

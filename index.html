@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v38.54 -->
+<!-- Tony's Recipes Collection v38.55 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -4176,7 +4176,7 @@ function checkWorkerHealth() {
   if (_workerHealth !== null) { renderSyncHealth(); return Promise.resolve(_workerHealth); }
   return fetch(WORKER_ENDPOINT, {
       method: 'POST', headers: workerHeaders(),
-      body: workerBody({ action: 'health' }),
+      body: workerBody({ action: 'health', project: (APP_CONFIG.firebase && APP_CONFIG.firebase.projectId) || '' }),   // v38.55 — this copy's notices
       signal: AbortSignal.timeout(10000)
     })
     .then(function(r){ return r.json(); })
@@ -4203,12 +4203,85 @@ function serverNoticeTime(t) {
   try { return new Date(t).toLocaleTimeString(typeof _i18nLang === 'string' && _i18nLang ? _i18nLang : undefined, { hour: '2-digit', minute: '2-digit' }); }
   catch(e) { return new Date(t).toTimeString().slice(0, 5); }
 }
+// v38.55 (Worker v79) — every allowance: { kind: paused|warning, title, affects, detail (the owner's), self }.
 function serverNoticeText(n, owner) {
-  var head = '⏸ Paused until ' + serverNoticeTime(n.until) + ': ' + (n.affects || 'some features') + '.';
-  if (owner) return head + ' Cloudflare’s free daily allowance for ' + (n.what === 'd1' ? 'database writes (D1)' : 'storage writes (KV)')
-    + ' is used up' + (n.since ? ' (since ' + serverNoticeTime(n.since) + ')' : '') + '. It comes back by itself — nothing to do. Everything else works.';
-  return head + ' The server’s free daily allowance is used up; it comes back by itself. Everything else works.';
+  var self = n.self !== false;
+  if (n.kind === 'warning') return '⚠️ ' + (n.title || 'A free allowance is nearly used up') + '.' + (owner && n.detail ? ' ' + n.detail : '');
+  var head = '⏸ ' + (self ? 'Paused until ' + serverNoticeTime(n.until) : 'Paused for now') + ': ' + (n.affects || 'some features') + '.';
+  if (owner) return head + ' ' + (n.title ? n.title + (n.since ? ' (since ' + serverNoticeTime(n.since) + ')' : '') + '. ' : '')
+    + (n.detail || '') + (self ? ' Nothing to do.' : '');
+  return head + (self ? ' It comes back by itself' : ' The app’s owner has been told') + '. Everything else works.';
 }
+// Firebase's own daily limits, met by this app (v38.55): said here, and told to the server, which tells the owner —
+// Firestore's (everyone in this copy is told) and "no more sign-in e-mails today" (the owner only).
+function nextPacificMidnight(now) {
+  try {
+    var p = {};
+    new Intl.DateTimeFormat('en-US', { timeZone: 'America/Los_Angeles', hourCycle: 'h23', year: 'numeric', month: 'numeric', day: 'numeric',
+      hour: 'numeric', minute: 'numeric', second: 'numeric' }).formatToParts(new Date(now)).forEach(function(x){ p[x.type] = x.value; });
+    var wall = Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute, +p.second);
+    return Date.UTC(+p.year, +p.month - 1, +p.day + 1) - (wall - Math.floor(now / 1000) * 1000);
+  } catch(e) { return now + 24 * 3600e3; }
+}
+var _limitTold = {};
+function firebaseLimitHit(what, err) {
+  var project = (APP_CONFIG.firebase && APP_CONFIG.firebase.projectId) || '';
+  if (what === 'firestore') serverNoticeFrom({ what: 'firestore:' + project, kind: 'paused', scope: 'all', until: nextPacificMidnight(Date.now()), self: true,
+    affects: 'saving to and reading from the cloud (your changes stay on this device and go up when it comes back)',
+    title: 'Firebase’s free daily allowance for the database (Firestore) is used up' });
+  try { syncLog('error', 'Firebase limit: ' + what, String((err && (err.code || err.message)) || '').slice(0, 160)); } catch(e) {}
+  if (_limitTold[what] && Date.now() - _limitTold[what] < 3600e3) return false;
+  _limitTold[what] = Date.now();
+  var u = window._fbUser;
+  Promise.resolve(what === 'firestore' && u && u.getIdToken ? u.getIdToken().catch(function(){ return ''; }) : '').then(function(tok){
+    return fetch(WORKER_ENDPOINT, { method: 'POST', headers: workerHeaders(),
+      body: workerBody({ action: 'limit-report', what: what, project: project, idToken: tok || undefined }), signal: AbortSignal.timeout(10000) });
+  }).catch(function(){});
+  return true;
+}
+function isFirestoreQuota(e) {
+  var code = String((e && e.code) || ''), msg = String((e && e.message) || '');
+  return code === 'resource-exhausted' || /RESOURCE_EXHAUSTED|quota exceeded/i.test(msg);
+}
+window.addEventListener('unhandledrejection', function(ev){ try { if (isFirestoreQuota(ev && ev.reason)) firebaseLimitHit('firestore', ev.reason); } catch(e) {} });
+window.firebaseLimitHit = firebaseLimitHit; window.nextPacificMidnight = nextPacificMidnight;
+// v38.55 — ⚙️ → 👑 App owner → 🩺 Server allowances: the hourly usage watch's last reading of Cloudflare's free
+// allowances (today; Pages builds this month) and every allowance notice running, with what it touches.
+var USAGE_LABELS = { workerRequests: 'Worker requests', kvWrites: 'KV writes', kvReads: 'KV reads', kvDeletes: 'KV deletes', kvLists: 'KV lists',
+  d1RowsWritten: 'D1 rows written', d1RowsRead: 'D1 rows read', pagesBuilds: 'Pages builds this month' };
+function serverAllowanceLines(d) {
+  var lines = [], u = d && d.usage, m = (u && u.metrics) || {};
+  if (u && u.at) {
+    lines.push('Cloudflare, measured ' + new Date(u.at).toLocaleString(undefined, { weekday: 'short', hour: '2-digit', minute: '2-digit' }) + ' (today = since 03:00 Israel time):');
+    Object.keys(USAGE_LABELS).forEach(function(k){
+      var x = m[k]; if (!x || !(x.limit > 0)) return;
+      var pct = Math.round(100 * (x.used || 0) / x.limit);
+      lines.push((pct >= 100 ? '⛔ ' : pct >= 70 ? '⚠️ ' : '✓ ') + USAGE_LABELS[k] + ': ' + (x.used || 0).toLocaleString() + ' of ' + x.limit.toLocaleString() + ' (' + pct + '%)');
+    });
+  } else lines.push(d && d.watch ? 'The hourly usage watch has not reported yet.' : 'The hourly usage watch is not connected to this server yet.');
+  lines.push('');
+  var ns = (d && d.notices) || [];
+  if (ns.length) { lines.push('Running now:'); ns.forEach(function(n){ lines.push(serverNoticeText(n, true)); }); }
+  else lines.push('Nothing is paused or close to its allowance.');
+  lines.push('', 'Firebase (the recipes themselves) is not measured here; if its daily allowance runs out, the app that meets it says so and you are e-mailed.');
+  return lines;
+}
+async function openServerAllowances() {
+  if (!(typeof isAppOwner === 'function' && isAppOwner()) || !window._fbUser) { toast('This is for the app’s owner.'); return false; }
+  for (;;) {
+    var d = null;
+    try {
+      var r = await fetch(WORKER_ENDPOINT, { method: 'POST', headers: workerHeaders(),
+        body: workerBody({ action: 'meter-admin', op: 'allowances', idToken: await _fbUser.getIdToken() }), signal: AbortSignal.timeout(15000) });
+      d = await r.json();
+      if (!r.ok || !d || !d.ok) throw new Error((d && d.error) || ('HTTP ' + r.status));
+    } catch(e) { toast('❌ Could not ask the server: ' + String((e && e.message) || e).slice(0, 140), 8000); return false; }
+    if ((d.notices || []).length) serverNoticeFrom(d.notices);
+    var again = await askConfirm({ icon: '🩺', title: 'Server allowances', message: serverAllowanceLines(d).join('\n'), okLabel: 'Close', cancelLabel: '↻ Again' });
+    if (again !== false) return true;
+  }
+}
+window.openServerAllowances = openServerAllowances; window.serverAllowanceLines = serverAllowanceLines;
 function serverNoticeClosed() {
   try { return JSON.parse(localStorage.getItem(SERVER_NOTICE_KEY) || '{}') || {}; } catch(e) { return {}; }
 }
@@ -8331,7 +8404,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v38.54';
+var APP_VERSION = 'v38.55';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -11348,7 +11421,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.54</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.55</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -11448,6 +11521,8 @@ body.banner-shown .header {
             <button type="button" class="drop-item set-head" aria-expanded="false" title="Households, payments, deployments, and the Gmail and Bring! connections — the app&#39;s owner only." onclick="settingsGroup('owner')">👑 App owner</button>
             <div class="set-body">
               <button class="drop-item" data-owner-only data-layout-only="households" title="Every household in this copy: members, AI spending and allowances, links, shares, last use. Only you can open it." onclick="closeDrop('settingsDrop');openManagement()">📊 Households (management)</button>
+              <!-- v38.55 — Tony: "Please make sure the Admin gets a notification if any allowance is exceeded or blocked." -->
+              <button class="drop-item" data-owner-only title="How much of the free daily allowances (Cloudflare) is used, and anything paused right now (the app&#39;s owner only)." onclick="closeDrop('settingsDrop');openServerAllowances()">🩺 Server allowances</button>
               <!-- v38.42 — Tony: "Let's make the invitations sendable from the app, from the Admin account." -->
               <button class="drop-item" data-owner-only title="The tester invitation, in English or Hebrew, with this copy's link — sent through your Gmail, one e-mail to each person, or by WhatsApp or the mail app (the app's owner only)." onclick="closeDrop('settingsDrop');openInviteTesters()">✉️ Invite testers</button>
               <button class="drop-item" title="The app's running costs and billing (the app's owner only)." data-owner-only onclick="closeDrop('settingsDrop');openPayments()">💳 Payments</button>
@@ -12085,7 +12160,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.54</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.55</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -25604,7 +25679,9 @@ function handleFirestoreSaveError(err) {
     return;
   }
   if (msg.indexOf('quota') > -1 || code === 'resource-exhausted' || msg.indexOf('RESOURCE_EXHAUSTED') > -1) {
-    showServiceError('FIREBASE_QUOTA: Firebase Firestore quota exceeded.\n\nFree tier: 50,000 reads/day, 20,000 writes/day, 1GB storage.\n\nCheck usage: https://console.firebase.google.com/u/0/project/' + APP_CONFIG.firebase.projectId + '/firestore/databases/-default-/data\n\nUpgrade at: https://console.firebase.google.com/u/0/project/' + APP_CONFIG.firebase.projectId + '/overview');
+    // v38.55 — said plainly to whoever met it (the bar), and told to the owner through the server; no console links for a tester.
+    firebaseLimitHit('firestore', err);
+    _offlineQueue = true; try { localStorage.setItem('tonys_offline_queue', '1'); } catch(e) {}
     return;
   }
   if (code === 'unavailable' || !navigator.onLine) {
@@ -26088,7 +26165,9 @@ function authErrorText(err) {
     'auth/account-exists-with-different-credential': 'You have signed in with this address another way before (Google, Microsoft, Apple or a password). Please use that way.',
     'auth/invalid-action-code': 'This sign-in link has expired or was already used. Ask for a new one.',
     'auth/expired-action-code': 'This sign-in link has expired. Ask for a new one.',
-    'auth/network-request-failed': 'No connection to the sign-in service. Check the connection and try again.'
+    'auth/network-request-failed': 'No connection to the sign-in service. Check the connection and try again.',
+    // v38.55 — Firebase's free plan sends only a few sign-in links a day for the whole app
+    'auth/quota-exceeded': 'Sign-in links by e-mail are used up for today. Please sign in with Google, or with your e-mail address and a password, instead — the app’s owner has been told.'
   })[c] || ((err && err.message) || String(err));
 }
 function renderSignInOptions() {
@@ -26206,6 +26285,7 @@ function authFailed(err, what) {
   // as Tony did as a new tester) is a slip, not a fault: kept in the log, not counted as an error.
   var slip = err && /auth\/(invalid-credential|wrong-password|user-not-found|invalid-email|missing-password|weak-password)/.test(err.code || '');
   if (!(err && err.cancelled)) try { syncLog(slip ? 'auth' : 'error', what + (slip ? ' refused' : ' failed'), _lastAuthError.slice(0, 200)); } catch(e) {}
+  if (err && err.code === 'auth/quota-exceeded') firebaseLimitHit('auth-email', err);   // v38.55 — the owner hears of it
   loginSay(err && err.otherAccount ? 'Sign in again and choose the other account.' : authErrorText(err));
 }
 async function startProviderSignIn(kind) {
@@ -29580,7 +29660,7 @@ var HELP_SYSTEM_PROMPT = [
   "- Every item in ⚙️ explains itself when you point at it.",
   "",
   "=== FOR THE APP'S OWNER ===",
-  "- ⚙️ → 👑 App owner is shown only to the app's owner: 📊 Households, ✉️ Invite testers, 💳 Payments, 🚀 Deployments, 🔑 Check the app's key, 🔐 Two-step sign-in for the owner, 📧 Gmail Setup, 🛒 Bring!",
+  "- ⚙️ → 👑 App owner is shown only to the app's owner: 📊 Households, 🩺 Server allowances, ✉️ Invite testers, 💳 Payments, 🚀 Deployments, 🔑 Check the app's key, 🔐 Two-step sign-in for the owner, 📧 Gmail Setup, 🛒 Bring!",
   "- ✉️ Invite testers: the tester invitation in English or עברית, with this copy's link; the wording can be changed (this device keeps it; 'The original words' brings it back). Paste the addresses; 📧 Send with Gmail sends each person their own e-mail, from the app's address when the owner's Gmail may send as it. Also ✉️ Mail app, 💬 WhatsApp and 📋 Copy. The first Gmail send needs the Gmail API switched on for the copy's Google Cloud project, and Google's permission",
   "- 🔐 Two-step sign-in: an authenticator app's 6-digit code on top of the Google sign-in, for the owner's tools",
   "- The owner's log panel and its pop-up offer 📋 Copy log (everyone else's send the report to the owner)",

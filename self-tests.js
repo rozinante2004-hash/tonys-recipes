@@ -7621,12 +7621,61 @@ window.SELF_TESTS = [
         if(document.getElementById('serverNoticeBar')) throw new Error('✕ did not close it');
         Object.keys(_serverNotices).forEach(function(k){ delete _serverNotices[k]; });
         if(serverNoticeFrom({ what:'kv', until:until, affects:'x' })!==0 || document.getElementById('serverNoticeBar')) throw new Error('a closed notice came back');
-        if(!/Cloudflare/.test(serverNoticeText({ what:'d1', until:until, since:Date.now() }, true)) || /Cloudflare/.test(serverNoticeText({ what:'d1', until:until }, false)))
+        var d1n={ what:'d1', kind:'paused', until:until, since:Date.now(), self:true, title:'Cloudflare’s free daily allowance for the database (D1) is used up', affects:'AI features', detail:'It comes back by itself at 00:00 UTC.' };
+        if(!/Cloudflare/.test(serverNoticeText(d1n, true)) || /Cloudflare/.test(serverNoticeText(Object.assign({}, d1n, { detail:'' }), false)) || !/comes back by itself/.test(serverNoticeText(d1n, false)))
           throw new Error('the owner is told whose allowance it is; a tester only that it comes back');
+        // v38.55 — what needs the owner says so, and a warning reads as one.
+        if(!/Paused for now: AI features\. The app’s owner has been told/.test(serverNoticeText({ what:'anthropic', kind:'paused', until:until, self:false, affects:'AI features' }, false)))
+          throw new Error('a pause that needs the owner: '+serverNoticeText({ what:'anthropic', kind:'paused', until:until, self:false, affects:'AI features' }, false));
+        if(!/^⚠️ KV writes at 81%/.test(serverNoticeText({ what:'usage:kvWrites', kind:'warning', until:until, title:'KV writes at 81% of the free allowance today', detail:'812 of 1,000' }, true)))
+          throw new Error('a warning');
         if(!window.fetch._mknNotice) throw new Error('the server’s refusals are not looked at');
       } finally {
         _userActiveAt=realAt; _livePollAt=realPoll;
         Object.keys(_serverNotices).forEach(function(k){ delete _serverNotices[k]; }); Object.assign(_serverNotices, realNotices);
+        try { if(realLs===null) localStorage.removeItem(SERVER_NOTICE_KEY); else localStorage.setItem(SERVER_NOTICE_KEY, realLs); } catch(e) {}
+        var b=document.getElementById('serverNoticeBar'); if(b) b.remove();
+      }
+    } },
+
+  { id:'firebase_limits_told', group:'Core', name:'🩺 Firebase’s own daily limits are said plainly and told to the owner: Firestore used up → a bar (no console links) and a report; no more sign-in e-mails today → a clear way on (Google or a password) and a report; the owner’s 🩺 Server allowances page reads the usage watch (v38.55)',
+    test: async()=>{
+      var realFetch=window.fetch, realNotices=Object.assign({}, _serverNotices), realTold=Object.assign({}, _limitTold), realUser=window._fbUser, realLs=null, sent=[];
+      try { realLs=localStorage.getItem(SERVER_NOTICE_KEY); } catch(e) {}
+      try{
+        try { localStorage.removeItem(SERVER_NOTICE_KEY); } catch(e) {}
+        Object.keys(_serverNotices).forEach(function(k){ delete _serverNotices[k]; });
+        Object.keys(_limitTold).forEach(function(k){ delete _limitTold[k]; });
+        window.fetch=async function(u, o){ sent.push(JSON.parse((o && o.body) || '{}')); return new Response('{"ok":true}', { status:200 }); };
+        window._fbUser={ uid:'uF', email:'f@example.com', getIdToken: async function(){ return 'tok'; } };
+        var src=String(handleFirestoreSaveError);
+        if(src.indexOf("firebaseLimitHit('firestore'")===-1 || src.indexOf('FIREBASE_QUOTA')!==-1) throw new Error('a used-up Firestore still shows the technical box');
+        firebaseLimitHit('firestore', { code:'resource-exhausted', message:'Quota exceeded.' });
+        await wait(30);
+        var bar=document.getElementById('serverNoticeBar');
+        if(!bar || !/saving to and reading from the cloud/.test(bar.textContent) || /console\.firebase/.test(bar.textContent)) throw new Error('the bar: '+(bar && bar.textContent));
+        var rep=sent.filter(function(b){ return b.action==='limit-report'; });
+        if(rep.length!==1 || rep[0].what!=='firestore' || rep[0].idToken!=='tok' || rep[0].project!==APP_CONFIG.firebase.projectId) throw new Error('the report: '+JSON.stringify(rep));
+        firebaseLimitHit('firestore', { code:'resource-exhausted' }); await wait(30);
+        if(sent.filter(function(b){ return b.action==='limit-report'; }).length!==1) throw new Error('told again and again');
+        // the sign-in e-mails
+        var t=authErrorText({ code:'auth/quota-exceeded' });
+        if(!/used up for today/.test(t) || !/Google/.test(t) || !/password/.test(t)) throw new Error('the words: '+t);
+        authFailed({ code:'auth/quota-exceeded', message:'x' }, 'Sending a sign-in link'); await wait(30);
+        var r2=sent.filter(function(b){ return b.action==='limit-report' && b.what==='auth-email'; });
+        if(r2.length!==1 || r2[0].idToken) throw new Error('the sign-in e-mail report: '+JSON.stringify(r2));
+        // Pacific midnight
+        if(nextPacificMidnight(Date.parse('2026-10-19T22:00:00Z'))!==Date.parse('2026-10-20T07:00:00Z') || nextPacificMidnight(Date.parse('2026-12-01T10:00:00Z'))!==Date.parse('2026-12-02T08:00:00Z'))
+          throw new Error('midnight in California');
+        // the owner's page
+        var lines=serverAllowanceLines({ watch:true, usage:{ at:Date.now(), metrics:{ kvWrites:{ used:812, limit:1000 }, workerRequests:{ used:900, limit:100000 }, pagesBuilds:{ used:510, limit:500, period:'month' } } },
+          notices:[{ what:'usage:kvWrites', kind:'warning', until:Date.now()+3600e3, title:'KV writes at 81% of the free allowance today', detail:'812 of 1,000 today.' }] }).join('\n');
+        if(!/⚠️ KV writes: 812 of 1,000 \(81%\)/.test(lines) || !/✓ Worker requests/.test(lines) || !/⛔ Pages builds this month: 510 of 500/.test(lines) || !/Running now:/.test(lines)) throw new Error('the page: '+lines);
+        if(!/not connected/.test(serverAllowanceLines({ watch:false, notices:[] }).join('\n'))) throw new Error('no watch yet, yet it does not say so');
+      } finally {
+        window.fetch=realFetch; window._fbUser=realUser;
+        Object.keys(_serverNotices).forEach(function(k){ delete _serverNotices[k]; }); Object.assign(_serverNotices, realNotices);
+        Object.keys(_limitTold).forEach(function(k){ delete _limitTold[k]; }); Object.assign(_limitTold, realTold);
         try { if(realLs===null) localStorage.removeItem(SERVER_NOTICE_KEY); else localStorage.setItem(SERVER_NOTICE_KEY, realLs); } catch(e) {}
         var b=document.getElementById('serverNoticeBar'); if(b) b.remove();
       }

@@ -2,9 +2,13 @@ name: Cloudflare usage
 
 # What used the account's Cloudflare free allowances (Worker requests, KV
 # writes, D1 rows), hour by hour in Israel time. Counts only — the log is
-# public. Run by hand, or by a push that changes the tool or this file.
+# public. Run by hand, or by a push that changes the tool or this file — and
+# every hour (v79), when it only tells the Worker today's use (--report).
 
 on:
+  # v79 — the usage watch: every hour, today's use is told to the Worker, which warns the owner at 70%.
+  schedule:
+    - cron: "41 * * * *"
   workflow_dispatch:
     inputs:
       days:
@@ -28,4 +32,6 @@ jobs:
       - name: Usage
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        run: node tools/cf-usage.js "${{ github.event.inputs.days || '2' }}"
+        run: |
+          if [ "${{ github.event_name }}" = "schedule" ]; then node tools/cf-usage.js --report
+          else node tools/cf-usage.js "${{ github.event.inputs.days || '2' }}" && node tools/cf-usage.js --report; fi
