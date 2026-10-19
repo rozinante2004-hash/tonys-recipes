@@ -7681,6 +7681,52 @@ window.SELF_TESTS = [
       }
     } },
 
+  { id:'reads_not_doubled', group:'Sharing', name:'📉 Fewer database reads: a linked kitchen listened to live is not also read once on every open, and a new device learns which recipes have no photo from the one bulk read, not one read per recipe (v38.56, measured on the emulator: a tester’s reopen 117 → 18 reads)',
+    test: async()=>{
+      var real={ hh:window._household, live:window._live, start:window.linkLiveStart, now:window.hhFetchLinkedNow, cache:_linkCache['hLV'],
+                 recipes:recipes, cloudDoc:window.cloudDoc, fbDb:window._fbDb, user:window._fbUser, probed:null,
+                 toast:window.toast, save:window.saveLocal, grid:window.renderGrid, cloud:_cloudSnapshotForTest() };
+      window.toast=function(){}; window.saveLocal=function(){}; window.renderGrid=function(){};
+      try { real.probed=localStorage.getItem(PHOTO_PROBED_KEY); } catch(e) {}
+      var reads=0;
+      try{
+        window._linkLiveUnderTest=true;
+        window._household={ hid:'hOwn', role:'owner' };
+        window.linkLiveStart=function(){ return true; };
+        window.hhFetchLinkedNow=async function(hid, c){ reads++; c.loading=null; return c; };
+        _live={ hid:'hOwn', unsubs:[], talk:{}, mine:{}, recipes:{ hLV:function(){} } };
+        delete _linkCache['hLV'];
+        await hhFetchLinked('hLV');
+        if(reads!==0) throw new Error('a kitchen listened to live was read once more');
+        delete _live.recipes.hLV;                                   // refused: the listener let go
+        await hhFetchLinked('hLV');
+        if(reads!==1) throw new Error('with no listener, the one-off read did not happen ('+reads+')');
+        // the photos
+        var asked=0;
+        window._fbDb={}; window._fbUser={ uid:'uP' };
+        window.cloudDoc=function(){ asked++; return { get: async function(){ return { exists:false, data:function(){ return {}; } }; } }; };
+        try { localStorage.removeItem(PHOTO_PROBED_KEY); } catch(e) {}
+        recipes=[{ id:9001, name:'No photo' }, { id:9002, name:'Has one in the cloud' }];
+        var bulk={ complete:true, byId:{} }; bulk.byId[photoDocId(9002)]={ photo:'data:image/png;base64,AAAA' };
+        var out=await repairMissingPhotos(bulk);
+        if(asked!==0) throw new Error('asked the cloud recipe by recipe although the bulk read had the answer ('+asked+')');
+        if(out.restored!==1 || recipes[1].photo!=='data:image/png;base64,AAAA' || recipes[0].photo) throw new Error('the repair from the bulk read: '+JSON.stringify(out));
+        recipes=[{ id:9003, name:'Old device' }];
+        try { localStorage.removeItem(PHOTO_PROBED_KEY); } catch(e) {}
+        await repairMissingPhotos();
+        if(asked!==1) throw new Error('without a bulk read it no longer asks at all ('+asked+')');
+        if(String(repairMissingPhotos).indexOf('_photoBulk')!==-1 || String(attachCloudPhotos).indexOf('out.bulk')===-1) throw new Error('the bulk read must be handed over by the same load, never kept');
+      } finally {
+        window._linkLiveUnderTest=false;
+        window._household=real.hh; _live=real.live; window.linkLiveStart=real.start; window.hhFetchLinkedNow=real.now;
+        if(real.cache) _linkCache['hLV']=real.cache; else delete _linkCache['hLV'];
+        recipes=real.recipes; window.cloudDoc=real.cloudDoc; window._fbDb=real.fbDb; window._fbUser=real.user;
+        window.toast=real.toast; window.saveLocal=real.save; window.renderGrid=real.grid;
+        _cloudRestoreForTest(real.cloud);
+        try { if(real.probed===null) localStorage.removeItem(PHOTO_PROBED_KEY); else localStorage.setItem(PHOTO_PROBED_KEY, real.probed); } catch(e) {}
+      }
+    } },
+
   { id:'beta_moved_to_its_domain', group:'Core', name:'🌐 The beta lives at mykitchennotes.community: its old address and www. send visitors on with the shared link and the extension’s text; nothing else moves; the family links to it there (v38.17)',
     test: async()=>{
       var olds=['https://my-kitchen-notes-beta.pages.dev', 'https://www.mykitchennotes.community'], site='https://mykitchennotes.community';

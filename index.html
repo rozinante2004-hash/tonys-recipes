@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v38.55 -->
+<!-- Tony's Recipes Collection v38.56 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -5858,6 +5858,13 @@ function toggleLinkedFilter(hid) { return toggleKitchen(hid); }
 async function hhFetchLinked(hid) {
   var c = _linkCache[hid] = _linkCache[hid] || { at: 0, list: [], photos: {} };
   if (c.loading) return c.loading;
+  // v38.56 — measured (the emulator, a 100-recipe kitchen): every app open read a linked kitchen's recipes TWICE,
+  // once here and once by its live listener (v38.52). The listener's first answer fills the list, so while it is
+  // listened to (or about to be) this read is not made; refused, the listener lets go and this read says why.
+  if (typeof linkLiveStart === 'function' && (!_selfTestRunning || window._linkLiveUnderTest)) {
+    try { linkLiveStart(); } catch(e) {}
+    if (_live && _live.hid && _household && _live.hid === _household.hid && _live.recipes && _live.recipes[hid]) return c;
+  }
   return (c.loading = hhFetchLinkedNow(hid, c));
 }
 // v38.49 — a recipe's document is { r: <the recipe as JSON>, updatedAt, id } (v28.0), unpacked here as
@@ -8404,7 +8411,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v38.55';
+var APP_VERSION = 'v38.56';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -11421,7 +11428,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.55</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.56</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -12160,7 +12167,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.55</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.56</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -24369,7 +24376,11 @@ function forgetPhotoProbes() { try { localStorage.removeItem(PHOTO_PROBED_KEY); 
 // Bounded: at most PHOTO_REPAIR_MAX reads per run, and each answer remembered.
 var PHOTO_REPAIR_MAX = 60;
 
-async function repairMissingPhotos() {
+// v38.56 — `bulk`: the complete photo read the same load just made (attachCloudPhotos returns it). With it,
+// a recipe absent from it has no photo document — no read per recipe (60 of a 100-recipe kitchen's first load on a
+// new device, measured). Handed over, never kept: a kept one could be another household's after a switch.
+async function repairMissingPhotos(bulk) {
+  bulk = bulk && bulk.complete && bulk.byId ? bulk : null;
   if (!_fbDb || !window._fbUser) return { restored: 0, checked: 0 };
   var probed = {}, restored = 0, checked = 0, nowProbed = [];
   photoProbed().forEach(function(i){ probed[i] = true; });
@@ -24378,9 +24389,13 @@ async function repairMissingPhotos() {
     if (r.photo || r._ph || r.hp || probed[r.id]) continue;
     checked++;
     try {
-      var snap = await cloudDoc(photoDocId(r.id)).get();
-      countCloudRead();
-      var pd = snap.exists ? (snap.data() || {}) : {};
+      var pd;
+      if (bulk) pd = bulk.byId[photoDocId(r.id)] || {};
+      else {
+        var snap = await cloudDoc(photoDocId(r.id)).get();
+        countCloudRead();
+        pd = snap.exists ? (snap.data() || {}) : {};
+      }
       if (pd.photo || pd.photoUrl) {
         r.photo = pd.photo || pd.photoUrl;
         _cloudPhotoStamps[r.id] = r.photo;
@@ -24687,8 +24702,9 @@ window.readCloudPhotoDocs = readCloudPhotoDocs;
 
 // Re-attach cloud photos to a freshly-loaded recipe list. Legacy inline photos (from the
 // old single-doc format) are kept as-is and left un-stamped so the next save migrates them.
-async function attachCloudPhotos(list) {
+async function attachCloudPhotos(list, out) {
   var bulk = await readCloudPhotoDocs();
+  if (out) out.bulk = bulk;                // v38.56 — handed to repairMissingPhotos by the same load
   for (var i = 0; i < list.length; i++) {
     var r = list[i];
     if (r.photo) { delete r.hp; delete r._ph; continue; } // legacy inline photo — keep, migrate on next save
@@ -25944,10 +25960,11 @@ async function _loadFromFirestoreInner(user) {
           recipes = fsRecipes; // normal load
         }
         // Pull each recipe's photo from its own cloud doc, and restore local-only originals
-        await attachCloudPhotos(recipes);
+        var photoRead = {};
+        await attachCloudPhotos(recipes, photoRead);
         // ...then rescue any whose marker was lost by the pre-v30.2 bug, which is
         // the only way a device that already went wrong ever gets its photos back.
-        try { await repairMissingPhotos(); } catch(e) { console.warn('photo repair failed:', e); }
+        try { await repairMissingPhotos(photoRead.bulk); } catch(e) { console.warn('photo repair failed:', e); }
         recipes.forEach(function(r) { if (!r.originalPhoto && _localOrig[r.id]) r.originalPhoto = _localOrig[r.id]; });
         recipes.forEach(function(r) { if ((!r.history || !r.history.length) && _localHist[r.id]) r.history = _localHist[r.id]; });
         // Photo safety net (see _localPhoto comment above)

@@ -371,6 +371,17 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
   (2) **Firebase Spark limits sign-in-link e-mails to 5 a day per project** (Blaze 25,000); the beta offers email-link
   sign-in and an empty password sends a link. Password reset 150/day, verification 1,000/day. (3) Worker CPU p99.9
   16.5 ms vs the free 10 ms (no errors seen). (4) The CLOUDFLARE_API_TOKEN reads account analytics and Pages, not D1.
+- **Released: v38.55 + Worker v79 (20 Oct 2026, 01:30 Israel time, CI green on 8d47720).** All jobs success (Worker
+  deploy with USAGE_KEY).
+- **v38.56 — fewer Firestore reads, measured** (`$S/e2e/reads.mjs`: emulator + real rules; counts every document a
+  get returns and every server-sent listener change, with the caller). A 100-recipe kitchen (a third with photos) and a
+  tester linked to it. Before → after: tester reopens **117 → 18** (the linked kitchen was read by `hhFetchLinkedNow` AND
+  by its live listener — `hhFetchLinked` now leaves it to the listener while `_live.recipes[hid]` holds; refused, the
+  listener lets go and the one-off read says why); a second device's first load **227 → 168** (`repairMissingPhotos(bulk)`
+  takes the complete photo read `attachCloudPhotos(list, out)` just made — handed over, never kept, so it can never be
+  another household's after a switch: a kept copy did exactly that in a self-test). Idle app: 0 reads, 0 Worker calls.
+  Still: any change in a household makes each other device's next open read every recipe and photo (151 here) —
+  an incremental read would fix it; left for after the launch (the sync core). Self-test `reads_not_doubled`.
 - **Before the testers, Tony's steps (16 Oct 2026):** (1) Cloudflare Email Routing destination addresses — done.
   (2) **The community app's browser key is restricted, both stages:** API restrictions = Identity Toolkit API, Token
   Service API, Cloud Firestore API (Google warned of "active usage" of eight Maps APIs — scanners; updated anyway);
