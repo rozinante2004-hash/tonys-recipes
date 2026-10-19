@@ -32,6 +32,9 @@ jobs:
       - name: Usage
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          FIREBASE_RULES_KEY: ${{ secrets.FIREBASE_RULES_KEY }}
         run: |
+          # v79 — Firestore's day too, through Cloud Monitoring (the service account needs "Monitoring Viewer")
+          if [ -n "$FIREBASE_RULES_KEY" ]; then npm install --no-save --no-audit --no-fund google-auth-library@9 >/dev/null 2>&1 || true; fi
           if [ "${{ github.event_name }}" = "schedule" ]; then node tools/cf-usage.js --report
           else node tools/cf-usage.js "${{ github.event.inputs.days || '2' }}" && node tools/cf-usage.js --report; fi

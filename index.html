@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v38.56 -->
+<!-- Tony's Recipes Collection v38.57 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -4248,7 +4248,8 @@ window.firebaseLimitHit = firebaseLimitHit; window.nextPacificMidnight = nextPac
 // v38.55 — ⚙️ → 👑 App owner → 🩺 Server allowances: the hourly usage watch's last reading of Cloudflare's free
 // allowances (today; Pages builds this month) and every allowance notice running, with what it touches.
 var USAGE_LABELS = { workerRequests: 'Worker requests', kvWrites: 'KV writes', kvReads: 'KV reads', kvDeletes: 'KV deletes', kvLists: 'KV lists',
-  d1RowsWritten: 'D1 rows written', d1RowsRead: 'D1 rows read', pagesBuilds: 'Pages builds this month' };
+  d1RowsWritten: 'D1 rows written', d1RowsRead: 'D1 rows read', pagesBuilds: 'Pages builds this month',
+  firestoreReads: 'Firestore reads (Firebase’s day)', firestoreWrites: 'Firestore writes (Firebase’s day)', firestoreDeletes: 'Firestore deletes (Firebase’s day)' };
 function serverAllowanceLines(d) {
   var lines = [], u = d && d.usage, m = (u && u.metrics) || {};
   if (u && u.at) {
@@ -4263,7 +4264,8 @@ function serverAllowanceLines(d) {
   var ns = (d && d.notices) || [];
   if (ns.length) { lines.push('Running now:'); ns.forEach(function(n){ lines.push(serverNoticeText(n, true)); }); }
   else lines.push('Nothing is paused or close to its allowance.');
-  lines.push('', 'Firebase (the recipes themselves) is not measured here; if its daily allowance runs out, the app that meets it says so and you are e-mailed.');
+  if (!m.firestoreReads) lines.push('', 'Firestore (the recipes themselves) is not measured yet: give the backup’s service account the “Monitoring Viewer” role in Google Cloud, and the hourly watch adds it. Meanwhile, if its daily allowance runs out, the app that meets it says so and you are e-mailed.');
+  else lines.push('', 'Firebase’s day starts at midnight in California (10:00 Israel time in summer, 09:00 in winter).');
   return lines;
 }
 async function openServerAllowances() {
@@ -8411,7 +8413,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v38.56';
+var APP_VERSION = 'v38.57';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -11428,7 +11430,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.56</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.57</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -12167,7 +12169,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.56</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.57</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>

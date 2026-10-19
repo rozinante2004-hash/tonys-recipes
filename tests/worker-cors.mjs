@@ -1682,6 +1682,13 @@ console.log('\nEvery allowance, told to the owner (v79):');
     expect('the next hour\'s same reading is not e-mailed again', mails.length === 2, mails.length + '');
     const snap = db.raw.prepare('SELECT metrics FROM usage_snapshot').get();
     expect('the last reading is kept for the owner\'s page', snap && JSON.parse(snap.metrics).kvWrites.used === 812, JSON.stringify(snap));
+    const realNow = Date.now;
+    Date.now = () => Date.parse('2026-10-20T12:00:00Z');                   // 05:00 in California
+    try { await worker.fetch(post({ action: 'usage-report', key: 'k'.repeat(64), metrics: { firestoreReads: { used: 41000, limit: 50000, period: 'pacific-day', project: 'my-kitchen-notes-beta' } }, appKey: 'secret-k' }), e); }
+    finally { Date.now = realNow; }
+    const fsr = db.raw.prepare("SELECT * FROM allowance_notices WHERE what = 'usage:firestoreReads'").get();
+    expect('Firestore\'s day is California\'s: warned until its midnight', fsr && fsr.until === Date.parse('2026-10-21T07:00:00Z') && /Firestore reads at 82%/.test(fsr.title)
+      && /midnight in California/.test(fsr.detail) && /my-kitchen-notes-beta/.test(fsr.affects), JSON.stringify(fsr));
   }
 }
 

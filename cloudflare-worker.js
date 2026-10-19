@@ -1,4 +1,7 @@
-// Tony's Recipes — Cloudflare Worker v79
+// Tony's Recipes — Cloudflare Worker v80
+// v80: THE USAGE WATCH COUNTS FIRESTORE TOO. usage-report takes firestoreReads/Writes/Deletes (period 'pacific-day':
+// Firebase's day ends at midnight in California, so the warning lasts until then), measured by the hourly watch from
+// Cloud Monitoring when the backup's service account may read it ("Monitoring Viewer").
 // v79: EVERY ALLOWANCE, TOLD TO THE OWNER (Tony, 19 Oct 2026: "Please make sure the Admin gets a notification if any
 // allowance is exceeded or blocked"). `raiseNotice` keeps a notice (D1 `allowance_notices`; KV `notice:d1` when D1
 // is what ran out), shows it in the apps (health: everyone in that copy, scope 'all'; the owner's notes-new: all) and
@@ -363,7 +366,7 @@
 //   AI_MAX_TOKENS   – the longest answer one call may ask for (32000; the
 //                     app's largest, reading several recipes at once, asks 8000).
 
-const WORKER_VERSION = 'v79';
+const WORKER_VERSION = 'v80';
 const VIDEO_MAX_MB_DEFAULT = 50;
 const GEMINI_API = 'https://generativelanguage.googleapis.com';
 const GEMINI_MODEL_DEFAULT = 'gemini-2.5-flash';
@@ -810,7 +813,8 @@ async function limitReport(request, env, body) {
 // sets USAGE_KEY), so nothing new has to be kept anywhere.
 const USAGE_NAMES = {
   workerRequests: 'Worker requests', kvWrites: 'KV writes', kvReads: 'KV reads', kvDeletes: 'KV deletes', kvLists: 'KV lists',
-  d1RowsWritten: 'D1 rows written', d1RowsRead: 'D1 rows read', pagesBuilds: 'Pages builds'
+  d1RowsWritten: 'D1 rows written', d1RowsRead: 'D1 rows read', pagesBuilds: 'Pages builds',
+  firestoreReads: 'Firestore reads', firestoreWrites: 'Firestore writes', firestoreDeletes: 'Firestore deletes'
 };
 function sameText(a, b) {
   a = String(a || ''); b = String(b || '');
@@ -826,12 +830,14 @@ async function usageReport(env, body) {
     if (!x || !(Number(x.limit) > 0)) continue;
     const used = Math.max(0, Number(x.used) || 0), limit = Number(x.limit), pct = Math.round(100 * used / limit);
     if (pct < 70) continue;
-    const month = x.period === 'month';
+    const month = x.period === 'month', pacific = x.period === 'pacific-day';   // Firebase's day ends at midnight in California
     await raiseNotice(env, { what: 'usage:' + k, kind: used >= limit ? 'paused' : 'warning', scope: 'owner',
-      until: month ? nextUtcMonth(now) : nextUtcMidnight(now), self: true,
+      until: month ? nextUtcMonth(now) : pacific ? nextPacificMidnight(now) : nextUtcMidnight(now), self: true,
       title: USAGE_NAMES[k] + ' at ' + pct + '% of the free allowance ' + (month ? 'this month' : 'today'),
-      affects: k === 'pagesBuilds' ? 'publishing new versions of the app' : k.indexOf('d1') === 0 ? 'the server\'s database' : 'the server',
-      detail: used.toLocaleString('en-US') + ' of ' + limit.toLocaleString('en-US') + (month ? ' this month.' : ' today (Cloudflare\'s day ends 00:00 UTC).') });
+      affects: k === 'pagesBuilds' ? 'publishing new versions of the app' : k.indexOf('d1') === 0 ? 'the server\'s database'
+        : k.indexOf('firestore') === 0 ? 'the recipes in the cloud (' + String(x.project || 'Firebase').slice(0, 40) + ')' : 'the server',
+      detail: used.toLocaleString('en-US') + ' of ' + limit.toLocaleString('en-US') + (month ? ' this month.'
+        : pacific ? ' today (Firebase\'s day ends at midnight in California).' : ' today (Cloudflare\'s day ends 00:00 UTC).') });
     warned.push(k);
   }
   if (env.METER_DB) {
@@ -2988,4 +2994,4 @@ export default {
   }
 };
 
-// ── END OF WORKER v79 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
+// ── END OF WORKER v80 ── If this is the last line in the Cloudflare editor, the whole file was pasted.

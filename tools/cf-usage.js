@@ -204,8 +204,45 @@ async function monthBuilds() {
   }
   return n;
 }
+// Firestore's day so far (the free plan: 50,000 reads, 20,000 writes, 20,000 deletes a day, counted from
+// midnight in California), from Cloud Monitoring — when FIREBASE_RULES_KEY's service account may read it
+// ("Monitoring Viewer" on the project). Without that it says so and the rest goes on.
+function pacificMidnightBefore(now) {
+  const p = {};
+  new Intl.DateTimeFormat('en-US', { timeZone: 'America/Los_Angeles', hourCycle: 'h23', year: 'numeric', month: 'numeric', day: 'numeric',
+    hour: 'numeric', minute: 'numeric', second: 'numeric' }).formatToParts(new Date(now)).forEach(function(x){ p[x.type] = x.value; });
+  const wall = Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute, +p.second);
+  return Date.UTC(+p.year, +p.month - 1, +p.day) - (wall - Math.floor(now / 1000) * 1000);
+}
+async function firestoreMetrics(project) {
+  const key = process.env.FIREBASE_RULES_KEY || '';
+  if (!key) return { note: 'no FIREBASE_RULES_KEY here' };
+  let token;
+  try {
+    const { GoogleAuth } = require('google-auth-library');
+    const client = await new GoogleAuth({ credentials: JSON.parse(key), scopes: ['https://www.googleapis.com/auth/monitoring.read'] }).getClient();
+    token = (await client.getAccessToken()).token;
+  } catch (e) { return { note: 'no Google sign-in for Cloud Monitoring (' + String(e.message || e).slice(0, 120) + ')' }; }
+  const now = Date.now(), start = pacificMidnightBefore(now), out = {};
+  const period = Math.max(60, Math.ceil((now - start) / 1000)) + 's';
+  for (const [name, metric, limit] of [['firestoreReads', 'read_count', 50000], ['firestoreWrites', 'write_count', 20000], ['firestoreDeletes', 'delete_count', 20000]]) {
+    const q = new URLSearchParams({ filter: 'metric.type="firestore.googleapis.com/document/' + metric + '"',
+      'interval.startTime': new Date(start).toISOString(), 'interval.endTime': new Date(now).toISOString(),
+      'aggregation.alignmentPeriod': period, 'aggregation.perSeriesAligner': 'ALIGN_SUM', 'aggregation.crossSeriesReducer': 'REDUCE_SUM' });
+    const r = await fetch('https://monitoring.googleapis.com/v3/projects/' + project + '/timeSeries?' + q, { headers: { Authorization: 'Bearer ' + token } });
+    if (r.status === 403) return { note: 'the service account may not read Cloud Monitoring in ' + project + ' — give it the "Monitoring Viewer" role there' };
+    if (!r.ok) return { note: 'Cloud Monitoring answered HTTP ' + r.status };
+    const j = await r.json();
+    let used = 0;
+    (j.timeSeries || []).forEach(function(t){ (t.points || []).forEach(function(pt){ used += Number((pt.value || {}).int64Value || 0); }); });
+    out[name] = { used, limit, period: 'pacific-day', project };
+  }
+  return { metrics: out };
+}
 async function report() {
   const metrics = await todayMetrics();
+  const fs = await firestoreMetrics('my-kitchen-notes-beta');
+  if (fs.metrics) Object.assign(metrics, fs.metrics); else console.log('Firestore: not measured — ' + fs.note);
   const builds = await monthBuilds();
   if (builds !== null) metrics.pagesBuilds = { used: builds, limit: 500, period: 'month' };
   const wr = require('fs').readFileSync(require('path').join(__dirname, '..', 'worker', 'wrangler.jsonc'), 'utf8');

@@ -382,6 +382,13 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
   another household's after a switch: a kept copy did exactly that in a self-test). Idle app: 0 reads, 0 Worker calls.
   Still: any change in a household makes each other device's next open read every recipe and photo (151 here) —
   an incremental read would fix it; left for after the launch (the sync core). Self-test `reads_not_doubled`.
+- **v38.57 + Worker v80 — the usage watch counts Firestore too**: `firestoreMetrics` (tools/cf-usage.js) reads Cloud
+  Monitoring (`firestore.googleapis.com/document/read_count|write_count|delete_count`, summed since midnight in
+  California) with FIREBASE_RULES_KEY — needs the **"Monitoring Viewer"** role on my-kitchen-notes-beta for that
+  service account (Tony's one step; until then it prints why and goes on). usage-report period 'pacific-day' → the
+  warning lasts until Firebase's midnight. 🩺 Server allowances shows Firestore lines, or how to add them. First
+  manual run of the watch (20 Oct 01:44): HTTP 200, warned kvWrites (1,113 — the UTC day before v78) and pagesBuilds
+  (918 this month) — Tony's first two alert e-mails.
 - **Before the testers, Tony's steps (16 Oct 2026):** (1) Cloudflare Email Routing destination addresses — done.
   (2) **The community app's browser key is restricted, both stages:** API restrictions = Identity Toolkit API, Token
   Service API, Cloud Firestore API (Google warned of "active usage" of eight Maps APIs — scanners; updated anyway);

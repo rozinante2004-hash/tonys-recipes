@@ -7672,6 +7672,9 @@ window.SELF_TESTS = [
           notices:[{ what:'usage:kvWrites', kind:'warning', until:Date.now()+3600e3, title:'KV writes at 81% of the free allowance today', detail:'812 of 1,000 today.' }] }).join('\n');
         if(!/⚠️ KV writes: 812 of 1,000 \(81%\)/.test(lines) || !/✓ Worker requests/.test(lines) || !/⛔ Pages builds this month: 510 of 500/.test(lines) || !/Running now:/.test(lines)) throw new Error('the page: '+lines);
         if(!/not connected/.test(serverAllowanceLines({ watch:false, notices:[] }).join('\n'))) throw new Error('no watch yet, yet it does not say so');
+        if(!/Monitoring Viewer/.test(lines)) throw new Error('Firestore not measured, yet the page does not say how to add it');
+        var withFs=serverAllowanceLines({ watch:true, usage:{ at:Date.now(), metrics:{ firestoreReads:{ used:12000, limit:50000, period:'pacific-day' } } }, notices:[] }).join('\n');
+        if(!/✓ Firestore reads \(Firebase’s day\): 12,000 of 50,000 \(24%\)/.test(withFs) || /Monitoring Viewer/.test(withFs)) throw new Error('Firestore measured: '+withFs);
       } finally {
         window.fetch=realFetch; window._fbUser=realUser;
         Object.keys(_serverNotices).forEach(function(k){ delete _serverNotices[k]; }); Object.assign(_serverNotices, realNotices);
