@@ -1,0 +1,31 @@
+name: Cloudflare usage
+
+# What used the account's Cloudflare free allowances (Worker requests, KV
+# writes, D1 rows), hour by hour in Israel time. Counts only — the log is
+# public. Run by hand, or by a push that changes the tool or this file.
+
+on:
+  workflow_dispatch:
+    inputs:
+      days:
+        description: "How many days back (1–7)"
+        default: "2"
+  push:
+    branches: ["test"]
+    paths: ["tools/cf-usage.js", ".github/workflows/cf-usage.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  usage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+      - name: Usage
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: node tools/cf-usage.js "${{ github.event.inputs.days || '2' }}"
