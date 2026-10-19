@@ -137,7 +137,7 @@ async function pages() {
   const r = await cf('/accounts/' + ACCOUNT + '/pages/projects');
   if (r.status !== 200 || !r.j) { console.log('\nPages: HTTP ' + r.status); return; }
   const month = new Date().toISOString().slice(0, 7);
-  let total = 0; const per = [];
+  let total = 0; const per = [], kinds = {};
   for (const p of (r.j.result || [])) {
     let n = 0, page = 1;
     for (;;) {
@@ -145,12 +145,24 @@ async function pages() {
       const list = (d.j && d.j.result) || [];
       const mine = list.filter(function(x){ return String(x.created_on || '').slice(0, 7) === month; });
       n += mine.length;
+      mine.forEach(function(x){
+        const k = p.name + ' ' + (x.environment || '?') + ' ' + (((x.deployment_trigger || {}).metadata || {}).branch || '?') + ' ' + ((x.deployment_trigger || {}).type || '?')
+          + ' → ' + ((x.latest_stage || {}).name || '?') + ':' + ((x.latest_stage || {}).status || '?');
+        kinds[k] = (kinds[k] || 0) + 1;
+      });
       if (list.length < 25 || mine.length < list.length || page > 40) break;
       page++;
     }
     total += n; per.push(p.name + ' ' + n);
   }
   console.log('\nPages deployments this month (' + month + '): ' + total + ' (free: 500 builds a month) — ' + per.join(', '));
+  Object.keys(kinds).sort().forEach(function(k){ console.log('  ' + String(kinds[k]).padStart(4) + '  ' + k); });
+  for (const p of (r.j.result || [])) {
+    const b = p.build_config || {}, src = ((p.source || {}).config) || {};
+    console.log('  ' + p.name + ': production branch ' + (p.production_branch || '?') + ', previews ' + (src.preview_deployment_setting || '?')
+      + (src.preview_branch_includes ? ' include ' + JSON.stringify(src.preview_branch_includes) : '') + (src.preview_branch_excludes ? ' exclude ' + JSON.stringify(src.preview_branch_excludes) : '')
+      + ', build "' + (b.build_command || '') + '"');
+  }
 }
 
 (async function(){
