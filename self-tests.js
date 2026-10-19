@@ -7595,6 +7595,43 @@ window.SELF_TESTS = [
       }
     } },
 
+  { id:'idle_quiet_and_server_notice', group:'Core', name:'🔕 An app nobody is using stops asking the server every two minutes (every 30 instead; at once on the first touch or return), and a used-up server allowance is said in a bar with what it stops and when it comes back — once, closable, never once its time has passed (v38.54)',
+    test: async()=>{
+      var realAt=_userActiveAt, realPoll=_livePollAt, realLs=null, realNotices=Object.assign({}, _serverNotices);
+      try { realLs=localStorage.getItem(SERVER_NOTICE_KEY); } catch(e) {}
+      try{
+        // 18–19 Oct 2026: four idle windows, ~270 requests an hour all night, Cloudflare's free allowance gone twice.
+        _userActiveAt=Date.now();
+        if(livePollGap(false)!==110e3) throw new Error('in use, the gap is '+livePollGap(false));
+        _userActiveAt=Date.now()-11*60e3;
+        if(livePollGap(false)!==30*60e3) throw new Error('nobody there for 11 minutes, yet the gap is '+livePollGap(false));
+        if(livePollGap(true)!==20e3) throw new Error('a return does not ask at once');
+        document.dispatchEvent(new Event('wheel'));
+        if(appIdleFor()>5000) throw new Error('using the app did not count as someone being there');
+        // The server's notice.
+        try { localStorage.removeItem(SERVER_NOTICE_KEY); } catch(e) {}
+        Object.keys(_serverNotices).forEach(function(k){ delete _serverNotices[k]; });
+        var until=Date.now()+3600e3;
+        var n=serverNoticeFrom({ what:'kv', since:Date.now()-60e3, until:until, affects:'sending a shopping list to Bring!' });
+        var bar=document.getElementById('serverNoticeBar');
+        if(n!==1 || !bar || bar.textContent.indexOf('Bring!')===-1 || bar.textContent.indexOf(serverNoticeTime(until))===-1) throw new Error('the bar: '+(bar && bar.textContent));
+        if(serverNoticeFrom([{ what:'kv', until:until, affects:'x' }])!==0) throw new Error('the same notice counted twice');
+        if(serverNoticeFrom({ what:'d1', until:Date.now()-1000, affects:'x' })!==0) throw new Error('a notice whose time has passed was taken');
+        bar.querySelector('.snb-close').click();
+        if(document.getElementById('serverNoticeBar')) throw new Error('✕ did not close it');
+        Object.keys(_serverNotices).forEach(function(k){ delete _serverNotices[k]; });
+        if(serverNoticeFrom({ what:'kv', until:until, affects:'x' })!==0 || document.getElementById('serverNoticeBar')) throw new Error('a closed notice came back');
+        if(!/Cloudflare/.test(serverNoticeText({ what:'d1', until:until, since:Date.now() }, true)) || /Cloudflare/.test(serverNoticeText({ what:'d1', until:until }, false)))
+          throw new Error('the owner is told whose allowance it is; a tester only that it comes back');
+        if(!window.fetch._mknNotice) throw new Error('the server’s refusals are not looked at');
+      } finally {
+        _userActiveAt=realAt; _livePollAt=realPoll;
+        Object.keys(_serverNotices).forEach(function(k){ delete _serverNotices[k]; }); Object.assign(_serverNotices, realNotices);
+        try { if(realLs===null) localStorage.removeItem(SERVER_NOTICE_KEY); else localStorage.setItem(SERVER_NOTICE_KEY, realLs); } catch(e) {}
+        var b=document.getElementById('serverNoticeBar'); if(b) b.remove();
+      }
+    } },
+
   { id:'beta_moved_to_its_domain', group:'Core', name:'🌐 The beta lives at mykitchennotes.community: its old address and www. send visitors on with the shared link and the extension’s text; nothing else moves; the family links to it there (v38.17)',
     test: async()=>{
       var olds=['https://my-kitchen-notes-beta.pages.dev', 'https://www.mykitchennotes.community'], site='https://mykitchennotes.community';

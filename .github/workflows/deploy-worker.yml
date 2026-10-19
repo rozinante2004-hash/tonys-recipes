@@ -94,7 +94,8 @@ jobs:
             echo "live: $got, published: $want"
             if [ "$got" = "$want" ]; then
               echo "$h" | grep -q '"db":true' || { echo "::error::the Worker lost its database (METER_DB)"; exit 1; }
-              echo "$h" | grep -q '"rateLimiting":true' || { echo "::error::the Worker lost its storage (BRING_KV)"; exit 1; }
+              # v78 — rateLimiting is now true with the database alone; Bring! says whether KV is bound.
+              echo "$h" | grep -q '"bring":true' || { echo "::error::the Worker lost its storage (BRING_KV)"; exit 1; }
               echo "$h" | grep -q '"owner":true' || { echo "::error::the Worker has no owner's address (OWNER_EMAIL)"; exit 1; }
               echo "database, storage and the owner's address connected"; exit 0
             fi

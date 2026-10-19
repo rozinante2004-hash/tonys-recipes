@@ -33,10 +33,16 @@ import worker from '../cloudflare-worker.js';
 const ORIGIN = 'https://rozinante2004-hash.github.io';
 let failures = [];
 
+// v78 — the per-minute ceilings are counted in the Worker's memory, which lives
+// as long as this test file does. Each request comes from its own address unless
+// a test names one, so one section's burst does not spend the next one's minute.
+let _ipN = 0;
 function post(body, origin = ORIGIN, extraHeaders = {}) {
+  _ipN++;
   return new Request('https://worker.test', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Origin': origin, ...extraHeaders },
+    headers: { 'Content-Type': 'application/json', 'Origin': origin,
+               'CF-Connecting-IP': '198.51.' + ((_ipN >> 8) & 255) + '.' + (_ipN & 255), ...extraHeaders },
     body: JSON.stringify(body),
   });
 }
@@ -313,22 +319,25 @@ console.log('\nSpend guard rails (v39):');
     try { return await fn(); } finally { globalThis.fetch = realFetch; }
   }
 
-  // (a) The cheap, high-volume path is SAMPLED. 300 photo requests used to be
-  // 300 KV writes against a 1,000/day allowance. RATE_LIMIT is lifted well clear
-  // of 300 on purpose: otherwise the per-minute limit refuses the tail of the
-  // burst and the write count looks low because the requests never ran.
+  // (a) The cheap, high-volume path writes NOTHING (v78). v39 sampled it (one
+  // write in five), and that was still the whole allowance: four idle windows
+  // asking every two minutes were 1,107 KV writes a day (18–19 Oct 2026). The
+  // per-minute ceiling is counted in memory — and still fires.
   {
     const kv = fakeKv();
-    const env2 = { BRING_KV: kv, APP_SHARED_KEY: 'secret-k', RATE_LIMIT: '100000' };
-    for (let i = 0; i < 300; i++) await worker.fetch(post(photoBody()), env2);
-    expect('300 photo requests cost far fewer than 300 KV writes', kv.writes < 120,
-      `${kv.writes} writes for 300 requests — the sampling is not in effect, so a photo burst still eats the daily allowance`);
-    expect('…but it still counts them', kv.writes > 10,
-      `${kv.writes} writes — nothing is being recorded at all, so the limiter is decorative`);
-    const counted = parseInt(kv.store.get([...kv.store.keys()][0]) || '0', 10);
-    expect('the sampled count still tracks the real number', counted > 200 && counted < 400,
-      `the counter reads ${counted} after 300 requests — sampling without crediting the skipped ones `
-      + 'means the limiter under-counts by 5x and never fires');
+    const env2 = { BRING_KV: kv, APP_SHARED_KEY: 'secret-k' };
+    const one = { 'CF-Connecting-IP': '203.0.113.7' };
+    let refused = 0, first = -1;
+    for (let i = 0; i < 200; i++) {
+      const r = await worker.fetch(post(photoBody(), ORIGIN, one), env2);
+      if (r.status === 429) { refused++; if (first < 0) first = i; }
+    }
+    expect('200 photo searches write nothing to KV', kv.writes === 0,
+      `${kv.writes} KV writes — ordinary requests are spending the 1,000-a-day allowance again`);
+    expect('…and the per-minute ceiling still holds (150 a minute)', first === 150 && refused === 50,
+      `first refusal at request ${first}, ${refused} refused — the limiter is decorative`);
+    const other = await worker.fetch(post(photoBody(), ORIGIN, { 'CF-Connecting-IP': '203.0.113.8' }), env2);
+    expect('…for that caller only', other.status !== 429, `got ${other.status} for someone else`);
   }
 
   // (b) The AI path is counted EXACTLY — it is rare, and it is the one that
@@ -337,9 +346,8 @@ console.log('\nSpend guard rails (v39):');
     const kv = fakeKv();
     const env2 = { BRING_KV: kv, APP_SHARED_KEY: 'secret-k', ANTHROPIC_API_KEY: 'sk-test' };
     await noNetwork(async () => { for (let i = 0; i < 5; i++) await worker.fetch(post(aiBody()), env2); });
-    const minuteKey = [...kv.store.keys()].find(k => k.endsWith(':ai'));
-    expect('five AI calls are counted as five', kv.store.get(minuteKey) === '5',
-      `the per-minute counter reads ${kv.store.get(minuteKey)} after 5 calls`);
+    expect('no per-minute counter is written (v78: memory)', ![...kv.store.keys()].some(k => /:(ai|x)$/.test(k)),
+      [...kv.store.keys()].join(', '));
     const dayKey = [...kv.store.keys()].find(k => k.startsWith('rl:day:'));
     expect('the daily ceiling counts them too', kv.store.get(dayKey) === '5',
       `the daily counter reads ${kv.store.get(dayKey)} after 5 calls`);
@@ -418,17 +426,28 @@ console.log('\nSpend guard rails (v39):');
     const second = await noNetwork(() => worker.fetch(post(aiBody()), env2));
     expect('a failed KV write closes the AI path behind it', second.status === 429,
       `got ${second.status} — writes are failing and AI calls keep running unmetered, which is exactly v38's bug`);
-    expect('and says so in words a person can act on', /KV write allowance/.test((await second.json()).error || ''),
+    const sj = await second.json();
+    expect('and says so in words a person can act on', /KV write allowance/.test(sj.error || '') && sj.paused === true,
       'the message does not say what is actually wrong');
+    expect('…naming the allowance and when it comes back (v78)', sj.notice && sj.notice.what === 'kv'
+      && sj.notice.until === Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), new Date().getUTCDate() + 1)
+      && /AI features/.test(sj.notice.affects || ''), JSON.stringify(sj.notice));
 
-    // Recovery: a healthy KV write reopens it. 100 requests so the 1-in-5
-    // sampling is certain to have written at least once.
+    // Recovery (v78): nothing but an AI call writes a counter now, so the breaker
+    // lets one call try again after five minutes, and a write that works reopens it.
     const healthy = fakeKv();
-    const env3 = { BRING_KV: healthy, APP_SHARED_KEY: 'secret-k', ANTHROPIC_API_KEY: 'sk-test', RATE_LIMIT: '100000' };
-    for (let i = 0; i < 100; i++) await worker.fetch(post(photoBody()), env3);
-    const after = await noNetwork(() => worker.fetch(post(aiBody()), env3));
-    expect('a working KV reopens it', after.status === 200,
-      `got ${after.status} — the breaker never resets, so one transient write failure disables AI for good`);
+    const env3 = { BRING_KV: healthy, APP_SHARED_KEY: 'secret-k', ANTHROPIC_API_KEY: 'sk-test' };
+    const stillShut = await noNetwork(() => worker.fetch(post(aiBody()), env3));
+    expect('within five minutes it stays shut', stillShut.status === 429, `got ${stillShut.status}`);
+    const realNow = Date.now;
+    Date.now = () => realNow() + 5 * 60e3 + 1000;
+    let after, again;
+    try {
+      after = await noNetwork(() => worker.fetch(post(aiBody()), env3));
+      again = await noNetwork(() => worker.fetch(post(aiBody()), env3));
+    } finally { Date.now = realNow; }
+    expect('five minutes on, a call tries again and a working KV reopens it', after.status === 200 && again.status === 200,
+      `got ${after.status}, ${again.status} — the breaker never resets, so one write failure disables AI until the isolate dies`);
   }
 
   // (g) health reports the ceilings to a keyed caller, and to nobody else.
@@ -526,12 +545,13 @@ console.log('\nphoto-fetch (v40):');
       const e3 = { BRING_KV: kv, APP_SHARED_KEY: 'secret-k' };
       let refused = 0;
       for (let i = 0; i < 300; i++) {
-        const r = await worker.fetch(post({ action: 'photo-fetch', url: 'https://e.com/a.png', appKey: 'secret-k' }), e3);
+        const r = await worker.fetch(post({ action: 'photo-fetch', url: 'https://e.com/a.png', appKey: 'secret-k' }, ORIGIN,
+          { 'CF-Connecting-IP': '203.0.113.20' }), e3);   // one caller: the burst is one app's
         if (r.status === 429) refused++;
       }
       expect('300 photo downloads in a burst are all allowed', refused === 0,
         `${refused} were refused — "auto-fetch missing photos" over a big library would half-fail`);
-      expect('…and cost few KV writes', kv.writes < 45, `${kv.writes} writes`);
+      expect('…and cost no KV writes (v78)', kv.writes === 0, `${kv.writes} writes`);
     }
   } finally { globalThis.fetch = realFetch; }
 }
@@ -1067,6 +1087,13 @@ console.log('\nAI per household (v60):');
     expect('the owner reads every copy\'s notes, from any copy, newest first', f.status === 200 && f.d.notes.length === 2 && f.d.notes.map(n => n.project).sort().join() === 'recipes-f379d,tonys-recipes-test', JSON.stringify(f.d).slice(0, 200));
     f = await fb({ action: 'meter-admin', op: 'notes-new', idToken: tOwner });
     expect('…counts the new ones', f.d && f.d.new === 2, JSON.stringify(f.d));
+    expect('v78: …and carries the server\'s notices (an array, empty when all is well)', f.d && Array.isArray(f.d.server), JSON.stringify(f.d));
+    {
+      const before = db.raw.prepare('SELECT last_at FROM owner_devices').all().map(r => r.last_at).join();
+      await fb({ action: 'meter-admin', op: 'notes-new', idToken: tOwner });
+      const after = db.raw.prepare('SELECT last_at FROM owner_devices').all().map(r => r.last_at).join();
+      expect('v78: the owner\'s device "last seen" is not rewritten on every call', before && before === after, before + ' → ' + after);
+    }
     // v68 — the owner answers a note in its writer's own app.
     const slowId = nrow.id;
     f = await fb({ action: 'meter-admin', op: 'note-reply', id: slowId, text: 'Thanks — fixed in the next version', idToken: tA });
@@ -1472,6 +1499,96 @@ console.log('\nWikimedia Commons for photos (v77):');
     const lim = await (await worker.fetch(post({ action: 'photo-search', query: 'x', source: 'wikimedia' }), env)).json();
     expect('a refusal is an error the app moves past', lim.rateLimited === true && /Wikimedia Commons/.test(lim.error || ''), JSON.stringify(lim));
   } finally { globalThis.fetch = realFetch; }
+}
+
+// v78 — 18–19 Oct 2026: four idle windows used the account's 1,000 KV writes a day
+// and nobody was told. Ordinary requests now write nothing; the AI ceilings live in
+// D1; a used-up allowance is remembered in the other store and said, with its end.
+console.log('\nA used-up allowance is said, not swallowed (v78):');
+{
+  const { DatabaseSync } = await import('node:sqlite');
+  function d1(opts = {}) {
+    const raw = new DatabaseSync(':memory:');
+    const st = (sql, args) => ({
+      bind: (...a) => st(sql, a),
+      first: async () => raw.prepare(sql).get(...(args || [])) || null,
+      all: async () => ({ results: raw.prepare(sql).all(...(args || [])) }),
+      run: async () => {
+        if (opts.writesFail && /^\s*(INSERT|UPDATE|DELETE)/i.test(sql)) throw new Error('D1_ERROR: Exceeded maximum daily rows written: SQLITE_ERROR');
+        const x = raw.prepare(sql).run(...(args || [])); return { success: true, meta: { changes: Number(x.changes) } };
+      }
+    });
+    return { raw, prepare: (sql) => st(sql, []) };
+  }
+  function kvStore(opts = {}) {
+    const store = new Map();
+    return { store, writes: 0,
+      async get(k) { return store.has(k) ? store.get(k) : null; },
+      async put(k, v) { this.writes++; if (opts.putThrows) throw new Error('KV put() limit exceeded for the day.'); store.set(k, v); } };
+  }
+  const ai = () => ({ model: 'claude-haiku-4-5', max_tokens: 10, messages: [], appKey: 'secret-k' });
+  const stub = async (fn) => {
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = async () => new Response('{"stub":true}', { status: 200, headers: { 'Content-Type': 'application/json' } });
+    try { return await fn(); } finally { globalThis.fetch = realFetch; }
+  };
+  const midnight = () => { const d = new Date(); return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 1); };
+
+  // (a) With D1 bound, the AI day/month ceilings are counted there, exactly — KV is not touched.
+  {
+    const db = d1(), kv = kvStore();
+    const e = { METER_DB: db, BRING_KV: kv, APP_SHARED_KEY: 'secret-k' };
+    await stub(async () => { for (let i = 0; i < 3; i++) await worker.fetch(post(ai()), e); });
+    const rows = db.raw.prepare('SELECT k, n FROM counters ORDER BY k').all();
+    expect('three AI calls: the day and the month each read 3, in D1', rows.length === 2 && rows.every(r => r.n === 3)
+      && /^rl:day:/.test(rows[0].k) && /^rl:mon:/.test(rows[1].k), JSON.stringify(rows));
+    expect('…and KV is not written at all', kv.writes === 0, kv.writes + ' KV writes');
+    for (let i = 0; i < 50; i++) await worker.fetch(post({ action: 'feedback-replies', appKey: 'secret-k' }), e);
+    expect('fifty ordinary requests write nothing either', kv.writes === 0 && db.raw.prepare('SELECT SUM(n) AS t FROM counters').get().t === 6,
+      kv.writes + ' KV writes');
+    const h = await (await worker.fetch(post({ action: 'health', appKey: 'secret-k' }), e)).json();
+    expect('health: the day so far comes from D1, and says where the counters live', h.spend && h.spend.dailyUsed === 3
+      && h.limits && h.limits.minute === 'memory' && h.limits.ceilings === 'd1', JSON.stringify([h.spend, h.limits]));
+    db.raw.prepare("UPDATE counters SET n = 300 WHERE k LIKE 'rl:day:%'").run();
+    const capped = await stub(() => worker.fetch(post(ai()), e));
+    const cj = await capped.json();
+    expect('the daily ceiling still stops the spending', capped.status === 429 && cj.spendCap === 'daily', JSON.stringify(cj));
+  }
+
+  // (b) D1's daily allowance used up: the AI path pauses, the notice is kept in KV until 00:00 UTC, and it is said.
+  {
+    const db = d1({ writesFail: true }), kv = kvStore();
+    const e = { METER_DB: db, BRING_KV: kv, APP_SHARED_KEY: 'secret-k' };
+    const first = await stub(() => worker.fetch(post(ai()), e));
+    expect('the call whose count failed was not refused by the guard rail', first.status !== 429, 'got ' + first.status);
+    const noted = JSON.parse(kv.store.get('notice:d1') || 'null');
+    expect('…and the used-up allowance is kept in KV until it comes back', noted && noted.until === midnight(), JSON.stringify(noted));
+    const second = await stub(() => worker.fetch(post(ai()), e));
+    const sj = await second.json();
+    expect('the next AI call is paused, naming D1 and when it ends', second.status === 429 && sj.paused === true
+      && sj.notice && sj.notice.what === 'd1' && sj.notice.until === midnight() && /notes to the app owner/.test(sj.notice.affects), JSON.stringify(sj));
+    const h = await (await worker.fetch(post({ action: 'health', appKey: 'secret-k' }), e)).json();
+    expect('health tells every app (keyed)', Array.isArray(h.notices) && h.notices.some(n => n.what === 'd1' && n.until === midnight()), JSON.stringify(h.notices));
+    const anon = await (await worker.fetch(post({ action: 'health' }), e)).json();
+    expect('…and nobody else', anon.notices === undefined, JSON.stringify(anon.notices));
+    kv.writes = 0;
+    await stub(() => worker.fetch(post(ai()), e));
+    expect('said once, not once per request', kv.writes === 0, kv.writes + ' more KV writes');
+    // the breaker would hold for five minutes; reopen it for what follows
+    const realNow = Date.now; Date.now = () => realNow() + 6 * 60e3;
+    try { await stub(() => worker.fetch(post(ai()), { METER_DB: d1(), APP_SHARED_KEY: 'secret-k' })); } finally { Date.now = realNow; }
+  }
+
+  // (c) A D1 failure elsewhere (a note) is answered as what it is, not as "Worker error".
+  {
+    const db = d1({ writesFail: true }), kv = kvStore();
+    const thrown = await worker.fetch(post({ action: 'bring-recipe-page', appKey: 'secret-k', name: 'x', ingredients: ['a'] }),
+      { APP_SHARED_KEY: 'secret-k', BRING_KV: kvStore({ putThrows: true }), METER_DB: db });
+    const tj = await thrown.json();
+    expect('KV used up under a Bring! page: 503 SERVER_LIMIT with its notice', thrown.status === 503 && /^SERVER_LIMIT/.test(tj.error)
+      && tj.notice && tj.notice.what === 'kv' && /Bring!/.test(tj.notice.affects), JSON.stringify(tj));
+    check('…with CORS', thrown);
+  }
 }
 
 if (failures.length) {

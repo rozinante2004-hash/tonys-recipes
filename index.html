@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v38.53 -->
+<!-- Tony's Recipes Collection v38.54 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -4180,11 +4180,91 @@ function checkWorkerHealth() {
       signal: AbortSignal.timeout(10000)
     })
     .then(function(r){ return r.json(); })
-    .then(function(d){ _workerHealth = (d && d.ok) ? d : false; return _workerHealth; })
+    .then(function(d){ _workerHealth = (d && d.ok) ? d : false;
+      if (d && d.notices && typeof serverNoticeFrom === 'function') serverNoticeFrom(d.notices);   // v38.54
+      return _workerHealth; })
     .catch(function(){ _workerHealth = false; return false; })
     .then(function(v){ renderSyncHealth(); return v; });
 }
 window.checkWorkerHealth = checkWorkerHealth;
+
+// ─── WHEN THE SERVER SAYS A DAILY ALLOWANCE IS USED UP (v38.54, Worker v78) ──
+// Tony, 19 Oct 2026, after Cloudflare e-mailed "KV daily operation limit
+// exceeded": "I did not receive any indication from the application that there
+// is a problem or that any service is denied. I should get such notification
+// from the app itself." The Worker now names a used-up allowance — in `health`
+// (as the app opens), in the owner's new-notes count (every few minutes while he
+// is about) and in any refusal — with what it stops and when it comes back. A
+// bar at the top says it until it is closed or its time has passed; a closed
+// one stays closed on this device.
+var SERVER_NOTICE_KEY = 'mkn_server_notice_closed';
+var _serverNotices = {};
+function serverNoticeTime(t) {
+  try { return new Date(t).toLocaleTimeString(typeof _i18nLang === 'string' && _i18nLang ? _i18nLang : undefined, { hour: '2-digit', minute: '2-digit' }); }
+  catch(e) { return new Date(t).toTimeString().slice(0, 5); }
+}
+function serverNoticeText(n, owner) {
+  var head = '⏸ Paused until ' + serverNoticeTime(n.until) + ': ' + (n.affects || 'some features') + '.';
+  if (owner) return head + ' Cloudflare’s free daily allowance for ' + (n.what === 'd1' ? 'database writes (D1)' : 'storage writes (KV)')
+    + ' is used up' + (n.since ? ' (since ' + serverNoticeTime(n.since) + ')' : '') + '. It comes back by itself — nothing to do. Everything else works.';
+  return head + ' The server’s free daily allowance is used up; it comes back by itself. Everything else works.';
+}
+function serverNoticeClosed() {
+  try { return JSON.parse(localStorage.getItem(SERVER_NOTICE_KEY) || '{}') || {}; } catch(e) { return {}; }
+}
+// Takes one notice or a list ({what, since, until, affects}); says how many were new.
+function serverNoticeFrom(list) {
+  list = (Array.isArray(list) ? list : [list]).filter(function(n){ return n && n.what && Number(n.until) > Date.now(); });
+  var closed = serverNoticeClosed(), fresh = 0;
+  list.forEach(function(n){
+    var k = n.what + ':' + n.until;
+    if (!_serverNotices[k] && !closed[k]) fresh++;
+    _serverNotices[k] = n;
+  });
+  if (fresh) serverNoticeRender();
+  return fresh;
+}
+function serverNoticeRender() {
+  var now = Date.now(), owner = typeof isAppOwner === 'function' && isAppOwner(), closed = serverNoticeClosed();
+  var live = Object.keys(_serverNotices).filter(function(k){ return _serverNotices[k].until > now && !closed[k]; });
+  var bar = document.getElementById('serverNoticeBar');
+  clearTimeout(serverNoticeRender._t);
+  if (!live.length) { if (bar) bar.remove(); return; }
+  if (!bar) { bar = document.createElement('div'); bar.id = 'serverNoticeBar'; bar.setAttribute('role', 'status'); document.body.appendChild(bar); }
+  bar.textContent = '';
+  live.forEach(function(k){ var p = document.createElement('div'); p.className = 'snb-line'; p.textContent = serverNoticeText(_serverNotices[k], owner); bar.appendChild(p); });
+  var x = document.createElement('button'); x.type = 'button'; x.className = 'snb-close'; x.setAttribute('aria-label', 'Close'); x.textContent = '✕';
+  x.onclick = serverNoticeClose; bar.appendChild(x);
+  var next = Math.min.apply(null, live.map(function(k){ return _serverNotices[k].until; })) - now + 1000;
+  serverNoticeRender._t = setTimeout(serverNoticeRender, Math.min(next, 6 * 3600e3));
+}
+function serverNoticeClose() {
+  var closed = serverNoticeClosed(), now = Date.now();
+  Object.keys(closed).forEach(function(k){ if (+k.split(':')[1] < now) delete closed[k]; });
+  Object.keys(_serverNotices).forEach(function(k){ closed[k] = 1; });
+  try { localStorage.setItem(SERVER_NOTICE_KEY, JSON.stringify(closed)); } catch(e) {}
+  serverNoticeRender();
+}
+// Whichever feature asked: a refusal from our Worker that names a used-up allowance is shown.
+(function(){
+  var orig = window.fetch;
+  if (typeof orig !== 'function' || orig._mknNotice) return;
+  var wrapped = function(input) {
+    var p = orig.apply(window, arguments);
+    try {
+      var url = typeof input === 'string' ? input : (input && input.url) || '';
+      if (WORKER_ENDPOINT && url.indexOf(WORKER_ENDPOINT) === 0)
+        p.then(function(r){
+          if (r && (r.status === 429 || r.status === 503))
+            r.clone().json().then(function(d){ if (d && d.notice) serverNoticeFrom(d.notice); }).catch(function(){});
+        }, function(){});
+    } catch(e) {}
+    return p;
+  };
+  wrapped._mknNotice = true;
+  window.fetch = wrapped;
+})();
+window.serverNoticeFrom = serverNoticeFrom; window.serverNoticeClose = serverNoticeClose; window.serverNoticeText = serverNoticeText;
 
 function openSyncHealth() {
   renderSyncHealth();
@@ -5616,10 +5696,26 @@ async function linkLiveLinks() {
   if (document.getElementById('lrBody')) renderLinkRequestsPage();
   if (added.length) toast('\u{1F91D} ' + hhLinkName(added[0]) + ' accepted — their recipes are now in your list.', 8000);
 }
+// v38.54 — not while nobody is there. 18–19 Oct 2026: four windows left open on a
+// desk asked the server every two minutes, all night (~270 requests an hour), and
+// used up Cloudflare's free daily allowance two days running. Now an app nobody
+// has touched for 10 minutes asks every 30; the first touch, key or return to
+// the window asks at once.
+var APP_IDLE_MS = 10 * 60e3, _userActiveAt = Date.now();
+function appIdleFor() { return Date.now() - _userActiveAt; }
+function appActive() {
+  var was = appIdleFor() > APP_IDLE_MS;
+  _userActiveAt = Date.now();
+  if (was) livePoll(true);
+}
+['pointerdown', 'keydown', 'touchstart', 'wheel'].forEach(function(ev){
+  document.addEventListener(ev, appActive, { passive: true, capture: true });
+});
+function livePollGap(force) { return force ? 20e3 : appIdleFor() > APP_IDLE_MS ? 30 * 60e3 : 110e3; }
 var _livePollAt = 0, _liveOwnerN = -1;
 async function livePoll(force) {
   if (_selfTestRunning || document.visibilityState === 'hidden' || typeof fbSignedInUser !== 'function' || !fbSignedInUser()) return false;
-  if (Date.now() - _livePollAt < (force ? 20e3 : 110e3)) return false;
+  if (Date.now() - _livePollAt < livePollGap(force)) return false;
   _livePollAt = Date.now();
   try { if (typeof fbRepliesCheck === 'function') await fbRepliesCheck(); } catch(e) {}
   try {
@@ -5633,7 +5729,8 @@ async function livePoll(force) {
   return true;
 }
 setInterval(function(){ livePoll(false); }, 30e3);
-document.addEventListener('visibilitychange', function(){ if (document.visibilityState === 'visible') livePoll(true); });
+document.addEventListener('visibilitychange', function(){ if (document.visibilityState === 'visible') { _userActiveAt = Date.now(); livePoll(true); } });
+window.appIdleFor = appIdleFor; window.livePollGap = livePollGap;
 window.linkLiveStart = linkLiveStart; window.linkLiveStop = linkLiveStop; window.linkLiveTalk = linkLiveTalk; window.livePoll = livePoll;
 async function hhRemoveLink(i) {
   var l = hhLinks()[i];
@@ -7351,6 +7448,7 @@ async function feedbackCountNew() {
       var d = await r.json();
       if (!r.ok || !d) return null;
       n += d.new || 0;
+      if (d.server && typeof serverNoticeFrom === 'function') serverNoticeFrom(d.server);   // v38.54 — Worker v78
     }
   } catch(e) { return null; }
   return n;
@@ -7371,8 +7469,12 @@ function feedbackDot(n) {
   var on = typeof isAppOwner === 'function' && isAppOwner() && typeof n === 'number' && feedbackInboxHere();
   return pathDots({ feedback: on ? n : 0 });
 }
+var _quarterAt = 0;
 setInterval(function(){
   if (_selfTestRunning) return;
+  // v38.54 — an app nobody is using does this hourly, not every quarter of an hour.
+  if (typeof appIdleFor === 'function' && appIdleFor() > APP_IDLE_MS && Date.now() - _quarterAt < 55 * 60e3) return;
+  _quarterAt = Date.now();
   if (typeof isAppOwner === 'function' && isAppOwner() && hhDb() && feedbackInboxHere()) feedbackCountNew().then(feedbackKnown).catch(function(){});
   if (_household && hhDb()) hhLoadIncoming().then(talkLoad).then(linkDotRefresh).catch(function(){});   // v37.80/81 — new link requests and messages
   if (fbSignedInUser()) fbRepliesLoad().catch(function(){});   // v38.00 — answers to my notes (the dot; the window when the app opens)
@@ -7560,7 +7662,8 @@ function insightsStart() {
   insSoon(8000);
   return true;
 }
-setInterval(function(){ if (!insQuiet()) insightsSend().catch(function(){}); }, 10 * 60e3);
+// v38.54 — not while nobody is there: what waits goes when the app is next used, or hidden.
+setInterval(function(){ if (!insQuiet() && !(typeof appIdleFor === 'function' && appIdleFor() > APP_IDLE_MS)) insightsSend().catch(function(){}); }, 10 * 60e3);
 document.addEventListener('visibilitychange', function(){
   if (insQuiet()) return;
   if (document.visibilityState === 'hidden') { insSessionTouch(); insightsSend({ keepalive: true }).catch(function(){}); }
@@ -8228,7 +8331,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v38.53';
+var APP_VERSION = 'v38.54';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -10306,6 +10409,14 @@ li.line-sub-indent { padding-inline-start: 22px; }
 .linked-card.linked-fresh { animation: linkedFresh 2.4s ease-out; }
 @keyframes linkedFresh { 0%, 30% { box-shadow: 0 0 0 3px var(--terracotta-fill), 0 4px 14px rgba(193,68,14,0.25); } 100% { box-shadow: none; } }
 @media (prefers-reduced-motion: reduce) { .linked-card.linked-fresh { animation: none; outline: 3px solid var(--terracotta-fill); } }
+/* v38.54 — the server says a daily allowance is used up (serverNoticeFrom) */
+#serverNoticeBar { position: fixed; z-index: 9600; top: calc(env(safe-area-inset-top, 0px) + 8px); left: 12px; right: 12px;
+  max-width: 620px; margin: 0 auto; padding: 10px 40px 10px 14px; border-radius: 12px; font-size: 13px; line-height: 1.45;
+  background: var(--warn-bg); color: var(--warn-text); border: 1px solid var(--warn-border); box-shadow: 0 6px 20px rgba(0,0,0,0.18); }
+#serverNoticeBar .snb-line + .snb-line { margin-top: 6px; }
+#serverNoticeBar .snb-close { position: absolute; top: 6px; right: 6px; width: 30px; height: 30px; border: 0; border-radius: 50%;
+  background: transparent; color: inherit; font-size: 15px; cursor: pointer; }
+#serverNoticeBar .snb-close:hover, #serverNoticeBar .snb-close:focus-visible { background: rgba(0,0,0,0.08); }
 .kitchen-filter { position: relative; display: inline-flex; }
 .kitchen-menu { position: absolute; top: calc(100% + 6px); inset-inline-start: 0; z-index: 160; min-width: 240px; max-width: 320px; max-height: 60vh; overflow-y: auto;
   background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 8px 26px rgba(0,0,0,0.18); padding: 8px; }
@@ -11237,7 +11348,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.53</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.54</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -11974,7 +12085,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.53</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.54</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -21386,6 +21497,10 @@ async function _aiCallUncached(prompt, maxTokens, tools, _ck, model, system) {
         try { ours = await r.clone().json(); } catch(e) {}
         if (ours && ours.rateLimited && ours.error) {
           if (ours.allowance) throw aiAllowanceError(ours.error);
+          // v38.54 — a used-up daily allowance (Worker v78): when it comes back, in local time.
+          if (ours.paused && ours.notice && ours.notice.until)
+            throw new Error('RATE_LIMIT: AI features are paused until ' + serverNoticeTime(ours.notice.until)
+              + ' — the server\u2019s free daily allowance is used up, and it comes back by itself. Everything else works.');
           throw new Error(ours.error);
         }
         const retryAfter = r.headers.get('retry-after');

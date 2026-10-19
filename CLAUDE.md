@@ -328,6 +328,24 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
   A's open app 0.6 s with the note; ‹ Back kept address and note. **Farm**: a tapped animal stays facing you through
   the puff (`farmOuch(el, a, keepFacing)`; turns back only if grabbed). Self-test `link_request_back_and_mail`.
 - **Released: v38.53 (17 Oct 2026, 23:05 Israel time, CI green on 9a1ae9a).** All jobs success.
+- **v38.54 + Worker v78 — Cloudflare's free KV allowance used up by idle windows** (Tony, 19 Oct: "[Alert] KV daily
+  operation limit exceeded … I have barely touched the application … I did not receive any indication from the
+  application"). Measured with `tools/cf-usage.js` (workflow **Cloudflare usage**, counts only; the Workers token CAN read
+  account analytics): ~270 Worker requests an hour around the clock from 18 Oct 00:40 — about four open windows (two
+  owner) on Tony's desk; per 2 days: feedback-replies 6,522, owner notes-new 3,289, usage counts 3,194. One request in
+  five wrote a KV rate counter → **1,107 and 1,113 KV writes** (allowance 1,000; resets 00:00 UTC = 03:00 Israel).
+  Cause: v38.49's `livePoll` asked every 2 min while visible, and v39's sampled KV per-minute counter. Fix — **Worker
+  v78**: per-minute ceilings in isolate memory (`minuteCount`, no storage); AI day/month and video day ceilings in D1
+  `counters` when METER_DB is bound (`ceilingCount`, KV only without D1); breaker `_ceilingWritesFailing` retries after
+  5 min; owner_devices written at most hourly; `tableOnce` (CREATE TABLE once per isolate per database). A write refused
+  for a used-up allowance (`isLimitError`) → `noteServerLimit` keeps it in the OTHER store until 00:00 UTC (KV→D1
+  `server_notices`, D1→KV `notice:d1`; read before write) → `serverNotices`: health `notices` (keyed), notes-new `server`,
+  AI refusal `notice`, SERVER_LIMIT 503 for KV/D1 errors elsewhere. health `limits`. deploy check now `"bring":true`.
+  **App v38.54**: idle-aware timers (`appIdleFor`, 10 min; livePoll every 30 min idle, at once on touch/return;
+  the 15-min timer hourly when idle; insights not while idle); `serverNoticeFrom` bar `#serverNoticeBar` (warn tokens,
+  closable, remembered per notice) fed by health, the owner's count and a fetch hook on Worker 429/503 with `notice`;
+  the AI refusal names the local time it comes back. Self-test `idle_quiet_and_server_notice`; Worker tests: no KV
+  writes on ordinary requests, D1 ceilings, notices, owner device hourly.
 - **Before the testers, Tony's steps (16 Oct 2026):** (1) Cloudflare Email Routing destination addresses — done.
   (2) **The community app's browser key is restricted, both stages:** API restrictions = Identity Toolkit API, Token
   Service API, Cloud Firestore API (Google warned of "active usage" of eight Maps APIs — scanners; updated anyway);

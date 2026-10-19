@@ -1,4 +1,14 @@
-// Tony's Recipes — Cloudflare Worker v77
+// Tony's Recipes — Cloudflare Worker v78
+// v78: AN IDLE APP NO LONGER USES UP THE FREE ALLOWANCE, AND A USED-UP ONE IS SAID (Tony, 19 Oct 2026:
+// "[Alert] KV daily operation limit exceeded … I have barely touched the application … How can I expect
+// 20 beta testers to run on the same application if only my own limited use triggers blocking?").
+// Measured (tools/cf-usage.js): ~270 requests an hour around the clock from about four open windows, one
+// in five writing a KV rate counter — 1,107 and 1,113 KV writes on 18 and 19 Oct against 1,000. The
+// per-minute ceilings are now counted in memory (no storage at all); the AI day/month ceilings and the
+// video day count are in D1 (`counters`) when it is bound; the owner's device record is written at most
+// hourly. A write refused because a daily allowance is used up is remembered in the other store until
+// 00:00 UTC and reported: health `notices` (keyed), the owner's notes-new `server`, and a refusal's
+// `notice` {what, since, until, affects}. health: `limits`.
 // v77: WIKIMEDIA COMMONS FOR PHOTOS (Tony, 16 Oct 2026: "Getting pics back from Openverse takes ages …
 // Perhaps we do not want to use Openverse at all?"). Measured that day from GitHub's servers: Openverse's
 // search took 12.6–27.8 s every time; Wikimedia Commons searched directly took 0.26–0.55 s, with every
@@ -344,7 +354,7 @@
 //   AI_MAX_TOKENS   – the longest answer one call may ask for (32000; the
 //                     app's largest, reading several recipes at once, asks 8000).
 
-const WORKER_VERSION = 'v77';
+const WORKER_VERSION = 'v78';
 const VIDEO_MAX_MB_DEFAULT = 50;
 const GEMINI_API = 'https://generativelanguage.googleapis.com';
 const GEMINI_MODEL_DEFAULT = 'gemini-2.5-flash';
@@ -434,8 +444,19 @@ function appKeyOk(request, env, body) {
 // dozen calls on a busy day — and is the only one that spends real money, so it
 // still gets an exact count. Worst case at the daily ceiling is ~700 writes,
 // inside the allowance, and ordinary family use is a tenth of that.
-const KV_SAMPLE_CHEAP = 5;    // count 1 request in 5 on the non-AI paths
-const KV_SAMPLE_MONTH = 10;   // the monthly total is a coarse guard rail
+//
+// v78 — and the per-minute half of that went too far. 18–19 Oct 2026: four app
+// windows left open on a desk asked this Worker ~270 times an hour, night and
+// day (v38.49 had made an open app ask every two minutes); one request in five
+// wrote a KV counter, and the account's 1,000 writes a day were gone by evening
+// on both days — "[Alert] KV daily operation limit exceeded" while Tony had
+// barely touched the app. So the PER-MINUTE ceilings are now counted in this
+// isolate's memory, which costs nothing: a runaway is one caller hammering, and
+// that lands on one isolate. The DAY and MONTH ceilings on the money path (and
+// the video day count) go to D1 when it is bound — exact, one statement, and
+// 100,000 writes a day on the free plan — and stay in KV otherwise (tests, a
+// bare deployment). An ordinary request now writes nothing anywhere.
+const KV_SAMPLE_MONTH = 10;   // KV only: the monthly total is a coarse guard rail (D1 counts it exactly)
 const AI_DAILY_DEFAULT = 300;     // Anthropic calls per day, all callers
 const AI_MONTHLY_DEFAULT = 3000;  // …and per calendar month
 
@@ -443,10 +464,15 @@ const AI_MONTHLY_DEFAULT = 3000;  // …and per calendar month
 // many of them, so this is not a global truth — it does not need to be. Its job
 // is that once writes start failing in THIS isolate, the money-spending path
 // stops immediately instead of running unmetered until the isolate is recycled.
-let _kvWritesFailing = false;
+// v78 — it holds WHEN the last write failed, and lets one call try again after
+// five minutes: nothing else writes a counter any more, so nothing else would
+// ever find out that the store works again.
+let _ceilingWritesFailing = 0;
+const CEILING_RETRY_MS = 5 * 60e3;
 
 function utcDayKey(now)   { return new Date(now).toISOString().slice(0, 10); }  // YYYY-MM-DD
 function utcMonthKey(now) { return new Date(now).toISOString().slice(0, 7); }   // YYYY-MM
+function nextUtcMidnight(now) { const d = new Date(now); return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 1); }
 
 function ceilingResp(what, used, cap) {
   // Say whose ceiling this is. "Rate limited" with no owner sends the reader to
@@ -460,33 +486,61 @@ function ceilingResp(what, used, cap) {
   }, 429);
 }
 
-// Read a counter, decide, then credit it. Returns the value it read.
-async function kvCount(kv, key, ttlSec, sample) {
+// v78 — per caller per minute, in memory. Old minutes are swept once the map grows.
+const _minuteCounts = new Map();
+function minuteCount(key, bucket) {
+  let e = _minuteCounts.get(key);
+  if (!e || e.bucket !== bucket) {
+    if (_minuteCounts.size > 5000) for (const [k, v] of _minuteCounts) if (v.bucket !== bucket) _minuteCounts.delete(k);
+    e = { bucket, n: 0 };
+    _minuteCounts.set(key, e);
+  }
+  return ++e.n;
+}
+
+// Read a ceiling counter, decide, then credit it. Returns the value it read.
+// D1 when bound (exact), else KV (sampled where `sample` > 1).
+const _tablesMade = new WeakMap();   // database → names of the tables already made in this isolate
+async function tableOnce(db, name, sql) {
+  let made = _tablesMade.get(db);
+  if (!made) { made = new Set(); _tablesMade.set(db, made); }
+  if (made.has(name)) return;
+  await db.prepare(sql).run();
+  made.add(name);
+}
+async function ceilingCount(env, key, ttlSec, sample) {
+  const db = env.METER_DB;
+  if (db) {
+    await tableOnce(db, 'counters', 'CREATE TABLE IF NOT EXISTS counters (k TEXT PRIMARY KEY, n INTEGER NOT NULL DEFAULT 0, until INTEGER)');
+    const row = await db.prepare('SELECT n FROM counters WHERE k = ?1').bind(key).first();
+    const used = (row && Number(row.n)) || 0;
+    return { used, credit: async () => {
+      try {
+        await db.prepare('INSERT INTO counters (k, n, until) VALUES (?1, 1, ?2) ON CONFLICT (k) DO UPDATE SET n = n + 1')
+          .bind(key, Date.now() + ttlSec * 1000).run();
+        _ceilingWritesFailing = 0;
+      } catch (e) { _ceilingWritesFailing = Date.now(); await noteServerLimit(env, 'd1', e); }
+    } };
+  }
+  const kv = env.BRING_KV;
   const used = parseInt(await kv.get(key) || '0', 10) || 0;
   return { used, credit: async () => {
     if (sample > 1 && Math.random() >= 1 / sample) return;   // sampled out — no write
     try {
       await kv.put(key, String(used + sample), { expirationTtl: ttlSec });
-      _kvWritesFailing = false;   // writes work again — let the AI path back in
-    } catch (e) { _kvWritesFailing = true; }
+      _ceilingWritesFailing = 0;   // writes work again — let the AI path back in
+    } catch (e) { _ceilingWritesFailing = Date.now(); await noteServerLimit(env, 'kv', e); }
   } };
 }
 
-// KV is eventually consistent, so all of this is approximate — which is fine:
-// the job is to bound a runaway, not to meter precisely.
+// KV and D1 are eventually consistent across isolates, so all of this is
+// approximate — which is fine: the job is to bound a runaway, not to meter precisely.
 async function rateLimited(request, env, action) {
-  const kv = env.BRING_KV;
   // The AI path (no action) is the expensive one; browsing photos is cheap.
   const costly = !action || action === 'ai' || action === 'instagram-fetch' || action === 'video-recipe' || action === 'video-from-url';
   // Narrower than `costly`: instagram-fetch is slow but it does not spend
   // Anthropic credits, so it must not eat into the AI ceilings.
   const aiSpend = !action || action === 'ai';
-
-  // No KV bound at all is a DEPLOYMENT fact, not an attack — there is nothing
-  // to read and nothing to write, and breaking the family's app to punish a
-  // hypothetical abuser is the wrong trade. `health` reports rateLimiting:false
-  // so it is visible rather than silent.
-  if (!kv) return null;
 
   const now = Date.now();
   const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
@@ -499,56 +553,49 @@ async function rateLimited(request, env, action) {
     || (photoBytes ? 600 : costly ? 40 : 150);
   const windowSec = 60;
   const bucket = Math.floor(now / 1000 / windowSec);
-  const key = 'rl:' + ip + ':' + bucket + (costly ? ':ai' : ':x');
-  // A 600/min ceiling counted 1-in-5 would still be 120 writes a minute, so the
-  // burstiest path is sampled the hardest.
-  const sample = costly ? 1 : (photoBytes ? KV_SAMPLE_MONTH : KV_SAMPLE_CHEAP);
-
-  // If writes are already known to be failing in this isolate we cannot meter,
-  // and unmeterable spend is the thing these ceilings exist to stop.
-  if (aiSpend && _kvWritesFailing) {
-    return jsonResp({ error: 'RATE_LIMIT: the spend guard rail cannot record this call, so AI '
-      + 'requests are paused. This usually means the Worker\'s KV write allowance is used up for '
-      + 'today. Everything that does not call the AI still works.', rateLimited: true }, 429);
-  }
-
-  let minute;
-  try { minute = await kvCount(kv, key, windowSec * 2, sample); }
-  catch (e) {
-    // KV is bound but not answering. Carry on for the cheap paths; refuse the
-    // one that spends money.
-    if (!aiSpend) return null;
-    return jsonResp({ error: 'RATE_LIMIT: the spend guard rail is not answering, so AI requests '
-      + 'are paused rather than run unmetered. Everything that does not call the AI still works.',
-      rateLimited: true }, 429);
-  }
-  if (minute.used >= limit) {
-    return jsonResp({ error: 'RATE_LIMIT: too many requests in the last minute (' + minute.used + '/' + limit
+  const n = minuteCount(ip + (costly ? ':ai' : photoBytes ? ':ph' : ':x'), bucket);
+  if (n > limit) {
+    return jsonResp({ error: 'RATE_LIMIT: too many requests in the last minute (' + (n - 1) + '/' + limit
       + '). Wait a minute and try again.', rateLimited: true, retryAfter: windowSec }, 429);
+  }
+  if (!aiSpend) return null;
+
+  // No store bound at all is a DEPLOYMENT fact, not an attack — there is
+  // nothing to count in, and breaking the family's app to punish a hypothetical
+  // abuser is the wrong trade. `health` reports rateLimiting:false so it is
+  // visible rather than silent.
+  if (!env.METER_DB && !env.BRING_KV) return null;
+
+  // If writes are known to be failing in this isolate we cannot meter, and
+  // unmeterable spend is the thing these ceilings exist to stop.
+  if (_ceilingWritesFailing && now - _ceilingWritesFailing < CEILING_RETRY_MS) {
+    const store = env.METER_DB ? 'd1' : 'kv';
+    const notice = (await serverNotices(env)).filter(function (x) { return x.what === store; })[0] || null;
+    return jsonResp({ error: 'RATE_LIMIT: AI features are paused: the server cannot record AI calls just now — '
+      + 'usually because its free daily allowance for storage writes (' + (store === 'd1' ? 'D1 database' : 'KV')
+      + ' write allowance) is used up. Everything that does not call the AI still works.', rateLimited: true, paused: true,
+      notice }, 429);
   }
 
   // Daily and monthly ceilings, on the Anthropic path only and across ALL
   // callers — an IP is free to change, an API bill is not. A per-minute limit
   // alone allows ~57,000 calls a day on Tony's credits.
-  if (aiSpend) {
-    const dayMax = parseInt(env.AI_DAILY_MAX || '', 10) || AI_DAILY_DEFAULT;
-    const monMax = parseInt(env.AI_MONTHLY_MAX || '', 10) || AI_MONTHLY_DEFAULT;
-    let day, mon;
-    try {
-      day = await kvCount(kv, 'rl:day:' + utcDayKey(now), 60 * 60 * 48, 1);
-      mon = await kvCount(kv, 'rl:mon:' + utcMonthKey(now), 60 * 60 * 24 * 40, KV_SAMPLE_MONTH);
-    } catch (e) {
-      return jsonResp({ error: 'RATE_LIMIT: the spend guard rail is not answering, so AI requests '
-        + 'are paused rather than run unmetered. Everything that does not call the AI still works.',
-        rateLimited: true }, 429);
-    }
-    if (day.used >= dayMax) return ceilingResp('daily', day.used, dayMax);
-    if (mon.used >= monMax) return ceilingResp('monthly', mon.used, monMax);
-    await day.credit();
-    await mon.credit();
+  const dayMax = parseInt(env.AI_DAILY_MAX || '', 10) || AI_DAILY_DEFAULT;
+  const monMax = parseInt(env.AI_MONTHLY_MAX || '', 10) || AI_MONTHLY_DEFAULT;
+  let day, mon;
+  try {
+    day = await ceilingCount(env, 'rl:day:' + utcDayKey(now), 60 * 60 * 48, 1);
+    mon = await ceilingCount(env, 'rl:mon:' + utcMonthKey(now), 60 * 60 * 24 * 40, KV_SAMPLE_MONTH);
+  } catch (e) {
+    // The store is bound but not answering. Refuse the one path that spends money.
+    return jsonResp({ error: 'RATE_LIMIT: the spend guard rail is not answering, so AI requests '
+      + 'are paused rather than run unmetered. Everything that does not call the AI still works.',
+      rateLimited: true, paused: true }, 429);
   }
-
-  await minute.credit();
+  if (day.used >= dayMax) return ceilingResp('daily', day.used, dayMax);
+  if (mon.used >= monMax) return ceilingResp('monthly', mon.used, monMax);
+  await day.credit();
+  await mon.credit();
   return null;
 }
 
@@ -556,19 +603,77 @@ async function rateLimited(request, env, action) {
 // app key — `health` itself is open on purpose, and the counts are none of an
 // anonymous caller's business.
 async function spendStatus(env) {
-  const kv = env.BRING_KV;
   const out = {
     dailyMax:   parseInt(env.AI_DAILY_MAX || '', 10) || AI_DAILY_DEFAULT,
     monthlyMax: parseInt(env.AI_MONTHLY_MAX || '', 10) || AI_MONTHLY_DEFAULT,
     dailyUsed: null, monthlyUsed: null
   };
-  if (!kv) return out;
+  if (!env.METER_DB && !env.BRING_KV) return out;
   const now = Date.now();
   try {
-    out.dailyUsed   = parseInt(await kv.get('rl:day:' + utcDayKey(now)) || '0', 10) || 0;
-    out.monthlyUsed = parseInt(await kv.get('rl:mon:' + utcMonthKey(now)) || '0', 10) || 0;
+    out.dailyUsed   = (await ceilingCount(env, 'rl:day:' + utcDayKey(now), 0, 1)).used;
+    out.monthlyUsed = (await ceilingCount(env, 'rl:mon:' + utcMonthKey(now), 0, 1)).used;
   } catch (e) {}
   return out;
+}
+
+// ─── A USED-UP ALLOWANCE IS SAID, NOT SWALLOWED (v78) ───────────────────────
+// Tony, 19 Oct 2026: "I did not receive any indication from the application that
+// there is a problem or that any service is denied. I should get such
+// notification from the app itself." Cloudflare's free daily allowances (KV
+// writes, D1 rows) end at 00:00 UTC. When a write fails because one is used up,
+// that is remembered — in the OTHER store (a KV failure in D1, a D1 failure in
+// KV), read before written so many isolates do not each write it — until the
+// allowance comes back. Every app hears it: `health` (keyed) lists it, the
+// owner's `notes-new` carries it, and a refusal names it with its end time.
+// What stops, in words a person can act on. With D1 bound the AI counters are
+// there, so a used-up KV allowance only touches Bring!.
+function noticeAffects(env, what) {
+  if (what === 'd1') return 'AI features, notes to the app owner and their replies, and usage statistics';
+  return env.METER_DB ? 'sending a shopping list to Bring!'
+    : 'AI features (reading recipes, translating, suggestions) and sending to Bring!';
+}
+const _notices = {};   // what → { since, until, savedAt }
+function isLimitError(e) { return /limit|exceed|quota|too many|429/i.test(String((e && e.message) || e || '')); }
+async function noteServerLimit(env, what, err) {
+  if (!isLimitError(err)) return;          // a passing fault is not "used up until midnight"
+  const now = Date.now(), until = nextUtcMidnight(now), cur = _notices[what];
+  if (cur && cur.until === until && now - cur.savedAt < 10 * 60e3) return;
+  const since = (cur && cur.until === until && cur.since) || now;
+  _notices[what] = { since, until, savedAt: now };
+  const detail = String((err && err.message) || err || '').slice(0, 200);
+  try {
+    if (what === 'kv' && env.METER_DB) {
+      const db = env.METER_DB;
+      await tableOnce(db, 'server_notices', 'CREATE TABLE IF NOT EXISTS server_notices (what TEXT PRIMARY KEY, since INTEGER, until INTEGER, detail TEXT)');
+      const have = await db.prepare('SELECT until FROM server_notices WHERE what = ?1').bind(what).first();
+      if (!have || Number(have.until) !== until)
+        await db.prepare('INSERT INTO server_notices (what, since, until, detail) VALUES (?1, ?2, ?3, ?4) '
+          + 'ON CONFLICT (what) DO UPDATE SET since = excluded.since, until = excluded.until, detail = excluded.detail')
+          .bind(what, since, until, detail).run();
+    } else if (what === 'd1' && env.BRING_KV) {
+      const have = JSON.parse(await env.BRING_KV.get('notice:d1') || 'null');
+      if (!have || have.until !== until)
+        await env.BRING_KV.put('notice:d1', JSON.stringify({ since, until, detail }), { expiration: Math.floor(until / 1000) + 60 });
+    }
+  } catch (e) { /* the notice stays in this isolate's memory */ }
+}
+async function serverNotices(env) {
+  const now = Date.now(), out = {};
+  Object.keys(_notices).forEach(function (w) { if (_notices[w].until > now) out[w] = { since: _notices[w].since, until: _notices[w].until }; });
+  if (env.METER_DB && !out.kv) {
+    try {
+      const r = await env.METER_DB.prepare('SELECT since, until FROM server_notices WHERE what = ?1 AND until > ?2').bind('kv', now).first();
+      if (r) out.kv = { since: Number(r.since), until: Number(r.until) };
+    } catch (e) { /* no table yet: nothing has ever run out */ }
+  }
+  if (env.BRING_KV && !out.d1) {
+    try {
+      const v = JSON.parse(await env.BRING_KV.get('notice:d1') || 'null');
+      if (v && v.until > now) out.d1 = { since: v.since, until: v.until };
+    } catch (e) {}
+  }
+  return Object.keys(out).map(function (w) { return Object.assign({ what: w, affects: noticeAffects(env, w) }, out[w]); });
 }
 
 // ── Bring! recipe import (v42) ────────────────────────────────────────────────
@@ -707,6 +812,8 @@ async function handleRequest(request, env) {
       return jsonResp({
         ok: true,
         spend: keyed ? await spendStatus(env) : undefined,
+        // v78 — a used-up daily allowance (KV writes, D1 rows), with when it comes back.
+        notices: keyed ? await serverNotices(env) : undefined,
         // Keep in step with the header at the top of this file. It said v34 on a
         // v36 Worker, which made `health` — the one endpoint whose entire job is
         // to report the truth about this Worker — quietly wrong about it.
@@ -714,7 +821,9 @@ async function handleRequest(request, env) {
         originAllowed: origin !== false,
         appKeyRequired: !!env.APP_SHARED_KEY,
         appKeyAccepted: keyed,
-        rateLimiting: !!env.BRING_KV,
+        rateLimiting: !!(env.BRING_KV || env.METER_DB),
+        // v78 — where the counters live: per minute in memory; the AI day/month in D1 (else KV).
+        limits: { minute: 'memory', ceilings: env.METER_DB ? 'd1' : env.BRING_KV ? 'kv' : 'off' },
         // v60 — the app sends its sign-in and household only to a Worker that
         // strips them before Anthropic (an older one would forward them, and
         // Anthropic refuses unknown fields — the v37 lesson).
@@ -1406,14 +1515,17 @@ async function ownerTwoStepOn(project, token, env) {
   _ownerSec.set(project, { on, at: Date.now() });
   return on;
 }
+// v78 — the table is made once per isolate, and a known device's "last seen" is
+// written at most hourly: the owner's open app asks every few minutes, and each
+// of those was a D1 write (3,223 in two days, 18–19 Oct 2026).
 async function ownerWatch(env, db, claims, body, request) {
-  await db.prepare('CREATE TABLE IF NOT EXISTS owner_devices (email TEXT NOT NULL, device TEXT NOT NULL, first_at INTEGER, last_at INTEGER, '
-    + 'ua TEXT, PRIMARY KEY (email, device))').run();
+  await tableOnce(db, 'owner_devices', 'CREATE TABLE IF NOT EXISTS owner_devices (email TEXT NOT NULL, device TEXT NOT NULL, first_at INTEGER, last_at INTEGER, '
+    + 'ua TEXT, PRIMARY KEY (email, device))');
   const email = String(claims.email || '').toLowerCase(), now = Date.now(), op = String(body.op || 'list');
   const dev = /^[A-Za-z0-9-]{8,64}$/.test(String(body.device || '')) ? String(body.device) : 'unknown';
   const ua = String(request.headers.get('User-Agent') || '').slice(0, 200);
-  const known = await db.prepare('SELECT 1 AS k FROM owner_devices WHERE email = ?1 AND device = ?2').bind(email, dev).first();
-  await db.prepare('INSERT INTO owner_devices (email, device, first_at, last_at, ua) VALUES (?1, ?2, ?3, ?3, ?4) '
+  const known = await db.prepare('SELECT last_at FROM owner_devices WHERE email = ?1 AND device = ?2').bind(email, dev).first();
+  if (!known || !(Number(known.last_at) > now - 3600e3)) await db.prepare('INSERT INTO owner_devices (email, device, first_at, last_at, ua) VALUES (?1, ?2, ?3, ?3, ?4) '
     + 'ON CONFLICT (email, device) DO UPDATE SET last_at = excluded.last_at, ua = excluded.ua').bind(email, dev, now, ua).run();
   const cf = request.cf || {};
   const where = [cf.city, cf.country || request.headers.get('CF-IPCountry')].filter(Boolean).join(', ') || 'unknown place';
@@ -1871,7 +1983,7 @@ async function feedbackAdmin(env, db, body, claims) {
   }
   if (body.op === 'notes-new') {
     const r = await db.prepare("SELECT COUNT(*) AS n FROM feedback WHERE status = 'new'").first();
-    return jsonResp({ new: (r && r.n) || 0 });
+    return jsonResp({ new: (r && r.n) || 0, server: await serverNotices(env) });   // v78 — the owner hears of a used-up allowance
   }
   const id = parseInt(body.id, 10);
   if (!(id > 0)) return jsonResp({ error: 'FEEDBACK: which note?' }, 400);
@@ -2100,11 +2212,10 @@ async function surveyAdmin(env, db, body, proj) {
 // ─── VIDEO RECIPES (v43, v44) ────────────────────────────────────────────────
 // The daily ceiling both video actions share. null = go ahead.
 async function videoDailyCap(env) {
-  const kv = env.BRING_KV;
-  if (!kv) return null;
+  if (!env.METER_DB && !env.BRING_KV) return null;
   const vMax = parseInt(env.VIDEO_DAILY_MAX || '', 10) || VIDEO_DAILY_DEFAULT;
   try {
-    const vDay = await kvCount(kv, 'rl:vid:' + utcDayKey(Date.now()), 60 * 60 * 48, 1);
+    const vDay = await ceilingCount(env, 'rl:vid:' + utcDayKey(Date.now()), 60 * 60 * 48, 1);   // v78 — D1 when bound
     if (vDay.used >= vMax) {
       return jsonResp({ error: 'VIDEO_CAP: this Worker\'s daily ceiling for reading videos has been reached ('
         + vDay.used + '/' + vMax + '). Raise VIDEO_DAILY_MAX, or try again tomorrow.', rateLimited: true }, 429);
@@ -2628,7 +2739,15 @@ async function retentionSweep(env, now) {
 export default {
   // v75 — the daily sweep (cron in worker/wrangler.jsonc).
   async scheduled(event, env, ctx) {
-    const p = retentionSweep(env, (event && Number(event.scheduledTime)) || Date.now());
+    const at = (event && Number(event.scheduledTime)) || Date.now();
+    const p = retentionSweep(env, at).then(async function (done) {
+      // v78 — the AI ceiling counters and the allowance notices that have run their time.
+      if (env.METER_DB) {
+        try { await env.METER_DB.prepare('DELETE FROM counters WHERE until < ?1').bind(at).run(); } catch (e) {}
+        try { await env.METER_DB.prepare('DELETE FROM server_notices WHERE until < ?1').bind(at).run(); } catch (e) {}
+      }
+      return done;
+    });
     if (ctx && ctx.waitUntil) ctx.waitUntil(p); else await p;
   },
   async fetch(request, env) {
@@ -2637,7 +2756,20 @@ export default {
     try {
       resp = await handleRequest(request, env);
     } catch (err) {
-      resp = jsonResp({ error: 'Worker error: ' + (err && err.message ? err.message : String(err)) }, 500);
+      const msg = err && err.message ? err.message : String(err);
+      // v78 — D1's daily allowance used up: remembered (in KV) and said, with when it comes back.
+      // …and KV's (a Bring! page): the same, remembered in D1.
+      if (/\bKV\b|put\(\)/.test(msg) && isLimitError(err)) {
+        await noteServerLimit(env, 'kv', err);
+        resp = jsonResp({ error: 'SERVER_LIMIT: the server\'s free daily allowance for storage writes is used up, so this '
+          + 'cannot be done just now. It comes back by itself at 00:00 UTC.', serverLimit: true,
+          notice: (await serverNotices(env)).filter(function (n) { return n.what === 'kv'; })[0] || null }, 503);
+      } else if (/\bD1\b|D1_/.test(msg) && isLimitError(err)) {
+        await noteServerLimit(env, 'd1', err);
+        resp = jsonResp({ error: 'SERVER_LIMIT: the server\'s free daily allowance for its database is used up, so this '
+          + 'cannot be done just now. It comes back by itself at 00:00 UTC.', serverLimit: true,
+          notice: (await serverNotices(env)).filter(function (n) { return n.what === 'd1'; })[0] || null }, 503);
+      } else resp = jsonResp({ error: 'Worker error: ' + msg }, 500);
     }
     // Stamp CORS on EVERY response, whatever produced it — including the binary
     // download path and anything that throws. Handlers no longer decide this.
@@ -2647,4 +2779,4 @@ export default {
   }
 };
 
-// ── END OF WORKER v77 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
+// ── END OF WORKER v78 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
