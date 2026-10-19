@@ -41,6 +41,8 @@ async function analytics() {
         sum { requests } dimensions { actionType datetimeHour namespaceId } }
       w: workersInvocationsAdaptive(limit: 2000, filter: { datetime_geq: $since, datetime_lt: $until }) {
         sum { requests errors } dimensions { scriptName datetimeHour status } }
+      q: d1QueriesAdaptiveGroups(limit: 40, orderBy: [count_DESC], filter: { datetime_geq: $since, datetime_lt: $until }) {
+        count sum { rowsRead rowsWritten } dimensions { query } }
       d1: d1AnalyticsAdaptiveGroups(limit: 2000, filter: { datetimeHour_geq: $since, datetimeHour_lt: $until }) {
         sum { readQueries writeQueries rowsRead rowsWritten } dimensions { datetimeHour } }
     } } }`;
@@ -82,6 +84,11 @@ async function analytics() {
     console.log('  ' + d + ': Worker requests ' + x.req + ' (free: 100,000) · KV writes ' + (x.kvWrite + x.kvWriteOtherNs)
       + ' (free: 1,000) · D1 rows written ' + x.d1w + ' (free: 100,000) · D1 rows read ' + x.d1r + ' (free: 5,000,000)');
   });
+  if (a.q && a.q.length) {
+    console.log('\nD1 statements, most frequent first (count · rows written · rows read):');
+    a.q.forEach(function(g){ console.log('  ' + String(g.count).padStart(7) + String(g.sum.rowsWritten).padStart(8) + String(g.sum.rowsRead).padStart(9)
+      + '  ' + String(g.dimensions.query || '').replace(/\s+/g, ' ').slice(0, 150)); });
+  }
   console.log('\nWorker requests by Worker: ' + Object.keys(scripts).map(function(s){ return s + ' ' + scripts[s]; }).join(', '));
   return true;
 }
