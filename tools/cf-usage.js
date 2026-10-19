@@ -41,6 +41,8 @@ async function analytics() {
         sum { requests } dimensions { actionType datetimeHour namespaceId } }
       w: workersInvocationsAdaptive(limit: 2000, filter: { datetime_geq: $since, datetime_lt: $until }) {
         sum { requests errors } dimensions { scriptName datetimeHour status } }
+      cpu: workersInvocationsAdaptive(limit: 10, filter: { datetime_geq: $since, datetime_lt: $until }) {
+        sum { requests errors } quantiles { cpuTimeP50 cpuTimeP99 cpuTimeP999 } dimensions { scriptName status } }
       q: d1QueriesAdaptiveGroups(limit: 40, orderBy: [count_DESC], filter: { datetime_geq: $since, datetime_lt: $until }) {
         count sum { rowsRead rowsWritten } dimensions { query } }
       d1: d1AnalyticsAdaptiveGroups(limit: 2000, filter: { datetimeHour_geq: $since, datetimeHour_lt: $until }) {
@@ -89,6 +91,10 @@ async function analytics() {
     a.q.forEach(function(g){ console.log('  ' + String(g.count).padStart(7) + String(g.sum.rowsWritten).padStart(8) + String(g.sum.rowsRead).padStart(9)
       + '  ' + String(g.dimensions.query || '').replace(/\s+/g, ' ').slice(0, 150)); });
   }
+  (a.cpu || []).forEach(function(g){
+    console.log('CPU (ms, limit 10 on the free plan) ' + g.dimensions.scriptName + ' [' + g.dimensions.status + '] requests ' + g.sum.requests
+      + ': p50 ' + (g.quantiles.cpuTimeP50 / 1000).toFixed(1) + ', p99 ' + (g.quantiles.cpuTimeP99 / 1000).toFixed(1) + ', p99.9 ' + (g.quantiles.cpuTimeP999 / 1000).toFixed(1));
+  });
   console.log('\nWorker requests by Worker: ' + Object.keys(scripts).map(function(s){ return s + ' ' + scripts[s]; }).join(', '));
   return true;
 }
@@ -114,9 +120,44 @@ async function counters() {
   console.log('  Other rl: keys: ' + other);
 }
 
+const D1_ID = '4ca9eeaa-221f-4afa-a2f3-b85f8942a66b';         // METER_DB, worker/wrangler.jsonc
+async function d1(sql) {
+  const r = await cf('/accounts/' + ACCOUNT + '/d1/database/' + D1_ID + '/query', { method: 'POST', body: JSON.stringify({ sql }) });
+  if (r.status !== 200 || !r.j || !r.j.success) return { error: 'HTTP ' + r.status + ' ' + String(r.text).slice(0, 160) };
+  return { rows: ((r.j.result || [])[0] || {}).results || [] };
+}
+async function tables() {
+  const t = await d1("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%' ORDER BY name");
+  if (t.error) { console.log('\nD1 (the database): not readable with this token — ' + t.error); return; }
+  const parts = [];
+  for (const row of t.rows) { const c = await d1('SELECT COUNT(*) AS n FROM "' + row.name.replace(/"/g, '') + '"'); parts.push(row.name + ' ' + (c.rows ? c.rows[0].n : '?')); }
+  console.log('\nD1 tables (rows): ' + parts.join(', '));
+}
+async function pages() {
+  const r = await cf('/accounts/' + ACCOUNT + '/pages/projects');
+  if (r.status !== 200 || !r.j) { console.log('\nPages: HTTP ' + r.status); return; }
+  const month = new Date().toISOString().slice(0, 7);
+  let total = 0; const per = [];
+  for (const p of (r.j.result || [])) {
+    let n = 0, page = 1;
+    for (;;) {
+      const d = await cf('/accounts/' + ACCOUNT + '/pages/projects/' + encodeURIComponent(p.name) + '/deployments?per_page=25&page=' + page);
+      const list = (d.j && d.j.result) || [];
+      const mine = list.filter(function(x){ return String(x.created_on || '').slice(0, 7) === month; });
+      n += mine.length;
+      if (list.length < 25 || mine.length < list.length || page > 40) break;
+      page++;
+    }
+    total += n; per.push(p.name + ' ' + n);
+  }
+  console.log('\nPages deployments this month (' + month + '): ' + total + ' (free: 500 builds a month) — ' + per.join(', '));
+}
+
 (async function(){
   if (!TOKEN) { console.log('CLOUDFLARE_API_TOKEN is not set.'); process.exit(1); }
   console.log('Cloudflare usage, the last ' + DAYS + ' day(s), ' + il(Date.now()) + ' Israel time\n');
   await analytics();
   await counters();
+  await tables();
+  await pages();
 })().catch(function(e){ console.log('Failed: ' + (e && e.message || e)); process.exit(1); });
