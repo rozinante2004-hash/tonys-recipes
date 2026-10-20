@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v38.58 -->
+<!-- Tony's Recipes Collection v38.59 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -366,6 +366,9 @@
     width: 50px; height: 50px; border-radius: 50%; border: 2px solid #fff; cursor: pointer; font-size: 22px; line-height: 1;
     background: linear-gradient(135deg, #C1440E, #D4A843); color: #fff; box-shadow: 0 4px 14px rgba(0,0,0,.28); overflow: hidden; }
   #feedbackFab:focus-visible { outline: 3px solid var(--terracotta, #C1440E); outline-offset: 3px; }
+  /* v38.59 — the audit: on a phone the 💬 button sat on the last thing on the page ("✏️ Type it in", the last
+     card); room below it now, so everything can be scrolled clear of the button. */
+  body:has(#feedbackFab) { padding-bottom: calc(76px + env(safe-area-inset-bottom)); }
   #feedbackFab.fb-shine { animation: fbBob 3.2s ease-in-out infinite; }
   #feedbackFab.fb-shine::after { content: ''; position: absolute; inset: -40%; background: linear-gradient(115deg, transparent 40%, rgba(255,255,255,.75) 50%, transparent 60%);
     transform: translateX(-120%); animation: fbShine 3.2s ease-in-out infinite; }
@@ -8413,7 +8416,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v38.58';
+var APP_VERSION = 'v38.59';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -9757,8 +9760,10 @@ body.i18n-harvesting #serviceErrorOverlay, body.i18n-harvesting #emailModalOverl
 .card-footer { padding: 8px 13px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
 .difficulty { font-size: 11px; padding: 2px 8px; border-radius: 4px; font-weight: 500; }
 .easy { background: #EAF5E9; color: #35703D; } .medium { background: #FFF3E0; color: #9A5100; } .hard { background: #FEECEC; color: #A32B2B; }
-.fav-btn { background: none; border: none; cursor: pointer; font-size: 16px; padding: 2px; transition: transform 0.15s; }
-.fav-btn:hover { transform: scale(1.2); }
+/* v38.59 — the audit: the card's ♥ and the "❤ Favourites" filter chip share the class, so the chip took the heart's
+   16px, its missing border and its grow-on-hover. The heart's rules now leave the chip alone. */
+.fav-btn:not(.filter-btn) { background: none; border: none; cursor: pointer; font-size: 16px; padding: 2px; transition: transform 0.15s; }
+.fav-btn:not(.filter-btn):hover { transform: scale(1.2); }
 
 /* MOBILE RECIPE GRID — configurable columns (Settings → Grid Layout) */
 @media (max-width: 700px) {
@@ -10453,9 +10458,9 @@ li.line-sub-indent { padding-inline-start: 22px; }
 /* Lang buttons */
 
 /* Fav button */
-.fav-btn { transition: transform 0.15s, filter 0.15s; }
-.fav-btn:hover { transform: scale(1.25); filter: drop-shadow(0 2px 3px rgba(0,0,0,0.25)); }
-.fav-btn:active { transform: scale(0.95); }
+.fav-btn:not(.filter-btn) { transition: transform 0.15s, filter 0.15s; }
+.fav-btn:not(.filter-btn):hover { transform: scale(1.25); filter: drop-shadow(0 2px 3px rgba(0,0,0,0.25)); }
+.fav-btn:not(.filter-btn):active { transform: scale(0.95); }
 
 /* Hero photo button */
 .hero-photo-btn {
@@ -10539,9 +10544,15 @@ li.line-sub-indent { padding-inline-start: 22px; }
 /* ── GOOGLE DRIVE / LOGIN SCREEN ── */
 #loginScreen {
   position: fixed; inset: 0; background: var(--cream);
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
   z-index: 9999; padding: 2rem; text-align: center;
+  overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
 }
+/* v38.59 — the audit (20 Oct): centred with justify-content, a screen shorter than the page pushed the top of it
+   ABOVE the screen, where no scrolling reaches — on a 667-pixel phone the logo and the app's name (94 px) were cut
+   off. Auto margins centre it when there is room and let it start at the top, scrollable, when there is not. */
+#loginScreen::before { content: ''; margin-top: auto; }
+#loginScreen::after { content: ''; margin-bottom: auto; }
 .login-logo { font-family: 'Playfair Display', 'Frank Ruhl Libre', serif; font-size: 32px; color: var(--heading); margin-bottom: 8px; }
 .login-logo span { color: var(--gold); font-style: italic; }
 .login-subtitle { font-size: 14px; color: var(--muted); margin-bottom: 2.5rem; line-height: 1.6; max-width: 360px; }
@@ -11430,12 +11441,12 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.58</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.59</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
         <span class="ds-dot"></span><span id="dsText">Offline mode</span>
-        <button onclick="signOut()" id="signOutBtn" style="display:none;background:none;border:none;color:rgba(255,255,255,0.5);font-size:11px;cursor:pointer;margin-left:6px;font-family:'DM Sans','Heebo',sans-serif;text-decoration:underline;">Sign out</button>
+        <button onclick="signOut()" id="signOutBtn" style="display:none;background:none;border:none;color:rgba(255,255,255,0.5);font-size:11px;cursor:pointer;margin-left:6px;font-family:'DM Sans','Heebo',sans-serif;text-decoration:underline;white-space:nowrap;">Sign out</button>
         <button onclick="showLoginScreen()" id="signInHeaderBtn" style="display:none;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);color:white;font-size:11px;cursor:pointer;margin-left:6px;font-family:'DM Sans','Heebo',sans-serif;padding:3px 10px;border-radius:5px;">Sign in</button>
       </div>
       <!-- v36.31 — the interface language. Beside ? and the cog because that is
@@ -11790,7 +11801,7 @@ body.banner-shown .header {
         <label class="form-label">Photo (optional)</label>
         <div class="photo-zone" id="photoZone" onclick="document.getElementById('f-photo').click()">
           <input type="file" id="f-photo" accept="image/*" onchange="onPhotoFile(event)">
-          <span class="photo-zone-hint" id="photoHint">📷 Click to upload a photo</span>
+          <span class="photo-zone-hint" id="photoHint">📷 Add a photo</span>
           <img id="photoPreview" class="photo-zone-preview" alt="">
           <button class="photo-remove" id="photoRemove" onclick="removePhoto(event)" title="Remove">✕</button>
         </div>
@@ -12169,7 +12180,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.58</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.59</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14215,8 +14226,20 @@ var I18N_HARVEST = [
   ['the converter',         function(){ i18nHarvestCalc(); }],
   // v37.84 — Tony: About, the kitchen rules and the privacy/terms buttons stayed
   // English in Hebrew; a scan of every window built on demand found 16 such.
-  ['the windows opened on demand', function(){ i18nHarvestDemand(); }]
+  ['the windows opened on demand', function(){ i18nHarvestDemand(); }],
+  // v38.59 — the audit: the harvest runs in the FAMILY copy, which signs in with Google only, so the e-mail and
+  // password form (the beta's) was never drawn and "Use my e-mail address", "Create an account", "Forgot password?"
+  // stayed English in Hebrew. Drawn here with every way switched on, then put back as this copy has it.
+  ['the sign-in choices, every way', function(){ i18nHarvestSignIn(); }]
 ];
+function i18nHarvestSignIn() {
+  var host = document.getElementById('otherSignIns');
+  if (!host || typeof renderSignInOptions !== 'function') return;
+  var keep = window._signInOverride, html = host.innerHTML;
+  window._signInOverride = { google: true, microsoft: true, apple: true, password: true, emailLink: true };
+  try { renderSignInOptions(); i18nCollect(); }
+  finally { window._signInOverride = keep; host.innerHTML = html; }
+}
 // Each is drawn hidden (body.i18n-harvesting), catalogued, and removed — all in
 // ONE synchronous run. The harvest can be running in the background (the
 // translation editor starts it and carries on), so nothing may wait in here:
@@ -23028,7 +23051,10 @@ function applyParsedRecipe(parsed, resultDivId, overlayId, originalPhoto) {
   document.getElementById(resultDivId).innerHTML =
     '<div class="translate-block" style="margin-top:12px;">'
     + '<div class="translate-block-title">' + escH(parsed.name||'Untitled') + '</div>'
-    + '<div style="font-size:12px;color:var(--muted);margin-bottom:10px;">' + escH(parsed.category||'') + ' &middot; ' + escH(parsed.difficulty||'') + ' &middot; ' + escH(parsed.prep||'') + ' &middot; ' + escH(parsed.servings||'') + '</div>'
+    // v38.59 — the audit: an empty field left its dots behind ("Dinner · · · 2"); only what is there, servings with 🍽
+    + '<div style="font-size:12px;color:var(--muted);margin-bottom:10px;">' + [parsed.category, parsed.difficulty, parsed.prep,
+        parsed.servings ? '\u{1F37D} ' + parsed.servings : '']
+        .filter(function(x){ return x && String(x).trim(); }).map(function(x){ return escH(String(x)); }).join(' &middot; ') + '</div>'
     + '<div class="translate-section-label">Ingredients</div>' + ingsHtml
     + '<div class="translate-section-label" style="margin-top:14px;">Method</div>' + stepsHtml
     // v37.15 — written out by an AI that watched the video: check the amounts.

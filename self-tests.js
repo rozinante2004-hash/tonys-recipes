@@ -7742,6 +7742,19 @@ window.SELF_TESTS = [
       }
     } },
 
+  { id:'i18n_harvest_signin_every_way', group:'Core', name:'🌐 The phrase harvest draws the sign-in choices with every way switched on, so the e-mail and password form is translated even though the family copy (where the harvest runs) signs in with Google only (v38.59)',
+    test: async()=>{
+      if(!I18N_HARVEST.some(function(h){ return /sign-in choices/.test(h[0]); })) throw new Error('the sign-in choices are not in the harvest');
+      var host=document.getElementById('otherSignIns'), keepHtml=host ? host.innerHTML : null, keepOver=window._signInOverride, keepH=_i18nHarvested;
+      try{
+        _i18nHarvested={};
+        i18nHarvestSignIn();
+        var k=Object.keys(_i18nHarvested);
+        ['Create an account', 'Forgot password?', 'E-mail address', '✉️ Use my e-mail address'].forEach(function(w){ if(k.indexOf(w)===-1) throw new Error('not harvested: '+w); });
+        if(window._signInOverride!==keepOver || (host && host.innerHTML!==keepHtml)) throw new Error('the sign-in choices were not put back as this copy has them');
+      } finally { _i18nHarvested=keepH; window._signInOverride=keepOver; if(host) host.innerHTML=keepHtml; }
+    } },
+
   { id:'beta_moved_to_its_domain', group:'Core', name:'🌐 The beta lives at mykitchennotes.community: its old address and www. send visitors on with the shared link and the extension’s text; nothing else moves; the family links to it there (v38.17)',
     test: async()=>{
       var olds=['https://my-kitchen-notes-beta.pages.dev', 'https://www.mykitchennotes.community'], site='https://mykitchennotes.community';

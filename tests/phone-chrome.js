@@ -195,6 +195,28 @@ function expect(name, cond, detail) {
 
   expect('nothing threw while scrolling', crashes.length === 0, crashes.slice(0, 2).join(' | '));
 
+  // v38.59 — the sign-in screen on a small phone (667 px, an iPhone SE or 8): centred with
+  // justify-content, its top (the logo and the app's name) sat 94 px above the screen, where no
+  // scrolling reaches. Now it starts in view and scrolls.
+  {
+    const small = await browser.newPage({ viewport: { width: 375, height: 667 } });
+    await small.goto(`http://127.0.0.1:${PORT}/index.html`, { waitUntil: 'networkidle' });
+    const s = await small.evaluate(() => {
+      const ls = document.getElementById('loginScreen');
+      if (!ls || getComputedStyle(ls).display === 'none') return null;
+      const items = Array.prototype.filter.call(ls.children, function (c) { return getComputedStyle(c).display !== 'none'; });
+      const top = Math.min.apply(null, items.map(function (c) { return c.getBoundingClientRect().top; }));
+      ls.scrollTop = 1e6;
+      const last = items[items.length - 1].getBoundingClientRect().bottom;
+      return { top: Math.round(top), lastBottom: Math.round(last), h: innerHeight, scrolls: ls.scrollHeight > ls.clientHeight };
+    });
+    if (s) {
+      expect('the sign-in screen starts on the screen of a small phone', s.top >= 0, `its top is at ${s.top}px — cut off above the screen`);
+      expect('…and scrolls to its last line', s.lastBottom <= s.h + 1, `the last line ends at ${s.lastBottom}px of ${s.h}`);
+    } else console.log('  (no sign-in screen shown here — skipped)');
+    await small.close();
+  }
+
   await browser.close();
   if (failures.length) {
     console.log(`\n${failures.length} failure(s):`);

@@ -400,6 +400,18 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
   deleting a password account offers "Type my password" first. Worker v81: AI_DAILY_DEFAULT 1000, AI_MONTHLY_DEFAULT
   10000, and AI_DAILY_MAX/AI_MONTHLY_MAX set in worker/wrangler.jsonc vars (a dashboard value cannot keep 300/3,000).
   cf-usage.yml runs at :11 and :41 (GitHub ran one of five hourly slots overnight).
+- **CI broke 20 Oct morning:** ubuntu-latest became Ubuntu 26.04; Playwright 1.56 "does not support chromium on
+  ubuntu26.04-x64" → self-tests.yml and translate-languages.yml `runs-on: ubuntu-24.04`. **Released: v38.58 + Worker
+  v81 (20 Oct 2026, 09:54 Israel time, CI green on cbb5695).**
+- **The pre-launch audit (Tony, 20 Oct: "run a full audit … prepare a plan … start implementing immediately everything
+  you can")** — AUDIT-2026-10-prelaunch.md. Walkthrough `$S/e2e/walk.mjs` (emulator; phone 390×844 without device
+  emulation — Playwright's iPhone/Pixel emulation makes signInWithCredential hang on the emulator, a harness quirk).
+  **v38.59**: the sign-in screen scrolled its top above small phones (justify-content:center + overflow; 71–94 px cut
+  off at 667 px) → `::before/::after` auto margins + overflow-y:auto, phone-chrome check at 375×667 (fails on the old
+  CSS); the phrase harvest missed the e-mail/password form (the family copy has Google only) → `i18nHarvestSignIn`
+  draws every way (self-test `i18n_harvest_signin_every_way`); `body:has(#feedbackFab)` bottom padding; Sign out
+  nowrap; `.fav-btn:not(.filter-btn)` (the Favourites chip took the card heart's 16px and hover scale); import preview
+  meta only non-empty fields (🍽 servings); "📷 Add a photo".
 - **Before the testers, Tony's steps (16 Oct 2026):** (1) Cloudflare Email Routing destination addresses — done.
   (2) **The community app's browser key is restricted, both stages:** API restrictions = Identity Toolkit API, Token
   Service API, Cloud Firestore API (Google warned of "active usage" of eight Maps APIs — scanners; updated anyway);
