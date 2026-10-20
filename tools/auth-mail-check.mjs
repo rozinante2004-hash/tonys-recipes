@@ -27,8 +27,8 @@ async function token() {
   return t.token || t;
 }
 
-async function get(url, bearer, project) {
-  const r = await fetch(url, { headers: { Authorization: 'Bearer ' + bearer, 'x-goog-user-project': project } });
+async function get(url, bearer) {
+  const r = await fetch(url, { headers: { Authorization: 'Bearer ' + bearer } });
   const text = await r.text();
   let body = null; try { body = JSON.parse(text); } catch (e) {}
   return { ok: r.ok, status: r.status, body, message: body && body.error ? body.error.message : '' };
@@ -36,7 +36,7 @@ async function get(url, bearer, project) {
 
 async function check(project, bearer) {
   say('== ' + project);
-  const cfg = await get('https://identitytoolkit.googleapis.com/admin/v2/projects/' + project + '/config', bearer, project);
+  const cfg = await get('https://identitytoolkit.googleapis.com/admin/v2/projects/' + project + '/config', bearer);
   if (!cfg.ok) { warn(project + ': the Authentication settings could not be read (' + cfg.status + ' ' + cfg.message + ')'); return; }
   const c = cfg.body || {};
   const email = (c.signIn && c.signIn.email) || {};
@@ -60,10 +60,10 @@ async function check(project, bearer) {
     if (!t.senderDisplayName && /%APP_NAME%/.test(t.subject || '%APP_NAME%')) defaultName = true;
   }
   // The public-facing name (%APP_NAME%) is the OAuth consent screen's application name.
-  const proj = await get('https://cloudresourcemanager.googleapis.com/v1/projects/' + project, bearer, project);
+  const proj = await get('https://cloudresourcemanager.googleapis.com/v1/projects/' + project, bearer);
   const number = proj.ok && proj.body ? proj.body.projectNumber : '';
   if (number) {
-    const brands = await get('https://iap.googleapis.com/v1/projects/' + number + '/brands', bearer, project);
+    const brands = await get('https://iap.googleapis.com/v1/projects/' + number + '/brands', bearer);
     if (brands.ok) {
       const b = (brands.body && brands.body.brands) || [];
       const name = b.length ? b[0].applicationTitle : '';
