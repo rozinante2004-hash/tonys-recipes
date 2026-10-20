@@ -560,7 +560,11 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
 - **CallMeBot is full (20 Oct, Tony):** "The bot is currently full. Please check back in a few days; once slots are
   available, the phone number will be visible." Users report WhatsApp blocking its numbers as spam since late 2025
   and the operator adding a ~4 €/year plan; it suggests TextMeBot (from your own number) or InOut.bot (paid, Meta's
-  API). Plan: Tony tries again in a few days; e-mail is unaffected; fallback offered: Telegram's own bot (free). Tests:
+  API). Plan: Tony tries again in a few days; e-mail is unaffected; fallback offered: Telegram's own bot (free).
+  Tony (20 Oct): "Let's avoid Telegram alerts for now. Please remind me to try callmebot in a few days." — a reminder
+  into this session for Fri 23 Oct 09:00 Israel time (send_later trig_01WbrHDAywfPeK4e7ecHThkY). Others told to him:
+  TextMeBot / Green-API / Whapi (link HIS WhatsApp by QR — access to his chats, ban risk: not advised), Meta's own
+  Cloud API (official; a separate sender number, Meta Business account, an approved template; ~$0.005 a message). Tests:
   self-test `idle_quiet_and_server_notice` + `firebase_limits_told`; 9 Worker checks (g).
 - **GitHub drops most scheduled runs on this repository** (20 Oct): the usage watch (:11 and :41) ran at 01:13 and 06:31
   UTC only; Publish languages (every 10 min) runs every 2–5 h; the 02:17 backup starts 07:00–07:51 UTC. The watch is an
