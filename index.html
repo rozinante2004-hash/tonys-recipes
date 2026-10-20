@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v38.57 -->
+<!-- Tony's Recipes Collection v38.58 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -6861,8 +6861,8 @@ async function accountReauthenticate(user, before) {
     // deletion carries on (householdEnter, DELETE_AFTER_LINK_KEY).
     if (signInOn('emailLink')) {
       var way = await askChoice(intro, [
-        { value: 'link', label: '\u{1F4E7} E-mail me a confirmation link' },
-        { value: 'password', label: '\u{1F511} Type my password' }
+        { value: 'password', label: '\u{1F511} Type my password' },                 // v38.58 — the password first: e-mailed links are few
+        { value: 'link', label: '\u{1F4E7} E-mail me a confirmation link' }
       ], { icon: '\u{1F510}', title: 'Confirm it is you' });
       if (!way) return false;
       if (way === 'link') {
@@ -8413,7 +8413,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v38.57';
+var APP_VERSION = 'v38.58';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -11430,7 +11430,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.57</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.58</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -12169,7 +12169,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.57</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.58</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -26228,9 +26228,12 @@ function renderSignInOptions() {
               + '</div>'
               + '<button type="button" onclick="emailResetPassword()" style="margin-top:6px;background:none;border:none;color:var(--terracotta);text-decoration:underline;font-size:12px;cursor:pointer;padding:0;">Forgot password?</button>'
             : '')
+      // v38.58 — Tony (20 Oct): password first. Firebase's free plan sends only 5 sign-in-link e-mails a day for the
+      // whole app, so beside a password the link is a small fallback under "Forgot password?", not a second button.
       +   (signInOn('emailLink')
-            ? '<div style="margin-top:8px;"><button type="button" class="ask-btn ghost" onclick="emailSendLink()">'
-              + (signInOn('password') ? 'No password — e-mail me a sign-in link instead' : 'E-mail me a sign-in link') + '</button></div>'
+            ? (signInOn('password')
+                ? '<div style="margin-top:4px;"><button type="button" onclick="emailSendLink()" style="background:none;border:none;color:var(--muted);text-decoration:underline;font-size:12px;cursor:pointer;padding:0;">Or e-mail me a one-time sign-in link (no password)</button></div>'
+                : '<div style="margin-top:8px;"><button type="button" class="ask-btn ghost" onclick="emailSendLink()">E-mail me a sign-in link</button></div>')
             : '')
       + '</form>';
   }

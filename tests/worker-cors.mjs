@@ -383,7 +383,7 @@ console.log('\nSpend guard rails (v39):');
   // (d) The monthly ceiling is separate from the daily one.
   {
     const kv = fakeKv();
-    kv.store.set('rl:mon:' + new Date().toISOString().slice(0, 7), '3000');
+    kv.store.set('rl:mon:' + new Date().toISOString().slice(0, 7), '10000');
     const resp = await noNetwork(() => worker.fetch(post(aiBody()),
       { BRING_KV: kv, APP_SHARED_KEY: 'secret-k', ANTHROPIC_API_KEY: 'sk-test' }));
     expect('the monthly ceiling refuses on its own', resp.status === 429, `got ${resp.status}`);
@@ -458,7 +458,7 @@ console.log('\nSpend guard rails (v39):');
     const keyedH = await (await worker.fetch(post({ action: 'health', appKey: 'secret-k' }), e2)).json();
     expect('health reports the daily count to the app', keyedH.spend && keyedH.spend.dailyUsed === 12,
       'the app cannot see how close the bill is to its ceiling: ' + JSON.stringify(keyedH.spend));
-    expect('and the ceiling itself', keyedH.spend && keyedH.spend.dailyMax === 300,
+    expect('and the ceiling itself (v81: 1,000)', keyedH.spend && keyedH.spend.dailyMax === 1000,
       JSON.stringify(keyedH.spend));
     const anonH = await (await worker.fetch(post({ action: 'health' }), e2)).json();
     expect('an anonymous health ping is told nothing about the bill', anonH.spend === undefined,
@@ -1549,7 +1549,7 @@ console.log('\nA used-up allowance is said, not swallowed (v78):');
     const h = await (await worker.fetch(post({ action: 'health', appKey: 'secret-k' }), e)).json();
     expect('health: the day so far comes from D1, and says where the counters live', h.spend && h.spend.dailyUsed === 3
       && h.limits && h.limits.minute === 'memory' && h.limits.ceilings === 'd1', JSON.stringify([h.spend, h.limits]));
-    db.raw.prepare("UPDATE counters SET n = 300 WHERE k LIKE 'rl:day:%'").run();
+    db.raw.prepare("UPDATE counters SET n = 1000 WHERE k LIKE 'rl:day:%'").run();   // v81: the default daily ceiling
     const capped = await stub(() => worker.fetch(post(ai()), e));
     const cj = await capped.json();
     expect('the daily ceiling still stops the spending', capped.status === 429 && cj.spendCap === 'daily', JSON.stringify(cj));

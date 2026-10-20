@@ -4588,11 +4588,23 @@ window.SELF_TESTS = [
         var he=String(householdEnter);
         if(he.indexOf('!list.length && await householdClaimKept')!==-1 || he.indexOf('await householdClaimKept(user)')===-1)
           throw new Error('a place kept for you is only taken up when you have no household');
-        // Deleting a password account: an e-mailed link as well as the password.
+        // Deleting a password account: the password first (v38.58 — e-mailed links are 5 a day on Firebase's free
+        // plan), and an e-mailed link as well.
         window._signInOverride=Object.assign({}, real.over, { emailLink:true });
         var ways=null; window.askChoice=async function(m,o){ ways=o.map(function(x){ return x.value; }); return null; };
         await accountReauthenticate({ email:'p@example.com', providerData:[{ providerId:'password' }] }, true);
-        if(!ways || ways.join()!=='link,password') throw new Error('deleting a password account offers: '+JSON.stringify(ways));
+        if(!ways || ways.join()!=='password,link') throw new Error('deleting a password account offers: '+JSON.stringify(ways));
+        // …and on the sign-in screen the link is a small fallback beside a password, not a second big button.
+        window._signInOverride=Object.assign({}, real.over, { emailLink:true, password:true });
+        if(typeof renderSignInOptions==='function'){
+          var hostX=document.getElementById('otherSignIns'), keepX=hostX ? hostX.innerHTML : null;
+          if(hostX){ renderSignInOptions();
+            var lb=Array.prototype.slice.call(hostX.querySelectorAll('button')).filter(function(b){ return /one-time sign-in link/.test(b.textContent); })[0];
+            var bad=lb && lb.classList.contains('ask-btn');
+            hostX.innerHTML=keepX;
+            if(!lb || bad) throw new Error('beside a password the e-mailed link should be a small fallback');
+          }
+        }
         // The way back to confirming stands out in ⚙️.
         var ci=document.getElementById('confirmEmailItem');
         if(!ci || parseInt(getComputedStyle(ci).fontWeight,10)<700) throw new Error('"Confirm my e-mail address" does not stand out');

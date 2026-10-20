@@ -9,6 +9,7 @@ on:
   # v79 — the usage watch: every hour, today's use is told to the Worker, which warns the owner at 70%.
   schedule:
     - cron: "41 * * * *"
+    - cron: "11 * * * *"     # twice an hour: GitHub drops scheduled runs when it is busy (one of five ran, 20 Oct)
   workflow_dispatch:
     inputs:
       days:

@@ -16,7 +16,9 @@
   "keep_vars": true,
   "vars": {
     "ALLOWED_ORIGINS": "https://tonys-recipes-test.pages.dev",
-    "APP_SHARED_KEY": "tonys-recipes-web-v1"
+    "APP_SHARED_KEY": "tonys-recipes-web-v1",
+    "AI_DAILY_MAX": "1000",
+    "AI_MONTHLY_MAX": "10000"
   },
   // The AI spending, notes and household reports (v60+).
   "d1_databases": [

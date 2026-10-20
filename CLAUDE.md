@@ -389,6 +389,17 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
   warning lasts until Firebase's midnight. 🩺 Server allowances shows Firestore lines, or how to add them. First
   manual run of the watch (20 Oct 01:44): HTTP 200, warned kvWrites (1,113 — the UTC day before v78) and pagesBuilds
   (918 this month) — Tony's first two alert e-mails.
+- **Released: v38.56 (20 Oct 2026, 01:57 Israel time, CI green on a2f266a) and v38.57 + Worker v80 (02:02, CI green on
+  2331580).** All jobs success.
+- **Tony's answers, 20 Oct (AskUserQuestion):** (1) Pages previews off — "Run your job": tools/cf-pages-previews.js +
+  workflow "Cloudflare Pages previews" ran 09:23: both projects `previews none`, production branches unchanged.
+  (2) "Password first". (3) AI ceilings "1,000/day, 10,000/month".
+- **v38.58 + Worker v81:** the e-mail sign-in was ALREADY password-first in the beta (Sign in with an empty password
+  says "Please type your password"; the link only from its own button) — I had told Tony otherwise, corrected. Now the
+  link is a small text fallback under "Forgot password?" ("Or e-mail me a one-time sign-in link (no password)"), and
+  deleting a password account offers "Type my password" first. Worker v81: AI_DAILY_DEFAULT 1000, AI_MONTHLY_DEFAULT
+  10000, and AI_DAILY_MAX/AI_MONTHLY_MAX set in worker/wrangler.jsonc vars (a dashboard value cannot keep 300/3,000).
+  cf-usage.yml runs at :11 and :41 (GitHub ran one of five hourly slots overnight).
 - **Before the testers, Tony's steps (16 Oct 2026):** (1) Cloudflare Email Routing destination addresses — done.
   (2) **The community app's browser key is restricted, both stages:** API restrictions = Identity Toolkit API, Token
   Service API, Cloud Firestore API (Google warned of "active usage" of eight Maps APIs — scanners; updated anyway);

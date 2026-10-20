@@ -1,4 +1,7 @@
-// Tony's Recipes — Cloudflare Worker v80
+// Tony's Recipes — Cloudflare Worker v81
+// v81: THE AI CEILINGS FOR 20 TESTERS (Tony, 20 Oct 2026: "1,000/day, 10,000/month"): AI_DAILY_DEFAULT 1000,
+// AI_MONTHLY_DEFAULT 10000, and the same set as variables in worker/wrangler.jsonc so a value left in the dashboard
+// cannot keep the old 300 / 3,000. Each household's own allowance still caps the bill.
 // v80: THE USAGE WATCH COUNTS FIRESTORE TOO. usage-report takes firestoreReads/Writes/Deletes (period 'pacific-day':
 // Firebase's day ends at midnight in California, so the warning lasts until then), measured by the hourly watch from
 // Cloud Monitoring when the backup's service account may read it ("Monitoring Viewer").
@@ -366,7 +369,7 @@
 //   AI_MAX_TOKENS   – the longest answer one call may ask for (32000; the
 //                     app's largest, reading several recipes at once, asks 8000).
 
-const WORKER_VERSION = 'v80';
+const WORKER_VERSION = 'v81';
 const VIDEO_MAX_MB_DEFAULT = 50;
 const GEMINI_API = 'https://generativelanguage.googleapis.com';
 const GEMINI_MODEL_DEFAULT = 'gemini-2.5-flash';
@@ -469,8 +472,10 @@ function appKeyOk(request, env, body) {
 // 100,000 writes a day on the free plan — and stay in KV otherwise (tests, a
 // bare deployment). An ordinary request now writes nothing anywhere.
 const KV_SAMPLE_MONTH = 10;   // KV only: the monthly total is a coarse guard rail (D1 counts it exactly)
-const AI_DAILY_DEFAULT = 300;     // Anthropic calls per day, all callers
-const AI_MONTHLY_DEFAULT = 3000;  // …and per calendar month
+// v81 — Tony (20 Oct 2026), for 20 testers: 1,000 a day and 10,000 a month (were 300 and 3,000). Each household's
+// own monthly allowance (meterStart) still caps the bill; these only stop a runaway across everyone.
+const AI_DAILY_DEFAULT = 1000;     // Anthropic calls per day, all callers
+const AI_MONTHLY_DEFAULT = 10000;  // …and per calendar month
 
 // Isolate-scoped circuit breaker. A Worker isolate is short-lived and there are
 // many of them, so this is not a global truth — it does not need to be. Its job
@@ -2994,4 +2999,4 @@ export default {
   }
 };
 
-// ── END OF WORKER v80 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
+// ── END OF WORKER v81 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
