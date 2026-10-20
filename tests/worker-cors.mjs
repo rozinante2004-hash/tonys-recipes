@@ -1250,6 +1250,29 @@ console.log('\nAI per household (v60):');
     f = await fb({ action: 'meter-admin', op: 'allowances', idToken: famOwner }, ORIGIN);
     expect('v83: the owner\'s 🩺 page reads today\'s count, per copy', f.status === 200 && f.d.appReads && f.d.appReads.byProject['tonys-recipes-test'] === 35800
       && f.d.appReads.limit === 50000 && /^\d{4}-\d\d-\d\d$/.test(f.d.appReads.day), JSON.stringify(f.d && f.d.appReads));
+    // v87 — the sign-in-link e-mails (Tony: "We are collecting stats about it, right?"): each counted per copy and day.
+    f = await fb({ action: 'link-sent', project: 'nowhere' });
+    expect('v87: a link is counted only for a copy this server serves', f.status === 400, JSON.stringify(f));
+    const linkRows = () => db.raw.prepare("SELECT k, n FROM counters WHERE k LIKE 'links%:my-kitchen-notes-beta:%'").all();
+    for (let i = 1; i <= 3; i++) { f = await fb({ action: 'link-sent', project: 'my-kitchen-notes-beta' }); }
+    expect('v87: no sign-in needed (it comes before one); the day\'s count comes back', f.status === 200 && f.d.today === 3
+      && !db.raw.prepare("SELECT 1 FROM allowance_notices WHERE what = 'usage:signinLinks:my-kitchen-notes-beta'").get(), JSON.stringify([f, linkRows()]));
+    f = await fb({ action: 'link-sent', project: 'my-kitchen-notes-beta' });
+    const lw = db.raw.prepare("SELECT * FROM allowance_notices WHERE what = 'usage:signinLinks:my-kitchen-notes-beta'").get();
+    expect('v87: at 4 of 5 the owner is warned, until Firebase\'s midnight, in Israel time', f.d.today === 4 && lw && lw.kind === 'warning' && lw.scope === 'owner'
+      && /4 of the 5/.test(lw.title) && /Israel time/.test(lw.detail) && !/UTC/.test(lw.detail), JSON.stringify(lw));
+    await fb({ action: 'link-sent', project: 'my-kitchen-notes-beta' });
+    await fb({ action: 'limit-report', what: 'auth-email', project: 'my-kitchen-notes-beta' });
+    f = await fb({ action: 'meter-admin', op: 'allowances', idToken: famOwner }, ORIGIN);
+    const lb = f.d && f.d.links && f.d.links.byProject['my-kitchen-notes-beta'];
+    expect('v87: the owner\'s 🩺 page: today 5 of 5, the most in a day, days all 5 went, days someone was turned away',
+      f.d.links.limit === 5 && lb && lb.today === 5 && lb.most === 5 && lb.full === 1 && lb.refused === 1 && lb.days === 1, JSON.stringify(f.d && f.d.links));
+    db.raw.prepare("INSERT INTO counters (k, n, until) VALUES ('links:my-kitchen-notes-beta:2001-01-01', 5, ?)").run(Date.now() + 864e5);
+    db.raw.prepare("UPDATE counters SET n = 50 WHERE k LIKE 'links:my-kitchen-notes-beta:2%' AND k NOT LIKE '%2001-01-01'").run();
+    f = await fb({ action: 'link-sent', project: 'my-kitchen-notes-beta' });
+    const f3 = await fb({ action: 'meter-admin', op: 'allowances', idToken: famOwner }, ORIGIN);
+    expect('v87: a count stops at 50 a day (a forged one can only warn); days older than 30 are left out', f.d.today === 50
+      && f3.d.links.byProject['my-kitchen-notes-beta'].full === 1 && f3.d.links.byProject['my-kitchen-notes-beta'].most === 50, JSON.stringify([f.d, f3.d.links]));
     // v76 — the trends: every copy's counts added up by month and name, for the owner only.
     db.raw.prepare("INSERT INTO usage_counts (project, hid, month, k, n) VALUES ('tonys-recipes-test', 'hT2', ?, 'added.link', 4), ('tonys-recipes-test', 'hOld', '2001-01', 'added.link', 9)").run(nowMonth);
     f = await fb({ action: 'meter-admin', op: 'trends', idToken: tA });

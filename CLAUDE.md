@@ -559,6 +559,19 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
   enabled … project #313792199018" (the service account's own project, the quota project) — Firebase's own counts
   cannot be read on the free plan. **v38.67:** 🩺 says so instead of asking for the role; the watch says why
   (`firestoreMetrics` now reports Google's message, addresses taken out). The apps' own read count (v38.63) stands in.
+- **Released: v38.67 (20 Oct 2026, CI green on 13b1b17).** 🩺: Firebase's own count needs billing — said plainly.
+- **Tony, 20 Oct ~21:3x:** (1) "The plan is to start sending invitations to the testers this Sunday" — **Sun 25 Oct**:
+  from then on, ASK before each release (the 16 Oct standing permission ends when the testers go live); Playwright
+  (audit C) after launch week. Israel's clocks go back that same morning (UTC+2). (2) Features before the launch: none
+  suggested — a freeze; after it, testers' feedback first (ideas: duplicate import, all-of-these-ingredients search,
+  bulk category, the meal planner — low priority by Tony). (3) "Stay on the free plan unless we realize, from the
+  stats we are collecting, that 5 is insufficient. We are collecting stats about it, right?" — only the run-outs were
+  told; **v38.68 + Worker v87** count every link: the app's `linkSentTell()` (after each sendSignInLinkToEmail — the
+  sign-in form and the confirm-deletion link) → Worker `link-sent` {project} (no sign-in, ≤ 50 a day counted, D1
+  counters `links:<project>:<Firebase day>`, 40 days); a refusal (limit-report auth-email) → `linksno:`; at 4 of 5 an
+  owner warning `usage:signinLinks:<project>`; meter-admin `allowances` → `links` {limit, byProject: {today, most,
+  full, refused, days}} (the last 30 days) → 🩺 "Sign-in-link e-mails" lines. Tests: self-test
+  `auth_more_ways_to_sign_in` (told, with the copy and never the address) + `firebase_limits_told`; 5 Worker checks.
 - **Move step 9 finished (20 Oct 2026, 18:05 Israel time; Tony: "OK to delete the 4 + 135 old family documents").**
   clear-source `all` + `shared` (run 39445140837): 139 deleted (households 4, shared 135), the household cut to its
   moved mark; clear-check after it (run 39445361414): recipes-f379d holds 1 document of the moved household (its own,

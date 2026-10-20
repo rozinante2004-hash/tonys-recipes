@@ -4473,8 +4473,13 @@ window.SELF_TESTS = [
         if(!/do not match/.test(err.textContent)) throw new Error('a wrong password said: '+err.textContent);
         calls=[]; await emailResetPassword();
         if(!/If there is an account/.test(err.textContent)) throw new Error('"Forgot password" tells whether an address has an account: '+err.textContent);
-        calls=[]; await emailSendLink();
+        calls=[]; var told=[], fetchWas=window.fetch;
+        window.fetch=async function(u,o){ try{ told.push(JSON.parse((o&&o.body)||'{}')); }catch(e){} return new Response('{"ok":true}',{status:200}); };
+        try { await emailSendLink(); } finally { window.fetch=fetchWas; }
         if(calls.join()!=='link:new@example.com:true' || localStorage.getItem('tonys_signin_email')!=='new@example.com') throw new Error('the sign-in link: '+calls.join());
+        // v38.68 — each link is told to the server, which counts them (Firebase sends 5 a day): the copy, never the address
+        var ls=told.filter(function(b){ return b.action==='link-sent'; });
+        if(ls.length!==1 || ls[0].project!==APP_CONFIG.firebase.projectId || JSON.stringify(ls[0]).indexOf('example.com')!==-1) throw new Error('the link is not counted, or with the address: '+JSON.stringify(told));
         E.value='not an address'; calls=[];
         await emailSendLink(); if(calls.length || !/does not look like/.test(err.textContent)) throw new Error('a bad address was sent a link');
         // An address someone merely typed is not the owner's.
@@ -7698,6 +7703,10 @@ window.SELF_TESTS = [
         var lines=serverAllowanceLines({ watch:true, usage:{ at:Date.now(), metrics:{ kvWrites:{ used:812, limit:1000 }, workerRequests:{ used:900, limit:100000 }, pagesBuilds:{ used:510, limit:500, period:'month' } } },
           notices:[{ what:'usage:kvWrites', kind:'warning', until:Date.now()+3600e3, title:'KV writes at 81% of the free allowance today', detail:'812 of 1,000 today.' }] }).join('\n');
         var withErr=serverAllowanceLines({ watch:true, usage:{ at:Date.now(), metrics:{ workerErrors:{ used:3, of:900 } } }, notices:[] }).join('\n');
+        // v38.68 — the sign-in-link e-mails, today and the last 30 days
+        var withLinks=serverAllowanceLines({ watch:true, notices:[], links:{ limit:5, byProject:{ 'my-kitchen-notes-beta':{ today:4, most:5, full:1, refused:1, days:6 } } } }).join('\n');
+        if(!/⚠️ my-kitchen-notes-beta: today 4 of 5 · last 30 days: most in a day 5, days all 5 were used 1, days someone was turned away 1/.test(withLinks)) throw new Error('the sign-in links: '+withLinks);
+        if(!/None asked for/.test(serverAllowanceLines({ watch:true, notices:[], links:{ limit:5, byProject:{} } }).join('\n'))) throw new Error('no links, yet it does not say so');
         if(!/✓ Server errors today: 3 of 900 requests \(0.3%\)/.test(withErr)) throw new Error('the server\u2019s errors: '+withErr);
         if(!/⚠️ KV writes: 812 of 1,000 \(81%\)/.test(lines) || !/✓ Worker requests/.test(lines) || !/⚠️ Pages builds this month: 510 of 500 \(102%\) — Cloudflare still builds/.test(lines) || !/Running now:/.test(lines)) throw new Error('the page: '+lines);
         // v38.66 — over the Pages allowance is only stopped when Cloudflare refused a build; each copy's builds are named

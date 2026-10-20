@@ -1,4 +1,9 @@
-// Tony's Recipes — Cloudflare Worker v86
+// Tony's Recipes — Cloudflare Worker v87
+// v87: SIGN-IN-LINK E-MAILS, COUNTED (Tony, 20 Oct 2026: "Stay on the free plan unless we realize, from the stats we
+// are collecting, that 5 is insufficient. We are collecting stats about it, right?"): action `link-sent` (no sign-in —
+// it comes before one; a ceiling of 50 a day instead) counts each link the apps ask Firebase for, per copy and
+// Firebase's day, kept 40 days; a refusal (limit-report auth-email) counts too; at 4 of 5 the owner is warned;
+// meter-admin `allowances` returns `links` (today, the most in a day, days all 5 went, days someone was refused).
 // v86: A NOTICE SAYS WHAT IT IS (Tony, 20 Oct 2026: "Perhaps the wording should be more informative ... What is Paused?
 // Where is this message coming from?"): Pages builds over 500 are a warning, not "paused" — Cloudflare kept building
 // past 500 in October — unless the watch sees a build refused (`lastOk: false`); the notice names the service, the
@@ -387,7 +392,7 @@
 //   AI_MAX_TOKENS   – the longest answer one call may ask for (32000; the
 //                     app's largest, reading several recipes at once, asks 8000).
 
-const WORKER_VERSION = 'v86';
+const WORKER_VERSION = 'v87';
 const VIDEO_MAX_MB_DEFAULT = 50;
 const GEMINI_API = 'https://generativelanguage.googleapis.com';
 const GEMINI_MODEL_DEFAULT = 'gemini-2.5-flash';
@@ -839,12 +844,62 @@ async function limitReport(request, env, body) {
     try { claims = await verifyIdToken(body.idToken, env); } catch (e) {}
     if (!claims || claims.aud !== project) return jsonResp({ error: 'LIMIT: sign in first.' }, 401);
   }
+  if (body.what === 'auth-email') await linkCount(env, project, true);   // v87
   const n = { what: body.what + ':' + project, kind: kind.kind || 'paused', scope: kind.scope, project, until: nextPacificMidnight(Date.now()),
     title: kind.title + ' (' + project + ')', affects: kind.affects, detail: kind.detail, self: true };
   await raiseNotice(env, n);
   // Told back to the app only when it is everyone's to know; "sign-in e-mails" is the owner's.
   const told = kind.scope === 'all' ? (await serverNotices(env, { project })).filter(function (x) { return x.what === n.what; })[0] || null : null;
   return jsonResp({ ok: true, notice: told });
+}
+
+// v87 — the sign-in-link e-mails Firebase's free plan sends: 5 a day for the whole project, and it does not say how
+// many it has sent. Each app says each link it asked for (before anyone is signed in, so no sign-in here: a ceiling
+// instead — a forged count can only raise a warning); a refusal is counted from limit-report. Kept 40 days.
+const LINK_FREE_A_DAY = 5, LINK_COUNT_CAP = 50, LINK_DAYS_KEPT = 40;
+async function linkCount(env, project, refused) {
+  if (!env.METER_DB) return null;
+  try {
+    const db = env.METER_DB, now = Date.now(), key = (refused ? 'linksno:' : 'links:') + project + ':' + pacificDayKey(now);
+    await tableOnce(db, 'counters', 'CREATE TABLE IF NOT EXISTS counters (k TEXT PRIMARY KEY, n INTEGER NOT NULL DEFAULT 0, until INTEGER)');
+    const row = await db.prepare('SELECT n FROM counters WHERE k = ?1').bind(key).first();
+    const had = (row && Number(row.n)) || 0;
+    if (had >= LINK_COUNT_CAP) return had;
+    await db.prepare('INSERT INTO counters (k, n, until) VALUES (?1, 1, ?2) ON CONFLICT (k) DO UPDATE SET n = n + 1')
+      .bind(key, now + LINK_DAYS_KEPT * 864e5).run();
+    return had + 1;
+  } catch (e) { return null; }
+}
+async function linkSent(request, env, body) {
+  const project = String(body.project || '').slice(0, 64);
+  if (!csvList(env.METER_PROJECTS, METER_PROJECTS_DEFAULT).includes(project)) return jsonResp({ error: 'LINK: which copy?' }, 400);
+  const today = await linkCount(env, project, false);
+  if (today === LINK_FREE_A_DAY - 1) {
+    const now = Date.now();
+    await raiseNotice(env, { what: 'usage:signinLinks:' + project, kind: 'warning', scope: 'owner', until: nextPacificMidnight(now), self: true,
+      title: 'Firebase sign-in-link e-mails: ' + today + ' of the ' + LINK_FREE_A_DAY + ' it sends a day (' + project + ')',
+      affects: 'signing in with an e-mailed link (passwords and Google still work)',
+      detail: 'One more today, then Firebase sends no more links until ' + ilTime(nextPacificMidnight(now)) + ' (Israel time). '
+        + 'If this keeps happening, the Blaze plan sends 25,000 a day. From the apps\u2019 own count of the links they asked for.' });
+  }
+  return jsonResp({ ok: true, today: today == null ? undefined : today });
+}
+async function linkStats(env) {
+  if (!env.METER_DB) return null;
+  try {
+    const rows = (await env.METER_DB.prepare("SELECT k, n FROM counters WHERE k LIKE 'links:%' OR k LIKE 'linksno:%'").all()).results || [];
+    const today = pacificDayKey(Date.now()), since = pacificDayKey(Date.now() - 30 * 864e5), by = {};
+    rows.forEach((r) => {
+      const [kind, project, day] = String(r.k).split(':'), n = Number(r.n) || 0;
+      if (!project || !day || day < since) return;
+      const p = by[project] || (by[project] = { today: 0, most: 0, full: 0, refused: 0, days: 0 });
+      if (kind === 'linksno') { p.refused++; return; }
+      if (day === today) p.today = n;
+      p.most = Math.max(p.most, n); p.days++;
+      if (n >= LINK_FREE_A_DAY) p.full++;
+    });
+    return { limit: LINK_FREE_A_DAY, byProject: by };
+  } catch (e) { return null; }
 }
 
 // The hourly usage watch (v79). The workflow measures the account's day so far
@@ -1627,6 +1682,7 @@ async function handleRequest(request, env) {
 
     // ── meter-me / meter-admin (v60) ─────────────────────────────────────────
     if (body.action === 'limit-report') return await limitReport(request, env, body);   // v79
+    if (body.action === 'link-sent') return await linkSent(request, env, body);         // v87
     if (body.action === 'usage-report') return await usageReport(env, body);            // v79
     if (body.action === 'meter-me' || body.action === 'meter-admin') return await meterAction(request, env, body);
     if (body.action === 'feedback-send') return await feedbackSend(request, env, body);   // v61
@@ -2134,7 +2190,7 @@ async function meterAction(request, env, body) {
   }
   if (body.op === 'allowances') {
     return jsonResp({ ok: true, usage: await usageSnapshot(env), notices: await serverNotices(env, { owner: true }), watch: !!env.USAGE_KEY,
-                      appReads: await appReadsToday(env) });   // v83
+                      appReads: await appReadsToday(env), links: await linkStats(env) });   // v83, v87
   }
   if (body.op === 'trends') {
     await signalsTable(db);
@@ -3226,4 +3282,4 @@ export default {
   }
 };
 
-// ── END OF WORKER v86 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
+// ── END OF WORKER v87 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
