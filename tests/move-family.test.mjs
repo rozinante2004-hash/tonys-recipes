@@ -172,7 +172,7 @@ ok(r.code === 1 && /belong to someone else — nothing was copied/.test(r.out), 
     try {
       const n = blob.readUInt16BE(0), key = privateDecrypt({ key: kp.privateKey, padding: constants.RSA_PKCS1_OAEP_PADDING, oaepHash: 'sha256' }, blob.subarray(2, 2 + n));
       const d = createDecipheriv('aes-256-gcm', key, blob.subarray(2 + n, 14 + n)); d.setAuthTag(blob.subarray(14 + n, 30 + n));
-      detail = JSON.parse(Buffer.concat([d.update(blob.subarray(30 + n)), d.final()]).toString('utf8'));
+      detail = JSON.parse((await import('node:zlib')).inflateRawSync(Buffer.concat([d.update(blob.subarray(30 + n)), d.final()])).toString('utf8'));
     } catch (e) { console.log(c.out); }
     ok(c.code === 0 && detail && detail.notThere.length === 1 && detail.notThere[0].name === 'Dish 3' && detail.notThere[0].sameNameInCommunity === false
       && detail.shared.length === 1 && detail.shared[0].path === 'shared/recipe_1', 'clear-detail lists what the community copy does not hold, sealed: ' + JSON.stringify(detail));

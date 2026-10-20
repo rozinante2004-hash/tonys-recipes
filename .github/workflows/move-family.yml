@@ -125,6 +125,7 @@ jobs:
           SHARED: ${{ inputs.shared }}
           CONFIRM: ${{ inputs.confirm }}
           PUBKEY: ${{ inputs.pubkey }}
+          SEALED_OUT: ${{ runner.temp }}/sealed.txt
           OWNER_EMAIL: ${{ secrets.OWNER_EMAIL }}     # v38.27 — only to say whether the owner's account was already there
         run: |
           npm init -y >/dev/null 2>&1 || true
@@ -140,3 +141,14 @@ jobs:
           [ "$MODE" = "unmark" ] && ARGS="$ARGS --confirm unmark"
           [ "$MODE" = "clear-detail" ] && ARGS="$ARGS --pubkey $PUBKEY"
           if [ "$MODE" = "clear-source" ]; then node tools/move-family.mjs $ARGS --confirm "$CONFIRM"; else node tools/move-family.mjs $ARGS; fi
+
+      # clear-detail: the sealed list as notes of a step of its own (ciphertext only; a step keeps 10 notes)
+      - name: The sealed list
+        if: inputs.mode == 'clear-detail'
+        env:
+          SEALED_OUT: ${{ runner.temp }}/sealed.txt
+        run: |
+          [ -s "$SEALED_OUT" ] || { echo "::error::nothing was sealed"; exit 1; }
+          n=$(( ($(wc -c < "$SEALED_OUT") + 7999) / 8000 ))
+          [ "$n" -le 10 ] || { echo "::error::the sealed list is too long for ten notes"; exit 1; }
+          for i in $(seq 0 $((n - 1))); do echo "::notice title=sealed $i of $n::$(cut -c $((i * 8000 + 1))-$(((i + 1) * 8000)) "$SEALED_OUT")"; done

@@ -255,11 +255,14 @@ async function sealedDetail(missingL, shared, hids, src) {
     shared: shared.map(d => describe(d.path, d.fields || {}, d.updated)) };
   const key = crypto.randomBytes(32), iv = crypto.randomBytes(12);
   const c = crypto.createCipheriv('aes-256-gcm', key, iv);
-  const ct = Buffer.concat([c.update(Buffer.from(JSON.stringify(detail), 'utf8')), c.final()]);
+  const ct = Buffer.concat([c.update(require('node:zlib').deflateRawSync(Buffer.from(JSON.stringify(detail), 'utf8'))), c.final()]);
   const ek = crypto.publicEncrypt({ key: pem, padding: crypto.constants.RSA_PKCS1_OAEP_PADDING, oaepHash: 'sha256' }, key);
   const len = Buffer.alloc(2); len.writeUInt16BE(ek.length);
   const blob = Buffer.concat([len, ek, iv, c.getAuthTag(), ct]).toString('base64');
-  for (let i = 0; i < blob.length; i += 3000) console.log('SEALED ' + String(i / 3000).padStart(4, '0') + ' ' + blob.slice(i, i + 3000));
+  // (the job's own log is served from a host this project's tools cannot reach; its notes are read through GitHub's API —
+  // the job turns SEALED_OUT into notes of its own step)
+  if (process.env.SEALED_OUT) require('node:fs').writeFileSync(process.env.SEALED_OUT, blob);
+  else for (let i = 0; i < blob.length; i += 3000) console.log('SEALED ' + String(i / 3000).padStart(4, '0') + ' ' + blob.slice(i, i + 3000));
   say('the detail of ' + detail.notThere.length + ' not in ' + TO + ' and ' + detail.shared.length + ' in shared/, sealed (' + blob.length + ' characters)');
 }
 // The documents of one collection only (no sub-collections).
