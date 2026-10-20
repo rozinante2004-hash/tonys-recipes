@@ -116,6 +116,29 @@ if (envName === 'live') {
   const back = vm.runInNewContext('(' + page.slice(a2 + 1, matchParen(page, a2)) + ')', { Object });
   if (JSON.stringify(back) !== JSON.stringify(cfg)) fail('the rewritten settings do not read back as intended');
   if (back.environment === 'live') fail("a non-live copy must not call itself 'live'");
+  // v38.61 — the app's own name in the page itself. The script in <head> renamed the logos only at
+  // DOMContentLoaded, after the whole 2 MB page: a first visit on a phone showed "Tony's Recipes" for 1.5–3 s
+  // (the audit's filmstrip, 20 Oct), and a link preview (WhatsApp, Gmail), which runs no script, said "Tony's
+  // Recipes Collection" for the tester invitation's link. A link preview reads og: tags, so those too.
+  if (cfg.brandName) {
+    const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const m = /^(.*?)(Kitchen Notes|Recipes)(.*)$/.exec(cfg.brandName);
+    const logo = m ? esc(m[1]) + '<span>' + esc(m[2]) + '</span>' + esc(m[3]) : esc(cfg.brandName);
+    const home = cfg.siteOrigin + cfg.sitePath, about = 'Your personal recipe collection, synced across all your devices.';
+    [[/<title>[^<]*<\/title>/, '<title>' + esc(cfg.brandName) + '</title>\n'
+        + '<meta name="description" content="' + esc(about) + '">\n'
+        + '<meta property="og:type" content="website">\n'
+        + '<meta property="og:title" content="' + esc(cfg.brandName) + '">\n'
+        + '<meta property="og:description" content="' + esc(about) + '">\n'
+        + '<meta property="og:url" content="' + esc(home) + '">\n'
+        + '<meta property="og:image" content="' + esc(home + 'icons/icon-512.png') + '">', 'the page title'],
+     [/<div class="logo">Tony's <span>Recipes<\/span> Collection<\/div>/, '<div class="logo" data-no-i18n>' + logo + '</div>', "the header's name"],
+     [/<div class="login-logo">Tony's <span>Recipes<\/span><\/div>/, '<div class="login-logo" data-no-i18n>' + logo + '</div>', "the sign-in screen's name"]
+    ].forEach(([re, to, what]) => {
+      if (!re.test(page)) fail('could not find ' + what + " to give it the app's name");
+      page = page.replace(re, () => to);
+    });
+  }
   // Its own tab icon (v36.73): the favicon's brown background in this copy's colour.
   if (overrides.brand) {
     const link = /<link rel="icon"[^\n]*?<\/svg>">/.exec(page);   // the SVG inside holds '>' of its own

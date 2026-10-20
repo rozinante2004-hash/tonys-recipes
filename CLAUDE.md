@@ -402,7 +402,8 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
   cf-usage.yml runs at :11 and :41 (GitHub ran one of five hourly slots overnight).
 - **CI broke 20 Oct morning:** ubuntu-latest became Ubuntu 26.04; Playwright 1.56 "does not support chromium on
   ubuntu26.04-x64" → self-tests.yml and translate-languages.yml `runs-on: ubuntu-24.04`. **Released: v38.58 + Worker
-  v81 (20 Oct 2026, 09:54 Israel time, CI green on cbb5695).**
+  v81 (20 Oct 2026, 09:54 Israel time, CI green on cbb5695).** All jobs success (Worker v81 deployed, Pages, Cloudflare
+  beta and test, Self Tests on main and test, languages).
 - **The pre-launch audit (Tony, 20 Oct: "run a full audit … prepare a plan … start implementing immediately everything
   you can")** — AUDIT-2026-10-prelaunch.md. Walkthrough `$S/e2e/walk.mjs` (emulator; phone 390×844 without device
   emulation — Playwright's iPhone/Pixel emulation makes signInWithCredential hang on the emulator, a harness quirk).
@@ -418,6 +419,38 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
   Server allowances page shows "Server errors today: N of M requests (x%)". Measured first load (perf.cjs, beta build,
   until the sign-in screen shows): fast desktop 0.5 s, mid phone on 4G (CPU 4×) 4.2 s, slow phone on fast 3G (CPU 6×)
   17 s — the first visit only; the service worker serves later opens from the device.
+  (Correction, same day: the local server did not compress. With brotli, as Cloudflare serves it — `$S/gzserve.cjs`:
+  811 KB over the wire; sign-in shown 0.55 s desktop, 2.6–2.9 s mid phone/4G, 5.7 s slow phone/3G.)
+- **Released: v38.59 (20 Oct 2026, 10:12 Israel time, CI green on 4d8f2cc).** All jobs success (Pages, Cloudflare beta
+  and test, Self Tests on main and test, languages).
+- **Move step 9 check (20 Oct 2026, 12:06 Israel time, `clear-check`, read-only, run 39398281437):** the same as the
+  16 Oct preview — 143 documents in recipes-f379d: 129 the same in the community copy, 10 changed since (households 8,
+  users 2), 4 not there = households/*/recipes/* 2 and households/*/photos/* 2 (last changed in the family DB 22 Aug and
+  5 Oct: two recipes and their photos deleted in the community app after the move); shared/ 135. clear-source waits for
+  Tony's OK (confirm "clear the family app"; `all` would also delete the 4, `shared` the 135).
+- **v38.61** (the audit, filmstrip of a first visit): (1) **the community app said "Tony's Recipes" for 1.5–3 s** on a
+  phone's first visit — the `<head>` script renamed the logos at DOMContentLoaded, after the 2 MB page — and its HTML
+  `<title>` was "Tony's Recipes Collection", which is what a WhatsApp/Gmail link preview of the tester invitation shows
+  (no script runs there). tools/build.js now writes the brand into the title, both logos (data-no-i18n) and adds
+  description + og:type/title/description/url/image for every copy with a brandName; the self-test
+  `brand_in_the_page_itself` reads the served HTML (live: keeps its title, no og:). The config test ignores og:url and
+  og:image (siteOrigin, written by the build). (2) The e-mail button appeared late and pushed the screen down: a small
+  inline script after `#otherSignIns` keeps n×54−8 px; `renderSignInOptions` clears it. (3) **Stray requests**: the
+  browser's look-ahead sometimes restarts in the middle of the 2 MB of inline code and reads it as markup — it asked for
+  `${escA(photoSrc(r))}`, `x` and three more; Cloudflare Pages has no 404.html, so it answers an unknown path with
+  index.html (SPA fallback): ~500 KB each, ~2.5 MB of a first visit. Every tag with an address inside the code is now
+  written `<img\u0020src=…` / `<iframe\u0020…` (the same at run time; no tag to the look-ahead); self-test
+  `no_fetchable_tags_in_the_code` fails on any `<img|video|source|script|link|iframe|… src/href=` in inline code.
+  **Write new ones the same way.**
+  (4) `kitchenTitle()` (live: "Tony’s Recipes Collection"; else the household's name, or brandName) for "Shared from …"
+  under an e-mailed recipe (`rHtml`) and a shared page (`buildRecipePage`) — a tester's said "Shared from Tony's Recipes
+  Collection"; self-test `kitchen_title_in_shares`. Tony's three exceptions (13 Oct: WhatsApp share text, the shared
+  list's title, the Word export) left as they are — asked again (audit "Needs Tony" 9), as testers get them too. The
+  backup-restore error no longer says "Tony's Recipes backup".
+- **GitHub drops most scheduled runs on this repository** (20 Oct): the usage watch (:11 and :41) ran at 01:13 and 06:31
+  UTC only; Publish languages (every 10 min) runs every 2–5 h; the 02:17 backup starts 07:00–07:51 UTC. The watch is an
+  early warning only (a real refusal is told at once by the Worker and the app), but hourly needs another clock: the
+  Worker's own cron with an analytics-only token (audit "Needs Tony" 10).
 - **Before the testers, Tony's steps (16 Oct 2026):** (1) Cloudflare Email Routing destination addresses — done.
   (2) **The community app's browser key is restricted, both stages:** API restrictions = Identity Toolkit API, Token
   Service API, Cloud Firestore API (Google warned of "active usage" of eight Maps APIs — scanners; updated anyway);

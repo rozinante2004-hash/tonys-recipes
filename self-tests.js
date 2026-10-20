@@ -3948,7 +3948,8 @@ window.SELF_TESTS = [
       var src=await (await fetch(location.href,{cache:'no-store'})).text();
       var a=src.indexOf('<script id="appConfig">'), z=src.indexOf('</script>', a);
       if(a===-1) throw new Error('no #appConfig block in the page');
-      var rest=(src.slice(0,a)+src.slice(z)).replace(/<meta http-equiv="Content-Security-Policy"[^>]*>/,'');
+      var rest=(src.slice(0,a)+src.slice(z)).replace(/<meta http-equiv="Content-Security-Policy"[^>]*>/,'')
+        .replace(/<meta property="og:(url|image)" content="[^"]*">/g,'');   // v38.61 — a link preview's address, written by the build from siteOrigin
       var ids=[APP_CONFIG.firebase.apiKey, APP_CONFIG.firebase.projectId, APP_CONFIG.firebase.messagingSenderId,
                APP_CONFIG.workerName, APP_CONFIG.cloudflareAccountId, APP_CONFIG.ownerKeys[0], APP_CONFIG.githubRepo,
                APP_CONFIG.siteOrigin.replace(/^https:\/\//,'')+APP_CONFIG.sitePath.replace(/\/$/,'')];
@@ -7755,6 +7756,65 @@ window.SELF_TESTS = [
         ['Create an account', 'Forgot password?', 'E-mail address', '✉️ Use my e-mail address'].forEach(function(w){ if(k.indexOf(w)===-1) throw new Error('not harvested: '+w); });
         if(window._signInOverride!==keepOver || (host && host.innerHTML!==keepHtml)) throw new Error('the sign-in choices were not put back as this copy has them');
       } finally { _i18nHarvested=keepH; window._signInOverride=keepOver; if(host) host.innerHTML=keepHtml; }
+    } },
+
+  { id:'brand_in_the_page_itself', group:'Core', name:'🏷 A copy with its own name has it in the page itself — the title, a link preview\u2019s tags, the header and the sign-in screen — not only after the 2 MB page has loaded (on a phone\u2019s first visit "Tony\u2019s Recipes" showed for 1.5–3 s; a WhatsApp preview of the invitation link said "Tony\u2019s Recipes Collection") (v38.61)',
+    test: async()=>{
+      var src=await (await fetch(location.href,{cache:'no-store'})).text();
+      var head=src.slice(0, src.indexOf('</head>'));
+      if(APP_CONFIG.environment==='live'){
+        if(!/<title>Tony's Recipes Collection<\/title>/.test(head)) throw new Error('the family app lost its own title');
+        if(/og:title/.test(head)) throw new Error('the family app has a link preview\u2019s name of its own');
+        return;
+      }
+      var brand=String(APP_CONFIG.brandName||''), esc=function(x){ return x.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); };
+      if(!brand) return;
+      if(head.indexOf('<title>'+esc(brand)+'</title>')===-1) throw new Error('the page\u2019s own title is not '+brand);
+      if(head.indexOf('<meta property="og:title" content="'+esc(brand)+'">')===-1) throw new Error('no link-preview title');
+      if(head.indexOf('<meta property="og:image" content="'+esc(APP_CONFIG.siteOrigin+APP_CONFIG.sitePath)+'icons/icon-512.png">')===-1) throw new Error('no link-preview picture at this copy\u2019s address');
+      if(!/<meta name="description" content="[^"]+">/.test(head)) throw new Error('no description');
+      var body=src.slice(src.indexOf('<body'));
+      if(/<div class="(logo|login-logo)"[^>]*>Tony/.test(body)) throw new Error('the header or the sign-in screen still says Tony\u2019s in the page itself');
+      ['.header .logo', '.login-logo'].forEach(function(sel){
+        var el=document.querySelector(sel);
+        if(sel==='.login-logo' && el && el.textContent.replace(/\s+/g,' ').trim()!==brand) throw new Error('the sign-in screen says '+el.textContent);
+      });
+      // The room kept for the sign-in buttons drawn later is let go once they are there.
+      var host=document.getElementById('otherSignIns');
+      if(host && host.style.minHeight) throw new Error('the sign-in buttons\u2019 kept room was never let go: '+host.style.minHeight);
+    } },
+
+  { id:'no_fetchable_tags_in_the_code', group:'Core', name:'🛰 The app\u2019s code holds no text the browser\u2019s look-ahead would fetch: an img/iframe/script/link written in a string is spelt with \\u0020 after its name. The look-ahead sometimes reads the 2 MB of code as page markup and asked for "${escA(photoSrc(r))}" and four more — and the site answers an unknown address with the whole app, ~2.5 MB of a first visit (v38.61)',
+    test: async()=>{
+      var raw=await (await fetch(location.href,{cache:'no-store'})).text();
+      var code=i18nScriptsOnly(raw.replace(/<!--[\s\S]*?-->/g, function(c){ return c.replace(/[^\n]/g,' '); }));
+      var re=/<(img|video|audio|source|track|script|link|iframe|frame|input|embed|object|base)[\s\/][^<>]*?\b(src|srcset|href|poster|data)\s*=/gi, m, hits=[];
+      while((m=re.exec(code))!==null) hits.push('line '+(code.slice(0,m.index).split('\n').length)+': '+m[0].slice(0,40));
+      if(hits.length) throw new Error(hits.length+' tag(s) in the code the look-ahead would fetch — write \\u0020 after the tag name: '+hits.slice(0,4).join(' · '));
+      // …and the spelling still makes the real thing.
+      var d=document.createElement('div'); d.innerHTML='<img\u0020src="data:," alt="">';
+      if(!d.querySelector('img') || d.querySelector('img').getAttribute('src')!=='data:,') throw new Error('\\u0020 after the tag name does not make an img');
+    } },
+
+  { id:'kitchen_title_in_shares', group:'Core', name:'🏷 A recipe sent by e-mail or shared as a page says the kitchen it came from (or the app\u2019s name) — a tester\u2019s said "Shared from Tony\u2019s Recipes Collection"; the family\u2019s own copy keeps its title (v38.61)',
+    test: async()=>{
+      var keep=_household;
+      try{
+        if(APP_CONFIG.environment==='live'){
+          if(kitchenTitle()!=='Tony\u2019s Recipes Collection') throw new Error('the family app says '+kitchenTitle());
+          return;
+        }
+        _household=null;
+        if(kitchenTitle()!==(APP_CONFIG.brandName||'My Kitchen Notes')) throw new Error('without a kitchen: '+kitchenTitle());
+        _household={ hid:'hT', name:'Dana <b>& Co</b> Kitchen Notes', role:'owner' };
+        if(kitchenTitle()!=='Dana <b>& Co</b> Kitchen Notes') throw new Error('in a kitchen: '+kitchenTitle());
+        var r={ id:'t1', name:'Soup', emoji:'🍲', category:'Dinner', prep:'5 min', servings:'2', ingredients:[{a:'1',n:'water'}], steps:['Boil'] };
+        var page=buildRecipePage(r), mail=rHtml(r);
+        [['the shared page',page],['the e-mail',mail]].forEach(function(x){
+          if(/Tony/.test(x[1])) throw new Error(x[0]+' names Tony');
+          if(x[1].indexOf('Dana &lt;b&gt;&amp; Co&lt;/b&gt; Kitchen Notes')===-1) throw new Error(x[0]+' does not say the kitchen, escaped');
+        });
+      } finally { _household=keep; }
     } },
 
   { id:'beta_moved_to_its_domain', group:'Core', name:'🌐 The beta lives at mykitchennotes.community: its old address and www. send visitors on with the shared link and the extension’s text; nothing else moves; the family links to it there (v38.17)',

@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v38.60 -->
+<!-- Tony's Recipes Collection v38.61 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -5911,7 +5911,7 @@ function linkedCardsInto(g, list, c, hid, lazy, name) {
   var tip = ' title="' + escA(String(T('A recipe from {1} (read-only)')).replace('{1}', name || T('a linked household'))) + '"';
   function pic(r, size) {
     var src = c.photos[r.id] || (/^https?:/i.test(r.photo || '') ? r.photo : '');
-    return src ? '<img src="' + escA(src) + '" alt="" loading="lazy" decoding="async">'
+    return src ? '<img\u0020src="' + escA(src) + '" alt="" loading="lazy" decoding="async">'
                : '<span class="linked-emoji" style="font-size:' + size + 'px;line-height:1;">' + escH(r.emoji) + '</span>';
   }
   function wants(r) { return (lazy && r._ph && !c.photos[r.id]) ? ' data-hid="' + escA(hid) + '" data-lph="' + escA(String(r.id)) + '"' : ''; }
@@ -6047,7 +6047,7 @@ function openLinkedRecipe(i, hid) {
       '<div style="position:sticky;top:60px;display:flex;justify-content:flex-end;padding:0 8px;z-index:20;pointer-events:none;">'
     +   '<button onclick="closeM(\'linkedViewOverlay\')" aria-label="Close" style="pointer-events:auto;width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,0.95);border:none;cursor:pointer;font-size:18px;color:var(--warm-brown);box-shadow:0 2px 12px rgba(0,0,0,0.3);">✕</button></div>'
     + '<div class="modal-hero" style="background:' + escA(r.bg) + ';">'
-    +   (src ? '<img src="' + escA(src) + '" alt="">' : '<span class="emoji-over">' + escH(r.emoji) + '</span>') + '</div>'
+    +   (src ? '<img\u0020src="' + escA(src) + '" alt="">' : '<span class="emoji-over">' + escH(r.emoji) + '</span>') + '</div>'
     + '<div class="modal-content' + (recipeIsRTL(r) ? ' rtl-recipe' : '') + '">'
     +   '<div id="linkedFrom" style="background:var(--card-bg);border:1px solid var(--border);border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:12.5px;color:var(--ink);">'
     +     '\u{1F91D} <span>From</span> <b data-no-i18n>' + escH(hhLinkName(l)) + '</b> · <span>read-only: you can look and cook, not change it.</span></div>'
@@ -6323,6 +6323,14 @@ function householdBrand() {
   var prefix = (document.title.match(/^\[[A-Z]+\] /) || [''])[0];
   document.title = prefix + n;
 }
+// v38.61 — the name a recipe leaves the app under ("Shared from …" in an e-mail and on a shared page). The family's
+// own copy keeps its title; any other copy says the kitchen it came from, or the app's name — a tester's recipe said
+// "Shared from Tony's Recipes Collection" (the audit, 20 Oct).
+function kitchenTitle() {
+  if (APP_CONFIG.environment === 'live') return 'Tony\u2019s Recipes Collection';
+  return (typeof _household !== 'undefined' && _household && _household.name) || APP_CONFIG.brandName || 'My Kitchen Notes';
+}
+window.kitchenTitle = kitchenTitle;
 function householdCanManage() { return !!(_household && (_household.role === 'owner' || _household.role === 'admin')); }
 function householdRenderBar() {
   var bar = document.getElementById('householdBar');
@@ -8422,7 +8430,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v38.60';
+var APP_VERSION = 'v38.61';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -8578,7 +8586,7 @@ function rHtml(r) {
   // this origin, so an escaping miss here is script execution with access to the
   // signed-in session. The recipe is NOT trusted input: it can come from an AI
   // import, a restored backup, or another family member with write access.
-  var photo = r.photo ? '<img src="' + escA(safeUrl(r.photo)) + '" alt="' + escA(r.name) + '" style="width:100%;max-height:320px;object-fit:cover;border-radius:0;">' : '';
+  var photo = r.photo ? '<img\u0020src="' + escA(safeUrl(r.photo)) + '" alt="' + escA(r.name) + '" style="width:100%;max-height:320px;object-fit:cover;border-radius:0;">' : '';
   var emojiBlock = !r.photo ? '<div style="font-size:80px;text-align:center;padding:32px 0;background:' + escA(r.bg||'#FFF0E8') + ';">' + escH(r.emoji||'🍽️') + '</div>' : '';
 
   var dietTags = (r.diets && r.diets.length)
@@ -8651,7 +8659,7 @@ function rHtml(r) {
 
     // Footer
     '<div style="background:#5C3D2E;padding:16px 32px;text-align:center;">',
-    '<div style="font-size:12px;color:rgba(255,255,255,0.6);">Shared from <span style="color:#D4A843;font-weight:600;">Tony\u2019s Recipes Collection</span></div>',
+    '<div style="font-size:12px;color:rgba(255,255,255,0.6);">Shared from <span style="color:#D4A843;font-weight:600;">' + escH(kitchenTitle()) + '</span></div>',
     sourceBlock ? '<div style="margin-top:4px;font-size:11px;color:rgba(255,255,255,0.4);">' + (r.source ? 'Source: ' + r.source : '') + '</div>' : '',
     '</div>',
 
@@ -11447,7 +11455,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.60</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.61</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -12186,7 +12194,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.60</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.61</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -12201,6 +12209,15 @@ body.banner-shown .header {
     </button>
     <!-- v37.03 — the other ways, each shown only when switched on for this copy -->
     <div id="otherSignIns" style="margin-top:8px;"></div>
+    <script>
+      // v38.61 — the buttons below Google's are drawn by the app's script at the very end of the page, 1–3 s later on a
+      // phone's first visit; until then their room is kept, so the screen does not jump under a finger
+      // (renderSignInOptions lets it go). A button is 46 px, 8 apart.
+      (function () {
+        var n = (signInOn('microsoft') ? 1 : 0) + (signInOn('apple') ? 1 : 0) + (signInOn('password') || signInOn('emailLink') ? 1 : 0);
+        if (n) document.getElementById('otherSignIns').style.minHeight = (n * 54 - 8) + 'px';
+      })();
+    </script>
     <div id="loginError" style="color:var(--bad-text);font-size:12px;margin-top:8px;display:none;"></div>
     <!-- v36.38 — "it just goes to Offline mode" had no next step. Every reason
          sign-in fails is invisible from inside the page unless it is asked for
@@ -13327,7 +13344,7 @@ window.addEventListener('resize', function(){ if (_lineMark) refreshLineMarker()
 // any browser, on any device, forever, with nothing to keep running.
 function buildRecipePage(r) {
   var esc = function(v){ return escH(v).replace(/<br>/g, '<br>'); };
-  var img = r.photo ? '<img class="hero" src="' + escA(r.photo) + '" alt="">' : '';
+  var img = r.photo ? '<img\u0020class="hero" src="' + escA(r.photo) + '" alt="">' : '';
   var ings = allIngredients(r).map(function(i){
     return '<li><span>' + escH(i.n) + '</span><b>' + escH(i.a) + '</b></li>';
   }).join('');
@@ -13358,7 +13375,7 @@ function buildRecipePage(r) {
     + '<h2>Method</h2><ol>' + steps + '</ol>'
     + (r.notes ? '<div class="notes" dir="auto"' + langAttr(r.notes) + '>' + escH(r.notes) + '</div>' : '')
     + (r.source ? '<div class="meta" style="margin-top:18px;">Source: ' + escH(r.source) + '</div>' : '')
-    + '</div><div class="foot">Shared from Tony\'s Recipes Collection</div></div></body></html>';
+    + '</div><div class="foot">Shared from ' + escH(kitchenTitle()) + '</div></div></body></html>';
 }
 function shareAsPage(id) {
   // findRecipeRef — see doWhatsApp (v36.13).
@@ -14616,7 +14633,7 @@ function i18nUnescape(v) {
 }
 // Everything outside an inline <script> blanked to spaces, with the newlines
 // kept so that every offset the scrape works with still points where it did.
-// A <script src=…> is left blank too: its body is empty here, and its contents
+// A script tag with a src= is left blank too: its body is empty here, and its contents
 // are not in this file to read.
 function i18nScriptsOnly(raw) {
   var blank = function(s){ return s.replace(/[^\n]/g, ' '); };
@@ -18216,7 +18233,7 @@ function renderGrid() {
       <div class="recipe-list-item${selectedIds.has(r.id) ? ' selected' : ''}" data-no-i18n ontouchstart="swipeStart(event,${r.id})" ontouchmove="swipeMove(event)" ontouchend="swipeEnd(event)" onclick="selectMode ? toggleRecipeSelect(event,${r.id}) : openView(${r.id})">
         ${selectHtml(r)}
         <div class="recipe-list-thumb" style="background:${escA(r.bg)};position:relative;overflow:hidden;">
-          ${r.photo ? `<img src="${escA(thumbSrc(r))}" alt="" loading="lazy" decoding="async">` : `<span style="font-size:26px;">${escH(r.emoji)}</span>`}
+          ${r.photo ? `<img\u0020src="${escA(thumbSrc(r))}" alt="" loading="lazy" decoding="async">` : `<span style="font-size:26px;">${escH(r.emoji)}</span>`}
           ${listBadgesHtml(r, !!r.photo)}
         </div>
         <div class="recipe-list-info">
@@ -18239,7 +18256,7 @@ function renderGrid() {
       <div class="recipe-card${selectedIds.has(r.id) ? ' selected' : ''}" data-no-i18n ontouchstart="swipeStart(event,${r.id})" ontouchmove="swipeMove(event)" ontouchend="swipeEnd(event)" onclick="selectMode ? toggleRecipeSelect(event,${r.id}) : openView(${r.id})">
         ${selectHtml(r)}
         <div class="card-image" style="background:${escA(r.bg)}">
-          ${r.photo ? `<img src="${escA(thumbSrc(r))}" alt="" loading="lazy" decoding="async">` : `<span style="font-size:52px;line-height:1;">${escH(r.emoji)}</span>`}
+          ${r.photo ? `<img\u0020src="${escA(thumbSrc(r))}" alt="" loading="lazy" decoding="async">` : `<span style="font-size:52px;line-height:1;">${escH(r.emoji)}</span>`}
           <div class="card-category-badge">${escH(T(r.category))}</div>
           ${gridBadgesHtml(r)}
         </div>
@@ -19216,7 +19233,7 @@ function drawView(){
       <button onclick="closeM('viewOverlay')" style="pointer-events:auto;width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,0.95);border:none;cursor:pointer;font-size:18px;color:var(--warm-brown);display:flex;align-items:center;justify-content:center;box-shadow:0 2px 12px rgba(0,0,0,0.3);touch-action:manipulation;flex-shrink:0;">✕</button>
     </div>
     <div class="modal-hero" style="background:${escA(r.bg)};cursor:pointer;" onclick="changeHeroPhoto(${r.id})" title="Tap to change the photo">
-      ${r.photo?`<img id="viewHeroImg" src="${escA(photoSrc(r))}" alt="">`:''}
+      ${r.photo?`<img\u0020id="viewHeroImg" src="${escA(photoSrc(r))}" alt="">`:''}
       <span class="emoji-over"${r.photo?' style="display:none"':''}>${escH(r.emoji)}</span>
       <button class="hero-photo-btn" onclick="event.stopPropagation();changeHeroPhoto(${r.id})">📷 ${r.photo?'Change photo':'Add photo'}</button>
     </div>
@@ -19349,7 +19366,7 @@ function drawView(){
         ${r.originalPhoto ? `<button class="action-btn" id="origPhotoBtn-${r.id}" onclick="toggleOriginalPhoto(${r.id})">📸 Show Original</button>` : ''}
         ${r.originalPhoto ? `<button class="action-btn" style="color:var(--danger);" onclick="removeOriginalPhoto(${r.id})">🗑️ Remove Original</button>` : ''}
       </div>
-      ${r.originalPhoto ? `<div id="origPhotoBox-${r.id}" style="display:none;margin-top:10px;"><div style="font-size:11px;color:var(--muted);margin-bottom:4px;letter-spacing:0.5px;">ORIGINAL SCAN</div><img src="${escA(r.originalPhoto)}" style="width:100%;border-radius:8px;border:1px solid var(--border);" alt="Original recipe photo"></div>` : ''}
+      ${r.originalPhoto ? `<div id="origPhotoBox-${r.id}" style="display:none;margin-top:10px;"><div style="font-size:11px;color:var(--muted);margin-bottom:4px;letter-spacing:0.5px;">ORIGINAL SCAN</div><img\u0020src="${escA(r.originalPhoto)}" style="width:100%;border-radius:8px;border:1px solid var(--border);" alt="Original recipe photo"></div>` : ''}
       
     </div>`;
   document.getElementById('viewOverlay').classList.add('open');
@@ -22838,8 +22855,8 @@ async function runUrlImport() {
         // This is the least trustworthy input the app handles: HTML relayed by
         // a third-party CORS proxy, from a page we did not choose. It used to
         // go through `div.innerHTML`, and a DETACHED div is not safe — measured
-        // in a real browser, `<img src=x onerror=...>` and `<video src=x
-        // onerror=...>` both FIRE from a node that was never added to the
+        // in a real browser, `img src=x onerror=...` and `video src=x
+        // onerror=...` tags both FIRE from a node that was never added to the
         // document. That was arbitrary script in this origin, with the
         // signed-in Firestore session, the Worker app key and every recipe
         // behind it. The tag-stripping below ran AFTER the damage.
@@ -23051,7 +23068,7 @@ function applyParsedRecipe(parsed, resultDivId, overlayId, originalPhoto) {
   var origPhotoHtml = originalPhoto
     ? '<div style="margin-top:8px;">'
       + '<button class="action-btn" onclick="showOriginalPhotoPreview(this)">📸 Show Original</button>'
-      + '<div style="display:none;margin-top:6px;"><img alt="" src="' + escA(safeUrl(originalPhoto)) + '" style="width:100%;border-radius:8px;border:1px solid var(--border);"></div>'
+      + '<div style="display:none;margin-top:6px;"><img\u0020alt="" src="' + escA(safeUrl(originalPhoto)) + '" style="width:100%;border-radius:8px;border:1px solid var(--border);"></div>'
       + '</div>'
     : '';
   document.getElementById(resultDivId).innerHTML =
@@ -26224,6 +26241,7 @@ function authErrorText(err) {
 function renderSignInOptions() {
   var host = document.getElementById('otherSignIns');
   if (!host) return;
+  host.style.minHeight = '';   // v38.61 — the room kept for these buttons while the page loaded
   var g = document.getElementById('googleSignInBtn');
   if (g) g.style.display = signInOn('google') ? '' : 'none';
   var b = 'class="google-signin-btn" style="margin-top:8px;"';
@@ -28362,7 +28380,7 @@ function openLegalDoc(which) {
     + '<b style="color:var(--heading);">' + escH(title) + '</b>'
     + '<span style="display:flex;gap:8px;align-items:center;"><a href="' + escA(file) + '" target="_blank" rel="noopener" style="font-size:12.5px;color:var(--terracotta);">Open in a new tab ↗</a>'
     + '<button type="button" class="modal-close" style="position:relative;top:auto;right:auto;" aria-label="Close" onclick="document.getElementById(\'legalDocOverlay\').remove()">✕</button></span></div>'
-    + '<iframe id="legalDocFrame" src="' + escA(file) + '" title="' + escA(title) + '" style="flex:1;border:0;width:100%;background:#fff;"></iframe></div>';
+    + '<iframe\u0020id="legalDocFrame" src="' + escA(file) + '" title="' + escA(title) + '" style="flex:1;border:0;width:100%;background:#fff;"></iframe></div>';
   ov.onclick = function(e){ if (e.target === ov) ov.remove(); };
   document.body.appendChild(ov);
   // Corrections made in the editor show at once, before they are published.
@@ -33132,7 +33150,7 @@ async function backupRestoreFile(event) {
   try {
     toast('Reading backup file\u2026');
     backup=JSON.parse(await file.text());
-    if(!backup||!backup.version||!Array.isArray(backup.recipes)) throw new Error('this is not a Tony\'s Recipes backup (no version or recipe list in it)');
+    if(!backup||!backup.version||!Array.isArray(backup.recipes)) throw new Error('this is not a backup from this app (no version or recipe list in it)');
     if(!backup.recipes.length) throw new Error('the backup contains no recipes');
     var photos=backup.photos||{};
     restored=backup.recipes.map(function(r){

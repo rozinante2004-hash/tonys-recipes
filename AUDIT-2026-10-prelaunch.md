@@ -15,7 +15,7 @@ require my input should be kept for the last stages."*
 - **The suites**: 393 self-tests × 3 copies + Hebrew/dark, phone chrome, double-click, close-in-view, axe, contrast,
   the Worker's 400+ checks.
 
-## Fixed (released, or in v38.59)
+## Fixed (released, or on the way: v38.60–v38.61)
 
 | # | Area | Finding | Fix |
 |---|------|---------|-----|
@@ -34,6 +34,10 @@ require my input should be kept for the last stages."*
 | 13 | UI | "❤ Favourites" chip bigger than its neighbours and growing on hover (it shared the card heart's class) | v38.59 |
 | 14 | UI | Import preview "Dinner · · · 2" — empty fields left their dots | v38.59: only what is there, 🍽 for servings |
 | 15 | UI (phone) | "📷 Click to upload a photo" on a phone | v38.59: "📷 Add a photo" |
+| 16 | First impression | The community app said "Tony's Recipes" for 1.5–3 s of a phone's first visit; a WhatsApp preview of the invitation link said "Tony's Recipes Collection" | v38.61: the name is in the page itself, with link-preview tags |
+| 17 | Budget (data) | ~2.5 MB of wasted download on a first visit (stray requests answered with the whole app) | v38.61, and a self-test so new code cannot bring it back |
+| 18 | UI (phone) | The sign-in screen jumped when the e-mail button appeared, 1–3 s in | v38.61: its room is kept |
+| 19 | Monitoring | The server's own errors were not watched | v38.60 + Worker v82: in the hourly watch, warned at ≥25 errors and ≥2% |
 
 ## Measured capacity — 20 testers (estimates from the measurements)
 
@@ -52,12 +56,12 @@ require my input should be kept for the last stages."*
 | # | Item | When |
 |---|------|------|
 | A | Any change in a household makes each other device's next open read every recipe and photo again (151 reads in the test). Read only what changed (`updatedAt` > last read). The sync core — careful work and its own tests. | After the launch |
-| B | Three stray 404 requests per page load (the browser's look-ahead reading text inside the app's code as image addresses). Costs nothing; noise in the console. | Low |
+| B | Stray requests per page load: the browser's look-ahead read text inside the app's code as image addresses. **Not harmless after all**: the site answers an unknown address with the whole app, ~500 KB each, ~2.5 MB of a first visit. | **Done** — v38.61 |
 | C | Playwright 1.56 → a version with Ubuntu 26.04 browsers, then unpin. | Before GitHub retires 24.04 |
 | D | Worker CPU: p99.9 16.5 ms against the free 10 ms (no errors in two days). Add the Worker's error rate to the hourly watch. | **Done** — v38.60 + Worker v82: warned at ≥25 errors and ≥2% of requests; a line on 🩺 Server allowances |
 | E | The page is 2,184 KB of its 2,200 KB budget: the next large feature should load rarely used panels on demand. | Before the next big feature |
 | F | The header says "☁️ Shared · <name>" for a kitchen of one, and the same again in the status line. | With Tony's wording (below) |
-| G | **First visit on a slow phone**: the sign-in screen shows after 0.5 s on a fast desktop, 4.2 s on a mid phone on 4G, 17 s on a slow phone on 3G (measured, CPU slowed 4× and 6×). Later opens come from the device. | Investigating |
+| G | **First visit on a phone** (measured with compression, as the site serves it): sign-in screen after 0.55 s on a fast desktop, 2.6–2.9 s on a mid phone on 4G, 5.7 s on a slow phone on 3G; 811 KB. Later opens come from the device. The community app showed **"Tony's Recipes"** for the first 1.5–3 s, and a link preview of the invitation said "Tony's Recipes Collection". | **Done** — v38.61: its own name from the first frame and in link previews; the sign-in buttons no longer jump. The load itself: fine for a beta; a lighter first screen is a bigger job for later |
 
 ## Needs Tony (kept for last)
 
@@ -72,3 +76,19 @@ require my input should be kept for the last stages."*
 5. **New recipe's category** starts at Breakfast (the first in the list) — Dinner is likelier.
 6. **AI models**: Sonnet 5 and Haiku 4.5 today; newer ones exist. Not urgent; worth a look after the launch.
 7. The header label (F above).
+8. **Move step 9 — clearing the family app's old database** (checked 20 Oct, 12:06, read-only): 143 documents; 129 the
+   same in the community app, 10 changed there since (your edits), 4 not there — two recipes and their photos deleted in
+   the community app after the move; plus 135 in the first layout's shared/. Clearing needs your OK; the 4 and the 135
+   only if you want them gone too.
+9. **Your name in what testers send out.** On 13 Oct you said to leave "Tony's Recipes" in the WhatsApp share, the
+   shared list's title and the Word export. In the community app these are the testers' too: a tester's Word export is
+   titled "Tony's Recipes Collection" (file Tonys_Recipes_….docx), sharing the app on WhatsApp says "Tony's Recipes
+   Collection" above a "My Kitchen Notes" link preview, and a printed list is "Tony's Recipes (3)". Suggest: the
+   kitchen's own name (yours keeps yours), or "My Kitchen Notes" when sharing the app. (Done already, as they were not
+   among your three: "Shared from …" under an e-mailed or shared recipe now names the kitchen.)
+10. **The hourly usage watch runs a few times a day, not hourly** — GitHub drops most scheduled runs on this
+    repository (the watch ran twice in 11 hours; the nightly backup starts ~5 hours late). Real refusals are still told
+    at once (the Worker and the app see them); the watch is the early warning at 70%. To make it hourly for sure: in
+    Cloudflare → My Profile → API Tokens, create a token with only **Account → Account Analytics → Read**, and add it
+    to GitHub as the secret `CF_ANALYTICS_TOKEN`; then the Worker's own clock (reliable) runs the Cloudflare part every
+    hour. Optional.
