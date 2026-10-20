@@ -60,7 +60,7 @@ const FROM = arg('from', ''), TO = arg('to', ''), MODE = arg('mode', 'survey');
 const MARK = arg('mark-moved', ''), WITH_I18N = has('i18n'), RESUME = has('resume');
 const OWNER = String(process.env.OWNER_EMAIL || '').toLowerCase();
 if (!/^[a-z0-9-]{4,40}$/.test(FROM) || !/^[a-z0-9-]{4,40}$/.test(TO) || FROM === TO) { console.error('usage: --from <project> --to <project> --mode survey|copy|remove'); process.exit(2); }
-if (['survey', 'copy', 'remove', 'unmark', 'clear-check', 'clear-source'].indexOf(MODE) === -1) { console.error('--mode survey, copy, remove, unmark, clear-check or clear-source'); process.exit(2); }
+if (['survey', 'copy', 'remove', 'unmark', 'clear-check', 'clear-source', 'clear-detail'].indexOf(MODE) === -1) { console.error('--mode survey, copy, remove, unmark, clear-check, clear-source or clear-detail'); process.exit(2); }
 if (MODE === 'clear-source' && arg('confirm', '') !== 'clear the family app') { console.error('clear-source deletes from ' + FROM + ': add --confirm "clear the family app"'); process.exit(2); }
 const CLEAR_ALL = has('all'), CLEAR_SHARED = has('shared');
 if (MODE === 'unmark' && arg('confirm', '') !== 'unmark') { console.error('unmark lets the family app work again: add --confirm unmark'); process.exit(2); }
@@ -223,6 +223,45 @@ async function updateTimes(p, rels) {
   }
   return at;
 }
+// clear-detail (20 Oct 2026 — Tony: "What do the 4 deleted items and the 135 shared/ documents contain?"): what the
+// documents the community copy does not hold are — names, dates, and whether a recipe of that name or id IS in the
+// community copy. Names cannot go in the log (the repository is public), so the list is sealed for whoever holds the
+// private key of --pubkey (base64 of a PEM): RSA-OAEP over a fresh AES-256-GCM key; the log carries ciphertext only.
+async function sealedDetail(missingL, shared, hids, src) {
+  const crypto = require('node:crypto');
+  const pem = Buffer.from(String(arg('pubkey', '')), 'base64').toString('utf8');
+  if (!/BEGIN PUBLIC KEY/.test(pem)) throw new Error('clear-detail needs --pubkey: a PEM public key, base64');
+  const nameIn = (v, depth) => {
+    if (!v || depth > 5) return '';
+    if (v.mapValue) { const f = v.mapValue.fields || {}; if (f.name && f.name.stringValue) return f.name.stringValue;
+      for (const k of Object.keys(f)) { const n = nameIn(f[k], depth + 1); if (n) return n; } }
+    if (v.arrayValue) for (const x of v.arrayValue.values || []) { const n = nameIn(x, depth + 1); if (n) return n; }
+    if (v.stringValue && /^\s*[[{]/.test(v.stringValue)) { try { const j = JSON.parse(v.stringValue); const n = (j && (j.name || (Array.isArray(j) && j[0] && j[0].name))) || ''; if (n) return String(n); } catch (e) {} }
+    return '';
+  };
+  const nameOf = fields => nameIn({ mapValue: { fields } }, 0);
+  const norm = n => String(n || '').toLowerCase().replace(/\s+/g, ' ').trim();
+  const there = { names: {}, ids: {} };
+  for (const h of hids) for (const r of await shallow(TO, 'households/' + h + '/recipes')) {
+    there.ids[r.path.split('/').pop()] = true; const n = nameOf(r.fields); if (n) there.names[norm(n)] = n; }
+  const fieldsOf = path => ((src.docs.find(d => d.path === path) || {}).fields) || {};
+  const describe = (path, fields, updated) => {
+    const id = path.split('/').pop(), rid = id.replace(/^(photo|recipe)_/, ''), name = nameOf(fields);
+    return { path, name, updated: updated ? new Date(updated).toISOString() : '', fields: Object.keys(fields).sort().slice(0, 25),
+      bytes: JSON.stringify(fields).length, sameNameInCommunity: name ? (there.names[norm(name)] || false) : null, sameIdInCommunity: !!there.ids[rid] };
+  };
+  const detail = { at: new Date().toISOString(), communityRecipes: Object.keys(there.ids).length,
+    notThere: missingL.map(x => describe(x.from, fieldsOf(x.from), (src.docs.find(d => d.path === x.from) || {}).updated)),
+    shared: shared.map(d => describe(d.path, d.fields || {}, d.updated)) };
+  const key = crypto.randomBytes(32), iv = crypto.randomBytes(12);
+  const c = crypto.createCipheriv('aes-256-gcm', key, iv);
+  const ct = Buffer.concat([c.update(Buffer.from(JSON.stringify(detail), 'utf8')), c.final()]);
+  const ek = crypto.publicEncrypt({ key: pem, padding: crypto.constants.RSA_PKCS1_OAEP_PADDING, oaepHash: 'sha256' }, key);
+  const len = Buffer.alloc(2); len.writeUInt16BE(ek.length);
+  const blob = Buffer.concat([len, ek, iv, c.getAuthTag(), ct]).toString('base64');
+  for (let i = 0; i < blob.length; i += 3000) console.log('SEALED ' + String(i / 3000).padStart(4, '0') + ' ' + blob.slice(i, i + 3000));
+  say('the detail of ' + detail.notThere.length + ' not in ' + TO + ' and ' + detail.shared.length + ' in shared/, sealed (' + blob.length + ' characters)');
+}
 // The documents of one collection only (no sub-collections).
 async function shallow(p, colPath) {
   const out = []; let pageToken;
@@ -295,7 +334,7 @@ async function main() {
 
   if (MODE === 'survey') { say('survey only — nothing changed (' + calls + ' requests, ' + Math.round((Date.now() - started) / 1000) + ' s)'); return; }
 
-  if (MODE === 'clear-check' || MODE === 'clear-source') {
+  if (MODE === 'clear-check' || MODE === 'clear-source' || MODE === 'clear-detail') {
     // Each family document beside what the community copy holds under its (mapped) name.
     const pairs = src.docs.map((d, i) => ({ from: d.path, to: docs[i].path, fields: docs[i].fields }))
       .filter(x => !/^i18n\//.test(x.from));
@@ -329,6 +368,7 @@ async function main() {
     say('verified: all ' + (sameL.length + changedL.length) + ' to be deleted are in ' + TO + ' — ' + sameL.length + ' with every field the same, '
       + (changedL.length - olderThere.length) + ' of the ' + changedL.length + ' changed since written there later than here'
       + (olderThere.length ? '; NOT ' + olderThere.length + ' (' + kinds(olderThere) + '): the family copy has the newer — they would be lost' : ''));
+    if (MODE === 'clear-detail') { await sealedDetail(missingL, shared, hids, src); say('detail only — nothing changed (' + calls + ' requests)'); return; }
     if (MODE === 'clear-check') { say('check only — nothing changed (' + calls + ' requests, ' + Math.round((Date.now() - started) / 1000) + ' s)'); return; }
     if (olderThere.length) throw new Error(olderThere.length + ' document(s) are newer in ' + FROM + ' than in ' + TO + ' — nothing was deleted');
     const gone = sameL.concat(changedL).concat(CLEAR_ALL ? missingL : []);

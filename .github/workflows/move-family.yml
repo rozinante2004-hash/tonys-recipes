@@ -32,7 +32,7 @@ on:
         required: true
         default: survey
         type: choice
-        options: [survey, copy, remove, unmark, clear-check, clear-source]
+        options: [survey, copy, remove, unmark, clear-check, clear-source, clear-detail]
       target:
         description: "where to"
         required: true
@@ -64,6 +64,10 @@ on:
         required: false
         default: false
         type: boolean
+      pubkey:
+        description: "clear-detail: the public key the list is sealed for (base64 of a PEM) — names never go in the log"
+        required: false
+        default: ""
       confirm:
         description: "copy into my-kitchen-notes-beta: type  move the family   ·   remove: type  remove   ·   unmark: type  unmark   ·   clear-source: type  clear the family app"
         required: false
@@ -120,6 +124,7 @@ jobs:
           ALL: ${{ inputs.all }}
           SHARED: ${{ inputs.shared }}
           CONFIRM: ${{ inputs.confirm }}
+          PUBKEY: ${{ inputs.pubkey }}
           OWNER_EMAIL: ${{ secrets.OWNER_EMAIL }}     # v38.27 — only to say whether the owner's account was already there
         run: |
           npm init -y >/dev/null 2>&1 || true
@@ -133,4 +138,5 @@ jobs:
           [ "$SHARED" = "true" ] && ARGS="$ARGS --shared"
           [ "$MODE" = "remove" ] && ARGS="$ARGS --confirm remove"
           [ "$MODE" = "unmark" ] && ARGS="$ARGS --confirm unmark"
+          [ "$MODE" = "clear-detail" ] && ARGS="$ARGS --pubkey $PUBKEY"
           if [ "$MODE" = "clear-source" ]; then node tools/move-family.mjs $ARGS --confirm "$CONFIRM"; else node tools/move-family.mjs $ARGS; fi

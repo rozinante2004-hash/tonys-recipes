@@ -160,6 +160,24 @@ ok(r.code === 1 && /belong to someone else — nothing was copied/.test(r.out), 
   ok((await allUsers(F2)).length === 1, 'the accounts stay');
   ok(!!(await get(T2, 'households/H9/recipes/r0')) && (await get(T2, 'households/H9/recipes/r2')).fields.name.stringValue === 'Dish 2, improved again', 'the community copy is untouched');
   ok(!/example\.com|uMOM|MKN-|Dish /.test(c.out), 'clear prints no address, id, identifier or recipe');
+  // 20 Oct 2026 — clear-detail: what the rest is, sealed for the holder of a private key (the log is public).
+  {
+    const { generateKeyPairSync, privateDecrypt, createDecipheriv, constants } = await import('node:crypto');
+    const kp = generateKeyPairSync('rsa', { modulusLength: 3072, publicKeyEncoding: { type: 'spki', format: 'pem' }, privateKeyEncoding: { type: 'pkcs8', format: 'pem' } });
+    c = run(['--from', F2, '--to', T2, '--mode', 'clear-detail']);
+    ok(c.code !== 0 && /needs --pubkey/.test(c.out), 'clear-detail needs a key to seal for');
+    c = run(['--from', F2, '--to', T2, '--mode', 'clear-detail', '--pubkey', Buffer.from(kp.publicKey).toString('base64')]);
+    const blob = Buffer.from(c.out.split('\n').filter(l => /^SEALED \d{4} /.test(l)).map(l => l.slice(12)).join(''), 'base64');
+    let detail = null;
+    try {
+      const n = blob.readUInt16BE(0), key = privateDecrypt({ key: kp.privateKey, padding: constants.RSA_PKCS1_OAEP_PADDING, oaepHash: 'sha256' }, blob.subarray(2, 2 + n));
+      const d = createDecipheriv('aes-256-gcm', key, blob.subarray(2 + n, 14 + n)); d.setAuthTag(blob.subarray(14 + n, 30 + n));
+      detail = JSON.parse(Buffer.concat([d.update(blob.subarray(30 + n)), d.final()]).toString('utf8'));
+    } catch (e) { console.log(c.out); }
+    ok(c.code === 0 && detail && detail.notThere.length === 1 && detail.notThere[0].name === 'Dish 3' && detail.notThere[0].sameNameInCommunity === false
+      && detail.shared.length === 1 && detail.shared[0].path === 'shared/recipe_1', 'clear-detail lists what the community copy does not hold, sealed: ' + JSON.stringify(detail));
+    ok(!/Dish |old layout|example\.com/.test(c.out) && !!(await get(F2, 'households/H9/recipes/r3')), 'clear-detail prints no name and changes nothing');
+  }
   c = run(['--from', F2, '--to', T2, '--mode', 'clear-source', '--all', '--shared', '--confirm', 'clear the family app']);
   ok(c.code === 0 && !(await get(F2, 'households/H9/recipes/r3')) && !(await get(F2, 'shared/recipe_1')) && !!(await get(F2, 'i18n/he')), '--all and --shared clear the rest (never i18n/)');
 }
