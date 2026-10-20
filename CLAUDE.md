@@ -602,6 +602,9 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
   `inviteOnlyShow` stubbed), `firebase_limits_told` (the table, left, value stronger than title in both themes),
   about-features list. 402 pass ×4 suites; phone, double-click, close-in-view, axe, contrast pass. Page 2,189 KB of
   2,200 KB.
+- **Released: v38.69 (20 Oct 2026, 22:28 Israel time, CI green on 234adf9).** All jobs success — the database rules
+  published to the three projects after the emulator checks (testerInvites live), Pages, Cloudflare beta and test,
+  Self Tests on main and test, languages. Tony's step: 📊 Households → "by invitation only".
 - **Move step 9 finished (20 Oct 2026, 18:05 Israel time; Tony: "OK to delete the 4 + 135 old family documents").**
   clear-source `all` + `shared` (run 39445140837): 139 deleted (households 4, shared 135), the household cut to its
   moved mark; clear-check after it (run 39445361414): recipes-f379d holds 1 document of the moved household (its own,
