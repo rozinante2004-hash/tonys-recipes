@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v38.66 -->
+<!-- Tony's Recipes Collection v38.67 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -4335,7 +4335,8 @@ function serverAllowanceLines(d) {
       lines.push((pct >= 100 ? '⛔ ' : pct >= 70 ? '⚠️ ' : '✓ ') + p + ': ' + n.toLocaleString() + ' of ' + lim.toLocaleString() + ' (' + pct + '%)');
     });
   }
-  if (!m.firestoreReads) lines.push('', 'Firebase’s own count is not measured yet: give the backup’s service account the “Monitoring Viewer” role in Google Cloud, and the hourly watch adds it. Meanwhile the apps count their own reads (above), you are warned at 70%, and if the allowance runs out the app that meets it says so and you are e-mailed.');
+  // v38.67 — Google lets Cloud Monitoring be read only with billing on (20 Oct: "This API method requires billing to be enabled")
+  if (!m.firestoreReads) lines.push('', 'Firebase’s own count cannot be read on the free plan (Google asks for billing to be switched on for that). The apps count their own reads instead (above): you are warned at 70%, and if the allowance runs out the app that meets it says so and you are e-mailed.');
   lines.push('', 'Firebase’s day starts at midnight in California (10:00 Israel time in summer, 09:00 in winter).');
   return lines;
 }
@@ -8708,7 +8709,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v38.66';
+var APP_VERSION = 'v38.67';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -11743,7 +11744,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.66</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.67</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -11831,7 +11832,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.66</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.67</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">

@@ -7704,9 +7704,9 @@ window.SELF_TESTS = [
         var refused=serverAllowanceLines({ watch:true, usage:{ at:Date.now(), metrics:{ pagesBuilds:{ used:949, limit:500, period:'month', lastOk:false, per:{ 'tonys-recipes-test':518, 'my-kitchen-notes-beta':431 } } } }, notices:[] }).join('\n');
         if(!/⛔ Pages builds this month: 949 of 500 \(190%\) — test copy 518, community app 431 — Cloudflare refused the latest build/.test(refused)) throw new Error('a refused build: '+refused);
         if(!/not connected/.test(serverAllowanceLines({ watch:false, notices:[] }).join('\n'))) throw new Error('no watch yet, yet it does not say so');
-        if(!/Monitoring Viewer/.test(lines)) throw new Error('Firestore not measured, yet the page does not say how to add it');
+        if(!/cannot be read on the free plan/.test(lines) || /Monitoring Viewer/.test(lines)) throw new Error('Firestore not measured, yet the page does not say why (billing, not a role): '+lines);
         var withFs=serverAllowanceLines({ watch:true, usage:{ at:Date.now(), metrics:{ firestoreReads:{ used:12000, limit:50000, period:'pacific-day' } } }, notices:[] }).join('\n');
-        if(!/✓ Firestore reads \(Firebase’s day\): 12,000 of 50,000 \(24%\)/.test(withFs) || /Monitoring Viewer/.test(withFs)) throw new Error('Firestore measured: '+withFs);
+        if(!/✓ Firestore reads \(Firebase’s day\): 12,000 of 50,000 \(24%\)/.test(withFs) || /free plan/.test(withFs)) throw new Error('Firestore measured: '+withFs);
       } finally {
         window.fetch=realFetch; window._fbUser=realUser;
         Object.keys(_serverNotices).forEach(function(k){ delete _serverNotices[k]; }); Object.assign(_serverNotices, realNotices);

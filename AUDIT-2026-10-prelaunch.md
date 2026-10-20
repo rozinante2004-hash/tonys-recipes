@@ -83,14 +83,15 @@ after the check (138 documents); each device reads only what changed (A above). 
       `WHATSAPP_PHONE` = the number with the country code (+972…), and `WHATSAPP_KEY` = the key.
    4. Say so; the server is redeployed with them; then ⚙️ → 👑 App owner → 📲 WhatsApp alerts → "📲 Send me a test
       alert". The same window turns each kind of alert on WhatsApp on or off (all on to begin with; e-mail unaffected).
-2. **Firebase's public-facing name** (the e-mails to testers say it): open
+2. **Done 20 Oct (Tony).** Firebase's public-facing name (the e-mails to testers say it): open
    https://console.firebase.google.com/project/my-kitchen-notes-beta/settings/general and set **Public-facing name**
    to **My Kitchen Notes** if it says "project-557995593102".
-3. **The hourly check on Cloudflare's clock** (agreed): open https://dash.cloudflare.com/profile/api-tokens → Create
+3. **Done 20 Oct (Tony); the server redeployed with it, 21:06.** The hourly check on Cloudflare's clock: open https://dash.cloudflare.com/profile/api-tokens → Create
    Token → Create Custom Token → Permissions: **Account · Account Analytics · Read** → Account Resources: Include · the
    account → Continue to summary → Create Token → copy it; then at
    https://github.com/rozinante2004-hash/tonys-recipes/settings/secrets/actions/new add it as `CF_ANALYTICS_TOKEN`.
-4. **Firebase's own counts** (agreed): open
+4. **Done 20 Oct, but Google wants billing on to read them** — so Firebase's own counts stay unread on the free plan;
+   the apps' own count of reads (v38.63) is the early warning (v38.67 says so on 🩺). Was: open
    https://console.cloud.google.com/iam-admin/iam?project=my-kitchen-notes-beta → Grant access → New principals:
    `rules-publisher@recipes-f379d.iam.gserviceaccount.com` → Role: **Monitoring Viewer** → Save.
 5. **Done 20 Oct 18:05 (Tony: "OK to delete the 4 + 135 old family documents"):** 139 deleted; a check after it

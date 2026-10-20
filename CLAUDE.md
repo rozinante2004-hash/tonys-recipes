@@ -553,6 +553,12 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
 - **Released: v38.66 + Worker v86 (20 Oct 2026, 18:00 Israel time, CI green on a9fdc26).** All jobs success (Worker
   v86 deployed; the WhatsApp and analytics secrets still not set). The watch run after it (18:07): pagesBuilds 952
   (real builds; the old count said 1,008), the notice re-worded as a warning.
+- **Tony's steps 2–4 done (20 Oct, 21:0x):** public-facing name set (not readable from here: the brands API answers
+  403 to FIREBASE_RULES_KEY — trust his word); CF_ANALYTICS_TOKEN set → deploy-worker dispatched 21:06 (no "not set"
+  notice for it); "Monitoring Viewer" granted, BUT Cloud Monitoring answers "This API method requires billing to be
+  enabled … project #313792199018" (the service account's own project, the quota project) — Firebase's own counts
+  cannot be read on the free plan. **v38.67:** 🩺 says so instead of asking for the role; the watch says why
+  (`firestoreMetrics` now reports Google's message, addresses taken out). The apps' own read count (v38.63) stands in.
 - **Move step 9 finished (20 Oct 2026, 18:05 Israel time; Tony: "OK to delete the 4 + 135 old family documents").**
   clear-source `all` + `shared` (run 39445140837): 139 deleted (households 4, shared 135), the household cut to its
   moved mark; clear-check after it (run 39445361414): recipes-f379d holds 1 document of the moved household (its own,

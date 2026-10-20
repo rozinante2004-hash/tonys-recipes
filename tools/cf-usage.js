@@ -233,7 +233,8 @@ async function monthBuilds() {
 }
 // Firestore's day so far (the free plan: 50,000 reads, 20,000 writes, 20,000 deletes a day, counted from
 // midnight in California), from Cloud Monitoring — when FIREBASE_RULES_KEY's service account may read it
-// ("Monitoring Viewer" on the project). Without that it says so and the rest goes on.
+// ("Monitoring Viewer" on the project). Without that it says so and the rest goes on. 20 Oct: Google also wants
+// billing on ("This API method requires billing to be enabled") — not on the free plan, so the apps' count stands in.
 function pacificMidnightBefore(now) {
   const p = {};
   new Intl.DateTimeFormat('en-US', { timeZone: 'America/Los_Angeles', hourCycle: 'h23', year: 'numeric', month: 'numeric', day: 'numeric',
@@ -261,6 +262,7 @@ async function firestoreMetrics(project) {
       // v86 — Google's own reason (a missing role, or the Cloud Monitoring API off in a project), addresses taken out
       let why = ''; try { why = String(((await r.json()).error || {}).message || ''); } catch (e) {}
       why = why.replace(/[\w.+-]+@[\w.-]+/g, '<account>').slice(0, 300);
+      if (/requires billing/i.test(why)) return { note: 'Google lets Cloud Monitoring be read only with billing on (the free plan): the apps\u2019 own count of reads stands in' };
       if (r.status === 403 && !/has not been used|disabled/i.test(why))
         return { note: 'the service account may not read Cloud Monitoring in ' + project + ' — give it the "Monitoring Viewer" role there (Google: ' + why + ')' };
       return { note: 'Cloud Monitoring answered HTTP ' + r.status + (why ? ' — ' + why : '') };
