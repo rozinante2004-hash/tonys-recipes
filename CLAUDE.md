@@ -614,6 +614,8 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
   householdRenderBar and hhSetFoundingOpen). I18N_EXTRA has both phrases. Tony asked whether the window's invite and
   Family Access's "🔗 Invitation link…" work the same: yes — both `householdInvite()` (the window adds one sentence
   first, and tells someone without the right to invite to ask the owner); his choice: keep both (option 1).
+- **Released: v38.70 (21 Oct 2026, 01:02 Israel time, CI green on db075ef — Tony: "Option 1, keep both and release
+  v38.70").** All jobs success (Pages, Cloudflare beta and test, Self Tests on main and test, languages).
 - **Move step 9 finished (20 Oct 2026, 18:05 Israel time; Tony: "OK to delete the 4 + 135 old family documents").**
   clear-source `all` + `shared` (run 39445140837): 139 deleted (households 4, shared 135), the household cut to its
   moved mark; clear-check after it (run 39445361414): recipes-f379d holds 1 document of the moved household (its own,
