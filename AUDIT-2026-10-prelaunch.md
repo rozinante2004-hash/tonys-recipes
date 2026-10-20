@@ -74,8 +74,8 @@ after the check (138 documents); each device reads only what changed (A above). 
 
 1. **WhatsApp alerts** (the server side is ready, v38.64 + Worker v84). 20 Oct 18:0x: CallMeBot answered "The bot is
    currently full. Please check back in a few days" — try again from step 1 in a few days (WhatsApp keeps blocking
-   its numbers as spam, by its users' reports); e-mail alerts are not affected. If it stays full: Telegram's own bot
-   (free, official) as the fallback, on Tony's word.
+   its numbers as spam, by its users' reports); e-mail alerts are not affected. Tony: "OK, we'll wait for CallMeBot"
+   (no Telegram for now) — reminded Fri 23 Oct 09:00 Israel time.
    1. Open https://www.callmebot.com/blog/free-api-whatsapp-messages/ — it shows CallMeBot's current WhatsApp number.
       Add that number to the phone's contacts.
    2. Send it, on WhatsApp, exactly: `I allow callmebot to send me messages` — it answers with an API key.
@@ -93,10 +93,6 @@ after the check (138 documents); each device reads only what changed (A above). 
 4. **Firebase's own counts** (agreed): open
    https://console.cloud.google.com/iam-admin/iam?project=my-kitchen-notes-beta → Grant access → New principals:
    `rules-publisher@recipes-f379d.iam.gserviceaccount.com` → Role: **Monitoring Viewer** → Save.
-5. **Done 20 Oct 18:05 (Tony: "OK to delete the 4 + 135 old family documents"):** 139 deleted, a check after it
-   found 0 recipes, photos or shared/ left — only the household's own document, cut to its moved mark. Was: delete
-   the 4 documents and the 135 of shared/ too? They
-   are three recipes deleted in the community app — "Porketta", "בייקון מבטן חזיר", "בטן = בייקון + פנצ'טה" — with
-   two photos, 56 recipes and 56 photos already in the kitchen, old settings and translations, and two WhatsApp chat
-   scans (personal chat text). Suggest: delete all, unless any of the three recipes should come back first.
+5. **Done 20 Oct 18:05 (Tony: "OK to delete the 4 + 135 old family documents"):** 139 deleted; a check after it
+   found no recipes, photos or shared/ left — only the household's own document, cut to its moved mark.
 6. **AI models** (agreed): a look after the launch.
