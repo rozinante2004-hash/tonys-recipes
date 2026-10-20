@@ -124,7 +124,7 @@ async function walk(p, colPath, out, keep) {
     const d = await call(FS(p) + '/' + enc(colPath) + q, null, p);
     for (const doc of d.documents || []) {
       const rel = doc.name.slice(doc.name.indexOf('/documents/') + '/documents/'.length);
-      if ((doc.fields || doc.createTime) && (!keep || keep(rel))) out.push({ path: rel, fields: doc.fields || {} });
+      if ((doc.fields || doc.createTime) && (!keep || keep(rel))) out.push({ path: rel, fields: doc.fields || {}, updated: Date.parse(doc.updateTime || '') || 0 });
       // (an id with ':' — a place kept or a request by e-mail — never has sub-collections, and
       // listing under it is refused: the ':' reads as the method's own)
       if (rel.split('/').pop().indexOf(':') === -1)
@@ -210,6 +210,18 @@ async function batchGet(p, rels) {
     });
   }
   return found;
+}
+// When each was last written, by Firestore's own clock (20 Oct 2026: step 9 deletes a document only where the
+// community copy's is the newer).
+async function updateTimes(p, rels) {
+  const at = {};
+  for (let i = 0; i < rels.length; i += 100) {
+    const d = await call(FS(p) + ':batchGet', { method: 'POST', body: JSON.stringify({ documents: rels.slice(i, i + 100).map(r => docName(p, r)) }) }, p);
+    (Array.isArray(d) ? d : [d]).forEach(x => {
+      if (x && x.found) at[x.found.name.slice(x.found.name.indexOf('/documents/') + '/documents/'.length)] = Date.parse(x.found.updateTime || '') || 0;
+    });
+  }
+  return at;
 }
 // The documents of one collection only (no sub-collections).
 async function shallow(p, colPath) {
@@ -306,7 +318,19 @@ async function main() {
       return ms ? new Date(ms).toISOString().slice(0, 10) : 'no date'; };
     say('by kind — changed since: ' + kinds(changedL) + '; not there: ' + kinds(missingL)
       + (missingL.length ? ' (last changed in ' + FROM + ': ' + missingL.map(when).sort().join(', ') + ')' : ''));
+    // 20 Oct 2026 — Tony: "If I have everything you suggest to delete … in the new one then it is OK to delete the old.
+    // Please verify that before deleting." The same: every field equal. Changed since: the community copy's must be
+    // the NEWER (Firestore's own last-written time), so nothing written in the family copy after the move is lost.
+    const fromAt = {}; src.docs.forEach(d => { fromAt[d.path] = d.updated || 0; });
+    const toAt = await updateTimes(TO, changedL.map(x => x.to));
+    // (a household already cut down to its moved mark by an earlier clearing is our own write, not the family's)
+    const onlyMark = x => /^households\/[^/]+$/.test(x.from) && Object.keys((src.docs.find(d => d.path === x.from) || {}).fields || {}).every(k => k === 'movedTo' || k === 'movedAt');
+    const olderThere = changedL.filter(x => !onlyMark(x) && !(toAt[x.to] > 0 && toAt[x.to] >= (fromAt[x.from] || 0)));
+    say('verified: all ' + (sameL.length + changedL.length) + ' to be deleted are in ' + TO + ' — ' + sameL.length + ' with every field the same, '
+      + (changedL.length - olderThere.length) + ' of the ' + changedL.length + ' changed since written there later than here'
+      + (olderThere.length ? '; NOT ' + olderThere.length + ' (' + kinds(olderThere) + '): the family copy has the newer — they would be lost' : ''));
     if (MODE === 'clear-check') { say('check only — nothing changed (' + calls + ' requests, ' + Math.round((Date.now() - started) / 1000) + ' s)'); return; }
+    if (olderThere.length) throw new Error(olderThere.length + ' document(s) are newer in ' + FROM + ' than in ' + TO + ' — nothing was deleted');
     const gone = sameL.concat(changedL).concat(CLEAR_ALL ? missingL : []);
     const isHH = rel => /^households\/[^/]+$/.test(rel);
     const writes = [];

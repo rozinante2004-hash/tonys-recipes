@@ -138,8 +138,16 @@ ok(r.code === 1 && /belong to someone else — nothing was copied/.test(r.out), 
   ok(!!(await get(F2, 'households/H9/recipes/r0')), 'clear-check changes nothing');
   ok(/by kind — changed since: households\/\*\/recipes\/\* 1; not there: households\/\*\/recipes\/\* 1 \(last changed in demo-family2: (no date|\d{4}-\d\d-\d\d)\)/.test(c.out) && !/H9|r3|uMOMfam/.test(c.out.split('by kind')[1] || ''),
     'clear-check says of what kind, with no ids');
+  ok(/verified: all 7 to be deleted are in demo-community2 — 6 with every field the same, 1 of the 1 changed since written there later than here/.test(c.out), 'clear-check proves the community copy holds all it would delete, the changed ones newer');
   c = run(['--from', F2, '--to', T2, '--mode', 'clear-source']);
   ok(c.code === 2 && !!(await get(F2, 'households/H9/recipes/r0')), 'clear-source needs --confirm "clear the family app"');
+  // 20 Oct 2026 — a document changed in the FAMILY copy after the community copy's: nothing is deleted.
+  await new Promise(r => setTimeout(r, 20));
+  await put(F2, 'households/H9/recipes/r2', { name: sv('Dish 2, changed in the old app') });
+  c = run(['--from', F2, '--to', T2, '--mode', 'clear-source', '--confirm', 'clear the family app']);
+  ok(c.code === 1 && /NOT 1 \(households\/\*\/recipes\/\* 1\)/.test(c.out) && /nothing was deleted/.test(c.out)
+    && !!(await get(F2, 'households/H9/recipes/r0')) && !!(await get(F2, 'codes/MKN-EEEE-FFFF')), 'a document newer in the family copy stops the clearing — nothing deleted');
+  await put(T2, 'households/H9/recipes/r2', { name: sv('Dish 2, improved again') });   // the community copy written last again
   c = run(['--from', F2, '--to', T2, '--mode', 'clear-source', '--confirm', 'clear the family app']);
   console.log(c.out);
   ok(c.code === 0 && /— 0 still there/.test(c.out), 'clear-source runs');
@@ -150,7 +158,7 @@ ok(r.code === 1 && /belong to someone else — nothing was copied/.test(r.out), 
   ok(tomb && Object.keys(tomb.fields).sort().join(',') === 'movedAt,movedTo', 'the household is cut down to its moved mark (an old app still sends people on)');
   ok(!!(await get(F2, 'shared/recipe_1')) && !!(await get(F2, 'i18n/he')) && !!(await get(F2, 'config/founding')), 'shared/ (without --shared), i18n/ and config/ stay');
   ok((await allUsers(F2)).length === 1, 'the accounts stay');
-  ok(!!(await get(T2, 'households/H9/recipes/r0')) && (await get(T2, 'households/H9/recipes/r2')).fields.name.stringValue === 'Dish 2, improved', 'the community copy is untouched');
+  ok(!!(await get(T2, 'households/H9/recipes/r0')) && (await get(T2, 'households/H9/recipes/r2')).fields.name.stringValue === 'Dish 2, improved again', 'the community copy is untouched');
   ok(!/example\.com|uMOM|MKN-|Dish /.test(c.out), 'clear prints no address, id, identifier or recipe');
   c = run(['--from', F2, '--to', T2, '--mode', 'clear-source', '--all', '--shared', '--confirm', 'clear the family app']);
   ok(c.code === 0 && !(await get(F2, 'households/H9/recipes/r3')) && !(await get(F2, 'shared/recipe_1')) && !!(await get(F2, 'i18n/he')), '--all and --shared clear the rest (never i18n/)');
