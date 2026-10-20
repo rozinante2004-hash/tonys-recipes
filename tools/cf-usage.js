@@ -257,8 +257,14 @@ async function firestoreMetrics(project) {
       'interval.startTime': new Date(start).toISOString(), 'interval.endTime': new Date(now).toISOString(),
       'aggregation.alignmentPeriod': period, 'aggregation.perSeriesAligner': 'ALIGN_SUM', 'aggregation.crossSeriesReducer': 'REDUCE_SUM' });
     const r = await fetch('https://monitoring.googleapis.com/v3/projects/' + project + '/timeSeries?' + q, { headers: { Authorization: 'Bearer ' + token } });
-    if (r.status === 403) return { note: 'the service account may not read Cloud Monitoring in ' + project + ' — give it the "Monitoring Viewer" role there' };
-    if (!r.ok) return { note: 'Cloud Monitoring answered HTTP ' + r.status };
+    if (!r.ok) {
+      // v86 — Google's own reason (a missing role, or the Cloud Monitoring API off in a project), addresses taken out
+      let why = ''; try { why = String(((await r.json()).error || {}).message || ''); } catch (e) {}
+      why = why.replace(/[\w.+-]+@[\w.-]+/g, '<account>').slice(0, 300);
+      if (r.status === 403 && !/has not been used|disabled/i.test(why))
+        return { note: 'the service account may not read Cloud Monitoring in ' + project + ' — give it the "Monitoring Viewer" role there (Google: ' + why + ')' };
+      return { note: 'Cloud Monitoring answered HTTP ' + r.status + (why ? ' — ' + why : '') };
+    }
     const j = await r.json();
     let used = 0;
     (j.timeSeries || []).forEach(function(t){ (t.points || []).forEach(function(pt){ used += Number((pt.value || {}).int64Value || 0); }); });
