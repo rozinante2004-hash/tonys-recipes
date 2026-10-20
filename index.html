@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v38.62 -->
+<!-- Tony's Recipes Collection v38.63 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -472,6 +472,45 @@
   // a genuine megabyte-or-two upload on a slow phone; short enough that a stuck
   // connection is REPORTED rather than spun on.
   var SYNC_WATCHDOG_MS = 90000;
+  // v38.63 — every document the app reads from Firestore, counted the way Firebase bills it (the audit, 20 Oct): a
+  // get, each document it returns (an empty answer is one); a listener, its whole answer the first time — a listener
+  // started again after half an hour away is billed as a new query — then each document that changes. Firebase's
+  // free plan has 50,000 reads a day for the whole copy; the server adds up every app's count (fsReadsAdd, with the
+  // usage reports) and warns the owner at 70%, which nothing else could do in time.
+  function fsReadsCountInstall() {
+    var F = window.firebase && firebase.firestore;
+    if (!F || !F.Query || !F.DocumentReference || F.Query.prototype._mknCounted) return;
+    var Q = F.Query.prototype, D = F.DocumentReference.prototype;
+    var add = function (n) { try { if (n > 0 && typeof fsReadsAdd === 'function') fsReadsAdd(n); } catch (e) {} };
+    var listen = function (orig, isQuery) {
+      return function () {
+        var a = Array.prototype.slice.call(arguments), i = -1;
+        for (var k = 0; k < a.length; k++) if (typeof a[k] === 'function') { i = k; break; }
+        if (i === -1 && a[0] && typeof a[0].next === 'function') {   // the observer form: { next, error }
+          var o = a[0], first0 = true;
+          a[0] = Object.assign({}, o, { next: function (s) { first0 = fsReadsSeen(s, first0, isQuery, add); return o.next.apply(this, arguments); } });
+        } else if (i >= 0) {
+          var f = a[i], first = true;
+          a[i] = function (s) { first = fsReadsSeen(s, first, isQuery, add); return f.apply(this, arguments); };
+        }
+        return orig.apply(this, a);
+      };
+    };
+    var qget = Q.get, dget = D.get;
+    Q.get = function () { return qget.apply(this, arguments).then(function (s) { try { if (!s.metadata.fromCache) add(Math.max(1, s.size)); } catch (e) {} return s; }); };
+    D.get = function () { return dget.apply(this, arguments).then(function (s) { try { if (!s.metadata.fromCache) add(1); } catch (e) {} return s; }); };
+    Q.onSnapshot = listen(Q.onSnapshot, true);
+    D.onSnapshot = listen(D.onSnapshot, false);
+    Q._mknCounted = true;
+  }
+  // One snapshot of a listener: what it read from the server. Returns whether the next is still the first.
+  function fsReadsSeen(s, first, isQuery, add) {
+    try {
+      if (!s || !s.metadata || s.metadata.fromCache || s.metadata.hasPendingWrites) return first;
+      add(isQuery ? (first ? Math.max(1, s.size) : s.docChanges().length) : 1);
+      return false;
+    } catch (e) { return first; }
+  }
   function withSyncWatchdog(promise, phase) {
     var timer;
     return Promise.race([
@@ -569,6 +608,7 @@
       firebase.initializeApp(firebaseConfig);
       _fbAuth     = firebase.auth();
       _fbDb       = firebase.firestore();
+      fsReadsCountInstall();   // v38.63
       if (useEmu) {
         _fbDb.useEmulator(emu.host, emu.firestorePort);
         _fbAuth.useEmulator('http://' + emu.host + ':' + emu.authPort, { disableWarnings: true });
@@ -4273,8 +4313,18 @@ function serverAllowanceLines(d) {
   var ns = (d && d.notices) || [];
   if (ns.length) { lines.push('Running now:'); ns.forEach(function(n){ lines.push(serverNoticeText(n, true)); }); }
   else lines.push('Nothing is paused or close to its allowance.');
-  if (!m.firestoreReads) lines.push('', 'Firestore (the recipes themselves) is not measured yet: give the backup’s service account the “Monitoring Viewer” role in Google Cloud, and the hourly watch adds it. Meanwhile, if its daily allowance runs out, the app that meets it says so and you are e-mailed.');
-  else lines.push('', 'Firebase’s day starts at midnight in California (10:00 Israel time in summer, 09:00 in winter).');
+  // v38.63 — Firestore reads as the apps count them (Worker v83), for every copy that has reported today
+  var ar = d && d.appReads, byP = (ar && ar.byProject) || {};
+  var projs = Object.keys(byP).sort(function(a, b){ return (a === APP_CONFIG.firebase.projectId ? -1 : 0) - (b === APP_CONFIG.firebase.projectId ? -1 : 0); });
+  if (projs.length) {
+    lines.push('', 'Firestore reads today, as the apps count them (Firebase’s day):');
+    projs.forEach(function(p){
+      var n = byP[p] || 0, lim = ar.limit || 50000, pct = Math.round(100 * n / lim);
+      lines.push((pct >= 100 ? '⛔ ' : pct >= 70 ? '⚠️ ' : '✓ ') + p + ': ' + n.toLocaleString() + ' of ' + lim.toLocaleString() + ' (' + pct + '%)');
+    });
+  }
+  if (!m.firestoreReads) lines.push('', 'Firebase’s own count is not measured yet: give the backup’s service account the “Monitoring Viewer” role in Google Cloud, and the hourly watch adds it. Meanwhile the apps count their own reads (above), you are warned at 70%, and if the allowance runs out the app that meets it says so and you are e-mailed.');
+  lines.push('', 'Firebase’s day starts at midnight in California (10:00 Israel time in summer, 09:00 in winter).');
   return lines;
 }
 async function openServerAllowances() {
@@ -7668,6 +7718,22 @@ function insightAdded(recipe, via, fallback) {
     insightCount('from.' + site);
   }
 }
+// v38.63 — the Firestore reads counted since the server was last told (fsReadsCountInstall), kept on the device so
+// a closed app still says. They are real reads whatever the app is doing, so they count during the Self Test too.
+var FS_READS_KEY = 'mkn_fs_reads', _fsReadsMem = 0, _fsReadsSaveT = null;
+function fsReadsAdd(n) {
+  if (!(n > 0) || !insightsOn()) return;
+  _fsReadsMem += Math.floor(n);
+  if (!_fsReadsSaveT) _fsReadsSaveT = setTimeout(function(){ _fsReadsSaveT = null; fsReadsSave(); }, 5000);
+  insSoon(10 * 60e3);
+}
+function fsReadsSave() {
+  if (!_fsReadsMem) return;
+  insWrite(FS_READS_KEY, Math.min(1e7, (Number(insRead(FS_READS_KEY, 0)) || 0) + _fsReadsMem));
+  _fsReadsMem = 0;
+}
+function fsReadsPending() { fsReadsSave(); return Number(insRead(FS_READS_KEY, 0)) || 0; }
+function fsReadsTaken(n) { insWrite(FS_READS_KEY, Math.max(0, fsReadsPending() - n)); }
 var _insTimer = null, _insSending = false;
 function insSoon(ms) {
   if (_insTimer || insQuiet()) return;
@@ -7694,7 +7760,8 @@ async function insightsSend(opts) {
       batches.push({ hid: b.hid, month: b.month, counts: part });
     }
   });
-  if (!errs.length && !batches.length) return true;
+  var readsN = Math.min(fsReadsPending(), 20000), readsSent = false;   // (the server takes 20,000 a call)
+  if (!errs.length && !batches.length && !readsN) return true;
   _insSending = true;
   try {
     var token = await u.getIdToken();
@@ -7706,6 +7773,7 @@ async function insightsSend(opts) {
       var d = {}; try { d = await r.json(); } catch(e) {}
       return { status: r.status, ok: r.ok && !!d.ok };
     };
+    if (readsN) { var rr = await post({ reads: readsN }); if (rr.ok) { fsReadsTaken(readsN); readsSent = true; } }
     var sentErrs = errs.map(function(e){ return Object.assign({}, e, common); }), errsDone = !sentErrs.length, done = [], drop = [];
     for (var i = 0; i < batches.length || !errsDone; i++) {
       var b = batches[i];
@@ -7744,7 +7812,7 @@ async function insightsSend(opts) {
       }).filter(Boolean);
       insWrite(INS_USE_KEY, nowUse);
     }
-    return errsDone === 'sent' || done.length > 0;
+    return errsDone === 'sent' || done.length > 0 || readsSent;
   } catch(e) { return false; }
   finally { _insSending = false; }
 }
@@ -8430,7 +8498,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v38.62';
+var APP_VERSION = 'v38.63';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -11461,7 +11529,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.62</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.63</div>
   <div class="login-card">
     <h2>Connect your storage</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -11548,7 +11616,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.62</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.63</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">

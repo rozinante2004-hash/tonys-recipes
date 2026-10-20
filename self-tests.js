@@ -7817,6 +7817,40 @@ window.SELF_TESTS = [
       } finally { _household=keep; }
     } },
 
+  { id:'firestore_reads_counted', group:'Core', name:'📊 The app counts its Firestore reads the way Firebase bills them and tells the server, which adds every app\u2019s count and warns the owner at 70% of the 50,000 free reads a day — Firebase\u2019s own count needs the Monitoring role and GitHub\u2019s clock (v38.63)',
+    test: async()=>{
+      var F=firebase.firestore;
+      if(!F.Query.prototype._mknCounted) throw new Error('the counter is not on Firestore\u2019s reads');
+      // what one listener snapshot costs
+      var got=[], add=function(n){ got.push(n); };
+      var snap=function(size, changes, cache, pending){ return { size:size, metadata:{ fromCache:!!cache, hasPendingWrites:!!pending }, docChanges:function(){ return new Array(changes); } }; };
+      var first=true;
+      first=fsReadsSeen(snap(5,5,true), first, true, add);          // from the device: free
+      first=fsReadsSeen(snap(5,1,false), first, true, add);         // the server's first answer: all of it
+      first=fsReadsSeen(snap(5,2,false), first, true, add);         // then what changed
+      first=fsReadsSeen(snap(5,1,false,true), first, true, add);    // this app's own write, not yet sent: free
+      first=fsReadsSeen(snap(0,0,false), true, true, add);          // an empty answer is one
+      fsReadsSeen(snap(1,0,false), true, false, add);               // a document: one
+      if(got.join()!=='5,2,1,1') throw new Error('billed as '+got.join());
+      // kept on the device until the server has it
+      var keep=localStorage.getItem(FS_READS_KEY), keepMem=_fsReadsMem, keepFo=window._featureOverride.insights;
+      try{
+        localStorage.removeItem(FS_READS_KEY); _fsReadsMem=0;
+        window._featureOverride.insights=false; fsReadsAdd(9);
+        if(fsReadsPending()!==0) throw new Error('counted in a copy that sends nothing');
+        window._featureOverride.insights=true; fsReadsAdd(7); fsReadsAdd(3.9);
+        if(fsReadsPending()!==10) throw new Error('kept '+fsReadsPending());
+        fsReadsTaken(6);
+        if(fsReadsPending()!==4) throw new Error('after the server took 6: '+fsReadsPending());
+      } finally {
+        if(keep===null) localStorage.removeItem(FS_READS_KEY); else localStorage.setItem(FS_READS_KEY, keep);
+        _fsReadsMem=keepMem; if(keepFo===undefined) delete window._featureOverride.insights; else window._featureOverride.insights=keepFo;
+      }
+      // the owner's page
+      var lines=serverAllowanceLines({ watch:true, notices:[], appReads:{ day:'2026-10-20', limit:50000, byProject:{ 'my-kitchen-notes-beta':36000, 'tonys-recipes-test':120 } } }).join('\n');
+      if(!/⚠️ my-kitchen-notes-beta: 36,000 of 50,000 \(72%\)/.test(lines) || !/✓ tonys-recipes-test: 120 of 50,000 \(0%\)/.test(lines)) throw new Error('the page: '+lines);
+    } },
+
   { id:'beta_moved_to_its_domain', group:'Core', name:'🌐 The beta lives at mykitchennotes.community: its old address and www. send visitors on with the shared link and the extension’s text; nothing else moves; the family links to it there (v38.17)',
     test: async()=>{
       var olds=['https://my-kitchen-notes-beta.pages.dev', 'https://www.mykitchennotes.community'], site='https://mykitchennotes.community';

@@ -451,10 +451,21 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
   the page arrives in pieces and a slow phone painted the app's header ("Offline mode", the search box) for ~0.5 s
   before the sign-in screen that covers it had arrived; now the first frame with content is the sign-in screen, and it
   comes first for the keyboard too. Filmstrip `$S/perf3.cjs`, compressed server `$S/gzserve.cjs` (port 8879).
+- **v38.63 + Worker v83 — Firestore reads, as the apps count them** (the audit: the 50,000 free reads a day are the
+  allowance 20 testers come nearest to, and nothing warned early — Firebase's count needs Monitoring Viewer, and the
+  watch runs on GitHub's unreliable clock). `fsReadsCountInstall()` (in the Firebase start-up script, right after
+  `firebase.firestore()`) wraps Query/DocumentReference get + onSnapshot: a get = its documents (empty = 1), a listener
+  = its whole first server answer (a listener started again after 30 min is billed as a new query), then each changed
+  document; from the device's cache or this app's unsent write = free. `fsReadsAdd` keeps them in `mkn_fs_reads` (only
+  where `insights` is on); `insightsSend` posts `reads` (≤ 20,000 a call) first and takes off what the server got.
+  Worker v83: app-signals adds them to D1 `counters` fsreads:<project>:<Firebase's day>; ≥70% of 50,000 → owner
+  warning `usage:firestoreReadsApps:<project>`; meter-admin `allowances` returns `appReads`, shown on 🩺 Server
+  allowances. Checked on the emulator against `$S/e2e/reads2.mjs`: a new device 91 = 91, 109 = 109. Self-test
+  `firestore_reads_counted` (397); 7 Worker checks.
 - **GitHub drops most scheduled runs on this repository** (20 Oct): the usage watch (:11 and :41) ran at 01:13 and 06:31
   UTC only; Publish languages (every 10 min) runs every 2–5 h; the 02:17 backup starts 07:00–07:51 UTC. The watch is an
   early warning only (a real refusal is told at once by the Worker and the app), but hourly needs another clock: the
-  Worker's own cron with an analytics-only token (audit "Needs Tony" 10).
+  Worker's own cron with an analytics-only token (audit "Needs Tony" 10). Firestore no longer depends on it (v38.63).
 - **Sign-in e-mails (20 Oct, `tools/auth-mail-check.mjs` + "Sign-in e-mails" workflow, read only):** the community
   copy's four templates are Google's defaults (subject "Reset your password for %APP_NAME%", reply-to set), sent by
   Firebase, links open my-kitchen-notes-beta.firebaseapp.com/__/auth/action. The browser key's website list DOES allow

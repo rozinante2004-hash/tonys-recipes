@@ -1,4 +1,8 @@
-// Tony's Recipes — Cloudflare Worker v82
+// Tony's Recipes — Cloudflare Worker v83
+// v83: FIRESTORE READS, AS THE APPS COUNT THEM (the audit, 20 Oct 2026): app-signals takes `reads` (documents this app
+// read since it last said, ≤ 20,000 a call) into D1 `counters` fsreads:<project>:<Firebase's day>; at 70% of the
+// 50,000 free reads an owner warning. Firebase's own count needs the Monitoring role and GitHub's clock, which drops
+// most scheduled runs. meter-admin `allowances` returns `appReads` for the owner's 🩺 page.
 // v82: THE SERVER'S OWN ERRORS IN THE USAGE WATCH (the audit, 20 Oct 2026): usage-report's `workerErrors` {used, of};
 // 2% of today's requests and at least 25 → an owner warning (often the free plan's 10 ms CPU limit, or a crash).
 // v81: THE AI CEILINGS FOR 20 TESTERS (Tony, 20 Oct 2026: "1,000/day, 10,000/month"): AI_DAILY_DEFAULT 1000,
@@ -371,7 +375,7 @@
 //   AI_MAX_TOKENS   – the longest answer one call may ask for (32000; the
 //                     app's largest, reading several recipes at once, asks 8000).
 
-const WORKER_VERSION = 'v82';
+const WORKER_VERSION = 'v83';
 const VIDEO_MAX_MB_DEFAULT = 50;
 const GEMINI_API = 'https://generativelanguage.googleapis.com';
 const GEMINI_MODEL_DEFAULT = 'gemini-2.5-flash';
@@ -683,6 +687,11 @@ function nextPacificMidnight(now) {
     const offset = wall - Math.floor(now / 1000) * 1000;                     // the Pacific wall clock minus UTC
     return Date.UTC(+p.year, +p.month - 1, +p.day + 1) - offset;
   } catch (e) { return nextUtcMidnight(now) + 8 * 3600e3; }
+}
+// v83 — Firebase's day (it ends at midnight in California), as YYYY-MM-DD.
+function pacificDayKey(now) {
+  try { return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Los_Angeles', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(now)); }
+  catch (e) { return new Date(now - 8 * 3600e3).toISOString().slice(0, 10); }
 }
 function ilTime(t) {
   try { return new Date(t).toLocaleString('en-GB', { timeZone: 'Asia/Jerusalem', weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }); }
@@ -1956,7 +1965,8 @@ async function meterAction(request, env, body) {
   // v76 — every copy's counts, added up by month and name, with how many households each came from.
   // v79 — the owner's 🩺 Server allowances: the usage watch's last reading and every notice running.
   if (body.op === 'allowances') {
-    return jsonResp({ ok: true, usage: await usageSnapshot(env), notices: await serverNotices(env, { owner: true }), watch: !!env.USAGE_KEY });
+    return jsonResp({ ok: true, usage: await usageSnapshot(env), notices: await serverNotices(env, { owner: true }), watch: !!env.USAGE_KEY,
+                      appReads: await appReadsToday(env) });   // v83
   }
   if (body.op === 'trends') {
     await signalsTable(db);
@@ -2329,8 +2339,42 @@ async function appSignals(request, env, body) {
     stmts.push(db.prepare('INSERT INTO usage_counts (project, hid, month, k, n) VALUES (?1, ?2, ?3, ?4, ?5) '
       + 'ON CONFLICT (project, hid, month, k) DO UPDATE SET n = n + excluded.n').bind(claims.aud, hid, month, k, n));
   });
+  // v83 — Firestore reads as the apps count them (the audit, 20 Oct). Firebase's own count reaches the hourly watch
+  // only with the Monitoring role, on GitHub's clock — which drops most runs; the 50,000 free reads of a day are the
+  // allowance 20 testers come nearest to. Every app adds what it read since it last said; the owner hears at 70%.
+  const fsReads = Number.isInteger(body.reads) && body.reads > 0 ? Math.min(body.reads, FS_READS_PER_CALL) : 0;
+  const readsKey = 'fsreads:' + claims.aud + ':' + pacificDayKey(now);
+  if (fsReads) {
+    await tableOnce(db, 'counters', 'CREATE TABLE IF NOT EXISTS counters (k TEXT PRIMARY KEY, n INTEGER NOT NULL DEFAULT 0, until INTEGER)');
+    stmts.push(db.prepare('INSERT INTO counters (k, n, until) VALUES (?1, ?2, ?3) ON CONFLICT (k) DO UPDATE SET n = n + excluded.n')
+      .bind(readsKey, fsReads, nextPacificMidnight(now) + 2 * 864e5));
+  }
   if (stmts.length) await db.batch(stmts);
-  return jsonResp({ ok: true, errors: keptErrors, dropped: errors.length - keptErrors, counts: counts.length, month });
+  let readsToday = null;
+  if (fsReads) {
+    const row = await db.prepare('SELECT n FROM counters WHERE k = ?1').bind(readsKey).first();
+    readsToday = (row && Number(row.n)) || 0;
+    const pct = Math.round(100 * readsToday / FS_FREE_READS);
+    if (pct >= 70) await raiseNotice(env, { what: 'usage:firestoreReadsApps:' + claims.aud, kind: 'warning', scope: 'owner',
+      until: nextPacificMidnight(now), self: true,
+      title: 'Firestore reads at about ' + pct + '% of the free allowance today, as the apps count them',
+      affects: 'the recipes in the cloud (' + String(claims.aud).slice(0, 40) + ')',
+      detail: readsToday.toLocaleString('en-US') + ' of ' + FS_FREE_READS.toLocaleString('en-US') + ' today (Firebase\'s day ends at midnight in California). '
+        + 'At 100% Firebase refuses every read until then — Firebase → Usage and billing shows its own count.' });
+  }
+  return jsonResp({ ok: true, errors: keptErrors, dropped: errors.length - keptErrors, counts: counts.length, month,
+                    reads: fsReads || undefined, readsToday: readsToday == null ? undefined : readsToday });
+}
+// v83 — the Spark plan's reads a day, per project; one call may add at most this many (a runaway or a forged count
+// can only raise a warning, never refuse anything).
+const FS_FREE_READS = 50000, FS_READS_PER_CALL = 20000;
+async function appReadsToday(env) {
+  if (!env.METER_DB) return null;
+  try {
+    const rows = (await env.METER_DB.prepare('SELECT k, n FROM counters WHERE k LIKE ?1').bind('fsreads:%:' + pacificDayKey(Date.now())).all()).results || [];
+    const out = {}; rows.forEach(r => { out[String(r.k).split(':')[1]] = Number(r.n) || 0; });
+    return { day: pacificDayKey(Date.now()), byProject: out, limit: FS_FREE_READS };
+  } catch (e) { return null; }
 }
 // The owner's side, through meter-admin: errors (newest 300, every copy),
 // errors-new (how many are new), error-status (new | done), error-delete.
@@ -3012,4 +3056,4 @@ export default {
   }
 };
 
-// ── END OF WORKER v82 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
+// ── END OF WORKER v83 ── If this is the last line in the Cloudflare editor, the whole file was pasted.

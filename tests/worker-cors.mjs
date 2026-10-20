@@ -1230,6 +1230,25 @@ console.log('\nAI per household (v60):');
     expect('v69: someone not in the household cannot add to its counts', f.status === 403, JSON.stringify(f));
     f = await fb({ action: 'app-signals', idToken: tA, usage: { counts: { 'scale': 1 } } });
     expect('v69: …nor counts with no household', f.status === 400, JSON.stringify(f));
+    // v83 — Firestore reads, as the apps count them: added up per copy and Firebase's day, the owner warned at 70%.
+    f = await fb({ action: 'app-signals', idToken: tA, reads: 300 });
+    expect('v83: an app says how many documents it read — no household needed', f.status === 200 && f.d.reads === 300 && f.d.readsToday === 300, JSON.stringify(f));
+    f = await fb({ action: 'app-signals', idToken: tB, reads: 500 });
+    expect('v83: …every app of the copy adds to one count for the day', f.d.readsToday === 800, JSON.stringify(f));
+    f = await fb({ action: 'app-signals', idToken: tA, reads: -5 });
+    const f2 = await fb({ action: 'app-signals', idToken: tA, reads: 1.5 });
+    expect('v83: …a nonsense count adds nothing', f.status === 200 && f.d.readsToday === undefined && f2.d.readsToday === undefined
+      && db.raw.prepare("SELECT n FROM counters WHERE k LIKE 'fsreads:tonys-recipes-test:%'").get().n === 800, JSON.stringify([f, f2]));
+    expect('v83: …no warning below 70%', !db.raw.prepare("SELECT 1 FROM allowance_notices WHERE what LIKE 'usage:firestoreReadsApps:%'").get());
+    f = await fb({ action: 'app-signals', idToken: tA, reads: 999999 });
+    expect('v83: …at most 20,000 from one call (a runaway or a forged count can only warn)', f.d.readsToday === 20800, JSON.stringify(f));
+    f = await fb({ action: 'app-signals', idToken: tA, reads: 15000 });
+    const fra = db.raw.prepare("SELECT * FROM allowance_notices WHERE what = 'usage:firestoreReadsApps:tonys-recipes-test'").get();
+    expect('v83: at 70% of the 50,000 free reads the owner is warned, until midnight in California',
+      f.d.readsToday === 35800 && fra && fra.kind === 'warning' && fra.scope === 'owner' && /72%/.test(fra.title) && /35,800 of 50,000/.test(fra.detail) && fra.until > Date.now(), JSON.stringify(fra));
+    f = await fb({ action: 'meter-admin', op: 'allowances', idToken: famOwner }, ORIGIN);
+    expect('v83: the owner\'s 🩺 page reads today\'s count, per copy', f.status === 200 && f.d.appReads && f.d.appReads.byProject['tonys-recipes-test'] === 35800
+      && f.d.appReads.limit === 50000 && /^\d{4}-\d\d-\d\d$/.test(f.d.appReads.day), JSON.stringify(f.d && f.d.appReads));
     // v76 — the trends: every copy's counts added up by month and name, for the owner only.
     db.raw.prepare("INSERT INTO usage_counts (project, hid, month, k, n) VALUES ('tonys-recipes-test', 'hT2', ?, 'added.link', 4), ('tonys-recipes-test', 'hOld', '2001-01', 'added.link', 9)").run(nowMonth);
     f = await fb({ action: 'meter-admin', op: 'trends', idToken: tA });

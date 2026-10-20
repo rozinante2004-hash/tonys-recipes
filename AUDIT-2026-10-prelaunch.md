@@ -15,7 +15,7 @@ require my input should be kept for the last stages."*
 - **The suites**: 393 self-tests × 3 copies + Hebrew/dark, phone chrome, double-click, close-in-view, axe, contrast,
   the Worker's 400+ checks.
 
-## Fixed (released, or on the way: v38.60–v38.62)
+## Fixed (released, or on the way: v38.60–v38.63)
 
 | # | Area | Finding | Fix |
 |---|------|---------|-----|
@@ -39,6 +39,7 @@ require my input should be kept for the last stages."*
 | 18 | UI (phone) | The sign-in screen jumped when the e-mail button appeared, 1–3 s in | v38.61: its room is kept |
 | 19 | Monitoring | The server's own errors were not watched | v38.60 + Worker v82: in the hourly watch, warned at ≥25 errors and ≥2% |
 | 20 | UI (phone) | On a slow phone the app's header ("Offline mode") showed for half a second before the sign-in screen | v38.62: the sign-in screen comes first in the page |
+| 21 | Budget | **No early warning for Firestore** — the allowance 20 testers come nearest to (50,000 reads a day): Firebase's own count needs a role, and GitHub runs the watch a few times a day | v38.63 + Worker v83: every app counts its reads the way Firebase bills them; the server adds them up and warns you at 70%; on 🩺 Server allowances |
 
 ## Measured capacity — 20 testers (estimates from the measurements)
 
@@ -66,8 +67,8 @@ require my input should be kept for the last stages."*
 
 ## Needs Tony (kept for last)
 
-1. **Monitoring Viewer** role for the backup's service account in my-kitchen-notes-beta — then Firestore's own counts
-   join the hourly watch (warned at 70% like the rest).
+1. **Monitoring Viewer** role for the backup's service account in my-kitchen-notes-beta — then Firebase's own counts
+   join the watch too (since v38.63 the apps count their reads themselves, so this is now a second opinion, optional).
 2. **Wording on the first screen**: "Connect your storage" (a tester signs in; nothing is connected) — suggest "Sign
    in"; "Why can't I sign in?" and "🪵 Copy the log" are support tools on the very first screen — suggest one small
    "Trouble signing in?" link.
