@@ -530,6 +530,25 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
   v85 deployed (WHATSAPP_PHONE, WHATSAPP_KEY, CF_ANALYTICS_TOKEN still not set — notices in the deploy log), the
   database rules published (linked readers may read `state/meta`), GitHub Pages, Cloudflare beta and test, Self Tests
   main and test, languages.
+- **v38.66 + Worker v86 — a notice says what it is** (Tony, 20 Oct 17:2x, from the 👑 bar: "⏸ Paused until 02:00 AM:
+  publishing new versions of the app. Pages builds at 184% … (since 01:44 AM). 918 of 500 this month. Nothing to do."
+  — "Is that one of the changes we have done today?" / "What is Paused? Where is this message coming from?"). Not
+  today's: the usage watch's first run (v38.57, 01:44) raised it; nothing was paused — Cloudflare kept building past
+  500 (all of October's later builds deployed) and the Worker called every allowance at 100% "paused"; "02:00 AM" was
+  1 Nov 02:00 (no date); and the D1 row kept its first words all day (`raiseNotice` returned early on the same
+  `until`). The October count: 945 at 07:06 UTC = ~590 previews nobody opened (off since 09:23 Israel time) + the real
+  ones; after that Cloudflare files a never-built "queued" deployment per push to another branch (41 by 14:28), which
+  `monthBuilds` counted. Now: tools/cf-usage.js `countBuilds` (exported; `require.main` guard) skips `queued` and
+  ad_hoc and returns `{used, per:{project:n}, lastOk}` (the latest production build per project went through or
+  failed). Worker `usageWords(k, x, now)`: the service in the title ("Cloudflare KV writes: 812 of 1,000 today (81%
+  of the free allowance)", "Firebase Firestore reads: …"), "The count starts again on <ilTime> (Israel time)", "From
+  the usage watch …" — no UTC; Pages: a WARNING over 500 unless `lastOk === false` (then paused), per copy ("the test
+  copy 518, the community app 431"), "Nothing has stopped …", two builds per version, the family app not affected.
+  `raiseNotice`: new words in the same episode are written (not mailed); `newsToMail` — a new episode, a later end,
+  or a turn for the worse (now paused, mailed at once even within the 20 h gap). App: `serverNoticeTime` adds the day
+  when not today; the owner's paused line starts "⏸ Stopped until <when>: <what>." and ends "It comes back by itself —
+  nothing to do."; 🩺 Pages line ⚠️ (⛔ only if refused) with per-copy counts and "Cloudflare still builds". Tests:
+  self-test `idle_quiet_and_server_notice` + `firebase_limits_told`; 9 Worker checks (g).
 - **GitHub drops most scheduled runs on this repository** (20 Oct): the usage watch (:11 and :41) ran at 01:13 and 06:31
   UTC only; Publish languages (every 10 min) runs every 2–5 h; the 02:17 backup starts 07:00–07:51 UTC. The watch is an
   early warning only (a real refusal is told at once by the Worker and the app), but hourly needs another clock: the

@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v38.65 -->
+<!-- Tony's Recipes Collection v38.66 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -4242,17 +4242,23 @@ window.checkWorkerHealth = checkWorkerHealth;
 // one stays closed on this device.
 var SERVER_NOTICE_KEY = 'mkn_server_notice_closed';
 var _serverNotices = {};
+// v38.66 — with the day when it is not today (Tony, 20 Oct: "Paused until 02:00 AM" meant 1 November).
 function serverNoticeTime(t) {
-  try { return new Date(t).toLocaleTimeString(typeof _i18nLang === 'string' && _i18nLang ? _i18nLang : undefined, { hour: '2-digit', minute: '2-digit' }); }
-  catch(e) { return new Date(t).toTimeString().slice(0, 5); }
+  var d = new Date(t), lang = typeof _i18nLang === 'string' && _i18nLang ? _i18nLang : undefined;
+  try {
+    return d.toDateString() === new Date().toDateString() ? d.toLocaleTimeString(lang, { hour: '2-digit', minute: '2-digit' })
+      : d.toLocaleString(lang, { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  } catch(e) { return d.toString().slice(0, 21); }
 }
 // v38.55 (Worker v79) — every allowance: { kind: paused|warning, title, affects, detail (the owner's), self }.
 function serverNoticeText(n, owner) {
   var self = n.self !== false;
   if (n.kind === 'warning') return '⚠️ ' + (n.title || 'A free allowance is nearly used up') + '.' + (owner && n.detail ? ' ' + n.detail : '');
   var head = '⏸ ' + (self ? 'Paused until ' + serverNoticeTime(n.until) : 'Paused for now') + ': ' + (n.affects || 'some features') + '.';
-  if (owner) return head + ' ' + (n.title ? n.title + (n.since ? ' (since ' + serverNoticeTime(n.since) + ')' : '') + '. ' : '')
-    + (n.detail || '') + (self ? ' Nothing to do.' : '');
+  // v38.66 — the owner reads what has stopped first, then whose allowance and since when (Tony: "What is Paused?")
+  if (owner) return '⏸ Stopped' + (self ? ' until ' + serverNoticeTime(n.until) : ' until you act') + ': ' + (n.affects || 'some features') + '. '
+    + (n.title ? n.title + (n.since ? ' (since ' + serverNoticeTime(n.since) + ')' : '') + '. ' : '')
+    + (n.detail || '') + (self ? ' It comes back by itself — nothing to do.' : '');
   return head + (self ? ' It comes back by itself' : ' The app’s owner has been told') + '. Everything else works.';
 }
 // Firebase's own daily limits, met by this app (v38.55): said here, and told to the server, which tells the owner —
@@ -4293,6 +4299,7 @@ window.firebaseLimitHit = firebaseLimitHit; window.nextPacificMidnight = nextPac
 var USAGE_LABELS = { workerRequests: 'Worker requests', kvWrites: 'KV writes', kvReads: 'KV reads', kvDeletes: 'KV deletes', kvLists: 'KV lists',
   d1RowsWritten: 'D1 rows written', d1RowsRead: 'D1 rows read', pagesBuilds: 'Pages builds this month',
   firestoreReads: 'Firestore reads (Firebase’s day)', firestoreWrites: 'Firestore writes (Firebase’s day)', firestoreDeletes: 'Firestore deletes (Firebase’s day)' };
+var PAGES_COPY_NAMES = { 'my-kitchen-notes-beta': 'community app', 'tonys-recipes-test': 'test copy' };
 function serverAllowanceLines(d) {
   var lines = [], u = d && d.usage, m = (u && u.metrics) || {};
   if (u && u.at) {
@@ -4300,7 +4307,11 @@ function serverAllowanceLines(d) {
     Object.keys(USAGE_LABELS).forEach(function(k){
       var x = m[k]; if (!x || !(x.limit > 0)) return;
       var pct = Math.round(100 * (x.used || 0) / x.limit);
-      lines.push((pct >= 100 ? '⛔ ' : pct >= 70 ? '⚠️ ' : '✓ ') + USAGE_LABELS[k] + ': ' + (x.used || 0).toLocaleString() + ' of ' + x.limit.toLocaleString() + ' (' + pct + '%)');
+      // v38.66 — over the Pages allowance is not stopped: Cloudflare kept building past 500 (⛔ only if it refused one)
+      var stopped = pct >= 100 && !(k === 'pagesBuilds' && x.lastOk !== false);
+      var per = k === 'pagesBuilds' && x.per ? Object.keys(x.per).map(function(p){ return (PAGES_COPY_NAMES[p] || p) + ' ' + Number(x.per[p]).toLocaleString(); }).join(', ') : '';
+      lines.push((stopped ? '⛔ ' : pct >= 70 ? '⚠️ ' : '✓ ') + USAGE_LABELS[k] + ': ' + (x.used || 0).toLocaleString() + ' of ' + x.limit.toLocaleString() + ' (' + pct + '%)'
+        + (per ? ' — ' + per : '') + (k === 'pagesBuilds' && pct >= 100 ? (x.lastOk === false ? ' — Cloudflare refused the latest build' : ' — Cloudflare still builds') : ''));
     });
     // v38.60 — the server's own errors today (Worker v82), out of its requests
     var er = m.workerErrors;
@@ -8696,7 +8707,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v38.65';
+var APP_VERSION = 'v38.66';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -11731,7 +11742,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.65</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.66</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -11819,7 +11830,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.65</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.66</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">

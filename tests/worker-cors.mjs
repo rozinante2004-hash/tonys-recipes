@@ -15,6 +15,7 @@
 // errors, refusals and the binary download, must carry CORS for an allowed
 // origin — and must never echo one that is not allowed.
 import worker from '../cloudflare-worker.js';
+import { createRequire } from 'module';
 
 // The Worker samples its KV counters with Math.random, so the write-count
 // checks below were a dice roll (one failed at 47 writes, v36.92). A fixed
@@ -1738,7 +1739,8 @@ console.log('\nEvery allowance, told to the owner (v79):');
     const r = await (await worker.fetch(post({ action: 'usage-report', key: 'k'.repeat(64), metrics, appKey: 'secret-k' }), e)).json();
     expect('70% or more is warned, below is not', JSON.stringify(r.warned) === '["kvWrites","pagesBuilds"]', JSON.stringify(r));
     const kvw = db.raw.prepare("SELECT * FROM allowance_notices WHERE what = 'usage:kvWrites'").get();
-    expect('…for the owner, saying the numbers', kvw && kvw.scope === 'owner' && kvw.kind === 'warning' && /KV writes at 81%/.test(kvw.title) && /812 of 1,000 today/.test(kvw.detail), JSON.stringify(kvw));
+    expect('…for the owner, saying the numbers', kvw && kvw.scope === 'owner' && kvw.kind === 'warning' && /^Cloudflare KV writes: 812 of 1,000 today \(81% of the free allowance\)$/.test(kvw.title)
+      && /starts again on .+ \(Israel time\)/.test(kvw.detail) && /usage watch/.test(kvw.detail) && !/UTC/.test(kvw.detail), JSON.stringify(kvw));
     expect('…by e-mail, once each', mails.length === 2, mails.length + '');
     await worker.fetch(post({ action: 'usage-report', key: 'k'.repeat(64), metrics, appKey: 'secret-k' }), e);
     expect('the next hour\'s same reading is not e-mailed again', mails.length === 2, mails.length + '');
@@ -1749,14 +1751,64 @@ console.log('\nEvery allowance, told to the owner (v79):');
     try { await worker.fetch(post({ action: 'usage-report', key: 'k'.repeat(64), metrics: { firestoreReads: { used: 41000, limit: 50000, period: 'pacific-day', project: 'my-kitchen-notes-beta' } }, appKey: 'secret-k' }), e); }
     finally { Date.now = realNow; }
     const fsr = db.raw.prepare("SELECT * FROM allowance_notices WHERE what = 'usage:firestoreReads'").get();
-    expect('Firestore\'s day is California\'s: warned until its midnight', fsr && fsr.until === Date.parse('2026-10-21T07:00:00Z') && /Firestore reads at 82%/.test(fsr.title)
-      && /midnight in California/.test(fsr.detail) && /my-kitchen-notes-beta/.test(fsr.affects), JSON.stringify(fsr));
+    expect('Firestore\'s day is California\'s: warned until its midnight', fsr && fsr.until === Date.parse('2026-10-21T07:00:00Z') && /^Firebase Firestore reads: 41,000 of 50,000 today \(82%/.test(fsr.title)
+      && /starts again on Wed 21 Oct, 10:00 \(Israel time\)/.test(fsr.detail) && /Firebase’s own figures/.test(fsr.detail) && /my-kitchen-notes-beta/.test(fsr.affects), JSON.stringify(fsr));
     const er = await (await worker.fetch(post({ action: 'usage-report', key: 'k'.repeat(64), metrics: { workerErrors: { used: 10, of: 100 } }, appKey: 'secret-k' }), e)).json();
     expect('v82: a handful of server errors is not warned (fewer than 25)', JSON.stringify(er.warned) === '[]', JSON.stringify(er));
     const er2 = await (await worker.fetch(post({ action: 'usage-report', key: 'k'.repeat(64), metrics: { workerErrors: { used: 60, of: 2000 } }, appKey: 'secret-k' }), e)).json();
     const ern = db.raw.prepare("SELECT * FROM allowance_notices WHERE what = 'usage:workerErrors'").get();
     expect('v82: …3% of the day\'s requests is (owner, with where to look)', JSON.stringify(er2.warned) === '["workerErrors"]' && ern && ern.scope === 'owner'
       && /60 times today \(3% of requests\)/.test(ern.title) && /Logs/.test(ern.detail), JSON.stringify([er2, ern]));
+  }
+
+  // (g) v86 — Tony, 20 Oct: "What is Paused? Where is this message coming from?" Pages builds over 500 are a warning
+  // (Cloudflare kept building), named per copy, with the day the count starts again; new figures are written, not
+  // mailed; a refused build is "paused" and mailed at once.
+  {
+    const db = d1(), e = Object.assign(base(), { METER_DB: db, USAGE_KEY: 'k'.repeat(64) });
+    const realNow = Date.now; let at = Date.parse('2026-10-20T12:00:00Z'); Date.now = () => at;
+    const report = (pb) => worker.fetch(post({ action: 'usage-report', key: 'k'.repeat(64), metrics: { pagesBuilds: Object.assign({ limit: 500, period: 'month' }, pb) }, appKey: 'secret-k' }), e);
+    const row = () => db.raw.prepare("SELECT * FROM allowance_notices WHERE what = 'usage:pagesBuilds'").get();
+    try {
+      // the notice Tony saw: kept from the first reading, "paused", 918
+      db.raw.exec('CREATE TABLE IF NOT EXISTS allowance_notices (what TEXT PRIMARY KEY, kind TEXT, scope TEXT, project TEXT, since INTEGER, until INTEGER, title TEXT, affects TEXT, detail TEXT, self INTEGER, mailed_at INTEGER)');
+      db.raw.prepare("INSERT INTO allowance_notices VALUES ('usage:pagesBuilds', 'paused', 'owner', '', ?, ?, 'Pages builds at 184% of the free allowance this month', 'publishing new versions of the app', '918 of 500 this month.', 1, ?)")
+        .run(at - 10 * 3600e3, Date.parse('2026-11-01T00:00:00Z'), at - 10 * 3600e3);
+      mails.length = 0;
+      await report({ used: 949, lastOk: true, per: { 'tonys-recipes-test': 518, 'my-kitchen-notes-beta': 431 } });
+      let n = row();
+      expect('v86: Pages builds over 500, the latest built: a warning, not "paused"', n.kind === 'warning', JSON.stringify(n));
+      expect('v86: …saying how many, per copy, that nothing stopped, when it starts again (Israel time) and who counted',
+        /^Cloudflare Pages: 949 builds this month, over the 500 the free plan includes \(190%\)$/.test(n.title)
+        && /the test copy 518, the community app 431/.test(n.detail) && /Nothing has stopped/.test(n.detail)
+        && /starts again on Sun 1 Nov, 02:00 \(Israel time\)/.test(n.detail) && /usage watch/.test(n.detail)
+        && /family app is published by GitHub/.test(n.affects) && n.since === at - 10 * 3600e3, JSON.stringify(n));
+      expect('v86: …the better news is not mailed again', mails.length === 0, String(mails.length));
+      at += 1800e3;
+      await report({ used: 951, lastOk: true, per: { 'tonys-recipes-test': 519, 'my-kitchen-notes-beta': 432 } });
+      n = row();
+      expect('v86: the next reading\'s figures replace the first (it said 918 all day)', /951 builds/.test(n.title) && /test copy 519/.test(n.detail) && mails.length === 0, JSON.stringify([n.title, mails.length]));
+      at += 1800e3;
+      await report({ used: 953, lastOk: false, per: { 'tonys-recipes-test': 520, 'my-kitchen-notes-beta': 433 } });
+      n = row();
+      expect('v86: a refused build is "paused" — and mailed at once, within the day', n.kind === 'paused' && /Cloudflare refused the latest build/.test(n.detail) && mails.length === 1
+        && /Subject: My Kitchen Notes: paused - Cloudflare Pages/.test(mails[0].raw), JSON.stringify([n.kind, mails.length]));
+      await report({ used: 300, per: { 'tonys-recipes-test': 300 } });
+      expect('v86: under 70% nothing new is raised', row().kind === 'paused' && /953/.test(row().title), row().title);
+      db.raw.prepare("DELETE FROM allowance_notices WHERE what = 'usage:pagesBuilds'").run();
+      await report({ used: 360, per: { 'tonys-recipes-test': 360 } });
+      expect('v86: 72% says the share, not "over"', /^Cloudflare Pages: 360 builds this month, 72% of the 500 the free plan includes$/.test(row().title)
+        && row().kind === 'warning' && !/Nothing has stopped/.test(row().detail), row().title);
+    } finally { Date.now = realNow; }
+    // the count itself: an entry Cloudflare filed but never built, and a direct upload, are not builds
+    const { countBuilds } = createRequire(import.meta.url)('../tools/cf-usage.js');
+    const d = (when, env, type, name, status) => ({ created_on: when, environment: env, deployment_trigger: { type }, latest_stage: { name, status } });
+    const c = countBuilds([d('2026-10-20T10:00:00Z', 'production', 'github:push', 'deploy', 'success'), d('2026-10-20T11:00:00Z', 'preview', 'github:push', 'queued', 'idle'),
+      d('2026-10-20T11:05:00Z', 'preview', 'github:push', 'queued', 'skipped'), d('2026-10-20T11:10:00Z', 'production', 'ad_hoc', 'deploy', 'success'),
+      d('2026-10-19T09:00:00Z', 'preview', 'github:push', 'deploy', 'success'), d('2026-09-30T23:00:00Z', 'production', 'github:push', 'deploy', 'success')], '2026-10');
+    expect('v86: the watch counts real builds only (not "queued", never built; not a direct upload; not last month)', c.used === 2 && c.lastOk === true, JSON.stringify(c));
+    const c2 = countBuilds([d('2026-10-20T10:00:00Z', 'production', 'github:push', 'deploy', 'success'), d('2026-10-20T12:00:00Z', 'production', 'github:push', 'build', 'failure')], '2026-10');
+    expect('v86: …and says when the latest production build failed', c2.used === 2 && c2.lastOk === false, JSON.stringify(c2));
   }
 
   // (f) v85 — a notice's kind decides WhatsApp: near-limit off, server errors on.
@@ -1788,7 +1840,7 @@ console.log('\nEvery allowance, told to the owner (v79):');
     const w1 = []; await worker.scheduled({ cron: '17 * * * *', scheduledTime: Date.now() }, e, { waitUntil: p => w1.push(p) }); await Promise.all(w1);
     const kv = db.raw.prepare("SELECT * FROM allowance_notices WHERE what = 'usage:kvWrites'").get();
     expect('v84: the hourly cron reads Cloudflare\'s analytics with its token and warns at 70%', calls.length === 1 && /graphql/.test(calls[0].url) && calls[0].auth === 'Bearer cf-t'
-      && kv && /KV writes at 85%/.test(kv.title) && mails.length === 1, JSON.stringify([calls, kv && kv.title, mails.length]));
+      && kv && /KV writes: 850 of 1,000 today \(85%/.test(kv.title) && mails.length === 1, JSON.stringify([calls, kv && kv.title, mails.length]));
     const sn = JSON.parse(db.raw.prepare('SELECT metrics FROM usage_snapshot WHERE id = 1').get().metrics);
     expect('v84: …and keeps the GitHub watch\'s figures beside its own (Pages builds)', sn.kvWrites.used === 850 && sn.pagesBuilds && sn.pagesBuilds.used === 120 && sn.workerErrors.of === 9000, JSON.stringify(sn));
     const daily = []; const w2 = []; await worker.scheduled({ cron: '23 3 * * *', scheduledTime: Date.now() }, e, { waitUntil: p => w2.push(p) }); await Promise.all(w2);

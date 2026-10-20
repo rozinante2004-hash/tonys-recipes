@@ -7614,7 +7614,7 @@ window.SELF_TESTS = [
       }
     } },
 
-  { id:'idle_quiet_and_server_notice', group:'Core', name:'🔕 An app nobody is using stops asking the server every two minutes (every 30 instead; at once on the first touch or return), and a used-up server allowance is said in a bar with what it stops and when it comes back — once, closable, never once its time has passed (v38.54)',
+  { id:'idle_quiet_and_server_notice', group:'Core', name:'🔕 An app nobody is using stops asking the server every two minutes (every 30 instead; at once on the first touch or return), and a used-up server allowance is said in a bar with what it stops and when it comes back — once, closable, never once its time has passed (v38.54); the owner reads what has stopped first, and a time not today carries its day (v38.66)',
     test: async()=>{
       var realAt=_userActiveAt, realPoll=_livePollAt, realLs=null, realNotices=Object.assign({}, _serverNotices);
       try { realLs=localStorage.getItem(SERVER_NOTICE_KEY); } catch(e) {}
@@ -7648,6 +7648,14 @@ window.SELF_TESTS = [
           throw new Error('a pause that needs the owner: '+serverNoticeText({ what:'anthropic', kind:'paused', until:until, self:false, affects:'AI features' }, false));
         if(!/^⚠️ KV writes at 81%/.test(serverNoticeText({ what:'usage:kvWrites', kind:'warning', until:until, title:'KV writes at 81% of the free allowance today', detail:'812 of 1,000' }, true)))
           throw new Error('a warning');
+        // v38.66 — Tony, 20 Oct: "What is Paused? Where is this message coming from?" The owner reads what has stopped
+        // first, and a time that is not today carries its day ("until 02:00 AM" meant 1 November).
+        var later=new Date(); later.setDate(later.getDate()+12); later.setHours(2,0,0,0);
+        var own=serverNoticeText({ what:'usage:kvWrites', kind:'paused', until:later.getTime(), since:Date.now(), self:true, affects:'the server', title:'Cloudflare KV writes: 1,000 of 1,000 today — the free allowance is used up' }, true);
+        if(!/^⏸ Stopped until /.test(own) || own.indexOf(serverNoticeTime(later.getTime()))===-1 || !/: the server\. Cloudflare KV writes/.test(own) || !/nothing to do/.test(own)) throw new Error('the owner\u2019s words: '+own);
+        if(serverNoticeTime(later.getTime())===later.toLocaleTimeString(undefined, { hour:'2-digit', minute:'2-digit' }) || !new RegExp(String(later.getDate())).test(serverNoticeTime(later.getTime())))
+          throw new Error('a later day without its date: '+serverNoticeTime(later.getTime()));
+        var soon=Date.now()+60e3; if(new Date(soon).toDateString()===new Date().toDateString() && serverNoticeTime(soon).length>8) throw new Error('today\u2019s time with a date: '+serverNoticeTime(soon));
         if(!window.fetch._mknNotice) throw new Error('the server’s refusals are not looked at');
       } finally {
         _userActiveAt=realAt; _livePollAt=realPoll;
@@ -7691,7 +7699,10 @@ window.SELF_TESTS = [
           notices:[{ what:'usage:kvWrites', kind:'warning', until:Date.now()+3600e3, title:'KV writes at 81% of the free allowance today', detail:'812 of 1,000 today.' }] }).join('\n');
         var withErr=serverAllowanceLines({ watch:true, usage:{ at:Date.now(), metrics:{ workerErrors:{ used:3, of:900 } } }, notices:[] }).join('\n');
         if(!/✓ Server errors today: 3 of 900 requests \(0.3%\)/.test(withErr)) throw new Error('the server\u2019s errors: '+withErr);
-        if(!/⚠️ KV writes: 812 of 1,000 \(81%\)/.test(lines) || !/✓ Worker requests/.test(lines) || !/⛔ Pages builds this month: 510 of 500/.test(lines) || !/Running now:/.test(lines)) throw new Error('the page: '+lines);
+        if(!/⚠️ KV writes: 812 of 1,000 \(81%\)/.test(lines) || !/✓ Worker requests/.test(lines) || !/⚠️ Pages builds this month: 510 of 500 \(102%\) — Cloudflare still builds/.test(lines) || !/Running now:/.test(lines)) throw new Error('the page: '+lines);
+        // v38.66 — over the Pages allowance is only stopped when Cloudflare refused a build; each copy's builds are named
+        var refused=serverAllowanceLines({ watch:true, usage:{ at:Date.now(), metrics:{ pagesBuilds:{ used:949, limit:500, period:'month', lastOk:false, per:{ 'tonys-recipes-test':518, 'my-kitchen-notes-beta':431 } } } }, notices:[] }).join('\n');
+        if(!/⛔ Pages builds this month: 949 of 500 \(190%\) — test copy 518, community app 431 — Cloudflare refused the latest build/.test(refused)) throw new Error('a refused build: '+refused);
         if(!/not connected/.test(serverAllowanceLines({ watch:false, notices:[] }).join('\n'))) throw new Error('no watch yet, yet it does not say so');
         if(!/Monitoring Viewer/.test(lines)) throw new Error('Firestore not measured, yet the page does not say how to add it');
         var withFs=serverAllowanceLines({ watch:true, usage:{ at:Date.now(), metrics:{ firestoreReads:{ used:12000, limit:50000, period:'pacific-day' } } }, notices:[] }).join('\n');

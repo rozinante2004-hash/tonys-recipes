@@ -1,4 +1,9 @@
-// Tony's Recipes — Cloudflare Worker v85
+// Tony's Recipes — Cloudflare Worker v86
+// v86: A NOTICE SAYS WHAT IT IS (Tony, 20 Oct 2026: "Perhaps the wording should be more informative ... What is Paused?
+// Where is this message coming from?"): Pages builds over 500 are a warning, not "paused" — Cloudflare kept building
+// past 500 in October — unless the watch sees a build refused (`lastOk: false`); the notice names the service, the
+// copies and their counts, when the count starts again (date and time, Israel time) and who counted. A running
+// notice now takes the latest figures (it kept the first reading, "918 of 500", all day); only a worse kind e-mails.
 // v85: EACH ALERT ON WHATSAPP, OR NOT (Tony, 20 Oct 2026): ALERT_KINDS (eight, all on by default); meter-admin
 // `alert-prefs` / `alert-prefs-set`; `ownerAlert(…, { kind })` skips WhatsApp for a kind switched off (e-mail always).
 // The new-device e-mail says Israel time, not UTC.
@@ -382,7 +387,7 @@
 //   AI_MAX_TOKENS   – the longest answer one call may ask for (32000; the
 //                     app's largest, reading several recipes at once, asks 8000).
 
-const WORKER_VERSION = 'v85';
+const WORKER_VERSION = 'v86';
 const VIDEO_MAX_MB_DEFAULT = 50;
 const GEMINI_API = 'https://generativelanguage.googleapis.com';
 const GEMINI_MODEL_DEFAULT = 'gemini-2.5-flash';
@@ -720,12 +725,21 @@ async function noteServerLimit(env, what, err) {
   if (!isLimitError(err)) return;          // a passing fault is not "used up until midnight"
   await raiseNotice(env, storeNotice(env, what, err));
 }
+// v86 — what is worth an e-mail (and a WhatsApp): a new episode, one that now ends later, or one turning for the worse
+// (now paused). New figures in a running one are only written, so the app shows them.
+// A turn for the worse is mailed even within a day of the last mail (the 70% warning came first, the same day).
+function newsToMail(have, n, now, mailedAt) {
+  const running = have && Number(have.until) > now;
+  if (running && n.kind === 'paused' && (have.kind || 'paused') !== 'paused') return true;
+  return (!running || Number(have.until) !== n.until) && !(Number(mailedAt) > now - NOTICE_MAIL_GAP_MS);
+}
 async function raiseNotice(env, n) {
   const now = Date.now();
   n = Object.assign({ kind: 'paused', scope: 'all', project: '', since: now, title: '', affects: '', detail: '', self: true }, n);
   n.until = Number(n.until) || nextUtcMidnight(now);
   const _notices = noticeMem(env), cur = _notices[n.what];
-  if (cur && cur.until === n.until && now - cur.savedAt < 10 * 60e3) return false;
+  const sameWords = function (h) { return h && (h.kind || 'paused') === n.kind && (h.title || '') === n.title && (h.detail || '') === n.detail && (h.affects || '') === n.affects; };
+  if (cur && cur.until === n.until && sameWords(cur) && now - cur.savedAt < 10 * 60e3) return false;
   if (cur && cur.until > now) n.since = cur.since;
   _notices[n.what] = Object.assign({}, n, { savedAt: now });
   let mail = false, kept = false;
@@ -734,10 +748,12 @@ async function raiseNotice(env, n) {
     try {
       await tableOnce(db, 'allowance_notices', 'CREATE TABLE IF NOT EXISTS allowance_notices (what TEXT PRIMARY KEY, kind TEXT, scope TEXT, '
         + 'project TEXT, since INTEGER, until INTEGER, title TEXT, affects TEXT, detail TEXT, self INTEGER, mailed_at INTEGER)');
-      const have = await db.prepare('SELECT since, until, mailed_at FROM allowance_notices WHERE what = ?1').bind(n.what).first();
-      if (have && Number(have.until) === n.until) { _notices[n.what].since = Number(have.since); return false; }
-      if (have && Number(have.until) > now) n.since = Number(have.since);   // the same episode, now ending later
-      mail = !(have && Number(have.mailed_at) > now - NOTICE_MAIL_GAP_MS);
+      const have = await db.prepare('SELECT since, until, mailed_at, kind, title, affects, detail FROM allowance_notices WHERE what = ?1').bind(n.what).first();
+      if (have && Number(have.until) === n.until && sameWords(have)) { _notices[n.what].since = Number(have.since); return false; }
+      if (have && Number(have.until) > now) n.since = Number(have.since);   // the same episode, now ending later or in other words
+      _notices[n.what].since = n.since;
+      // v86 — new figures in the same episode are written, not mailed; a turn for the worse (now paused) is mailed
+      mail = newsToMail(have, n, now, have && have.mailed_at);
       await db.prepare('INSERT INTO allowance_notices (what, kind, scope, project, since, until, title, affects, detail, self, mailed_at) '
         + 'VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11) ON CONFLICT (what) DO UPDATE SET kind = excluded.kind, scope = excluded.scope, '
         + 'project = excluded.project, since = excluded.since, until = excluded.until, title = excluded.title, affects = excluded.affects, '
@@ -751,9 +767,10 @@ async function raiseNotice(env, n) {
     try {
       const key = 'notice:' + n.what;
       const have = JSON.parse(await env.BRING_KV.get(key) || 'null');
-      if (have && have.until === n.until) { _notices[n.what].since = have.since; return false; }
+      if (have && have.until === n.until && sameWords(have)) { _notices[n.what].since = have.since; return false; }
       if (have && have.until > now) n.since = have.since;
-      mail = !(have && have.mailedAt > now - NOTICE_MAIL_GAP_MS);
+      _notices[n.what].since = n.since;
+      mail = newsToMail(have, n, now, have && have.mailedAt);
       await env.BRING_KV.put(key, JSON.stringify(Object.assign({}, n, { mailedAt: mail ? now : (have && have.mailedAt) || 0 })),
         { expiration: Math.floor(Math.max(n.until, now + 120e3) / 1000) + 60 });
       kept = true;
@@ -849,6 +866,35 @@ async function usageReport(env, body) {
   if (!env.USAGE_KEY || !sameText(body.key, env.USAGE_KEY)) return jsonResp({ error: 'FORBIDDEN' }, 403);
   return jsonResp({ ok: true, warned: await usageEvaluate(env, body.metrics || {}) });
 }
+// v86 — whose allowance, in plain words, and what each Pages project is to Tony.
+const USAGE_SERVICE = { firestoreReads: 'Firebase', firestoreWrites: 'Firebase', firestoreDeletes: 'Firebase' };
+const PAGES_COPIES = { 'my-kitchen-notes-beta': 'the community app', 'tonys-recipes-test': 'the test copy' };
+function usageWords(k, x, now) {
+  const used = Math.max(0, Number(x.used) || 0), limit = Number(x.limit), pct = Math.round(100 * used / limit);
+  const month = x.period === 'month', pacific = x.period === 'pacific-day';   // Firebase's day ends at midnight in California
+  const until = month ? nextUtcMonth(now) : pacific ? nextPacificMidnight(now) : nextUtcMidnight(now);
+  const n = (v) => Number(v).toLocaleString('en-US');
+  const restarts = 'The count starts again on ' + ilTime(until) + ' (Israel time).';
+  const who = 'From the usage watch, which reads ' + (k.indexOf('firestore') === 0 ? 'Firebase' : 'Cloudflare') + '\u2019s own figures several times a day.';
+  if (k === 'pagesBuilds') {
+    const per = Object.keys(x.per || {}).filter((p) => Number(x.per[p]) > 0).map((p) => (PAGES_COPIES[p] || p) + ' ' + n(x.per[p]));
+    const refused = used >= limit && x.lastOk === false;
+    return { until, kind: refused ? 'paused' : 'warning',
+      title: 'Cloudflare Pages: ' + n(used) + ' builds this month' + (used >= limit ? ', over the ' + n(limit) + ' the free plan includes (' + pct + '%)'
+        : ', ' + pct + '% of the ' + n(limit) + ' the free plan includes'),
+      affects: 'publishing new versions of the community app and the test copy (the family app is published by GitHub, not affected)',
+      detail: [per.length ? 'Builds: ' + per.join(', ') + '.' : '',
+        refused ? 'Cloudflare refused the latest build: both copies keep running the version they have, and new versions wait until the count starts again.'
+          : used >= limit ? (x.lastOk === true ? 'Nothing has stopped: Cloudflare has kept publishing every new version (the latest build went through).'
+            : 'Cloudflare has not refused a build so far.') : '',
+        'Each new version costs two builds (the test copy, then the community app).', restarts, who].filter(Boolean).join(' ') };
+  }
+  return { until, kind: used >= limit ? 'paused' : 'warning',
+    title: (USAGE_SERVICE[k] || 'Cloudflare') + ' ' + USAGE_NAMES[k] + ': ' + n(used) + ' of ' + n(limit) + ' ' + (month ? 'this month' : 'today')
+      + (used >= limit ? ' — the free allowance is used up' : ' (' + pct + '% of the free allowance)'),
+    affects: k.indexOf('d1') === 0 ? 'the server\'s database' : k.indexOf('firestore') === 0 ? 'the recipes in the cloud (' + String(x.project || 'Firebase').slice(0, 40) + ')' : 'the server',
+    detail: [restarts, who].join(' ') };
+}
 // The warnings at 70%, and the snapshot the owner's 🩺 page shows — merged, so the Worker's hourly Cloudflare count
 // (v84) and the GitHub watch's Pages builds and Firestore keep each other's figures.
 async function usageEvaluate(env, m) {
@@ -856,16 +902,10 @@ async function usageEvaluate(env, m) {
   for (const k of Object.keys(USAGE_NAMES)) {
     const x = m[k];
     if (!x || !(Number(x.limit) > 0)) continue;
-    const used = Math.max(0, Number(x.used) || 0), limit = Number(x.limit), pct = Math.round(100 * used / limit);
-    if (pct < 70) continue;
-    const month = x.period === 'month', pacific = x.period === 'pacific-day';   // Firebase's day ends at midnight in California
-    await raiseNotice(env, { what: 'usage:' + k, kind: used >= limit ? 'paused' : 'warning', scope: 'owner',
-      until: month ? nextUtcMonth(now) : pacific ? nextPacificMidnight(now) : nextUtcMidnight(now), self: true,
-      title: USAGE_NAMES[k] + ' at ' + pct + '% of the free allowance ' + (month ? 'this month' : 'today'),
-      affects: k === 'pagesBuilds' ? 'publishing new versions of the app' : k.indexOf('d1') === 0 ? 'the server\'s database'
-        : k.indexOf('firestore') === 0 ? 'the recipes in the cloud (' + String(x.project || 'Firebase').slice(0, 40) + ')' : 'the server',
-      detail: used.toLocaleString('en-US') + ' of ' + limit.toLocaleString('en-US') + (month ? ' this month.'
-        : pacific ? ' today (Firebase\'s day ends at midnight in California).' : ' today (Cloudflare\'s day ends 00:00 UTC).') });
+    if (Math.round(100 * Math.max(0, Number(x.used) || 0) / Number(x.limit)) < 70) continue;
+    const w = usageWords(k, x, now);
+    await raiseNotice(env, { what: 'usage:' + k, kind: w.kind, scope: 'owner', until: w.until, self: true,
+      title: w.title, affects: w.affects, detail: w.detail });
     warned.push(k);
   }
   // v82 — not an allowance but as worth hearing: the server answering with an error (a feature crashing, or the
@@ -3186,4 +3226,4 @@ export default {
   }
 };
 
-// ── END OF WORKER v85 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
+// ── END OF WORKER v86 ── If this is the last line in the Cloudflare editor, the whole file was pasted.

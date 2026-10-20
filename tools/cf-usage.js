@@ -155,7 +155,7 @@ async function pages() {
     }
     total += n; per.push(p.name + ' ' + n);
   }
-  console.log('\nPages deployments this month (' + month + '): ' + total + ' (free: 500 builds a month) — ' + per.join(', '));
+  console.log('\nPages deployments this month (' + month + '): ' + total + ' (free: 500 builds a month; "queued" ones were never built) — ' + per.join(', '));
   Object.keys(kinds).sort().forEach(function(k){ console.log('  ' + String(kinds[k]).padStart(4) + '  ' + k); });
   for (const p of (r.j.result || [])) {
     const b = p.build_config || {}, src = ((p.source || {}).config) || {};
@@ -190,21 +190,46 @@ async function todayMetrics() {
     workerErrors: { used: sum(a.w, 'errors'), of: sum(a.w, 'requests') }
   };
 }
+// v86 — what Cloudflare really built this month (Tony, 20 Oct: "What is Paused?"). Since the previews were switched
+// off (20 Oct 09:23) Cloudflare still files a deployment for every push to another branch, left "queued" and never
+// built: 41 of them by the afternoon were counted as builds. A direct upload (ad_hoc) is not a build either. And
+// whether the latest production build of each copy went through: Cloudflare kept building past 500 in October, so
+// "over the allowance" is not "stopped" unless a build is refused.
+function countBuilds(deployments, month) {
+  let used = 0, latest = null;
+  for (const x of deployments || []) {
+    if (String(x.created_on || '').slice(0, 7) !== month) continue;
+    if (((x.deployment_trigger || {}).type || '') === 'ad_hoc') continue;
+    const stage = x.latest_stage || {};
+    if ((stage.name || '') === 'queued') continue;
+    used++;
+    if (x.environment === 'production' && (!latest || String(x.created_on) > String(latest.created_on))) latest = x;
+  }
+  const st = latest ? (latest.latest_stage || {}) : null;
+  // a build still running is not a refusal
+  const lastOk = !st ? null : st.status === 'failure' || st.status === 'canceled' ? false : st.name === 'deploy' && st.status === 'success' ? true : null;
+  return { used, lastOk, lastAt: latest ? latest.created_on : null };
+}
 async function monthBuilds() {
   const r = await cf('/accounts/' + ACCOUNT + '/pages/projects');
   if (r.status !== 200 || !r.j) return null;
   const month = new Date().toISOString().slice(0, 7);
-  let n = 0;
+  const out = { used: 0, limit: 500, period: 'month', per: {}, lastOk: null };
   for (const p of (r.j.result || [])) {
-    for (let page = 1; page <= 40; page++) {
+    const all = [];
+    for (let page = 1; page <= 60; page++) {
       const d = await cf('/accounts/' + ACCOUNT + '/pages/projects/' + encodeURIComponent(p.name) + '/deployments?per_page=25&page=' + page);
       const list = (d.j && d.j.result) || [];
+      all.push(...list);
       const mine = list.filter(function(x){ return String(x.created_on || '').slice(0, 7) === month; });
-      n += mine.filter(function(x){ return ((x.deployment_trigger || {}).type || '') !== 'ad_hoc'; }).length;   // a direct upload is not a build
       if (list.length < 25 || mine.length < list.length) break;
     }
+    const c = countBuilds(all, month);
+    out.used += c.used; out.per[p.name] = c.used;
+    // the account's builds are refused for all its projects at once, so one refusal is enough to say so
+    if (c.lastOk === false) out.lastOk = false; else if (c.lastOk === true && out.lastOk !== false) out.lastOk = true;
   }
-  return n;
+  return out;
 }
 // Firestore's day so far (the free plan: 50,000 reads, 20,000 writes, 20,000 deletes a day, counted from
 // midnight in California), from Cloud Monitoring — when FIREBASE_RULES_KEY's service account may read it
@@ -246,7 +271,7 @@ async function report() {
   const fs = await firestoreMetrics('my-kitchen-notes-beta');
   if (fs.metrics) Object.assign(metrics, fs.metrics); else console.log('Firestore: not measured — ' + fs.note);
   const builds = await monthBuilds();
-  if (builds !== null) metrics.pagesBuilds = { used: builds, limit: 500, period: 'month' };
+  if (builds !== null) metrics.pagesBuilds = builds;
   const wr = require('fs').readFileSync(require('path').join(__dirname, '..', 'worker', 'wrangler.jsonc'), 'utf8');
   const appKey = (/"APP_SHARED_KEY"\s*:\s*"([^"]+)"/.exec(wr) || [])[1] || '';
   const key = require('crypto').createHmac('sha256', TOKEN).update('mkn-usage-watch-v1').digest('hex');
@@ -259,7 +284,8 @@ async function report() {
   if (r.status === 403) console.log('::warning::the Worker refused the usage watch — publish the Worker (deploy-worker.yml sets USAGE_KEY)');
 }
 
-(async function(){
+module.exports = { countBuilds };
+if (require.main === module) (async function(){
   if (!TOKEN) { console.log('CLOUDFLARE_API_TOKEN is not set.'); process.exit(1); }
   if (process.argv.includes('--report')) { await report(); return; }
   console.log('Cloudflare usage, the last ' + DAYS + ' day(s), ' + il(Date.now()) + ' Israel time\n');
