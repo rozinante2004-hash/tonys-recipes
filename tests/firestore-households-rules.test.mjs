@@ -1,3 +1,4 @@
+import { createHash } from 'crypto';
 // Firestore rules for HOUSEHOLDS (WP-D), tested against the real emulator
 // (v36.84). Every "may" and "may not" below is a line of the HOUSEHOLDS part of
 // firestore.rules (merged there, alongside the family's `shared` rules, in v36.86).
@@ -463,6 +464,22 @@ await check('the owner closes the copy to newcomers',          setDoc(doc(alice,
 await check('…nothing else goes in it',                        setDoc(doc(alice, 'config/founding'), { open: false, extra: 1 }), false);
 await check('closed: a newcomer cannot start a household',      found(carol, 'hClosed1', 'carol'), false);
 await check('closed: the app\'s owner still can',              found(alice, 'hClosed2', 'alice'), true);
+// v38.69 — Tony: "The Beta testing should only be possible by invitation-only (unless adding to the tester's household)."
+const sha = (a) => createHash('sha256').update(String(a).toLowerCase()).digest('hex');
+const tina = person('tina', { email: 'Tina@Example.com' }), tinaUnconfirmed = person('tina2', { email: 'tina@example.com', email_verified: false });
+await check('v38.69: only the app\'s owner invites a tester',     setDoc(doc(carol, 'testerInvites/' + sha('tina@example.com')), { at: 1, by: 'carol' }), false);
+await check('v38.69: the owner invites one (a fingerprint, never the address)', setDoc(doc(alice, 'testerInvites/' + sha('tina@example.com')), { at: 1, by: 'alice' }), true);
+await check('v38.69: …a key that is not a fingerprint is refused', setDoc(doc(alice, 'testerInvites/gina@example.com'), { at: 1, by: 'alice' }), false);
+await check('v38.69: …and nothing else goes in it',              setDoc(doc(alice, 'testerInvites/' + sha('x@example.com')), { at: 1, by: 'alice', email: 'x@example.com' }), false);
+await check('v38.69: closed: the invited tester founds a household (any capitals in the address)', found(tina, 'hTester1', 'tina'), true);
+await check('v38.69: …not with that address unconfirmed',         found(tinaUnconfirmed, 'hTester2', 'tina2'), false);
+await check('v38.69: …a forwarded invitation lets nobody else in', found(dave, 'hTester3', 'dave'), false);
+await check('v38.69: the tester may look up their own invitation', getDoc(doc(tina, 'testerInvites/' + sha('tina@example.com'))), true);
+await check('v38.69: …not anyone else\'s',                         getDoc(doc(dave, 'testerInvites/' + sha('tina@example.com'))), false);
+await check('v38.69: …nor the list',                              getDocs(collection(tina, 'testerInvites')), false);
+await check('v38.69: the owner reads the list',                   getDocs(collection(alice, 'testerInvites')), true);
+await check('v38.69: …and takes one back',                        deleteDoc(doc(alice, 'testerInvites/' + sha('tina@example.com'))), true);
+await check('v38.69: taken back: no new household',               found(tina, 'hTester4', 'tina'), false);
 await check('the owner opens it again',                        setDoc(doc(alice, 'config/founding'), { open: true, by: 'alice@example.com', at: 2 }), true);
 await check('open: a newcomer starts one',                     found(carol, 'hOpen1', 'carol'), true);
 

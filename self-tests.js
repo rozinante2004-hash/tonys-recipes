@@ -7705,7 +7705,20 @@ window.SELF_TESTS = [
         var withErr=serverAllowanceLines({ watch:true, usage:{ at:Date.now(), metrics:{ workerErrors:{ used:3, of:900 } } }, notices:[] }).join('\n');
         // v38.68 — the sign-in-link e-mails, today and the last 30 days
         var withLinks=serverAllowanceLines({ watch:true, notices:[], links:{ limit:5, byProject:{ 'my-kitchen-notes-beta':{ today:4, most:5, full:1, refused:1, days:6 } } } }).join('\n');
-        if(!/⚠️ my-kitchen-notes-beta: today 4 of 5 · last 30 days: most in a day 5, days all 5 were used 1, days someone was turned away 1/.test(withLinks)) throw new Error('the sign-in links: '+withLinks);
+        if(!/Sign-in-link e-mails — my-kitchen-notes-beta/.test(withLinks) || !/⚠️ Today: 4 of 5/.test(withLinks) || !/Most in one day \(last 30 days\): 5/.test(withLinks)
+          || !/Days all 5 were used: 1/.test(withLinks) || !/Days someone was turned away: 1/.test(withLinks)) throw new Error('the sign-in links: '+withLinks);
+        // v38.69 — Tony: "left-justify and tabulate … the values in a darker color than the titles"
+        var tbl=document.createElement('div'); tbl.innerHTML=serverAllowanceHtml({ watch:true, notices:[], usage:{ at:Date.now(), metrics:{ kvWrites:{ used:812, limit:1000 } } } });
+        document.body.appendChild(tbl);
+        try {
+          var th=tbl.querySelector('.alw-t th'), tdv=tbl.querySelector('.alw-t td.alw-v');
+          if(!th || !tdv || th.textContent!=='KV writes' || tdv.textContent!=='812 of 1,000 (81%)') throw new Error('the table: '+tbl.innerHTML.slice(0,300));
+          if(getComputedStyle(tbl.firstChild).textAlign!=='left' || getComputedStyle(th).textAlign!=='left') throw new Error('not left-aligned');
+          var lum=function(c){ var m=(c.match(/[\d.]+/g)||[]).map(Number); return 0.2126*m[0]+0.7152*m[1]+0.0722*m[2]; };
+          var dark=document.documentElement.getAttribute('data-theme')==='dark' || document.body.classList.contains('dark');
+          var lv=lum(getComputedStyle(tdv).color), lt=lum(getComputedStyle(th).color);
+          if(dark ? !(lv>lt) : !(lv<lt)) throw new Error('the value is not stronger than its title: '+getComputedStyle(tdv).color+' vs '+getComputedStyle(th).color);
+        } finally { tbl.remove(); }
         if(!/None asked for/.test(serverAllowanceLines({ watch:true, notices:[], links:{ limit:5, byProject:{} } }).join('\n'))) throw new Error('no links, yet it does not say so');
         if(!/✓ Server errors today: 3 of 900 requests \(0.3%\)/.test(withErr)) throw new Error('the server\u2019s errors: '+withErr);
         if(!/⚠️ KV writes: 812 of 1,000 \(81%\)/.test(lines) || !/✓ Worker requests/.test(lines) || !/⚠️ Pages builds this month: 510 of 500 \(102%\) — Cloudflare still builds/.test(lines) || !/Running now:/.test(lines)) throw new Error('the page: '+lines);
@@ -8042,7 +8055,7 @@ window.SELF_TESTS = [
         if(!af || parseInt(af.style.zIndex,10)<=parseInt(about.style.zIndex,10)) throw new Error('it opens behind About');
         var first=af.querySelector('.af-sec');
         if(!first || !/Cook together/.test(first.textContent)) throw new Error('the community is not first');
-        ['invite family and friends', 'Link with other households', 'Ask to join a household', 'block', 'Share a recipe on WhatsApp', 'share the app itself',
+        ['invite family and friends', 'Link with other households', 'Ask to join a household', 'block', 'Share a recipe on WhatsApp', 'or with a link',
          'browser extension', 'Change the servings', 'Translate a recipe', 'works offline'].forEach(function(x){ if(ft.indexOf(x)===-1) throw new Error('the list lacks: '+x); });
         appFeaturePhrases().forEach(function(x){ if(I18N_EXTRA.indexOf(x)===-1) throw new Error('not translated: '+x); });
         var wa=featureOn('whatsapp'); window._featureOverride.whatsapp=!wa;
@@ -9017,9 +9030,12 @@ window.SELF_TESTS = [
       var item=document.querySelector('#settingsDrop [onclick*="openInviteTesters"]');
       if(!item || !item.hasAttribute('data-owner-only') || !item.closest('[data-group="owner"]')) throw new Error('no owner-only ✉️ Invite testers in ⚙️ → 👑');
       var real={ owner:window.isAppOwner, send:window.sendViaGmailApi, ask:window.askConfirm, choice:window.askChoice, log:window.syncLog, toast:window.toast, find:window.gmailClientIdFind,
-                 ins:window.insightCount, tok:window.getGmailToken, fetch:window.fetch, drafts:localStorage.getItem(INVITE_DRAFTS_KEY), sent:localStorage.getItem(INVITE_SENT_KEY), lang:_inviteLang };
-      var logs=[];
+                 ins:window.insightCount, tok:window.getGmailToken, fetch:window.fetch, drafts:localStorage.getItem(INVITE_DRAFTS_KEY), sent:localStorage.getItem(INVITE_SENT_KEY), lang:_inviteLang,
+                 add:window.testerInvitesAdd, only:window.inviteOnlyShow };
+      var logs=[], registered=[];
       try{
+        // v38.69 — never the real database from a test: who may start a kitchen is recorded through this stand-in
+        window.testerInvitesAdd=async function(a){ registered=registered.concat(a); return a.length; }; window.inviteOnlyShow=function(){};
         window.toast=function(){}; window.insightCount=function(){}; window.gmailClientIdFind=async function(){ return ''; };
         window.syncLog=function(){ logs.push(JSON.stringify(Array.prototype.slice.call(arguments))); };
         localStorage.removeItem(INVITE_DRAFTS_KEY); localStorage.removeItem(INVITE_SENT_KEY); _inviteLang='en';
@@ -9051,6 +9067,7 @@ window.SELF_TESTS = [
         if(!r || r.sent!==2 || calls.length!==2 || calls[0].to!=='ann@x.example' || calls[1].to!=='ben@y.example') throw new Error('one e-mail each: '+JSON.stringify(r)+' '+calls.map(function(c){ return c.to; }));
         var sup=appSupportEmail();
         if(!calls[0].o.owner || (sup && (calls[0].o.from!=='My Kitchen Notes <'+sup+'>' || calls[0].o.replyTo!==sup))) throw new Error('not from the app’s address: '+JSON.stringify(calls[0].o));
+        if(JSON.stringify(registered)!==JSON.stringify(['ann@x.example','ben@y.example'])) throw new Error('v38.69: the ones sent to may not start a kitchen: '+JSON.stringify(registered));
         if(calls[0].plain.indexOf(link)===-1 || calls[0].html.indexOf('href="'+link+'"')===-1 || !/^Hello friend!/.test(calls[0].plain)) throw new Error('the e-mail lacks his words or the link');
         if(document.getElementById('invTo').value!=='') throw new Error('the addresses sent to stay in To');
         // Already invited: asked, and "only the new" sends only to them.
@@ -9077,8 +9094,74 @@ window.SELF_TESTS = [
         var ov=document.getElementById('inviteOverlay'); if(ov) ov.remove();
         window.isAppOwner=real.owner; window.sendViaGmailApi=real.send; window.askConfirm=real.ask; window.askChoice=real.choice; window.syncLog=real.log; window.toast=real.toast;
         window.gmailClientIdFind=real.find; window.insightCount=real.ins; window.getGmailToken=real.tok; window.fetch=real.fetch; _inviteLang=real.lang;
+        window.testerInvitesAdd=real.add; window.inviteOnlyShow=real.only;
         if(real.drafts===null) localStorage.removeItem(INVITE_DRAFTS_KEY); else localStorage.setItem(INVITE_DRAFTS_KEY, real.drafts);
         if(real.sent===null) localStorage.removeItem(INVITE_SENT_KEY); else localStorage.setItem(INVITE_SENT_KEY, real.sent);
+      }
+    } },
+
+  { id:'beta_by_invitation_only', group:'Sharing', name:'🔑 The beta by invitation only: the owner’s invitation lets that address (and nobody it is forwarded to) start a kitchen, kept as a fingerprint and never the address; testers share by inviting to their own kitchen, not the app’s link; the invitation says so in English and Hebrew (v38.69)',
+    test: async()=>{
+      var real={ owner:window.isAppOwner, db:window.hhDb, user:window._fbUser, hh:_household, open:window.hhFoundingOpen, ins:window.insightCount, drafts:localStorage.getItem(INVITE_DRAFTS_KEY), reg:localStorage.getItem(INVITE_REG_KEY) };
+      var docs={}, writes=[];
+      var fakeDb={ collection:function(c){ return { doc:function(id){ return {
+        set:async function(d){ writes.push({ c:c, id:id, d:d }); docs[c+'/'+id]=d; },
+        get:async function(){ return { exists: !!docs[c+'/'+id] }; } }; } }; } };
+      try{
+        window.insightCount=function(){};
+        // the fingerprint: SHA-256 of the address, lower-case, trimmed, in hex
+        var fp=await inviteFingerprint(' Ann@X.Example ');
+        if(fp!=='ff8cae1e494318afd37e2e532eff01ed9564cc43cbe2d898b2568ec104b2b527') throw new Error('the fingerprint: '+fp);
+        window.hhDb=function(){ return fakeDb; };
+        window.isAppOwner=function(){ return false; };
+        if(await testerInvitesAdd(['ann@x.example'])!==0 || writes.length) throw new Error('someone other than the owner recorded an invitation');
+        window.isAppOwner=function(){ return true; };
+        if(await testerInvitesAdd(['ann@x.example','ben@y.example'])!==2) throw new Error('the owner\u2019s invitations were not recorded');
+        if(writes[0].c!=='testerInvites' || writes[0].id!==fp || Object.keys(writes[0].d).sort().join()!=='at,by' || JSON.stringify(writes).indexOf('@')!==-1) throw new Error('what is stored: '+JSON.stringify(writes));
+        // who may start a kitchen while the copy is closed
+        window.hhFoundingOpen=async function(){ return false; };
+        window.isAppOwner=function(){ return false; };
+        window._fbUser={ uid:'t1', email:'ANN@x.example', emailVerified:true };
+        if(await householdMayFound()!==true) throw new Error('the invited address may not start a kitchen');
+        window._fbUser={ uid:'t2', email:'cat@z.example', emailVerified:true };
+        if(await householdMayFound()!==false) throw new Error('an address nobody invited may start a kitchen');
+        window._fbUser={ uid:'t3', email:'ann@x.example', emailVerified:false };
+        if(await householdMayFound()!==false) throw new Error('an unconfirmed address may start a kitchen');
+        if(String(householdWelcome).indexOf('Invited to test the app? Sign in with the address the invitation came to')===-1) throw new Error('the welcome does not tell a tester at another address what to do');
+        // Share This App: a tester invites to their kitchen; the app's link is not offered
+        window._fbUser={ uid:'t1', email:'ann@x.example', emailVerified:true };
+        _household={ hid:'hT', name:'Ann\u2019s kitchen', role:'owner' };
+        await openShareAppModal();
+        var C=document.getElementById('shareAppClosed'), O=document.getElementById('shareAppOpen'), B=document.getElementById('shareAppInviteBtn'), A=document.getElementById('shareAppAskOwner');
+        if(C.hidden || !O.hidden || B.hidden || !A.hidden) throw new Error('a tester is offered the app\u2019s link, or not the invitation to their kitchen');
+        if(!/householdInvite\(\)/.test(B.getAttribute('onclick')||'')) throw new Error('the button does not invite to the kitchen');
+        closeM('shareAppOverlay');
+        _household={ hid:'hT', name:'Ann\u2019s kitchen', role:'viewer' };
+        await openShareAppModal();
+        if(!B.hidden || A.hidden) throw new Error('someone who may not invite is offered to');
+        closeM('shareAppOverlay');
+        window.hhFoundingOpen=async function(){ return true; };
+        await openShareAppModal();
+        if(!C.hidden || O.hidden) throw new Error('an open copy hides the app\u2019s link');
+        closeM('shareAppOverlay');
+        window.hhFoundingOpen=async function(){ return false; }; window.isAppOwner=function(){ return true; };
+        await openShareAppModal();
+        if(!C.hidden || O.hidden) throw new Error('the owner cannot share the app');
+        closeM('shareAppOverlay');
+        // the invitation's words, in both languages
+        var en=INVITE_TEXTS.en.body, he=INVITE_TEXTS.he.body;
+        if(!/by invitation only/.test(en) || !/the one this invitation came to/.test(en) || !/don’t forward/.test(en) || !/Invite them to your kitchen/.test(en) || !/\n5\. /.test(en)) throw new Error('English: '+en);
+        if(!/בהזמנה בלבד/.test(he) || !/שאליה נשלחה ההזמנה/.test(he) || !/אל תעבירו/.test(he) || !/הזמינו אותם למטבח/.test(he) || !/\n5\. /.test(he)) throw new Error('Hebrew: '+he);
+        // wording kept from before says the original words changed
+        localStorage.setItem(INVITE_DRAFTS_KEY, JSON.stringify({ en:{ subject:'S', body:'B {link}' } }));
+        inviteDraftSave('he', 'S2', 'B2');
+        var kept=JSON.parse(localStorage.getItem(INVITE_DRAFTS_KEY));
+        if(kept.en.rev || kept.he.rev!==INVITE_TEXTS_REV) throw new Error('a new edit does not carry the texts\u2019 revision: '+JSON.stringify(kept));
+      } finally {
+        window.isAppOwner=real.owner; window.hhDb=real.db; window._fbUser=real.user; _household=real.hh; window.hhFoundingOpen=real.open; window.insightCount=real.ins;
+        if(real.drafts===null) localStorage.removeItem(INVITE_DRAFTS_KEY); else localStorage.setItem(INVITE_DRAFTS_KEY, real.drafts);
+        if(real.reg===null) localStorage.removeItem(INVITE_REG_KEY); else localStorage.setItem(INVITE_REG_KEY, real.reg);
+        var ov=document.getElementById('shareAppOverlay'); if(ov) ov.classList.remove('open');
       }
     } },
 

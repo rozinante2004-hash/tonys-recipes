@@ -574,6 +574,34 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
   `auth_more_ways_to_sign_in` (told, with the copy and never the address) + `firebase_limits_told`; 5 Worker checks.
 - **Released: v38.68 + Worker v87 (20 Oct 2026, 21:39 Israel time, CI green on 8eb4fb3).** All jobs success (Worker v87
   deployed; CF_ANALYTICS_TOKEN present — only the two WhatsApp secrets reported missing).
+- **v38.69 — the beta by invitation only; 🩺 as a table** (Tony, 20 Oct ~22:xx: "Please left-justify and tabulate the
+  Server allowances page … Make the values in a darker color than the titles. Can the testers use 'Share This App'? I
+  would like them to be able to add family members to their household, but not share it with non-testers … we may
+  need to change the text in the testers invitations as well. The Beta testing should only be possible by
+  invitation-only (unless adding to the tester's household). Once the above is done, please update the
+  reconstruction prompt and the Help."). (1) 🩺: `serverAllowanceItems` (heading / row {mark, t, v} / paragraph /
+  gap) → `serverAllowanceHtml` (`.alw` table, left, titles muted, values `--ink` 600) and `serverAllowanceLines`
+  (same, as text — notices and tests); askConfirm `opts.html` + `opts.wide` (`.ask-wide` 620 px, `.ask-html` scrolls);
+  "its day began at <local time>" and "Firebase's day begins … <local time>" computed (were fixed "03:00", "10:00").
+  (2) **Invitation only**: rules `testerInvites/{sha256 hex of the lower-case address}` {at, by} — owner writes/lists/
+  deletes, anyone `get`s only their own; `invitedTester()` (confirmed address + exists) lets them found while
+  `config/founding.open == false` (rules tests: 13 checks, incl. a forwarded invitation and unconfirmed). App:
+  `inviteFingerprint`, `testerInvitesAdd` (every send way: Gmail's sent, Mail app/WhatsApp/Copy the To list; none
+  typed → said), `testerInvitesCatchUp` (`mkn_invite_sent` → once, `mkn_invite_reg`), `testerInvited`,
+  `householdMayFound` = owner || open || invited; the welcome (closed, no elsewhere) adds "Invited to test the app?
+  Sign in with the address the invitation came to — you are signed in as …". Invite window: #invOnly (closed or not,
+  how many invited), #invOld (a saved wording from before `INVITE_TEXTS_REV` 2). `INVITE_TEXTS` en/he: sign in with
+  this address, by invitation only, don't forward, invite family from inside (step 4), feedback step 5.
+  **Share This App** (`openShareAppModal` async, `shareAppClosed()`): closed copy + not owner + in a household →
+  #shareAppClosed ("🔗 Invite someone to my kitchen" → householdInvite, or #shareAppAskOwner without the right) and
+  the app's link hidden (#shareAppOpen). ✨ What can this app do: no "share the app itself"; "by e-mail or with a
+  link". Help: invitation-only, inviting to your kitchen (⚙️ → 🏠 My household → 🔗 Invitation link…), the share
+  icon, the owner's invitations and 🩺. RECONSTRUCTION_PROMPT.md: §1b.13 (v38.46–v38.69), Worker v78–v87, the
+  rules-publishing note, current version. **Tony's step after the release: 📊 Households → "by invitation only".**
+  Self-tests `beta_by_invitation_only` (new), `invite_testers` (never the real database: `testerInvitesAdd` and
+  `inviteOnlyShow` stubbed), `firebase_limits_told` (the table, left, value stronger than title in both themes),
+  about-features list. 402 pass ×4 suites; phone, double-click, close-in-view, axe, contrast pass. Page 2,189 KB of
+  2,200 KB.
 - **Move step 9 finished (20 Oct 2026, 18:05 Israel time; Tony: "OK to delete the 4 + 135 old family documents").**
   clear-source `all` + `shared` (run 39445140837): 139 deleted (households 4, shared 135), the household cut to its
   moved mark; clear-check after it (run 39445361414): recipes-f379d holds 1 document of the moved household (its own,

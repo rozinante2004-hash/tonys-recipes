@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v38.47` — app. **Worker: v77**, deployed separately and versioned separately
+**Current version:** `v38.69` — app. **Worker: v87**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -104,7 +104,7 @@ slide‑up modal animation.
   added since stay) — or takes a backup / languages file. Every backup carries them (§10).
   Export languages was removed in v36.93 (the repository does its job).
 
-## 1b. The household era, the community app and the owner's tools (v36.84 – v38.45)
+## 1b. The household era, the community app and the owner's tools (v36.84 – v38.69)
 
 Everything in this section came after the single-collection design described in the rest of the
 file. Where the two disagree, **this section wins**. The working notes (`CLAUDE.md`, the bullet
@@ -560,9 +560,122 @@ Each item names the function or key to look for; `CLAUDE.md` has the long story 
 
 **State on 16 Oct 2026 (v38.45, Worker v77):** the family copy forwards to the community copy; the owner's
 two-step is required (Ente Auth, both owner accounts; Owner recovery job ready); the browser key is restricted
-(Identity Toolkit, Token Service, Firestore; the copy's addresses); the tester invitation is ready to send. Next:
-move step 9 (clearing the old family data, with the owner's OK), then the testers.
+(Identity Toolkit, Token Service, Firestore; the copy's addresses); the tester invitation is ready to send.
 
+### 1b.13 Testers, allowances and the pre-launch audit (v38.46 – v38.69, 16–20 Oct 2026)
+
+Each item names the function or key to look for; `CLAUDE.md` has the long story of each, and
+`AUDIT-2026-10-prelaunch.md` the audit (what was found, measured capacity for 20 testers, what is left).
+
+**A newcomer's first minutes**
+- **The welcome (v38.47, `householdWelcome`):** short and friendly; every button says what it does (🏠 Start my own
+  recipe collection / 🔗 I have an invitation link / 📬 Someone added my e-mail — let me confirm it); Cancel is
+  "👋 Not now — sign me out" (`askChoice` `opts.cancelLabel`, `opts.noBackdrop`); `user.reload()` first. Never "go to
+  My Kitchen Notes" from inside it (`householdElsewhereUrl` is '' there).
+- **The app's own name from the first frame (v38.61):** `tools/build.js` writes brandName into `<title>`, both
+  logos (`data-no-i18n`) and description + og:type/title/description/url/image for every copy with a brandName (a
+  WhatsApp/Gmail preview of the invitation runs no script). The sign-in screen comes first in the page (v38.62:
+  `#loginScreen` and `#offlineBanner` before the header), keeps room for the e-mail button (an inline script after
+  `#otherSignIns` reserves n×54−8 px), scrolls instead of cutting off its top on small phones (v38.59), says "Sign in"
+  and has one "Trouble signing in?" (v38.64; "🪵 Copy the log" only with the check it opens, `loginLogButtonReveal`).
+- **E-mail sign-in is password-first (v38.58):** the one-time link is a small fallback under "Forgot password?";
+  Remember me works both ways in the e-mail form too (`rememberChoice`); the form is a real login `<form>`.
+- **Firebase's free plan sends 5 sign-in-link e-mails a day per project.** v38.68: `linkSentTell()` after each
+  `sendSignInLinkToEmail` → Worker `link-sent` counts them (§4, Worker v87); a refusal (`auth/quota-exceeded` →
+  `firebaseLimitHit('auth-email')` → `limit-report`) is counted and told to the owner.
+- **No stray requests (v38.61):** the browser's look-ahead read text inside the 2 MB of inline code as markup and
+  fetched it; Cloudflare Pages answers an unknown path with index.html (~500 KB each). Every tag with an address
+  inside the code is written `<img\u0020src=…` / `<iframe\u0020…`; self-test `no_fetchable_tags_in_the_code`.
+  **Write new ones the same way.**
+- **A double click never acts twice (v38.48):** a window-capture guard (`_clickLayer`, `clickLayerOf`,
+  `clickIsGhost`) — a click with detail ≥ 2 within 700 ms counts only in the layer of the first (the name box's
+  "Let's cook!" sat on "✍️ Paste the text" behind it); `tests/double-click.js` in CI.
+
+**The beta by invitation only (v38.69)** — Tony, 20 Oct: "The Beta testing should only be possible by
+invitation-only (unless adding to the tester's household)."
+- `config/founding {open}` (v37.96, 📊 Households' switch) closes a copy to newcomers; the owner's ✉️ Invite testers
+  now also writes **`testerInvites/<SHA-256 of the address, lower-case, hex>` {at, by}** for each address it sends to
+  (`inviteFingerprint`, `testerInvitesAdd`; the ones invited from that device before are caught up once,
+  `testerInvitesCatchUp`, `mkn_invite_reg`). The address itself is never stored.
+- Rules: `invitedTester()` = signed in, address confirmed, and `exists(testerInvites/$(hashing.sha256(myEmail())
+  .toHexString().lower()))`; founding is allowed when `foundingOpen() || appAdmin() || invitedTester()`. Anyone may
+  `get` only their own fingerprint; only the owner lists, writes and deletes. A forwarded invitation lets nobody else in.
+- App: `householdMayFound()` = owner, or open, or `testerInvited(user)`. The welcome tells someone invited at
+  another address to sign in with that one. Joining a tester's kitchen still works (its 14-day invitation link,
+  being added by e-mail, a join request).
+- **Share This App** (`openShareAppModal`, `shareAppClosed()`): while the copy is closed, anyone but the owner sees
+  "🔗 Invite someone to my kitchen" (`householdInvite`, Read only) — or, without the right to invite, "ask your
+  kitchen's owner" — instead of the app's link; the owner shares the app as before.
+- The invitation's words (`INVITE_TEXTS`, English and Hebrew, `INVITE_TEXTS_REV` 2): sign in with the address the
+  invitation came to; please don't forward it; invite family from inside the app. Wording a device saved before
+  that is flagged in the window (`#invOld`) until "The original words" or a new edit.
+
+**Linked kitchens and talking to them (v38.49 – v38.53)**
+- Linked households' recipes appear in the main list (`renderLinkedInAll`, `.linked-card` on `--linked-bg/
+  --linked-border`, read-only), filtered by 🏠 Kitchens ▾ (`hiddenHouseholds`, `kitchenMenuHtml`); each linked
+  kitchen is listened to live (`linkLiveRecipes`); requests, links and messages arrive live (`linkLiveStart/Stop/
+  Talk`); 💬 Chats with linked kitchens (`openKitchenChats`); link requests by e-mail are a stepped window with
+  ‹ Back that keeps what was typed (`openConnectHousehold`, askConfirm/askChoice `opts.backLabel` → `ASK_BACK`,
+  defined at the top of the first script). **The app never says whether an e-mail address has an account.**
+- Every ✕ stays in view in a scrolling window (sticky `.modal > .modal-close`; `tests/close-in-view.js`).
+
+**Fewer Firestore reads (v38.56, v38.65)** — the 50,000 free reads a day are what 20 testers come nearest to.
+- A linked kitchen is read once (its listener), a second device's photos once (`repairMissingPhotos(bulk)`).
+- **Each device reads only what changed** (v38.65, `incrementalCloudLoad`, households layout): every recipe write
+  carries `syncedAt` (server time, `saveRecipeDoc`); a load whose meta moved asks `syncedAt > newest seen` and
+  `updatedAt > newest held − 15 min` (apps from before), reads one by one what meta.ids lists but nobody holds,
+  removes what it no longer lists only after a get finds it gone, and must add up BEFORE anything is recorded (else
+  the full read, unchanged). A full read every 24 h (`mkn_cloud_sync_<hid>`). Linked kitchens are kept on the device
+  (`mkn_linked_<myHid>_<theirs>`, ≤ 1.5 MB) and merged (`linkLiveChanged`); a linked reader may read their
+  `state/meta` only. Measured: a tester reopens 81 → 23 reads; another device after one edit 97 → 24.
+- **The apps count their reads** as Firebase bills them (v38.63, `fsReadsCountInstall` wraps get/onSnapshot;
+  `mkn_fs_reads`; sent with `insightsSend`) — Firebase's own count needs billing on (Cloud Monitoring), so this is
+  the early warning (owner warned at 70%).
+
+**Every allowance watched and told (v38.54 – v38.68, Worker v78 – v87)**
+- Idle windows are quiet (`appIdleFor`, 10 min: the live poll every 30 min, at once on a touch or return) — four
+  open windows had used up Cloudflare's 1,000 KV writes a day.
+- `serverNoticeFrom` → a bar (#serverNoticeBar): what has stopped and when it comes back; testers see only what is
+  everyone's. `serverNoticeTime` adds the day when it is not today. The owner's line starts with what has stopped
+  ("⏸ Stopped until <when>: <what>.") and names the service, the figures and who counted.
+- The usage watch (`tools/cf-usage.js --report`, GitHub, unreliable clock) and the Worker's own hourly cron (`17 * * *
+  *`, CF_ANALYTICS_TOKEN) report Cloudflare's day; Pages builds count only real builds (`countBuilds`: not
+  "queued", never built; not direct uploads) and over 500 is a WARNING unless a build was refused (Cloudflare kept
+  building past 500). Both Cloudflare Pages projects build production only (previews off).
+- ⚙️ → 👑 App owner → **🩺 Server allowances** (`openServerAllowances`): a left-aligned table (`serverAllowanceItems`
+  → `serverAllowanceHtml`; `serverAllowanceLines` is the same as text) — titles muted, values dark: Cloudflare's day,
+  Pages builds per copy (`pagesCopyName` by the project name's ending — project ids live in APP_CONFIG only), server
+  errors, what is running now, Firestore reads as the apps count them, sign-in-link e-mails (today, the most in a
+  day, days all 5 went, days someone was turned away), when Firebase's day begins.
+- **📲 WhatsApp alerts** (v38.64–v38.65): `ownerAlert` also sends through CallMeBot when the Worker secrets
+  WHATSAPP_PHONE and WHATSAPP_KEY are set; each of eight kinds on or off (`ALERT_KINDS`, D1 `owner_prefs`); a test alert.
+  E-mail always comes.
+
+**The Worker, v78 → v87 (new actions and stores; `tests/worker-cors.mjs` checks each)**
+- v78: per-minute ceilings in isolate memory (`minuteCount`), AI day/month and video ceilings in D1 `counters`
+  (`ceilingCount`), `tableOnce`; a refused write (`isLimitError`) → `noteServerLimit`. v79: `raiseNotice` →
+  D1 `allowance_notices` (KV `notice:<what>` without D1) and `ownerAlert`; actions `limit-report`, `usage-report`
+  (key = HMAC of the Cloudflare token, Worker secret USAGE_KEY); meter-admin `allowances`. v80: Firestore metrics
+  (period `pacific-day`). v81: AI ceilings 1,000 a day / 10,000 a month. v82: the server's own errors (≥ 25 and ≥ 2%).
+  v83: `app-signals` `reads` → `fsreads:<project>:<Firebase day>`. v84: WhatsApp via CallMeBot, `alert-test`, the
+  hourly cron. v85: `alert-prefs` / `alert-prefs-set`. v86: `usageWords` (plain words, Israel time, never UTC),
+  `newsToMail` (new figures written, not mailed; a turn for the worse mailed at once). v87: `link-sent`
+  (`links:<project>:<day>`, ≤ 50 a day, 40 days; `linksno:` for refusals; owner warned at 4 of 5), `linkStats`.
+
+**Smaller things**
+- Kitchen names, not the owner's, in exports and shares (`kitchenTitle()`, `kitchenFileStem()`); a new recipe starts
+  at Dinner; the terms say "the web app (in all its copies)".
+- The Self Test window cannot be closed while running and shows a meat grinder (`selfTestGrinderHtml`); a run
+  signed in for real puts the sign-in aside and back (`_selfTestPark`, `_selfTestSignInBack`).
+- The old family database (recipes-f379d) is cleared: move step 9 checked each document against the community copy
+  first (`tools/move-family.mjs clear-check / clear-source / clear-detail`); only the household's own moved-mark
+  document is left.
+- The database rules are published by the "Publish the database rules" job (deploy-rules.yml) after the rules
+  tests pass on the emulator; `tests/firestore-households-rules.test.mjs` covers every may and may not.
+
+**State on 20 Oct 2026 (v38.69, Worker v87):** testers are invited from Sunday 25 Oct; from then on every
+release waits for the owner's yes. Open: WhatsApp (CallMeBot was full), the AI models after the launch, the testing
+tools' update (Playwright, Ubuntu 26.04) after launch week, the page at 2,176 of its 2,200 KB budget.
 ---
 
 ## 2. File inventory (recreate all of these)
@@ -1040,9 +1153,10 @@ asserted something that had not happened.
 
 ## 4d. The security rules (Firestore + Storage)
 
-Both files live in the repo and are published **by hand** in the Firebase console. That is
-deliberate and must stay that way: **a bad rules push locks every device out at once**, and that
-is not something to automate behind a green CI run.
+Both files live in the repo and were published **by hand** in the Firebase console, because **a bad
+rules push locks every device out at once**. (Since the household era the "Publish the database rules"
+job, deploy-rules.yml, publishes `firestore.rules` to each copy on a push to `main` — only after the
+emulator rules tests pass in the same job. Keep that order: tests first, publish second.)
 
 `firestore.rules` is the **canonical** copy. The app fetches it at runtime
 (⚙️ Settings → 👥 Family Access → Show rules) and substitutes three placeholders — `READ`, `WRITE`,

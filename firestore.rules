@@ -115,6 +115,15 @@ service cloud.firestore {
       return !exists(/databases/$(database)/documents/config/founding)
         || get(/databases/$(database)/documents/config/founding).data.get('open', true) == true;
     }
+    // v38.69 — Tony, 20 Oct 2026: "The Beta testing should only be possible by invitation-only (unless adding to the
+    // tester's household)." The owner's ✉️ Invite testers writes testerInvites/<SHA-256 of the address, lower-case,
+    // in hex>; that address, confirmed, may found a household while the copy takes newcomers by invitation only. The
+    // address itself is never stored; a forwarded invitation does not let anyone else in.
+    function myInviteHash() { return hashing.sha256(myEmail()).toHexString().lower(); }
+    function invitedTester() {
+      return signedIn() && verified()
+        && exists(/databases/$(database)/documents/testerInvites/$(myInviteHash()));
+    }
     function isMember(hid) { return signedIn() && exists(memberPath(hid, request.auth.uid)); }
     function myRole(hid) { return get(memberPath(hid, request.auth.uid)).data.role; }
     function rank(r) {
@@ -215,7 +224,7 @@ service cloud.firestore {
       // households in link requests and conversations, and must never carry a quote.
       allow create: if signedIn()
         && hid.matches('^[A-Za-z0-9]{1,64}$')
-        && (foundingOpen() || appAdmin())                      // v37.96 — by invitation only, when closed
+        && (foundingOpen() || appAdmin() || invitedTester())   // v37.96 — by invitation only, when closed (v38.69: or invited)
         && request.resource.data.ownerUid == request.auth.uid
         && request.resource.data.keys().hasOnly(hhKeys())
         && !('features' in request.resource.data)               // v38.22 — never set by whoever founds it
@@ -568,6 +577,17 @@ service cloud.firestore {
         && request.resource.data.expiresAt is timestamp
         && atLeast(request.resource.data.hid, 'admin');
       allow delete: if signedIn() && atLeast(resource.data.hid, 'admin');
+    }
+
+    // v38.69 — the owner's tester invitations (see invitedTester): only he lists, writes and removes them; anyone
+    // signed in may look up the one for their OWN address (the app asks before offering "Start my own collection").
+    match /testerInvites/{h} {
+      allow get: if signedIn() && verified() && h == myInviteHash();
+      allow read: if appAdmin();
+      allow create, update: if appAdmin() && h.matches('^[0-9a-f]{64}$')
+        && request.resource.data.keys().hasOnly(['at', 'by'])
+        && request.resource.data.at is int && request.resource.data.by is string;
+      allow delete: if appAdmin();
     }
 
     // v37.96 — the copy's own settings, chosen by the app's owner: `founding`
