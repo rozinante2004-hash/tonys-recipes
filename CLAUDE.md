@@ -526,6 +526,10 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
   so a new kind starts on; unknown/D1 down = on); meter-admin `alert-prefs` / `alert-prefs-set`; `ownerAlert(…, {kind})`
   skips only WhatsApp. askConfirm took `checks: [{key,label,on}]` → `{ok, checks}`. The new-device e-mail says Israel
   time. Self-test `whatsapp_alerts_each_on_or_off`; 10 Worker checks.
+- **Released: v38.65 + Worker v85 (20 Oct 2026, 15:38 Israel time, CI green on 83ba8db).** All jobs success: Worker
+  v85 deployed (WHATSAPP_PHONE, WHATSAPP_KEY, CF_ANALYTICS_TOKEN still not set — notices in the deploy log), the
+  database rules published (linked readers may read `state/meta`), GitHub Pages, Cloudflare beta and test, Self Tests
+  main and test, languages.
 - **GitHub drops most scheduled runs on this repository** (20 Oct): the usage watch (:11 and :41) ran at 01:13 and 06:31
   UTC only; Publish languages (every 10 min) runs every 2–5 h; the 02:17 backup starts 07:00–07:51 UTC. The watch is an
   early warning only (a real refusal is told at once by the Worker and the app), but hourly needs another clock: the
