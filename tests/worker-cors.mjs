@@ -1689,6 +1689,12 @@ console.log('\nEvery allowance, told to the owner (v79):');
     const fsr = db.raw.prepare("SELECT * FROM allowance_notices WHERE what = 'usage:firestoreReads'").get();
     expect('Firestore\'s day is California\'s: warned until its midnight', fsr && fsr.until === Date.parse('2026-10-21T07:00:00Z') && /Firestore reads at 82%/.test(fsr.title)
       && /midnight in California/.test(fsr.detail) && /my-kitchen-notes-beta/.test(fsr.affects), JSON.stringify(fsr));
+    const er = await (await worker.fetch(post({ action: 'usage-report', key: 'k'.repeat(64), metrics: { workerErrors: { used: 10, of: 100 } }, appKey: 'secret-k' }), e)).json();
+    expect('v82: a handful of server errors is not warned (fewer than 25)', JSON.stringify(er.warned) === '[]', JSON.stringify(er));
+    const er2 = await (await worker.fetch(post({ action: 'usage-report', key: 'k'.repeat(64), metrics: { workerErrors: { used: 60, of: 2000 } }, appKey: 'secret-k' }), e)).json();
+    const ern = db.raw.prepare("SELECT * FROM allowance_notices WHERE what = 'usage:workerErrors'").get();
+    expect('v82: …3% of the day\'s requests is (owner, with where to look)', JSON.stringify(er2.warned) === '["workerErrors"]' && ern && ern.scope === 'owner'
+      && /60 times today \(3% of requests\)/.test(ern.title) && /Logs/.test(ern.detail), JSON.stringify([er2, ern]));
   }
 }
 

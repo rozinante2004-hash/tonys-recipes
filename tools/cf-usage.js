@@ -173,7 +173,7 @@ async function todayMetrics() {
   const q = `query($acct: string!, $since: Time!, $until: Time!) {
     viewer { accounts(filter: { accountTag: $acct }) {
       kv: kvOperationsAdaptiveGroups(limit: 20, filter: { datetime_geq: $since, datetime_lt: $until }) { sum { requests } dimensions { actionType } }
-      w: workersInvocationsAdaptive(limit: 20, filter: { datetime_geq: $since, datetime_lt: $until }) { sum { requests } }
+      w: workersInvocationsAdaptive(limit: 20, filter: { datetime_geq: $since, datetime_lt: $until }) { sum { requests errors } }
       d1: d1AnalyticsAdaptiveGroups(limit: 20, filter: { datetimeHour_geq: $since, datetimeHour_lt: $until }) { sum { rowsRead rowsWritten } }
     } } }`;
   const r = await graphql(q, { acct: ACCOUNT, since: since.toISOString(), until: now.toISOString() });
@@ -185,7 +185,9 @@ async function todayMetrics() {
     workerRequests: { used: sum(a.w, 'requests'), limit: 100000 },
     kvWrites: { used: kv.write || 0, limit: 1000 }, kvReads: { used: kv.read || 0, limit: 100000 },
     kvDeletes: { used: kv.delete || 0, limit: 1000 }, kvLists: { used: kv.list || 0, limit: 1000 },
-    d1RowsWritten: { used: sum(a.d1, 'rowsWritten'), limit: 100000 }, d1RowsRead: { used: sum(a.d1, 'rowsRead'), limit: 5000000 }
+    d1RowsWritten: { used: sum(a.d1, 'rowsWritten'), limit: 100000 }, d1RowsRead: { used: sum(a.d1, 'rowsRead'), limit: 5000000 },
+    // v82 — not an allowance: how often the server answered with an error today, out of how many requests
+    workerErrors: { used: sum(a.w, 'errors'), of: sum(a.w, 'requests') }
   };
 }
 async function monthBuilds() {
@@ -251,7 +253,8 @@ async function report() {
   const r = await fetch('https://lively-bread-273a.rozinante2004.workers.dev/', { method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action: 'usage-report', appKey, key, metrics }) });
   let j = null; try { j = await r.json(); } catch (e) {}
-  Object.keys(metrics).forEach(function(k){ const x = metrics[k]; console.log(k.padEnd(15) + String(x.used).padStart(9) + ' of ' + String(x.limit).padStart(9) + '  ' + Math.round(100 * x.used / x.limit) + '%'); });
+  Object.keys(metrics).forEach(function(k){ const x = metrics[k], of = x.limit || x.of || 1;
+    console.log(k.padEnd(15) + String(x.used).padStart(9) + ' of ' + String(of).padStart(9) + '  ' + Math.round(100 * x.used / of) + '%'); });
   console.log('The Worker: HTTP ' + r.status + (j && j.warned ? ', warned: ' + (j.warned.join(', ') || 'nothing') : j && j.error ? ' — ' + j.error : ''));
   if (r.status === 403) console.log('::warning::the Worker refused the usage watch — publish the Worker (deploy-worker.yml sets USAGE_KEY)');
 }

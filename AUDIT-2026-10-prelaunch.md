@@ -54,9 +54,10 @@ require my input should be kept for the last stages."*
 | A | Any change in a household makes each other device's next open read every recipe and photo again (151 reads in the test). Read only what changed (`updatedAt` > last read). The sync core — careful work and its own tests. | After the launch |
 | B | Three stray 404 requests per page load (the browser's look-ahead reading text inside the app's code as image addresses). Costs nothing; noise in the console. | Low |
 | C | Playwright 1.56 → a version with Ubuntu 26.04 browsers, then unpin. | Before GitHub retires 24.04 |
-| D | Worker CPU: p99.9 16.5 ms against the free 10 ms (no errors in two days). Add the Worker's error rate to the hourly watch. | Soon |
+| D | Worker CPU: p99.9 16.5 ms against the free 10 ms (no errors in two days). Add the Worker's error rate to the hourly watch. | **Done** — v38.60 + Worker v82: warned at ≥25 errors and ≥2% of requests; a line on 🩺 Server allowances |
 | E | The page is 2,184 KB of its 2,200 KB budget: the next large feature should load rarely used panels on demand. | Before the next big feature |
 | F | The header says "☁️ Shared · <name>" for a kitchen of one, and the same again in the status line. | With Tony's wording (below) |
+| G | **First visit on a slow phone**: the sign-in screen shows after 0.5 s on a fast desktop, 4.2 s on a mid phone on 4G, 17 s on a slow phone on 3G (measured, CPU slowed 4× and 6×). Later opens come from the device. | Investigating |
 
 ## Needs Tony (kept for last)
 

@@ -412,6 +412,12 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
   draws every way (self-test `i18n_harvest_signin_every_way`); `body:has(#feedbackFab)` bottom padding; Sign out
   nowrap; `.fav-btn:not(.filter-btn)` (the Favourites chip took the card heart's 16px and hover scale); import preview
   meta only non-empty fields (🍽 servings); "📷 Add a photo".
+- **v38.60 + Worker v82** (audit item D): the hourly usage watch also counts the Worker's errors today
+  (`workersInvocationsAdaptive` sum.errors in `todayMetrics()` → `workerErrors {used, of}`); the Worker warns once ≥25
+  errors AND ≥2% of requests ("The server answered with an error N times today (X% of requests)"); the owner's 🩺
+  Server allowances page shows "Server errors today: N of M requests (x%)". Measured first load (perf.cjs, beta build,
+  until the sign-in screen shows): fast desktop 0.5 s, mid phone on 4G (CPU 4×) 4.2 s, slow phone on fast 3G (CPU 6×)
+  17 s — the first visit only; the service worker serves later opens from the device.
 - **Before the testers, Tony's steps (16 Oct 2026):** (1) Cloudflare Email Routing destination addresses — done.
   (2) **The community app's browser key is restricted, both stages:** API restrictions = Identity Toolkit API, Token
   Service API, Cloud Firestore API (Google warned of "active usage" of eight Maps APIs — scanners; updated anyway);

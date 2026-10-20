@@ -7682,6 +7682,8 @@ window.SELF_TESTS = [
         // the owner's page
         var lines=serverAllowanceLines({ watch:true, usage:{ at:Date.now(), metrics:{ kvWrites:{ used:812, limit:1000 }, workerRequests:{ used:900, limit:100000 }, pagesBuilds:{ used:510, limit:500, period:'month' } } },
           notices:[{ what:'usage:kvWrites', kind:'warning', until:Date.now()+3600e3, title:'KV writes at 81% of the free allowance today', detail:'812 of 1,000 today.' }] }).join('\n');
+        var withErr=serverAllowanceLines({ watch:true, usage:{ at:Date.now(), metrics:{ workerErrors:{ used:3, of:900 } } }, notices:[] }).join('\n');
+        if(!/✓ Server errors today: 3 of 900 requests \(0.3%\)/.test(withErr)) throw new Error('the server\u2019s errors: '+withErr);
         if(!/⚠️ KV writes: 812 of 1,000 \(81%\)/.test(lines) || !/✓ Worker requests/.test(lines) || !/⛔ Pages builds this month: 510 of 500/.test(lines) || !/Running now:/.test(lines)) throw new Error('the page: '+lines);
         if(!/not connected/.test(serverAllowanceLines({ watch:false, notices:[] }).join('\n'))) throw new Error('no watch yet, yet it does not say so');
         if(!/Monitoring Viewer/.test(lines)) throw new Error('Firestore not measured, yet the page does not say how to add it');

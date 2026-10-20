@@ -1,4 +1,6 @@
-// Tony's Recipes — Cloudflare Worker v81
+// Tony's Recipes — Cloudflare Worker v82
+// v82: THE SERVER'S OWN ERRORS IN THE USAGE WATCH (the audit, 20 Oct 2026): usage-report's `workerErrors` {used, of};
+// 2% of today's requests and at least 25 → an owner warning (often the free plan's 10 ms CPU limit, or a crash).
 // v81: THE AI CEILINGS FOR 20 TESTERS (Tony, 20 Oct 2026: "1,000/day, 10,000/month"): AI_DAILY_DEFAULT 1000,
 // AI_MONTHLY_DEFAULT 10000, and the same set as variables in worker/wrangler.jsonc so a value left in the dashboard
 // cannot keep the old 300 / 3,000. Each household's own allowance still caps the bill.
@@ -369,7 +371,7 @@
 //   AI_MAX_TOKENS   – the longest answer one call may ask for (32000; the
 //                     app's largest, reading several recipes at once, asks 8000).
 
-const WORKER_VERSION = 'v81';
+const WORKER_VERSION = 'v82';
 const VIDEO_MAX_MB_DEFAULT = 50;
 const GEMINI_API = 'https://generativelanguage.googleapis.com';
 const GEMINI_MODEL_DEFAULT = 'gemini-2.5-flash';
@@ -844,6 +846,17 @@ async function usageReport(env, body) {
       detail: used.toLocaleString('en-US') + ' of ' + limit.toLocaleString('en-US') + (month ? ' this month.'
         : pacific ? ' today (Firebase\'s day ends at midnight in California).' : ' today (Cloudflare\'s day ends 00:00 UTC).') });
     warned.push(k);
+  }
+  // v82 — not an allowance but as worth hearing: the server answering with an error (a feature crashing, or the
+  // free plan's 10 ms CPU limit) on 2% or more of today's requests, and at least 25 times.
+  const er = m.workerErrors;
+  if (er && Number(er.used) >= 25 && Number(er.used) / Math.max(1, Number(er.of) || 0) >= 0.02) {
+    const pct = Math.round(1000 * er.used / Math.max(1, er.of)) / 10;
+    await raiseNotice(env, { what: 'usage:workerErrors', kind: 'warning', scope: 'owner', until: nextUtcMidnight(now), self: true,
+      title: 'The server answered with an error ' + Number(er.used).toLocaleString('en-US') + ' times today (' + pct + '% of requests)',
+      affects: 'whichever feature is failing',
+      detail: 'Often the free plan\'s 10 ms CPU limit, or one feature crashing. Cloudflare → Workers & Pages → lively-bread-273a → Logs shows which.' });
+    warned.push('workerErrors');
   }
   if (env.METER_DB) {
     try {
@@ -2999,4 +3012,4 @@ export default {
   }
 };
 
-// ── END OF WORKER v81 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
+// ── END OF WORKER v82 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
