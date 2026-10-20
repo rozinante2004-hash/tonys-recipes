@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v38.69 -->
+<!-- Tony's Recipes Collection v38.70 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -6641,6 +6641,7 @@ window.kitchenFileStem = kitchenFileStem;
 function householdCanManage() { return !!(_household && (_household.role === 'owner' || _household.role === 'admin')); }
 function householdRenderBar() {
   var bar = document.getElementById('householdBar');
+  shareAppLabels();   // v38.70
   if (!bar) return;
   // v37.02 — never a blank section: say why there is no household yet.
   if (!_household) {
@@ -7385,6 +7386,7 @@ async function hhSetFoundingOpen(open) {
   if (typeof isAppOwner !== 'function' || !isAppOwner() || !hhDb()) return false;
   await hhDb().collection('config').doc('founding').set({ open: !!open, by: String((window._fbUser && _fbUser.email) || ''), at: Date.now() });
   _hhFoundingOpen = !!open;
+  shareAppLabels();   // v38.70
   syncLog('save', open ? 'New households: anyone may start one' : 'New households: by invitation only');
   return true;
 }
@@ -8763,7 +8765,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v38.69';
+var APP_VERSION = 'v38.70';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -11810,7 +11812,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.69</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.70</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -11898,7 +11900,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.69</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.70</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -12043,7 +12045,7 @@ body.banner-shown .header {
           <button class="drop-item" onclick="closeDrop('moreDrop');openWhatCanIMake()">🥫 What can I make with what I have?</button>
           <button class="drop-item" data-layout-only="households" title="Link your kitchen with another household: once they agree, each of you sees the other's recipes, read-only." onclick="closeDrop('moreDrop');openConnectHousehold()">🤝 Connect with another household</button>
           <button class="drop-item" id="kitchenChatsItem" data-layout-only="households" onclick="closeDrop('moreDrop');openKitchenChats()">💬 Chats with linked kitchens</button>
-          <button class="drop-item" onclick="closeDrop('moreDrop');openShareAppModal()"><span aria-hidden="true" data-no-i18n style="display:inline-flex;"><svg class="share-ico" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="11.5" fill="#C1440E"/><path d="M7.2 12 14.8 7.6M7.2 12 14.8 16.4" stroke="#FFFFFF" stroke-width="1.9" stroke-linecap="round"/><circle cx="15" cy="7.4" r="2.6" fill="#FFFFFF"/><circle cx="7" cy="12" r="2.6" fill="#FFFFFF"/><circle cx="15" cy="16.6" r="2.6" fill="#FFFFFF"/></svg></span> Share this app</button>
+          <button class="drop-item" onclick="closeDrop('moreDrop');openShareAppModal()"><span aria-hidden="true" data-no-i18n style="display:inline-flex;"><svg class="share-ico" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="11.5" fill="#C1440E"/><path d="M7.2 12 14.8 7.6M7.2 12 14.8 16.4" stroke="#FFFFFF" stroke-width="1.9" stroke-linecap="round"/><circle cx="15" cy="7.4" r="2.6" fill="#FFFFFF"/><circle cx="7" cy="12" r="2.6" fill="#FFFFFF"/><circle cx="15" cy="16.6" r="2.6" fill="#FFFFFF"/></svg></span> <span id="shareAppMenuText">Share this app</span></button>
         <div style="height:1px;background:var(--border);margin:4px 0;"></div>
         <button class="drop-item" onclick="closeDrop('moreDrop');aiTagAllDiets()">🏷️ Auto-tag diet types</button>
         <button class="drop-item" onclick="closeDrop('moreDrop');autoFetchMissingPhotos()">📸 Auto-fetch missing photos</button>
@@ -12625,7 +12627,7 @@ body.banner-shown .header {
   <div class="modal share-app-modal">
     <button class="modal-close" onclick="closeM('shareAppOverlay')">✕</button>
     <div class="modal-header">
-      <div class="modal-header-title"><span aria-hidden="true" data-no-i18n style="display:inline-flex;vertical-align:-3px;"><svg class="share-ico" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="11.5" fill="#C1440E"/><path d="M7.2 12 14.8 7.6M7.2 12 14.8 16.4" stroke="#FFFFFF" stroke-width="1.9" stroke-linecap="round"/><circle cx="15" cy="7.4" r="2.6" fill="#FFFFFF"/><circle cx="7" cy="12" r="2.6" fill="#FFFFFF"/><circle cx="15" cy="16.6" r="2.6" fill="#FFFFFF"/></svg></span> Share This App</div>
+      <div class="modal-header-title"><span aria-hidden="true" data-no-i18n style="display:inline-flex;vertical-align:-3px;"><svg class="share-ico" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="11.5" fill="#C1440E"/><path d="M7.2 12 14.8 7.6M7.2 12 14.8 16.4" stroke="#FFFFFF" stroke-width="1.9" stroke-linecap="round"/><circle cx="15" cy="7.4" r="2.6" fill="#FFFFFF"/><circle cx="7" cy="12" r="2.6" fill="#FFFFFF"/><circle cx="15" cy="16.6" r="2.6" fill="#FFFFFF"/></svg></span> <span id="shareAppTitleText">Share This App</span></div>
       <div id="shareAppSub" style="font-size:12px;color:var(--muted);margin-top:4px;">Send this link to anyone — they can open it in their browser and install it on their phone or desktop.</div>
     </div>
     <div class="modal-body">
@@ -15216,6 +15218,8 @@ window.i18nBuildPatterns = i18nBuildPatterns; window.i18nMatchPattern = i18nMatc
 // translating a string nobody sees. A `{1}` makes it a shape, matched the same
 // way a built toast is.
 var I18N_EXTRA = [
+  // v38.70 — the share labels while the copy is by invitation only
+  'Share this app with family', 'Share This App with Family',
   // the long-job panel
   'almost done', 'a few more seconds', 'about {1} seconds left',
   'about a minute left', 'about {1} minutes left', 'finishing…',
@@ -28968,6 +28972,24 @@ async function openShareAppModal() {
   }
   document.getElementById('shareAppOverlay').classList.add('open');
 }
+// v38.70 — Tony, 20 Oct: "modify the text from 'Share this App' to 'Share this App with family'. It will convey the
+// right meaning and serve as a reminder. We will change it back once we launch officially." While the copy takes
+// newcomers by invitation only (📊 Households), every label says "with family"; opening the copy at the launch brings
+// the old words back by itself.
+async function shareAppLabels() {
+  var fam = false;
+  try { fam = typeof hhDb === 'function' && !!hhDb() && !!window._fbUser && (await hhFoundingOpen()) === false; } catch (e) {}
+  var menu = document.getElementById('shareAppMenuText'), ttl = document.getElementById('shareAppTitleText'), btn = document.getElementById('shareAppBtn');
+  var label = fam ? 'Share this app with family' : 'Share this app';
+  if (menu && menu.textContent !== label) menu.textContent = label;
+  if (ttl) { var t = fam ? 'Share This App with Family' : 'Share This App'; if (ttl.textContent !== t) ttl.textContent = t; }
+  if (btn && btn.getAttribute('title') !== label) {
+    btn.setAttribute('title', label); btn.setAttribute('aria-label', label);
+    if (typeof i18nApply === 'function' && typeof _i18nLang === 'string' && _i18nLang !== 'en') { try { i18nApply(btn); } catch (e) {} }
+  }
+  return fam;
+}
+window.shareAppLabels = shareAppLabels;
 async function shareAppClosed() {
   if (typeof isAppOwner === 'function' && isAppOwner()) return false;
   if (typeof hhDb !== 'function' || !hhDb() || !window._fbUser || typeof _household === 'undefined' || !_household) return false;
@@ -30318,7 +30340,7 @@ var HELP_SYSTEM_PROMPT = [
   "- ? → ℹ️ About: the version (and Update now when a newer one is out), ✨ What can this app do, ✉️ Contact us, the Privacy Statement and the Terms of Use",
   "- ✉️ Contact us: write to us by e-mail, or leave a note inside the app",
   "- Where a 💬 button shows (bottom-left), it sends a note about the app with a screenshot; answers arrive in the app (⚙️ → 💬 Help and feedback → 📨 Answers to my notes)",
-  "- 📲 The share icon next to the language picker: while the app takes newcomers by invitation only, it invites someone to your kitchen (see the household section) instead of sending the app's link; otherwise it sends a link to the app",
+  "- 📲 The share icon next to the language picker (and ⋯ More → Share this app): while the app takes newcomers by invitation only it is called 'Share this app with family' and invites someone to your kitchen (see the household section) instead of sending the app's link; otherwise it sends a link to the app",
   "",
   "=== THE FARM VISITORS ===",
   "- Now and then a cartoon farm animal strolls across the screen. Tap it and it turns to you and says something; then, still looking at you, it vanishes in a puff of smoke",

@@ -9100,7 +9100,7 @@ window.SELF_TESTS = [
       }
     } },
 
-  { id:'beta_by_invitation_only', group:'Sharing', name:'🔑 The beta by invitation only: the owner’s invitation lets that address (and nobody it is forwarded to) start a kitchen, kept as a fingerprint and never the address; testers share by inviting to their own kitchen, not the app’s link; the invitation says so in English and Hebrew (v38.69)',
+  { id:'beta_by_invitation_only', group:'Sharing', name:'🔑 The beta by invitation only: the owner’s invitation lets that address (and nobody it is forwarded to) start a kitchen, kept as a fingerprint and never the address; testers share by inviting to their own kitchen, not the app’s link (“Share this app with family” meanwhile, v38.70); the invitation says so in English and Hebrew (v38.69)',
     test: async()=>{
       var real={ owner:window.isAppOwner, db:window.hhDb, user:window._fbUser, hh:_household, open:window.hhFoundingOpen, ins:window.insightCount, drafts:localStorage.getItem(INVITE_DRAFTS_KEY), reg:localStorage.getItem(INVITE_REG_KEY) };
       var docs={}, writes=[];
@@ -9140,7 +9140,14 @@ window.SELF_TESTS = [
         await openShareAppModal();
         if(!B.hidden || A.hidden) throw new Error('someone who may not invite is offered to');
         closeM('shareAppOverlay');
+        // v38.70 — Tony: "Share this App with family" while the copy is by invitation only, back by itself at the launch
+        await shareAppLabels();
+        var mt=document.getElementById('shareAppMenuText'), tt=document.getElementById('shareAppTitleText'), hb=document.getElementById('shareAppBtn');
+        if(mt.textContent!=='Share this app with family' || tt.textContent!=='Share This App with Family' || hb.getAttribute('title')!=='Share this app with family' || hb.getAttribute('aria-label')!=='Share this app with family')
+          throw new Error('the labels while invitation only: '+[mt.textContent, tt.textContent, hb.getAttribute('title')].join(' | '));
         window.hhFoundingOpen=async function(){ return true; };
+        await shareAppLabels();
+        if(mt.textContent!=='Share this app' || tt.textContent!=='Share This App' || hb.getAttribute('title')!=='Share this app') throw new Error('the labels did not come back: '+mt.textContent);
         await openShareAppModal();
         if(!C.hidden || O.hidden) throw new Error('an open copy hides the app\u2019s link');
         closeM('shareAppOverlay');
@@ -9159,6 +9166,7 @@ window.SELF_TESTS = [
         if(kept.en.rev || kept.he.rev!==INVITE_TEXTS_REV) throw new Error('a new edit does not carry the texts\u2019 revision: '+JSON.stringify(kept));
       } finally {
         window.isAppOwner=real.owner; window.hhDb=real.db; window._fbUser=real.user; _household=real.hh; window.hhFoundingOpen=real.open; window.insightCount=real.ins;
+        try { shareAppLabels(); } catch(e) {}
         if(real.drafts===null) localStorage.removeItem(INVITE_DRAFTS_KEY); else localStorage.setItem(INVITE_DRAFTS_KEY, real.drafts);
         if(real.reg===null) localStorage.removeItem(INVITE_REG_KEY); else localStorage.setItem(INVITE_REG_KEY, real.reg);
         var ov=document.getElementById('shareAppOverlay'); if(ov) ov.classList.remove('open');
