@@ -547,7 +547,20 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
   `raiseNotice`: new words in the same episode are written (not mailed); `newsToMail` — a new episode, a later end,
   or a turn for the worse (now paused, mailed at once even within the 20 h gap). App: `serverNoticeTime` adds the day
   when not today; the owner's paused line starts "⏸ Stopped until <when>: <what>." and ends "It comes back by itself —
-  nothing to do."; 🩺 Pages line ⚠️ (⛔ only if refused) with per-copy counts and "Cloudflare still builds". Tests:
+  nothing to do."; 🩺 Pages line ⚠️ (⛔ only if refused) with per-copy counts and "Cloudflare still builds"
+  (`pagesCopyName`: by the name's ending — a project id written outside APP_CONFIG failed `cfg_identifiers_in_one_place`
+  on the built test copy, which stopped the first release, 6534e27).
+- **Released: v38.66 + Worker v86 (20 Oct 2026, 18:00 Israel time, CI green on a9fdc26).** All jobs success (Worker
+  v86 deployed; the WhatsApp and analytics secrets still not set). The watch run after it (18:07): pagesBuilds 952
+  (real builds; the old count said 1,008), the notice re-worded as a warning.
+- **Move step 9 finished (20 Oct 2026, 18:05 Israel time; Tony: "OK to delete the 4 + 135 old family documents").**
+  clear-source `all` + `shared` (run 39445140837): 139 deleted (households 4, shared 135), the household cut to its
+  moved mark; clear-check after it (run 39445361414): recipes-f379d holds 1 document of the moved household (its own,
+  the mark) and shared/ 0; config and i18n were never in the move. 3 sign-in accounts stay there (the mark forwards).
+- **CallMeBot is full (20 Oct, Tony):** "The bot is currently full. Please check back in a few days; once slots are
+  available, the phone number will be visible." Users report WhatsApp blocking its numbers as spam since late 2025
+  and the operator adding a ~4 €/year plan; it suggests TextMeBot (from your own number) or InOut.bot (paid, Meta's
+  API). Plan: Tony tries again in a few days; e-mail is unaffected; fallback offered: Telegram's own bot (free). Tests:
   self-test `idle_quiet_and_server_notice` + `firebase_limits_told`; 9 Worker checks (g).
 - **GitHub drops most scheduled runs on this repository** (20 Oct): the usage watch (:11 and :41) ran at 01:13 and 06:31
   UTC only; Publish languages (every 10 min) runs every 2–5 h; the 02:17 backup starts 07:00–07:51 UTC. The watch is an
