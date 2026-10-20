@@ -1,0 +1,31 @@
+name: Cloudflare Pages previews
+
+# Both Pages projects built a preview of every branch: 553 of October's 905
+# builds (free plan: 500 a month), none ever opened. This switches previews off
+# (or back on with "all"), touching nothing else. See tools/cf-pages-previews.js.
+
+on:
+  workflow_dispatch:
+    inputs:
+      previews:
+        description: "none (only the production branch builds) or all"
+        default: "none"
+  push:
+    branches: ["test"]
+    paths: ["tools/cf-pages-previews.js", ".github/workflows/cf-pages-previews.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  previews:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+      - name: Previews
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: node tools/cf-pages-previews.js "${{ github.event.inputs.previews || 'none' }}"
