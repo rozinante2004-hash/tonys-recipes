@@ -447,10 +447,20 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
   Collection"; self-test `kitchen_title_in_shares`. Tony's three exceptions (13 Oct: WhatsApp share text, the shared
   list's title, the Word export) left as they are — asked again (audit "Needs Tony" 9), as testers get them too. The
   backup-restore error no longer says "Tony's Recipes backup".
+- **v38.62**: `#offlineBanner` + `#loginScreen` moved from after the header to before it (only their place changed):
+  the page arrives in pieces and a slow phone painted the app's header ("Offline mode", the search box) for ~0.5 s
+  before the sign-in screen that covers it had arrived; now the first frame with content is the sign-in screen, and it
+  comes first for the keyboard too. Filmstrip `$S/perf3.cjs`, compressed server `$S/gzserve.cjs` (port 8879).
 - **GitHub drops most scheduled runs on this repository** (20 Oct): the usage watch (:11 and :41) ran at 01:13 and 06:31
   UTC only; Publish languages (every 10 min) runs every 2–5 h; the 02:17 backup starts 07:00–07:51 UTC. The watch is an
   early warning only (a real refusal is told at once by the Worker and the app), but hourly needs another clock: the
   Worker's own cron with an analytics-only token (audit "Needs Tony" 10).
+- **Sign-in e-mails (20 Oct, `tools/auth-mail-check.mjs` + "Sign-in e-mails" workflow, read only):** the community
+  copy's four templates are Google's defaults (subject "Reset your password for %APP_NAME%", reply-to set), sent by
+  Firebase, links open my-kitchen-notes-beta.firebaseapp.com/__/auth/action. The browser key's website list DOES allow
+  firebaseapp.com (probed accounts:resetPassword with an invalid code: community and firebaseapp.com → INVALID_OOB_CODE,
+  evil.example and no referrer → blocked), so the links work. The public-facing name (IAP brands) is not readable with
+  FIREBASE_RULES_KEY (403) — Tony to check it says My Kitchen Notes (audit "Needs Tony" 11). The test project: 403.
 - **Before the testers, Tony's steps (16 Oct 2026):** (1) Cloudflare Email Routing destination addresses — done.
   (2) **The community app's browser key is restricted, both stages:** API restrictions = Identity Toolkit API, Token
   Service API, Cloud Firestore API (Google warned of "active usage" of eight Maps APIs — scanners; updated anyway);

@@ -15,7 +15,7 @@ require my input should be kept for the last stages."*
 - **The suites**: 393 self-tests × 3 copies + Hebrew/dark, phone chrome, double-click, close-in-view, axe, contrast,
   the Worker's 400+ checks.
 
-## Fixed (released, or on the way: v38.60–v38.61)
+## Fixed (released, or on the way: v38.60–v38.62)
 
 | # | Area | Finding | Fix |
 |---|------|---------|-----|
@@ -38,6 +38,7 @@ require my input should be kept for the last stages."*
 | 17 | Budget (data) | ~2.5 MB of wasted download on a first visit (stray requests answered with the whole app) | v38.61, and a self-test so new code cannot bring it back |
 | 18 | UI (phone) | The sign-in screen jumped when the e-mail button appeared, 1–3 s in | v38.61: its room is kept |
 | 19 | Monitoring | The server's own errors were not watched | v38.60 + Worker v82: in the hourly watch, warned at ≥25 errors and ≥2% |
+| 20 | UI (phone) | On a slow phone the app's header ("Offline mode") showed for half a second before the sign-in screen | v38.62: the sign-in screen comes first in the page |
 
 ## Measured capacity — 20 testers (estimates from the measurements)
 
@@ -92,3 +93,9 @@ require my input should be kept for the last stages."*
     Cloudflare → My Profile → API Tokens, create a token with only **Account → Account Analytics → Read**, and add it
     to GitHub as the secret `CF_ANALYTICS_TOKEN`; then the Worker's own clock (reliable) runs the Cloudflare part every
     hour. Optional.
+11. **The name in Firebase's e-mails to testers** (address confirmation, password reset): their sender and subject
+    say the project's *public-facing name* — "Reset your password for %APP_NAME%". Checked 20 Oct (read only,
+    "Sign-in e-mails" job): all four templates are Google's defaults; the name itself could not be read from here.
+    Please look at Firebase (my-kitchen-notes-beta) → ⚙️ Project settings → General → **Public-facing name**: it should
+    say **My Kitchen Notes**, not "project-557995593102". The links in the mails work (checked: the key allows the page
+    they open).
