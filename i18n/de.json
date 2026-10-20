@@ -1,7 +1,7 @@
 {
  "lang": "de",
- "updatedAt": 1792524681564,
- "count": 2309,
+ "updatedAt": 1792533824896,
+ "count": 2311,
  "strings": {
   "\"Add to Home Screen\"": "Zum Home-Bildschirm hinzufügen",
   "\"Open Bring!\"": "Bring! öffnen",
@@ -938,11 +938,13 @@
   "Settings — something new": "Einstellungen — etwas Neues",
   "Share": "Teilen",
   "Share This App": "App teilen",
+  "Share This App with Family": "App mit der Familie teilen",
   "Share a recipe on WhatsApp, by e-mail, or as a web page that opens anywhere — or share the app itself.": "Rezept über WhatsApp, per E-Mail oder als Webseite teilen, die überall funktioniert – oder gleich die App selbst teilen.",
   "Share a recipe on WhatsApp, by e-mail, or as a web page that opens anywhere.": "Teile ein Rezept über WhatsApp, per E-Mail oder als Webseite, die sich überall öffnen lässt.",
   "Share on WhatsApp": "Auf WhatsApp teilen",
   "Share sheet": "Teilen-Menü",
   "Share this app": "Diese App teilen",
+  "Share this app with family": "App mit der Familie teilen",
   "Share via…": "Teilen über…",
   "Share your identifier": "Deine Kennung teilen",
   "Shift": "Umschalt",

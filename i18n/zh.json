@@ -1,7 +1,7 @@
 {
  "lang": "zh",
- "updatedAt": 1792524681564,
- "count": 2339,
+ "updatedAt": 1792533824896,
+ "count": 2341,
  "strings": {
   "\"Add to Home Screen\"": "添加到主屏幕",
   "\"Open Bring!\"": "打开 Bring!",
@@ -944,11 +944,13 @@
   "Settings — something new": "设置——新功能",
   "Share": "分享",
   "Share This App": "分享本应用",
+  "Share This App with Family": "与家人分享此应用",
   "Share a recipe on WhatsApp, by e-mail, or as a web page that opens anywhere — or share the app itself.": "通过WhatsApp、邮箱或网页链接分享菜谱——也可以分享这个App。",
   "Share a recipe on WhatsApp, by e-mail, or as a web page that opens anywhere.": "通过 WhatsApp、邮件或网页链接分享菜谱，打开即可查看。",
   "Share on WhatsApp": "分享到 WhatsApp",
   "Share sheet": "分享面板",
   "Share this app": "分享这个应用",
+  "Share this app with family": "和家人分享这个应用",
   "Share via…": "通过以下方式分享…",
   "Share your identifier": "分享你的识别码",
   "Shift": "Shift",

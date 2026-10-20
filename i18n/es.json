@@ -1,7 +1,7 @@
 {
  "lang": "es",
- "updatedAt": 1792524681564,
- "count": 2307,
+ "updatedAt": 1792533824896,
+ "count": 2309,
  "strings": {
   "\"Add to Home Screen\"": "Añadir a pantalla de inicio",
   "\"Open Bring!\"": "Abrir Bring!",
@@ -937,11 +937,13 @@
   "Settings — something new": "Ajustes: algo nuevo",
   "Share": "Compartir",
   "Share This App": "Compartir esta app",
+  "Share This App with Family": "Compartir esta app con la familia",
   "Share a recipe on WhatsApp, by e-mail, or as a web page that opens anywhere — or share the app itself.": "Comparte una receta por WhatsApp, por e-mail, o como página web que se abre en cualquier sitio — o comparte la app.",
   "Share a recipe on WhatsApp, by e-mail, or as a web page that opens anywhere.": "Comparte una receta por WhatsApp, por e-mail, o como página web que se abre en cualquier lugar.",
   "Share on WhatsApp": "Compartir por WhatsApp",
   "Share sheet": "Menú para compartir",
   "Share this app": "Compartir esta app",
+  "Share this app with family": "Comparte esta app con tu familia",
   "Share via…": "Compartir por…",
   "Share your identifier": "Comparte tu identificador",
   "Shift": "Mayús",
