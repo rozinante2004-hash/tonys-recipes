@@ -38,7 +38,9 @@ concurrency:
 
 jobs:
   translate:
-    runs-on: ubuntu-latest
+    # 20 Oct 2026 — ubuntu-latest became Ubuntu 26.04 overnight and Playwright 1.56 cannot install a browser
+    # there ("Playwright does not support chromium on ubuntu26.04-x64"): every self-test run failed before a test ran.
+    runs-on: ubuntu-24.04
     env:
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       ANTHROPIC_FEDERATION_RULE_ID: ${{ vars.ANTHROPIC_FEDERATION_RULE_ID || 'fdrl_014jJQzGTM4YjaEhCpgJJudC' }}
