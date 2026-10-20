@@ -572,6 +572,8 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
   owner warning `usage:signinLinks:<project>`; meter-admin `allowances` → `links` {limit, byProject: {today, most,
   full, refused, days}} (the last 30 days) → 🩺 "Sign-in-link e-mails" lines. Tests: self-test
   `auth_more_ways_to_sign_in` (told, with the copy and never the address) + `firebase_limits_told`; 5 Worker checks.
+- **Released: v38.68 + Worker v87 (20 Oct 2026, 21:39 Israel time, CI green on 8eb4fb3).** All jobs success (Worker v87
+  deployed; CF_ANALYTICS_TOKEN present — only the two WhatsApp secrets reported missing).
 - **Move step 9 finished (20 Oct 2026, 18:05 Israel time; Tony: "OK to delete the 4 + 135 old family documents").**
   clear-source `all` + `shared` (run 39445140837): 139 deleted (households 4, shared 135), the household cut to its
   moved mark; clear-check after it (run 39445361414): recipes-f379d holds 1 document of the moved household (its own,
