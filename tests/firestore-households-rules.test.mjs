@@ -312,7 +312,9 @@ await check('…but writes nothing there',                     setDoc(doc(hank, 
 await check('…nor can gina, who owns L1',       setDoc(doc(gina, 'households/L2/recipes/2'), { name: 'X' }), false);
 await check('…nor reads its members, settings or chats',     getDocs(collection(hank, 'households/L2/members')), false);
 await check('…nor the household itself',                     getDoc(doc(hank, 'households/L2')), false);
-await check('…nor its state',                                getDoc(doc(hank, 'households/L2/state/meta')), false);
+await check('…reads its index of recipes (state/meta, v38.65)', getDoc(doc(hank, 'households/L2/state/meta')), true);
+await check('…nor any other state',                          getDoc(doc(hank, 'households/L2/state/settings')), false);
+await check('…nor writes the index',                         setDoc(doc(hank, 'households/L2/state/meta'), { ids: [1] }), false);
 await check('jo, in L2, reads L1\'s recipes too', (async () => { await setDoc(doc(jo, 'homes/jo'), { hid: 'L2', at: 1 });
   await getDoc(doc(jo, 'households/L1/recipes/7')); })(), true);
 await check('a household not linked reads nothing', (async () => { await setDoc(doc(kim, 'homes/kim'), { hid: 'L3', at: 1 });

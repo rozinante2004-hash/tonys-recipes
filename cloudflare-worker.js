@@ -1,4 +1,7 @@
-// Tony's Recipes — Cloudflare Worker v84
+// Tony's Recipes — Cloudflare Worker v85
+// v85: EACH ALERT ON WHATSAPP, OR NOT (Tony, 20 Oct 2026): ALERT_KINDS (eight, all on by default); meter-admin
+// `alert-prefs` / `alert-prefs-set`; `ownerAlert(…, { kind })` skips WhatsApp for a kind switched off (e-mail always).
+// The new-device e-mail says Israel time, not UTC.
 // v84: THE OWNER ON WHATSAPP, AND THE HOURLY CHECK ON CLOUDFLARE'S CLOCK (Tony, 20 Oct 2026): `ownerAlert` also sends a
 // WhatsApp message through CallMeBot when WHATSAPP_PHONE and WHATSAPP_KEY are set; meter-admin `alert-test` sends a
 // test both ways. A cron at :17 every hour (HOURLY_CRON) reads today's Cloudflare use with CF_ANALYTICS_TOKEN (analytics
@@ -379,7 +382,7 @@
 //   AI_MAX_TOKENS   – the longest answer one call may ask for (32000; the
 //                     app's largest, reading several recipes at once, asks 8000).
 
-const WORKER_VERSION = 'v84';
+const WORKER_VERSION = 'v85';
 const VIDEO_MAX_MB_DEFAULT = 50;
 const GEMINI_API = 'https://generativelanguage.googleapis.com';
 const GEMINI_MODEL_DEFAULT = 'gemini-2.5-flash';
@@ -767,7 +770,7 @@ async function raiseNotice(env, n) {
            : n.self ? 'Comes back by itself: ' + ilTime(n.until) : 'Looked at again: ' + ilTime(n.until) + ' — it needs you to act (see above).',
          n.project ? 'Copy: ' + n.project : '', '',
          'The app shows this too (a bar at the top). You will not be e-mailed about this again for a day.'
-        ].join('\n').replace(/\n{3,}/g, '\n\n'));
+        ].join('\n').replace(/\n{3,}/g, '\n\n'), { kind: alertKindOf(n) });   // v85
     } catch (e) {}
   }
   return true;
@@ -1804,17 +1807,53 @@ async function ownerWatch(env, db, claims, body, request) {
     + 'ON CONFLICT (email, device) DO UPDATE SET last_at = excluded.last_at, ua = excluded.ua').bind(email, dev, now, ua).run();
   const cf = request.cf || {};
   const where = [cf.city, cf.country || request.headers.get('CF-IPCountry')].filter(Boolean).join(', ') || 'unknown place';
-  const lines = ['Account: ' + email, 'Copy: ' + claims.aud, 'Device: ' + ua, 'From: ' + where, 'When: ' + new Date(now).toUTCString()];
+  const lines = ['Account: ' + email, 'Copy: ' + claims.aud, 'Device: ' + ua, 'From: ' + where, 'When: ' + ilTime(now) + ' (Israel time)'];   // v85 — his time, not UTC
   if (!known) await ownerAlert(env, 'My Kitchen Notes: the owner\'s tools were opened on a new device',
     ['Someone signed in as the app\'s owner opened the owner\'s tools on a device not seen before.'].concat(lines,
       ['', 'If this was you, there is nothing to do. If not: change your Google password, sign out of all devices at',
-       'https://myaccount.google.com/device-activity and switch on the authenticator step in the app.']).join('\n'));
+       'https://myaccount.google.com/device-activity and switch on the authenticator step in the app.']).join('\n'), { kind: 'new-device' });
   if (OWNER_DESTRUCTIVE.has(op)) await ownerAlert(env, 'My Kitchen Notes: owner action "' + op + '"',
     ['The app\'s owner did "' + op + '"' + (body.hid ? ' on household ' + String(body.hid).slice(0, 64) : '') + (body.project ? ' in ' + String(body.project).slice(0, 40) : '') + '.']
-      .concat(lines).join('\n'));
+      .concat(lines).join('\n'), { kind: 'owner-action' });
+}
+// v85 — which alerts also come on WhatsApp (Tony, 20 Oct 2026: "add to the Admin's Setting an option to separately
+// enable/disable each of the alerts to be sent by Whatsapp. They should all be enabled by default"). Kept in D1
+// `owner_prefs` ('whatsapp_off': the kinds switched off — so a kind added later starts on). E-mail is not affected; the
+// owner's test alert ignores them. When D1 itself is what ran out, everything goes (unknown = on).
+const ALERT_KINDS = [
+  ['new-device', 'The owner\u2019s tools opened on a new device'],
+  ['owner-action', 'An owner action that cannot be undone (a household deleted, an allowance changed…)'],
+  ['near-limit', 'A free allowance near its limit (70%)'],
+  ['limit-reached', 'A free allowance used up \u2014 something paused'],
+  ['ai-service', 'The AI service refused (out of credit, its key, or Gemini\u2019s daily quota)'],
+  ['household-ai', 'A household reached its AI allowance'],
+  ['server-errors', 'The server answering with errors'],
+  ['usage-check', 'The hourly usage check cannot read the figures']
+];
+function alertKindOf(n) {
+  const w = String((n && n.what) || '');
+  if (/^usage:workerErrors/.test(w)) return 'server-errors';
+  if (/^usage:watch/.test(w)) return 'usage-check';
+  if (/^(anthropic|gemini)/.test(w)) return 'ai-service';
+  if (/^household-ai/.test(w)) return 'household-ai';
+  return n && n.kind === 'paused' ? 'limit-reached' : 'near-limit';
+}
+async function whatsappOff(env) {
+  if (!env.METER_DB) return {};
+  try {
+    await tableOnce(env.METER_DB, 'owner_prefs', 'CREATE TABLE IF NOT EXISTS owner_prefs (k TEXT PRIMARY KEY, v TEXT)');
+    const row = await env.METER_DB.prepare("SELECT v FROM owner_prefs WHERE k = 'whatsapp_off'").first();
+    const o = row ? JSON.parse(row.v || '{}') : {};
+    return o && typeof o === 'object' ? o : {};
+  } catch (e) { return {}; }
+}
+async function alertPrefsAnswer(env) {
+  const off = await whatsappOff(env);
+  return { ok: true, whatsappSet: !!(env.WHATSAPP_PHONE && env.WHATSAPP_KEY), kinds: ALERT_KINDS.map(([key, label]) => ({ key, label, on: off[key] !== true })) };
 }
 async function ownerAlert(env, subject, text, opts) {
-  const wa = opts && opts.whatsapp === false ? false : await ownerWhatsApp(env, subject, text);   // v84
+  const kindOff = opts && opts.kind ? (await whatsappOff(env))[opts.kind] === true : false;   // v85
+  const wa = (opts && opts.whatsapp === false) || kindOff ? false : await ownerWhatsApp(env, subject, text);   // v84
   // v75 — every address in ALERT_TO (comma-separated): with a spare owner key, each owner hears what the
   // other did, so whoever controls one mailbox cannot hide the other account's actions.
   const tos = Array.from(new Set(String(env.ALERT_TO || '').split(',').map(x => x.trim()).filter(x => /^[^\s@<>]+@[^\s@<>]+$/.test(x))));
@@ -2031,6 +2070,17 @@ async function meterAction(request, env, body) {
   if (/^error/.test(String(body.op || ''))) { const er = await signalsAdmin(env, db, body); if (er) return er; }   // v69
   // v76 — every copy's counts, added up by month and name, with how many households each came from.
   // v79 — the owner's 🩺 Server allowances: the usage watch's last reading and every notice running.
+  // v85 — which alerts also come on WhatsApp: read, and set (only the known kinds; anything not false is on)
+  if (body.op === 'alert-prefs') return jsonResp(await alertPrefsAnswer(env));
+  if (body.op === 'alert-prefs-set') {
+    const p = body.prefs && typeof body.prefs === 'object' && !Array.isArray(body.prefs) ? body.prefs : null;
+    if (!p) return jsonResp({ error: 'ALERTS: which alerts?' }, 400);
+    const off = {};
+    ALERT_KINDS.forEach(([key]) => { if (p[key] === false) off[key] = true; });
+    await tableOnce(db, 'owner_prefs', 'CREATE TABLE IF NOT EXISTS owner_prefs (k TEXT PRIMARY KEY, v TEXT)');
+    await db.prepare("INSERT INTO owner_prefs (k, v) VALUES ('whatsapp_off', ?1) ON CONFLICT (k) DO UPDATE SET v = excluded.v").bind(JSON.stringify(off)).run();
+    return jsonResp(await alertPrefsAnswer(env));
+  }
   // v84 — "Send me a test alert" (the owner's 🩺 page): proves the e-mail and WhatsApp reach him. Once a minute.
   if (body.op === 'alert-test') {
     if (Date.now() - _alertTestAt < 60e3) return jsonResp({ error: 'ALERTS: a test was sent less than a minute ago.' }, 429);
@@ -3136,4 +3186,4 @@ export default {
   }
 };
 
-// ── END OF WORKER v84 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
+// ── END OF WORKER v85 ── If this is the last line in the Cloudflare editor, the whole file was pasted.

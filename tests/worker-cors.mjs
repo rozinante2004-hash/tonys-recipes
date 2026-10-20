@@ -1418,6 +1418,23 @@ console.log('\nAI per household (v60):');
     try { ta = await (await worker.fetch(post({ action: 'meter-admin', op: 'alert-test', idToken: comOwner, device: 'dev-DDDD4444' }, TEST_ORIGIN), envBadKey)).json(); }
     finally { Date.now = realNowWa; }
     expect('v84: …and says so when CallMeBot refuses the key', ta.ok === true && ta.whatsapp === false && ta.whatsappSet === true, JSON.stringify(ta));
+    // v85 — each kind of alert on WhatsApp, or not: all on by default, e-mail never affected.
+    let ap = await (await worker.fetch(post({ action: 'meter-admin', op: 'alert-prefs', idToken: comOwner, device: 'dev-DDDD4444' }, TEST_ORIGIN), envWa)).json();
+    expect('v85: eight kinds of alert, all on WhatsApp by default', ap.ok === true && ap.kinds.length === 8 && ap.kinds.every(k => k.on === true) && ap.whatsappSet === true
+      && ap.kinds.map(k => k.key).join() === 'new-device,owner-action,near-limit,limit-reached,ai-service,household-ai,server-errors,usage-check', JSON.stringify(ap));
+    const apNo = await worker.fetch(post({ action: 'meter-admin', op: 'alert-prefs', idToken: tA }, TEST_ORIGIN), envWa);
+    expect('v85: …only the owner reads or sets them', apNo.status === 403, 'got ' + apNo.status);
+    ap = await (await worker.fetch(post({ action: 'meter-admin', op: 'alert-prefs-set', prefs: { 'new-device': false, 'owner-action': true, bogus: false }, idToken: comOwner, device: 'dev-DDDD4444' }, TEST_ORIGIN), envWa)).json();
+    expect('v85: the owner switches one off (an unknown name is ignored)', ap.ok === true && ap.kinds.filter(k => !k.on).map(k => k.key).join() === 'new-device', JSON.stringify(ap));
+    wa.length = 0; const mailsBeforeOff = mails.length;
+    await worker.fetch(post({ action: 'meter-admin', op: 'list', idToken: comOwner, device: 'dev-FFFF6666' }, TEST_ORIGIN), envWa);
+    expect('v85: …a new device is then e-mailed, not sent on WhatsApp — in Israel time', wa.length === 0 && mails.length === mailsBeforeOff + 1
+      && /When: [^\n]*\(Israel time\)/.test(mails[mails.length - 1].raw) && !/When: [^\n]*GMT/.test(mails[mails.length - 1].raw), JSON.stringify([wa.length, mails.length - mailsBeforeOff, (mails[mails.length - 1].raw.match(/When: [^\n]*/) || [])[0]]));
+    await worker.fetch(post({ action: 'meter-admin', op: 'set-cap', hid: 'hA', cap: 3, idToken: comOwner, device: 'dev-DDDD4444' }, TEST_ORIGIN), envWa);
+    expect('v85: …while an owner action (still on) goes on WhatsApp too', wa.length === 1 && /owner action/.test(new URL(wa[0]).searchParams.get('text')), JSON.stringify(wa));
+    await worker.fetch(post({ action: 'meter-admin', op: 'alert-prefs-set', prefs: {}, idToken: comOwner, device: 'dev-DDDD4444' }, TEST_ORIGIN), envWa);
+    ap = await (await worker.fetch(post({ action: 'meter-admin', op: 'alert-prefs', idToken: comOwner, device: 'dev-DDDD4444' }, TEST_ORIGIN), envWa)).json();
+    expect('v85: …and back on', ap.kinds.every(k => k.on), JSON.stringify(ap.kinds));
   } finally { globalThis.fetch = realFetch; }
 }
 
@@ -1740,6 +1757,22 @@ console.log('\nEvery allowance, told to the owner (v79):');
     const ern = db.raw.prepare("SELECT * FROM allowance_notices WHERE what = 'usage:workerErrors'").get();
     expect('v82: …3% of the day\'s requests is (owner, with where to look)', JSON.stringify(er2.warned) === '["workerErrors"]' && ern && ern.scope === 'owner'
       && /60 times today \(3% of requests\)/.test(ern.title) && /Logs/.test(ern.detail), JSON.stringify([er2, ern]));
+  }
+
+  // (f) v85 — a notice's kind decides WhatsApp: near-limit off, server errors on.
+  {
+    const db = d1(), sent = [];
+    const e = Object.assign(base(), { METER_DB: db, USAGE_KEY: 'k'.repeat(64), WHATSAPP_PHONE: '+972500000000', WHATSAPP_KEY: 'k',
+      __fetch: async (url) => { sent.push(new URL(String(url)).searchParams.get('text')); return new Response('Message queued', { status: 200 }); } });
+    db.raw.exec('CREATE TABLE IF NOT EXISTS owner_prefs (k TEXT PRIMARY KEY, v TEXT)');
+    db.raw.prepare("INSERT INTO owner_prefs (k, v) VALUES ('whatsapp_off', ?)").run(JSON.stringify({ 'near-limit': true }));
+    mails.length = 0;
+    await worker.fetch(post({ action: 'usage-report', key: 'k'.repeat(64), metrics: { kvWrites: { used: 800, limit: 1000 } }, appKey: 'secret-k' }), e);
+    expect('v85: an allowance at 70% with "near limit" off: e-mailed, not on WhatsApp', mails.length === 1 && sent.length === 0, JSON.stringify([mails.length, sent]));
+    await worker.fetch(post({ action: 'usage-report', key: 'k'.repeat(64), metrics: { workerErrors: { used: 60, of: 1000 } }, appKey: 'secret-k' }), e);
+    expect('v85: …server errors (on) come on WhatsApp too', mails.length === 2 && sent.length === 1 && /error/.test(sent[0]), JSON.stringify([mails.length, sent]));
+    await worker.fetch(post({ action: 'usage-report', key: 'k'.repeat(64), metrics: { d1RowsWritten: { used: 100000, limit: 100000 } }, appKey: 'secret-k' }), e);
+    expect('v85: …an allowance used up is "limit reached" (on): on WhatsApp', sent.length === 2 && /paused|D1 rows written/.test(sent[1]), JSON.stringify(sent));
   }
 
   // (e) v84 — the hourly check on Cloudflare's own clock, with an analytics-only token.

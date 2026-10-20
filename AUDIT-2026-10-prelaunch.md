@@ -57,46 +57,41 @@ require my input should be kept for the last stages."*
 
 | # | Item | When |
 |---|------|------|
-| A | Any change in a household makes each other device's next open read every recipe and photo again (151 reads in the test). Read only what changed (`updatedAt` > last read). The sync core — careful work and its own tests. | After the launch |
+| A | Any change in a household made each other device's next open read every recipe and photo again (97 reads for one edit). | **Done** — v38.65 (Tony: not after the launch): only what changed — 97 → 24; a tester linked to a 60-recipe kitchen reopens with 23 reads, not 81 |
 | B | Stray requests per page load: the browser's look-ahead read text inside the app's code as image addresses. **Not harmless after all**: the site answers an unknown address with the whole app, ~500 KB each, ~2.5 MB of a first visit. | **Done** — v38.61 |
 | C | Playwright 1.56 → a version with Ubuntu 26.04 browsers (1.64.1 is out, 20 Oct), then unpin. Not the week of the launch. | Before GitHub retires 24.04 |
 | D | Worker CPU: p99.9 16.5 ms against the free 10 ms (no errors in two days). Add the Worker's error rate to the hourly watch. | **Done** — v38.60 + Worker v82: warned at ≥25 errors and ≥2% of requests; a line on 🩺 Server allowances |
 | E | The page is 2,112 KB of its 2,200 KB budget (20 Oct, v38.63): the next large feature should load rarely used panels on demand. | Before the next big feature |
-| F | The header says "☁️ Shared · <name>" for a kitchen of one, and the same again in the status line. | With Tony's wording (below) |
+| F | The header says "☁️ Shared · <name>" for a kitchen of one. | Stays (Tony, 20 Oct) |
 | G | **First visit on a phone** (measured with compression, as the site serves it): sign-in screen after 0.55 s on a fast desktop, 2.6–2.9 s on a mid phone on 4G, 5.7 s on a slow phone on 3G; 811 KB. Later opens come from the device. The community app showed **"Tony's Recipes"** for the first 1.5–3 s, and a link preview of the invitation said "Tony's Recipes Collection". | **Done** — v38.61: its own name from the first frame and in link previews; the sign-in buttons no longer jump. The load itself: fine for a beta; a lighter first screen is a bigger job for later |
 
-## Needs Tony (kept for last)
+## Needs Tony — updated 20 Oct, after his answers
 
-1. **Monitoring Viewer** role for the backup's service account in my-kitchen-notes-beta — then Firebase's own counts
-   join the watch too (since v38.63 the apps count their reads themselves, so this is now a second opinion, optional).
-2. **Wording on the first screen**: "Connect your storage" (a tester signs in; nothing is connected) — suggest "Sign
-   in"; "Why can't I sign in?" and "🪵 Copy the log" are support tools on the very first screen — suggest one small
-   "Trouble signing in?" link.
-3. **The terms' first line** names "its family, test and beta copies" — meaningful to us, not to a tester.
-4. **Welcomes**: a new tester gets "Welcome to My Kitchen Notes" (needed — the choice), then the beta welcome, then a
-   "Welcome to the kitchen!" toast. Suggest dropping the toast.
-5. **New recipe's category** starts at Breakfast (the first in the list) — Dinner is likelier.
-6. **AI models**: Sonnet 5 and Haiku 4.5 today; newer ones exist. Not urgent; worth a look after the launch.
-7. The header label (F above).
-8. **Move step 9 — clearing the family app's old database** (checked 20 Oct, 12:06, read-only): 143 documents; 129 the
-   same in the community app, 10 changed there since (your edits), 4 not there — two recipes and their photos deleted in
-   the community app after the move; plus 135 in the first layout's shared/. Clearing needs your OK; the 4 and the 135
-   only if you want them gone too.
-9. **Your name in what testers send out.** On 13 Oct you said to leave "Tony's Recipes" in the WhatsApp share, the
-   shared list's title and the Word export. In the community app these are the testers' too: a tester's Word export is
-   titled "Tony's Recipes Collection" (file Tonys_Recipes_….docx), sharing the app on WhatsApp says "Tony's Recipes
-   Collection" above a "My Kitchen Notes" link preview, and a printed list is "Tony's Recipes (3)". Suggest: the
-   kitchen's own name (yours keeps yours), or "My Kitchen Notes" when sharing the app. (Done already, as they were not
-   among your three: "Shared from …" under an e-mailed or shared recipe now names the kitchen.)
-10. **The hourly usage watch runs a few times a day, not hourly** — GitHub drops most scheduled runs on this
-    repository (the watch ran twice in 11 hours; the nightly backup starts ~5 hours late). Real refusals are still told
-    at once (the Worker and the app see them); the watch is the early warning at 70%. To make it hourly for sure: in
-    Cloudflare → My Profile → API Tokens, create a token with only **Account → Account Analytics → Read**, and add it
-    to GitHub as the secret `CF_ANALYTICS_TOKEN`; then the Worker's own clock (reliable) runs the Cloudflare part every
-    hour. Optional.
-11. **The name in Firebase's e-mails to testers** (address confirmation, password reset): their sender and subject
-    say the project's *public-facing name* — "Reset your password for %APP_NAME%". Checked 20 Oct (read only,
-    "Sign-in e-mails" job): all four templates are Google's defaults; the name itself could not be read from here.
-    Please look at Firebase (my-kitchen-notes-beta) → ⚙️ Project settings → General → **Public-facing name**: it should
-    say **My Kitchen Notes**, not "project-557995593102". The links in the mails work (checked: the key allows the page
-    they open).
+Decided by Tony (20 Oct) and done in v38.64/v38.65: "Sign in"; one "Trouble signing in?" link; "in all its copies" in
+the terms and the privacy statement; a new recipe starts at Dinner; the kitchen's name (never his) in exports and
+shares; the "Welcome to the kitchen!" toast and the header's "☁️ Shared · name" stay; the old family database cleared
+after the check (138 documents); each device reads only what changed (A above). Agreed, his part below.
+
+1. **WhatsApp alerts** (the server side is ready, v38.64 + Worker v84):
+   1. Open https://www.callmebot.com/blog/free-api-whatsapp-messages/ — it shows CallMeBot's current WhatsApp number.
+      Add that number to the phone's contacts.
+   2. Send it, on WhatsApp, exactly: `I allow callmebot to send me messages` — it answers with an API key.
+   3. At https://github.com/rozinante2004-hash/tonys-recipes/settings/secrets/actions/new add two secrets:
+      `WHATSAPP_PHONE` = the number with the country code (+972…), and `WHATSAPP_KEY` = the key.
+   4. Say so; the server is redeployed with them; then ⚙️ → 👑 App owner → 📲 WhatsApp alerts → "📲 Send me a test
+      alert". The same window turns each kind of alert on WhatsApp on or off (all on to begin with; e-mail unaffected).
+2. **Firebase's public-facing name** (the e-mails to testers say it): open
+   https://console.firebase.google.com/project/my-kitchen-notes-beta/settings/general and set **Public-facing name**
+   to **My Kitchen Notes** if it says "project-557995593102".
+3. **The hourly check on Cloudflare's clock** (agreed): open https://dash.cloudflare.com/profile/api-tokens → Create
+   Token → Create Custom Token → Permissions: **Account · Account Analytics · Read** → Account Resources: Include · the
+   account → Continue to summary → Create Token → copy it; then at
+   https://github.com/rozinante2004-hash/tonys-recipes/settings/secrets/actions/new add it as `CF_ANALYTICS_TOKEN`.
+4. **Firebase's own counts** (agreed): open
+   https://console.cloud.google.com/iam-admin/iam?project=my-kitchen-notes-beta → Grant access → New principals:
+   `rules-publisher@recipes-f379d.iam.gserviceaccount.com` → Role: **Monitoring Viewer** → Save.
+5. **The rest of the old family database** (recipes-f379d): delete the 4 documents and the 135 of shared/ too? They
+   are three recipes deleted in the community app — "Porketta", "בייקון מבטן חזיר", "בטן = בייקון + פנצ'טה" — with
+   two photos, 56 recipes and 56 photos already in the kitchen, old settings and translations, and two WhatsApp chat
+   scans (personal chat text). Suggest: delete all, unless any of the three recipes should come back first.
+6. **AI models** (agreed): a look after the launch.

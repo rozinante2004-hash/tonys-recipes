@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v38.64 -->
+<!-- Tony's Recipes Collection v38.65 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -2188,7 +2188,7 @@ function _cloudSnapshotForTest() {
   var copy = function(o){ var c = {}; for (var k in (o || {})) c[k] = o[k]; return c; };
   var ls = {};
   try {
-    Object.keys(localStorage).forEach(function(k){ if (/^tonys_cloud_/.test(k)) ls[k] = localStorage.getItem(k); });
+    Object.keys(localStorage).forEach(function(k){ if (/^tonys_cloud_|^mkn_cloud_sync_|^mkn_linked_/.test(k)) ls[k] = localStorage.getItem(k); });   // v38.65
   } catch(e) {}
   return {
     base: copy(window._cloudRecipeBase), stamp: copy(window._cloudRecipeStamp),
@@ -2207,7 +2207,7 @@ function _cloudRestoreForTest(s) {
   window._cloudSchema = s.schema; window._lastCloudMetaAt = s.metaAt;
   try {
     Object.keys(localStorage).forEach(function(k){
-      if (/^tonys_cloud_/.test(k) && !(k in s.ls)) localStorage.removeItem(k);
+      if (/^tonys_cloud_|^mkn_cloud_sync_|^mkn_linked_/.test(k) && !(k in s.ls)) localStorage.removeItem(k);
     });
     Object.keys(s.ls).forEach(function(k){ localStorage.setItem(k, s.ls[k]); });
   } catch(e) {}
@@ -4365,6 +4365,33 @@ async function sendTestAlert() {
   } catch(e) { toast('❌ ' + String((e && e.message) || e).slice(0, 160), 8000); return false; }
 }
 window.sendTestAlert = sendTestAlert; window.testAlertText = testAlertText;
+// v38.65 — Tony: "add to the Admin's Setting an option to separately enable/disable each of the alerts to be sent by
+// Whatsapp. They should all be enabled by default" (Worker v85 keeps the choice, so it holds on every device).
+async function openWhatsAppAlerts() {
+  if (!(typeof isAppOwner === 'function' && isAppOwner()) || !window._fbUser) { toast('This is for the app’s owner.'); return false; }
+  var ask = async function(body) {
+    var r = await fetch(WORKER_ENDPOINT, { method: 'POST', headers: workerHeaders(),
+      body: workerBody(Object.assign({ action: 'meter-admin', idToken: await _fbUser.getIdToken() }, body)), signal: AbortSignal.timeout(20000) });
+    var d = await r.json();
+    if (!r.ok || !d || !d.ok) throw new Error((d && d.error) || ('HTTP ' + r.status));
+    return d;
+  };
+  for (;;) {
+    var d;
+    try { d = await ask({ op: 'alert-prefs' }); }
+    catch(e) { toast('❌ Could not ask the server: ' + String((e && e.message) || e).slice(0, 140), 8000); return false; }
+    var a = await askConfirm({ icon: '📲', title: 'WhatsApp alerts',
+      message: (d.whatsappSet ? 'WhatsApp is set up: the alerts ticked below also come to your phone.'
+                              : 'WhatsApp is not set up yet — until it is, these choices are kept but nothing is sent there (the steps are in the audit plan).')
+        + ' E-mail alerts are not affected: they always come.',
+      checks: d.kinds || [], okLabel: 'Save', altLabel: '📲 Send me a test alert', cancelLabel: 'Close' });
+    if (a === 'alt') { await sendTestAlert(); continue; }
+    if (!a || !a.ok) return false;
+    try { await ask({ op: 'alert-prefs-set', prefs: a.checks }); toast('✅ Saved — which alerts come on WhatsApp'); return true; }
+    catch(e) { toast('❌ Not saved: ' + String((e && e.message) || e).slice(0, 140), 8000); return false; }
+  }
+}
+window.openWhatsAppAlerts = openWhatsAppAlerts;
 function serverNoticeClosed() {
   try { return JSON.parse(localStorage.getItem(SERVER_NOTICE_KEY) || '{}') || {}; } catch(e) { return {}; }
 }
@@ -5755,7 +5782,7 @@ function linkLiveRecipes() {
   var want = {};
   hhLinks().forEach(function(l){ want[l.hid] = 1; });
   Object.keys(_live.recipes).forEach(function(h){
-    if (!want[h]) { try { _live.recipes[h](); } catch(e) {} delete _live.recipes[h]; if (_linkCache[h]) _linkCache[h].live = false; }
+    if (!want[h]) { try { _live.recipes[h](); } catch(e) {} delete _live.recipes[h]; if (_linkCache[h]) _linkCache[h].live = false; linkedForget(h); }
   });
   var hid0 = _live.hid;
   Object.keys(want).forEach(function(h){
@@ -5763,31 +5790,170 @@ function linkLiveRecipes() {
     _live.recipes[h] = function(){};                              // claimed while the household is noted
     Promise.resolve(typeof hhSetHome === 'function' ? hhSetHome() : null).then(function(){
       if (_live.hid !== hid0 || !_live.recipes[h]) return;
-      try {
-        var q = hhRef(h).collection('recipes');
-        if (typeof q.onSnapshot !== 'function') { delete _live.recipes[h]; return; }
-        var first = true;
-        _live.recipes[h] = q.onSnapshot(function(snap){
-          var c = _linkCache[h] = _linkCache[h] || { at: 0, list: [], photos: {} };
-          var changed = [];
-          try { (typeof snap.docChanges === 'function' ? snap.docChanges() : []).forEach(function(ch){
-            var id = String(ch.doc && ch.doc.id || '');
-            if (!id) return;
-            if (c.photos) delete c.photos[id];
-            if (c.photoAsk) delete c.photoAsk[id];
-            if (ch.type !== 'removed') changed.push(id);
-          }); } catch(e) {}
-          c.list = linkedRecipesFrom(snap); c.error = ''; c.at = Date.now(); c.loading = null; c.live = true;
-          linkLiveRecipesShown(h, first ? [] : changed);
-          first = false;
-        }, function(){
-          if (_linkCache[h]) _linkCache[h].live = false;
-          delete _live.recipes[h];                                // refused (a link just made or removed): asked again shortly
-          if (_live.hid === hid0) setTimeout(linkLiveRecipes, 8000);
-        });
-      } catch(e) { delete _live.recipes[h]; }
+      // v38.65 — kept on this device from the last visit, and fresh enough: only what changed is read
+      if (linkedKeptFresh(h) && linkLiveChanged(h, hid0)) return;
+      linkLiveWhole(h, hid0);
     });
   });
+}
+// The whole of a linked kitchen, listened to (v38.52) — the first answer is every recipe in it. v38.65: kept on this
+// device afterwards, so the next visit reads only what changed (linkLiveChanged).
+function linkLiveWhole(h, hid0) {
+  try {
+    var q = hhRef(h).collection('recipes');
+    if (typeof q.onSnapshot !== 'function') { delete _live.recipes[h]; return; }
+    var first = true, keptWhole = false;
+    _live.recipes[h] = q.onSnapshot(function(snap){
+      var c = _linkCache[h] = _linkCache[h] || { at: 0, list: [], photos: {} };
+      var changed = [];
+      try { (typeof snap.docChanges === 'function' ? snap.docChanges() : []).forEach(function(ch){
+        var id = String(ch.doc && ch.doc.id || '');
+        if (!id) return;
+        if (c.photos) delete c.photos[id];
+        if (c.photoAsk) delete c.photoAsk[id];
+        if (ch.type !== 'removed') changed.push(id);
+      }); } catch(e) {}
+      c.list = linkedRecipesFrom(snap); c.error = ''; c.at = Date.now(); c.loading = null; c.live = true;
+      if (!snap.metadata || !snap.metadata.fromCache) { linkedKeep(h, c, snap, !keptWhole); keptWhole = true; }
+      linkLiveRecipesShown(h, first ? [] : changed);
+      first = false;
+    }, function(){
+      if (_linkCache[h]) _linkCache[h].live = false;
+      delete _live.recipes[h];                                // refused (a link just made or removed): asked again shortly
+      if (_live.hid === hid0) setTimeout(linkLiveRecipes, 8000);
+    });
+  } catch(e) { delete _live.recipes[h]; }
+}
+// ─── v38.65 — a linked kitchen read only where it changed ────────────────────
+// As your own kitchen (incrementalCloudLoad): its recipes are kept on this device between visits (localStorage, at
+// most 1.5 MB a kitchen; photos are not kept — they come as their cards show, as before). A visit shows them at once,
+// then asks for the recipes written since (syncedAt, the server's time; updatedAt within 15 minutes for apps from before),
+// and listens on for more. Their index (state/meta — which the rules let a linked household read since v38.65) says
+// which are gone; one not listed is looked up by itself before it is taken away, and one listed but not held is read
+// by itself. A day since the whole was read, a refused index, too much to look up one by one — read whole, as before.
+var LINKED_KEEP_KEY = 'mkn_linked_', LINKED_KEEP_MAX = 1.5e6;
+function linkedKeepKey(h) { return LINKED_KEEP_KEY + (_live.hid || '') + '_' + h; }
+function linkedKeptRead(h) {
+  try { var k = JSON.parse(localStorage.getItem(linkedKeepKey(h)) || 'null'); return k && Array.isArray(k.list) && k.base && typeof k.base === 'object' ? k : null; }
+  catch(e) { return null; }
+}
+function linkedKeptFresh(h) {
+  var k = linkedKeptRead(h);
+  return !!(k && k.fullAt && Date.now() - k.fullAt < INCR_FULL_EVERY_MS && k.fullAt < Date.now() + 60e3);
+}
+function linkedDocSynced(d) { try { var v = (d.data() || {}).syncedAt; return v && typeof v.toMillis === 'function' ? v.toMillis() : 0; } catch(e) { return 0; } }
+function linkedDocAt(d) { try { var v = (d.data() || {}).updatedAt; return typeof v === 'number' ? v : 0; } catch(e) { return 0; } }
+// Kept after the whole was read (`whole`) or after a change: the list, each recipe's updatedAt, the newest syncedAt.
+function linkedKeep(h, c, snap, whole) {
+  var k = whole ? { list: [], base: {}, at: 0, fullAt: Date.now() } : (linkedKeptRead(h) || { base: {}, at: 0, fullAt: 0 });
+  if (snap && typeof snap.forEach === 'function') snap.forEach(function(d){ k.base[String(d.id)] = linkedDocAt(d); k.at = Math.max(k.at || 0, linkedDocSynced(d)); });
+  var ids = {};
+  c.list.forEach(function(r){ ids[String(r.id)] = true; });
+  Object.keys(k.base).forEach(function(i){ if (!ids[i]) delete k.base[i]; });
+  k.list = c.list;
+  try {
+    var json = JSON.stringify(k);
+    if (json.length > LINKED_KEEP_MAX || !k.fullAt) { localStorage.removeItem(linkedKeepKey(h)); return false; }
+    localStorage.setItem(linkedKeepKey(h), json);
+    return true;
+  } catch(e) { try { localStorage.removeItem(linkedKeepKey(h)); } catch(e2) {} return false; }
+}
+function linkedForget(h) { try { localStorage.removeItem(linkedKeepKey(h)); } catch(e) {} }
+function linkedRecipeFrom(d) {
+  var x = d.data() || {}, r = x;
+  if (typeof x.r === 'string') { try { r = JSON.parse(x.r); } catch(e) { r = null; } }
+  if (!r || typeof r !== 'object') return null;
+  if (r.id == null) r.id = /^\d+$/.test(d.id) ? +d.id : d.id;
+  return normalizeRecipe(r);
+}
+// Changed documents into the kept list: replaced, or added. Returns the ids that changed.
+function linkedMerge(c, docs) {
+  var changed = [], byId = {};
+  c.list.forEach(function(r, i){ byId[String(r.id)] = i; });
+  docs.forEach(function(d){
+    var r = linkedRecipeFrom(d), id = String(d.id);
+    if (!r) return;
+    if (byId[id] !== undefined) c.list[byId[id]] = r; else { byId[id] = c.list.length; c.list.push(r); }
+    if (c.photos) delete c.photos[id];
+    if (c.photoAsk) delete c.photoAsk[id];
+    changed.push(id);
+  });
+  c.list.sort(function(a, b){ return String(a.name).localeCompare(String(b.name)); });
+  return changed;
+}
+function linkLiveChanged(h, hid0) {
+  var kept = linkedKeptRead(h);
+  if (!kept) return false;
+  var ref = hhRef(h), recCol = ref.collection('recipes');
+  if (typeof recCol.where !== 'function' || typeof recCol.onSnapshot !== 'function') return false;
+  var c = _linkCache[h] = _linkCache[h] || { at: 0, list: [], photos: {} };
+  c.list = kept.list.map(function(r){ return normalizeRecipe(r); });
+  c.error = ''; c.at = Date.now(); c.loading = null; c.live = true;
+  linkLiveRecipesShown(h, []);
+  var unsubs = [], stopped = false;
+  var stop = function(){ stopped = true; unsubs.forEach(function(u){ try { u(); } catch(e) {} }); unsubs = []; };
+  // Anything that does not add up: forget the kept copy and read the whole, as before.
+  var whole = function(why){
+    if (stopped) return;
+    stop(); linkedForget(h);
+    try { syncLog('load', 'A linked kitchen read whole again', { why: String(why || '').slice(0, 80) }); } catch(e) {}
+    if (_live.hid === hid0 && _live.recipes[h]) linkLiveWhole(h, hid0);
+  };
+  _live.recipes[h] = stop;
+  var newestHeld = 0;
+  Object.keys(kept.base).forEach(function(i){ var v = kept.base[i]; if (typeof v === 'number' && v > newestHeld) newestHeld = v; });
+  var since = firebase.firestore.Timestamp.fromMillis(Math.max(0, (kept.at || 0) - INCR_SYNC_MARGIN_MS));
+  var take = function(snapOrDocs, isSnap){
+    if (stopped) return;
+    var docs = [];
+    snapOrDocs.forEach(function(d){ docs.push(d); });
+    if (!docs.length) return;
+    var k = linkedKeptRead(h) || kept;
+    docs.forEach(function(d){ k.base[String(d.id)] = linkedDocAt(d); k.at = Math.max(k.at || 0, linkedDocSynced(d)); });
+    var changed = linkedMerge(c, docs);
+    c.at = Date.now();
+    try { localStorage.setItem(linkedKeepKey(h), JSON.stringify(Object.assign(k, { list: c.list }))); } catch(e) { linkedForget(h); }
+    linkLiveRecipesShown(h, changed);
+  };
+  try {
+    // written since the last visit, and from then on
+    var firstChanges = true;
+    unsubs.push(recCol.where('syncedAt', '>', since).onSnapshot(function(snap){
+      if (snap.metadata && snap.metadata.fromCache) return;
+      if (firstChanges || typeof snap.docChanges !== 'function') { firstChanges = false; take(snap, true); return; }
+      take(snap.docChanges().filter(function(ch){ return ch.type !== 'removed'; }).map(function(ch){ return ch.doc; }), true);
+    }, function(e){ whole('changes refused: ' + (e && e.code)); }));
+    // written by apps from before syncedAt (their updatedAt within 15 minutes of the newest held)
+    recCol.where('updatedAt', '>', Math.max(0, newestHeld - INCR_SKEW_MS)).get().then(function(q){ take(q, false); }, function(e){ whole('older changes refused: ' + (e && e.code)); });
+    // which there are: the gone ones taken away, the ones not held read by themselves
+    unsubs.push(ref.collection('state').doc('meta').onSnapshot(async function(ms){
+      if (stopped || (ms.metadata && ms.metadata.fromCache)) return;
+      var m = ms.exists ? (ms.data() || {}) : null;
+      if (!m || !Array.isArray(m.ids)) return whole('no index');
+      var listed = {}, held = {};
+      m.ids.forEach(function(i){ listed[String(i)] = true; });
+      c.list.forEach(function(r){ held[String(r.id)] = true; });
+      var notHeld = Object.keys(listed).filter(function(i){ return !held[i]; });
+      var notListed = Object.keys(held).filter(function(i){ return !listed[i]; });
+      if (notHeld.length + notListed.length > INCR_MAX_ONE_BY_ONE) return whole('too much to look up');
+      try {
+        var found = [], gone = [];
+        for (var a = 0; a < notHeld.length; a++) { var s1 = await recCol.doc(notHeld[a]).get(); if (s1.exists) found.push(s1); }
+        for (var b = 0; b < notListed.length; b++) { var s2 = await recCol.doc(notListed[b]).get(); if (s2.exists) found.push(s2); else gone.push(notListed[b]); }
+        if (stopped) return;
+        if (gone.length) {
+          var g = {}; gone.forEach(function(i){ g[i] = true; });
+          c.list = c.list.filter(function(r){ return !g[String(r.id)]; });
+          var k = linkedKeptRead(h) || kept;
+          gone.forEach(function(i){ delete k.base[i]; });
+          try { localStorage.setItem(linkedKeepKey(h), JSON.stringify(Object.assign(k, { list: c.list }))); } catch(e) { linkedForget(h); }
+          linkLiveRecipesShown(h, []);
+        }
+        if (found.length) take(found, false);
+      } catch(e) { whole('looking up refused: ' + (e && e.code)); }
+    }, function(e){ whole('index refused: ' + (e && e.code)); }));
+  } catch(e) { whole('could not listen: ' + (e && e.message)); }
+  return true;
 }
 function linkLiveRecipesShown(h, changed) {
   if (typeof linkedInAllOn === 'function' && linkedInAllOn() && hhShown(h)) {
@@ -6584,6 +6750,10 @@ async function localCopyClear(why) {
   try {
     [STORAGE_KEY, NEXTID_KEY, 'tonys_offline_queue', CLOUD_DELETES_KEY, CLOUD_META_AT_KEY, CLOUD_BASE_KEY, LOCAL_SCOPE_KEY]
       .forEach(function(k){ localStorage.removeItem(k); });
+    // v38.65 — and the linked kitchens kept on this device, and what was last read (another account's, otherwise)
+    var drop = [];
+    for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); if (/^mkn_(linked_|cloud_sync_)/.test(k)) drop.push(k); }
+    drop.forEach(function(k){ localStorage.removeItem(k); });
   } catch(e) {}
   try { await idbClearAll(); } catch(e) {}
   recipes = []; nextId = 10; _offlineQueue = false; _pendingCloudDeletes = {};
@@ -8526,7 +8696,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v38.64';
+var APP_VERSION = 'v38.65';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -10006,6 +10176,10 @@ body.i18n-harvesting #serviceErrorOverlay, body.i18n-harvesting #emailModalOverl
 .ask-btn.danger { background: #C62828; }
 .ask-check { display:flex; align-items:center; gap:9px; margin:2px 0 12px; cursor:pointer;
   font-size:13px; color:var(--muted); text-align:start; }
+/* v38.65 — a list of ticks in one window (the owner's WhatsApp alerts): each on its own line, read from the start */
+.ask-checks { text-align: start; margin: 2px 0 10px; }
+.ask-checks .ask-check { align-items: flex-start; margin: 0 0 9px; line-height: 1.35; }
+.ask-checks .ask-check input { margin-top: 2px; flex: none; }
 .ask-check input { width:17px; height:17px; flex-shrink:0; accent-color:var(--terracotta); cursor:pointer; }
 .ask-btn.ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); font-size: 13px; font-weight: 500; padding: 10px; }
 .voice-btn.voice-on { background: var(--terracotta); color: #fff; border-color: var(--terracotta); animation: syncPulse 1.4s ease-in-out infinite; }
@@ -11557,7 +11731,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.64</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.65</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -11645,7 +11819,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.64</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.65</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -11747,8 +11921,8 @@ body.banner-shown .header {
               <button class="drop-item" data-owner-only data-layout-only="households" title="Every household in this copy: members, AI spending and allowances, links, shares, last use. Only you can open it." onclick="closeDrop('settingsDrop');openManagement()">📊 Households (management)</button>
               <!-- v38.55 — Tony: "Please make sure the Admin gets a notification if any allowance is exceeded or blocked." -->
               <button class="drop-item" data-owner-only title="How much of the free daily allowances (Cloudflare) is used, and anything paused right now (the app&#39;s owner only)." onclick="closeDrop('settingsDrop');openServerAllowances()">🩺 Server allowances</button>
-              <!-- v38.64 — Tony: the warnings on WhatsApp too; this proves they reach him (Worker v84) -->
-              <button class="drop-item" data-owner-only title="Sends you a test alert by e-mail and WhatsApp, to check they reach you (the app&#39;s owner only)." onclick="closeDrop('settingsDrop');sendTestAlert()">📲 Send me a test alert</button>
+              <!-- v38.64 — Tony: the warnings on WhatsApp too (Worker v84); v38.65 — each kind on or off, and the test (Worker v85) -->
+              <button class="drop-item" data-owner-only title="Which alerts also come to you on WhatsApp — each on or off — and a test alert (the app&#39;s owner only)." onclick="closeDrop('settingsDrop');openWhatsAppAlerts()">📲 WhatsApp alerts</button>
               <!-- v38.42 — Tony: "Let's make the invitations sendable from the app, from the Admin account." -->
               <button class="drop-item" data-owner-only title="The tester invitation, in English or Hebrew, with this copy's link — sent through your Gmail, one e-mail to each person, or by WhatsApp or the mail app (the app's owner only)." onclick="closeDrop('settingsDrop');openInviteTesters()">✉️ Invite testers</button>
               <button class="drop-item" title="The app's running costs and billing (the app's owner only)." data-owner-only onclick="closeDrop('settingsDrop');openPayments()">💳 Payments</button>
@@ -22104,6 +22278,12 @@ function askConfirm(opts) {
           ? '<label class="ask-check"><input type="checkbox" id="askCheck">'
             + '<span>' + escH(opts.checkbox) + '</span></label>'
           : '')
+      // v38.65 — a list of ticks ([{ key, label, on }]): only a caller that passes `checks` gets { ok, checks: {key: on} }
+      + (Array.isArray(opts.checks)
+          ? '<div class="ask-checks">' + opts.checks.map(function(c){
+              return '<label class="ask-check"><input type="checkbox" data-key="' + escA(c.key) + '"' + (c.on ? ' checked' : '') + '>'
+                + '<span>' + escH(c.label) + '</span></label>'; }).join('') + '</div>'
+          : '')
       + '<div class="ask-actions">'
       + '<button class="ask-btn' + (danger ? ' danger' : '') + '" id="askOk">' + escH(opts.okLabel || 'OK') + '</button>'
       // v36.21 — an optional third answer, resolving 'alt'. Restore needed one:
@@ -22123,7 +22303,9 @@ function askConfirm(opts) {
     var alt   = ov.querySelector('#askAlt');
     if (alt) alt.onclick = function(){ done('alt'); };
     var back = ov.querySelector('#askBack'); if (back) back.onclick = function(){ done(ASK_BACK); };   // v38.53
-    function refused() { return input ? null : (check ? { ok:false, checked:false } : false); }
+    var checks = Array.isArray(opts.checks);
+    function ticks() { var o = {}; ov.querySelectorAll('.ask-checks input[data-key]').forEach(function(x){ o[x.getAttribute('data-key')] = !!x.checked; }); return o; }
+    function refused() { return input ? null : checks ? { ok:false } : (check ? { ok:false, checked:false } : false); }
     function done(v) {
       ov.remove();
       document.removeEventListener('keydown', onKey, true);
@@ -22131,6 +22313,7 @@ function askConfirm(opts) {
     }
     function accept() {
       if (input) { done(input.value); return; }
+      if (checks) { done({ ok:true, checks:ticks() }); return; }
       done(check ? { ok:true, checked:check.checked } : true);
     }
     function onKey(e) {
@@ -24856,8 +25039,9 @@ window.readCloudPhotoDocs = readCloudPhotoDocs;
 
 // Re-attach cloud photos to a freshly-loaded recipe list. Legacy inline photos (from the
 // old single-doc format) are kept as-is and left un-stamped so the next save migrates them.
-async function attachCloudPhotos(list, out) {
-  var bulk = await readCloudPhotoDocs();
+async function attachCloudPhotos(list, out, opts) {
+  // v38.65 — `one`: a few changed recipes; each photo by itself, not every photo of the kitchen at once
+  var bulk = (opts && opts.one) ? { byId: {}, complete: false } : await readCloudPhotoDocs();
   if (out) out.bulk = bulk;                // v38.56 — handed to repairMissingPhotos by the same load
   for (var i = 0; i < list.length; i++) {
     var r = list[i];
@@ -25497,7 +25681,9 @@ async function saveRecipeDoc(r, db) {
     var snap = await tx.get(ref);
     var cloudAt = snap.exists ? ((snap.data() || {}).updatedAt) : null;
     if (!cloudWriteAllowed(cloudAt, base, r.updatedAt)) { refused = true; return; }
-    tx.set(ref, { r: json, updatedAt: stamped, id: r.id });
+    // v38.65 — and the server's own time: what a reading device asks for (incrementalCloudLoad). A recipe edited
+    // offline days ago and sent today has an old updatedAt, but its syncedAt is today.
+    tx.set(ref, { r: json, updatedAt: stamped, id: r.id, syncedAt: firebase.firestore.FieldValue.serverTimestamp() });
   });
   if (refused) {
     // Logged HERE, not in the caller. The successful write is logged a few lines
@@ -25617,10 +25803,11 @@ async function readCloudRecipeDocs(db, metaIds) {
 
 // Turn raw documents into a recipe list, recording each one's concurrency base.
 var _cloudUnreadable = {};   // id -> true when the cloud document exists but won't parse
-function parseCloudRecipeDocs(docs) {
-  var list = [];
+function parseCloudRecipeDocs(docs, opts) {
+  var list = [], partial = !!(opts && opts.partial);
   for (var i = 0; i < docs.length; i++) {
     var d = docs[i].data || {};
+    noteCloudSyncedAt(d.syncedAt);   // v38.65
     var r;
     try { r = JSON.parse(d.r || 'null'); } catch(e) { r = null; }
     if (!r || typeof r !== 'object') {
@@ -25661,14 +25848,131 @@ function parseCloudRecipeDocs(docs) {
   // A full read replaces `recipes` with the cloud's copies, so nothing is left in
   // conflict — this is why restarting the app cleared it before there was any
   // other way out.
-  clearAllRecipeConflicts();
-  syncLog('load', 'Read ' + list.length + ' recipe(s) from the cloud',
+  // v38.65 — a partial read (only what changed) ends the conflicts of what it read, and no other
+  if (partial) list.forEach(function(r){ clearRecipeConflict(r.id); }); else clearAllRecipeConflicts();
+  if (!partial) syncLog('load', 'Read ' + list.length + ' recipe(s) from the cloud',
           { docs: docs.length, unreadable: Object.keys(_cloudUnreadable).length });
   saveCloudBase();   // v29.2 — a full read is exactly when the base is authoritative
   setTimeout(function(){ try { exampleTwinsRemove(); } catch(e) {} }, 2500);   // v38.50 — once the list has settled
   return list;
 }
 window.cloudUnreadableIds = function(){ return Object.keys(_cloudUnreadable); };
+
+// ─── v38.65 — READ ONLY WHAT CHANGED ─────────────────────────────────────────
+// Tony, 20 Oct 2026: "Please implement the mechanism in which each device reads only the recipes that changed, not
+// the whole kitchen." Until now a change anywhere in a kitchen (meta.updatedAt moved) made every other device read
+// every recipe AND every photo again (the emulator: 97 reads for one edited recipe in a 60-recipe kitchen).
+//  • Every recipe write carries `syncedAt`, the server's own time (saveRecipeDoc). No device clock can make a recipe
+//    look old: one edited offline days ago and sent today is newer than anything read before.
+//  • A load whose meta moved asks only for recipes with syncedAt after the newest it has seen — and, for writes from
+//    apps older than this one, updatedAt within 15 minutes of the newest it holds — and only their photos.
+//  • Deletions come from meta.ids, the cloud's own index: a recipe held here and missing there is looked up by itself
+//    and removed only if its document is really gone; one listed there and held nowhere here is read by itself.
+//  • Anything that does not add up — the lists, a failed query, most of the kitchen changed, a day since the last full
+//    read — falls back to the full read, which is exactly as it was. Never a guess.
+// (syncedAt is the server's commit time, and a query sees every commit up to the moment it reads: a write it did not
+// see has a later time than any it did — no margin needed (the emulator writes ~25 recipes a second, so even 1 s of
+// margin read back a whole burst). The updatedAt question is only for apps from before syncedAt, until every device
+// has updated: 15 minutes of clock.)
+var CLOUD_SYNC_KEY = 'mkn_cloud_sync_', INCR_SKEW_MS = 15 * 60e3, INCR_SYNC_MARGIN_MS = 0, INCR_FULL_EVERY_MS = 24 * 3600e3,
+    INCR_MAX_CHANGED = 150, INCR_MAX_ONE_BY_ONE = 40;
+var _cloudSyncedMax = 0;           // the newest syncedAt (ms) seen in this load
+function noteCloudSyncedAt(v) {
+  var ms = 0;
+  try { ms = v && typeof v.toMillis === 'function' ? v.toMillis() : (typeof v === 'number' ? v : 0); } catch(e) { ms = 0; }
+  if (ms > _cloudSyncedMax) _cloudSyncedMax = ms;
+}
+// { at: the newest syncedAt read, fullAt: when every recipe was last read } — for this household only
+function cloudSyncMark() {
+  try { var m = JSON.parse(localStorage.getItem(CLOUD_SYNC_KEY + (_cloudHid || '')) || 'null'); return m && typeof m === 'object' ? m : {}; }
+  catch(e) { return {}; }
+}
+function setCloudSyncMark(m) { try { localStorage.setItem(CLOUD_SYNC_KEY + (_cloudHid || ''), JSON.stringify(m)); } catch(e) {} }
+window.cloudSyncMark = cloudSyncMark; window.setCloudSyncMark = setCloudSyncMark;
+async function incrementalCloudLoad(meta, offlineQueued, db) {
+  db = db || _fbDb;
+  if (_cloudLayout !== 'households' || !_cloudHid || offlineQueued || !recipes.length) return null;
+  if (!meta || typeof meta.updatedAt !== 'number' || !Array.isArray(meta.ids) || (meta.schema || 0) < CLOUD_SCHEMA) return null;
+  if (_lastCloudMetaAt === null || _lastCloudMetaAt === undefined) return null;
+  var mark = cloudSyncMark();
+  if (!mark.fullAt || Date.now() - mark.fullAt > INCR_FULL_EVERY_MS || mark.fullAt > Date.now() + 60e3) return null;
+  if (!recipes.every(function(r){ return _cloudRecipeBase[r.id] !== undefined; })) return null;
+  var col = db.collection('households').doc(_cloudHid).collection('recipes');
+  if (typeof col.where !== 'function') return null;
+  var newestHeld = 0;
+  Object.keys(_cloudRecipeBase).forEach(function(k){ var v = _cloudRecipeBase[k]; if (typeof v === 'number' && v > newestHeld) newestHeld = v; });
+  _cloudSyncedMax = mark.at || 0;
+  var got = {}, reads = 0;
+  var take = function(q) { reads += Math.max(1, q.size || 0); q.forEach(function(d){ got[String(d.id)] = { id: recipeDocId(d.id), data: d.data() }; }); };
+  take(await col.where('syncedAt', '>', firebase.firestore.Timestamp.fromMillis(Math.max(0, (mark.at || 0) - INCR_SYNC_MARGIN_MS))).get());
+  take(await col.where('updatedAt', '>', Math.max(0, newestHeld - INCR_SKEW_MS)).get());
+  var changedIds = Object.keys(got);
+  if (changedIds.length > INCR_MAX_CHANGED) { countCloudRead(reads); return null; }   // most of it changed: read it all
+  var cloudIds = {}, heldIds = {};
+  meta.ids.forEach(function(i){ cloudIds[String(i)] = true; });
+  recipes.forEach(function(r){ heldIds[String(r.id)] = true; });
+  // Listed there, held nowhere here and not just read — and any recipe in conflict: read each by itself.
+  var oneByOne = Object.keys(cloudIds).filter(function(i){ return !heldIds[i] && !got[i]; });
+  Object.keys(_conflictIds).forEach(function(i){ if (cloudIds[String(i)] && !got[String(i)] && oneByOne.indexOf(String(i)) === -1) oneByOne.push(String(i)); });
+  // Held here, not listed there: gone only if its document really is.
+  var maybeGone = Object.keys(heldIds).filter(function(i){ return !cloudIds[i] && !got[i]; });
+  if (oneByOne.length + maybeGone.length > INCR_MAX_ONE_BY_ONE) { countCloudRead(reads); return null; }
+  var gone = [];
+  for (var a = 0; a < oneByOne.length; a++) {
+    var s1 = await cloudDoc(recipeDocId(oneByOne[a]), db).get(); reads++;
+    if (s1.exists) got[oneByOne[a]] = { id: recipeDocId(oneByOne[a]), data: s1.data() };
+  }
+  for (var b = 0; b < maybeGone.length; b++) {
+    var s2 = await cloudDoc(recipeDocId(maybeGone[b]), db).get(); reads++;
+    if (s2.exists) got[maybeGone[b]] = { id: recipeDocId(maybeGone[b]), data: s2.data() };   // the index lags: keep it
+    else gone.push(maybeGone[b]);
+  }
+  countCloudRead(reads);
+  // It must add up BEFORE anything is recorded: every recipe the cloud lists is held here or was just read (an
+  // unreadable one excepted). Recording the newer versions and then giving up would let a later save, should the
+  // full read fail, write an older copy over a newer one.
+  var willHave = {};
+  Object.keys(heldIds).forEach(function(i){ if (gone.indexOf(i) === -1) willHave[i] = true; });
+  Object.keys(got).forEach(function(i){ willHave[i] = true; });
+  var short = Object.keys(cloudIds).filter(function(i){ return !willHave[i] && !_cloudUnreadable[i] && !_cloudUnreadable[+i]; });
+  if (short.length) { syncLog('load', 'Reading only what changed did not add up — reading everything', { missing: short.length }); return null; }
+  var docs = Object.keys(got).map(function(k){ return got[k]; });
+  var list = migrateRecipes(parseCloudRecipeDocs(docs, { partial: true }));
+  // What this device keeps that the cloud never holds: the scanned original, the history, a photo not yet sent.
+  var heldById = {};
+  recipes.forEach(function(r){ heldById[String(r.id)] = r; });
+  var keepPhoto = {};
+  list.forEach(function(r){
+    var old = heldById[String(r.id)];
+    if (!old) return;
+    if (!r.originalPhoto && old.originalPhoto) r.originalPhoto = old.originalPhoto;
+    if ((!r.history || !r.history.length) && old.history && old.history.length) r.history = old.history;
+    if (old.photo) keepPhoto[String(r.id)] = { photo: old.photo, updatedAt: old.updatedAt || 0 };
+  });
+  await attachCloudPhotos(list, null, { one: true });
+  var recovered = 0;
+  list.forEach(function(r){
+    var lp = keepPhoto[String(r.id)];
+    if (!r.photo && lp && lp.updatedAt >= (r.updatedAt || 0)) { r.photo = lp.photo; recovered++; }
+  });
+  // The kitchen as it is now: what changed replaced, what is new added, what is gone removed.
+  var byId = {}, goneSet = {};
+  list.forEach(function(r){ byId[String(r.id)] = r; });
+  gone.forEach(function(i){ goneSet[i] = true; });
+  var next = recipes.filter(function(r){ return !goneSet[String(r.id)]; }).map(function(r){ return byId[String(r.id)] || r; });
+  list.forEach(function(r){ if (!heldById[String(r.id)]) next.push(r); });
+  gone.forEach(function(i){
+    var k = isNaN(+i) ? i : +i;
+    delete _cloudRecipeIds[k]; delete _cloudRecipeBase[k]; delete _cloudRecipeStamp[k]; delete _cloudPhotoIds[k]; delete _cloudPhotoStamps[k];
+  });
+  recipes = next;
+  noteCloudIdsFromMeta(meta);
+  saveCloudBase();
+  setCloudSyncMark({ at: Math.max(mark.at || 0, _cloudSyncedMax), fullAt: mark.fullAt });
+  syncLog('load', 'Read ' + list.length + ' changed recipe(s) from the cloud, ' + gone.length + ' gone', { reads: reads, recovered: recovered });
+  return { changed: list.length, gone: gone.length, reads: reads, recovered: recovered };
+}
+window.incrementalCloudLoad = incrementalCloudLoad;
 
 // ─── ONE RECIPE, PULLED DOWN ON ITS OWN (5.4 §7, v35.3) ──────────────────────
 //
@@ -26086,10 +26390,25 @@ async function _loadFromFirestoreInner(user) {
       // unconditionally is also the safer failure mode: a `meta` document with a
       // missing or stale `schema` field now loads the collection rather than
       // reporting an empty cloud.
-      var docs = await readCloudRecipeDocs(_fbDb, meta.ids);
-      countCloudRead(docs.length);
-      fsRecipes = parseCloudRecipeDocs(docs);
-      cloudNextId = meta.nextId || 0;
+      // v38.65 — only what changed, when that can be known for sure; otherwise everything, as before
+      var inc = null;
+      try { inc = await incrementalCloudLoad(meta, offlineQueued); }
+      catch (e) { inc = null; dlog('[v38.65] reading only what changed failed — reading everything:', e && e.message); }
+      if (inc) {
+        nextId = mergeNextId(nextId, meta.nextId || 0);
+        saveLocal();
+        hasData = true;
+        if (typeof meta.updatedAt === 'number') setLastCloudMetaAt(meta.updatedAt);
+        _lastSyncOkAt = Date.now();
+        if (inc.recovered > 0) await saveToFirestore();   // a photo this device had not yet sent, sent now
+      } else {
+        _cloudSyncedMax = 0;
+        var docs = await readCloudRecipeDocs(_fbDb, meta.ids);
+        countCloudRead(docs.length);
+        fsRecipes = parseCloudRecipeDocs(docs);
+        cloudNextId = meta.nextId || 0;
+        if (_cloudLayout === 'households' && _cloudHid) setCloudSyncMark({ at: _cloudSyncedMax, fullAt: Date.now() });   // v38.65
+      }
     }
 
     {
@@ -29838,7 +30157,7 @@ var HELP_SYSTEM_PROMPT = [
   "- Every item in ⚙️ explains itself when you point at it.",
   "",
   "=== FOR THE APP'S OWNER ===",
-  "- ⚙️ → 👑 App owner is shown only to the app's owner: 📊 Households, 🩺 Server allowances, 📲 Send me a test alert, ✉️ Invite testers, 💳 Payments, 🚀 Deployments, 🔑 Check the app's key, 🔐 Two-step sign-in for the owner, 📧 Gmail Setup, 🛒 Bring!",
+  "- ⚙️ → 👑 App owner is shown only to the app's owner: 📊 Households, 🩺 Server allowances, 📲 WhatsApp alerts (which alerts also come on WhatsApp, each on or off, and a test), ✉️ Invite testers, 💳 Payments, 🚀 Deployments, 🔑 Check the app's key, 🔐 Two-step sign-in for the owner, 📧 Gmail Setup, 🛒 Bring!",
   "- ✉️ Invite testers: the tester invitation in English or עברית, with this copy's link; the wording can be changed (this device keeps it; 'The original words' brings it back). Paste the addresses; 📧 Send with Gmail sends each person their own e-mail, from the app's address when the owner's Gmail may send as it. Also ✉️ Mail app, 💬 WhatsApp and 📋 Copy. The first Gmail send needs the Gmail API switched on for the copy's Google Cloud project, and Google's permission",
   "- 🔐 Two-step sign-in: an authenticator app's 6-digit code on top of the Google sign-in, for the owner's tools",
   "- The owner's log panel and its pop-up offer 📋 Copy log (everyone else's send the report to the owner)",

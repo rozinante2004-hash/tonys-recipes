@@ -498,6 +498,34 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
   **The hourly check on Cloudflare's clock**: cron `17 * * * *` (HOURLY_CRON) reads today's Cloudflare analytics with
   CF_ANALYTICS_TOKEN (Account Analytics: Read) → `usageEvaluate` (shared with usage-report; the snapshot now MERGES,
   so Pages builds from the GitHub watch stay); a refused token → owner notice `usage:watch` once a day.
+- **Released: v38.64 + Worker v84 (20 Oct 2026, 14:56 Israel time, CI green on c0bdc0d).** All jobs success (Worker v84
+  deployed with the hourly cron; WHATSAPP_* and CF_ANALYTICS_TOKEN not set yet — notices in the deploy log).
+- **v38.65 — each device reads only what changed** (Tony, 20 Oct: "Please implement the mechanism in which each device
+  reads only the recipes that changed, not the whole kitchen. I do not see any reason to wait for the launch").
+  Own kitchen (`incrementalCloudLoad`, households layout only): every recipe write carries `syncedAt`
+  (FieldValue.serverTimestamp(), saveRecipeDoc — the only writer); a load whose meta moved asks `syncedAt > newest seen`
+  (no margin: commit times are ordered — even 1 s re-read a whole emulator burst) and `updatedAt > newest held − 15 min`
+  (apps from before syncedAt), reads one by one what meta.ids lists but nobody holds (and conflicted ones), and takes
+  away what meta.ids no longer lists ONLY after a get finds the document gone. It must add up BEFORE anything is
+  recorded (else null → the unchanged full read; recording then giving up could let a later save write an older copy
+  over a newer one); photos only of the changed (`attachCloudPhotos(list, null, { one: true })`); partial parse keeps
+  other recipes' conflicts. Full read every 24 h (`mkn_cloud_sync_<hid>` {at, fullAt}), and whenever > 150 changed or
+  > 40 to look up one by one. Linked kitchens (`linkLiveChanged`): kept in localStorage (`mkn_linked_<myHid>_<theirs>`,
+  ≤ 1.5 MB, no photos; cleared by localCopyClear and when the link goes), shown at once; a syncedAt listener for what
+  changed, a one-off updatedAt query for old apps, and their `state/meta` (RULES v38.65: a linked reader may read
+  `state/meta` only) for deletions — anything refused or not adding up → `linkLiveWhole` (the v38.52 listener). Emulator
+  ($S/e2e/reads2.mjs, recipes backdated 2 days): a tester linked to a 60-recipe kitchen reopens 81 → 23 reads; the
+  other device after one edit 97 → 24; a live edit followed 3 → 2. Self-tests `reads_only_what_changed`,
+  `linked_kitchen_kept_and_merged`; rules test (linked reads state/meta, not other state, never writes it); e2e-sync
+  both layouts pass.
+- **v38.65 + Worker v85 — each alert on WhatsApp, or not** (Tony, 20 Oct: "add to the Admin's Setting an option to
+  separately enable/disable each of the alerts to be sent by Whatsapp. They should all be enabled by default"): ⚙️ →
+  👑 App owner → 📲 WhatsApp alerts (`openWhatsAppAlerts`; replaces "Send me a test alert", which is now its third
+  button): eight ticks — new-device, owner-action, near-limit, limit-reached, ai-service, household-ai, server-errors,
+  usage-check (Worker `ALERT_KINDS`, `alertKindOf(notice)`) — kept in D1 `owner_prefs` 'whatsapp_off' (the kinds OFF,
+  so a new kind starts on; unknown/D1 down = on); meter-admin `alert-prefs` / `alert-prefs-set`; `ownerAlert(…, {kind})`
+  skips only WhatsApp. askConfirm took `checks: [{key,label,on}]` → `{ok, checks}`. The new-device e-mail says Israel
+  time. Self-test `whatsapp_alerts_each_on_or_off`; 10 Worker checks.
 - **GitHub drops most scheduled runs on this repository** (20 Oct): the usage watch (:11 and :41) ran at 01:13 and 06:31
   UTC only; Publish languages (every 10 min) runs every 2–5 h; the 02:17 backup starts 07:00–07:51 UTC. The watch is an
   early warning only (a real refusal is told at once by the Worker and the app), but hourly needs another clock: the

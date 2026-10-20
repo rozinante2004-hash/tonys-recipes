@@ -316,7 +316,9 @@ service cloud.firestore {
         allow delete: if atLeast(hid, 'admin') || beingDeleted(hid);
       }
       match /state/{doc} {
-        allow read: if isMember(hid) || beingDeleted(hid);
+        // v38.65 — and a linked household reads the index (`meta`: which recipes there are) and nothing else in state,
+        // so its devices read only the recipes that changed and still learn which were deleted.
+        allow read: if isMember(hid) || beingDeleted(hid) || (doc == 'meta' && linkedReader(hid));
         allow create, update: if atLeast(hid, 'editor');
         allow delete: if atLeast(hid, 'admin') || beingDeleted(hid);
       }

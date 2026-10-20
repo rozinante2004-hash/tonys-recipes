@@ -7869,7 +7869,7 @@ window.SELF_TESTS = [
 
   { id:'owner_test_alert', group:'Core', name:'📲 The owner can send himself a test alert, and is told what reached him — e-mail, and WhatsApp once its secrets are set (v38.64, Worker v84)',
     test: async()=>{
-      if(!document.querySelector('[onclick*="sendTestAlert()"][data-owner-only]')) throw new Error('no owner-only "Send me a test alert"');
+      if(!document.querySelector('[onclick*="openWhatsAppAlerts()"][data-owner-only]')) throw new Error('no owner-only "WhatsApp alerts"');
       var t=testAlertText({ mail:true, mailTo:2, whatsapp:true, whatsappSet:true }).join('\n');
       if(!/✅ E-mail: sent to your alert addresses \(2\)/.test(t) || !/✅ WhatsApp: sent/.test(t)) throw new Error('both sent: '+t);
       t=testAlertText({ mail:true, mailTo:1, whatsapp:false, whatsappSet:false }).join('\n');
@@ -7884,6 +7884,102 @@ window.SELF_TESTS = [
         var d=await sendTestAlert();
         if(!sent || sent.action!=='meter-admin' || sent.op!=='alert-test' || !d || d.whatsapp!==true) throw new Error('asked the server: '+JSON.stringify(sent));
       } finally { window.isAppOwner=realOwner; window._fbUser=realUser; window.fetch=realFetch; window.askConfirm=realConfirm; }
+    } },
+
+  { id:'whatsapp_alerts_each_on_or_off', group:'Core', name:'📲 The owner turns each kind of alert on WhatsApp on or off — all on by default, kept by the server, e-mail never affected (v38.65, Worker v85)',
+    test: async()=>{
+      // the window's ticks
+      var p=askConfirm({ title:'t', checks:[{ key:'a', label:'A', on:true }, { key:'b', label:'B', on:false }], okLabel:'Save' });
+      var boxes=document.querySelectorAll('#askOverlay .ask-checks input[data-key]');
+      if(boxes.length!==2 || !boxes[0].checked || boxes[1].checked) throw new Error('the ticks are not drawn as they are');
+      boxes[0].click(); boxes[1].click(); document.getElementById('askOk').click();
+      var got=await p;
+      if(!got || got.ok!==true || got.checks.a!==false || got.checks.b!==true) throw new Error('the ticks come back as '+JSON.stringify(got));
+      var p2=askConfirm({ title:'t', checks:[{ key:'a', label:'A', on:true }] }); document.getElementById('askCancel').click();
+      if((await p2).ok!==false) throw new Error('closing is not "not saved"');
+      // the owner's window: what the server says, and what is sent back
+      var realOwner=window.isAppOwner, realUser=window._fbUser, realFetch=window.fetch, realConfirm=window.askConfirm, sent=[], shown=null;
+      try{
+        window.isAppOwner=function(){ return true; }; window._fbUser={ getIdToken:async function(){ return 't'; } };
+        var kinds=[['new-device','N'],['owner-action','O'],['near-limit','L'],['limit-reached','R'],['ai-service','A'],['household-ai','H'],['server-errors','E'],['usage-check','U']].map(function(k){ return { key:k[0], label:k[1], on:true }; });
+        window.fetch=async function(u, o){ var b=JSON.parse(o.body); sent.push(b); return new Response(JSON.stringify({ ok:true, whatsappSet:false, kinds:kinds }), { status:200 }); };
+        window.askConfirm=async function(o){ shown=o; var c={}; o.checks.forEach(function(k){ c[k.key]=k.key!=='near-limit'; }); return { ok:true, checks:c }; };
+        if(await openWhatsAppAlerts()!==true) throw new Error('not saved');
+        if(!shown || shown.checks.length!==8 || !shown.checks.every(function(k){ return k.on; })) throw new Error('not all eight, all on: '+JSON.stringify(shown && shown.checks));
+        if(!/not set up yet/.test(shown.message) || !/E-mail alerts are not affected/.test(shown.message)) throw new Error('the window does not say how things stand: '+shown.message);
+        if(sent[0].op!=='alert-prefs' || sent[1].op!=='alert-prefs-set' || sent[1].prefs['near-limit']!==false || sent[1].prefs['new-device']!==true) throw new Error('sent: '+JSON.stringify(sent));
+      } finally { window.isAppOwner=realOwner; window._fbUser=realUser; window.fetch=realFetch; window.askConfirm=realConfirm; var ov=document.getElementById('askOverlay'); if(ov) ov.remove(); }
+    } },
+
+  { id:'reads_only_what_changed', group:'Sync', name:'☁️ A device reads only the recipes that changed (the server’s syncedAt; updatedAt for apps from before), learns deletions from the cloud’s own index and checks each, and falls back to reading everything whenever it does not add up (v38.65)',
+    test: async()=>{
+      var snap=_cloudSnapshotForTest(), real={ recipes:recipes, layout:window._cloudLayout, hid:window._cloudHid, db:window._fbDb, conflicts:Object.assign({}, _conflictIds) };
+      var TS=firebase.firestore.Timestamp, store, getsOne;
+      var docObj=function(id, data){ return { id:String(id), exists:!!data, data:function(){ return data; } }; };
+      var colApi=function(c){ return {
+        where:function(f, op, v){ return { get:async function(){
+          var lim=v && v.toMillis ? v.toMillis() : v;
+          var docs=Object.keys(store[c]||{}).filter(function(id){ var x=store[c][id][f]; if(x && x.toMillis) x=x.toMillis(); return typeof x==='number' && x>lim; }).map(function(id){ return docObj(id, store[c][id]); });
+          return { size:docs.length, forEach:function(fn){ docs.forEach(fn); } }; } }; },
+        doc:function(id){ return { get:async function(){ getsOne.push(c+'/'+id); return docObj(id, (store[c]||{})[id]); } }; } }; };
+      var fakeDb={ collection:function(path){
+        if(path==='households') return { doc:function(){ return { collection:function(c){ return colApi(c); } }; } };
+        return colApi(path.split('/').pop()); } };
+      var doc=function(id, name, upd, synced, ph){ return { r:JSON.stringify({ id:id, name:name, emoji:'🍲', updatedAt:upd, _ph:!!ph }), updatedAt:upd, id:id, syncedAt:TS.fromMillis(synced) }; };
+      // (T0: the newest version held here, recipe 3's; 1 and 2 three hours older — outside the 15 minutes asked of apps from before)
+      var T0=1.7e12, H=3600e3;
+      var setup=function(){
+        store={ recipes:{ '1':doc(1,'One, edited',T0+H,6000), '2':doc(2,'Two',T0-3*H,4000), '4':doc(4,'Four',T0-24*H,7000,true) }, photos:{ '4':{ photo:'data:image/png;base64,AAAA', updatedAt:7000 } } };
+        getsOne=[];
+        recipes=[normalizeRecipe({ id:1, name:'One', updatedAt:T0-3*H }), normalizeRecipe({ id:2, name:'Two', updatedAt:T0-3*H }), normalizeRecipe({ id:3, name:'Three', updatedAt:T0 })];
+        window._cloudRecipeBase={ 1:T0-3*H, 2:T0-3*H, 3:T0 }; window._cloudRecipeStamp={}; window._cloudRecipeIds={ 1:true, 2:true, 3:true }; window._cloudUnreadable={};
+        window._lastCloudMetaAt=1; _conflictIds={};
+        setCloudSyncMark({ at:5000, fullAt:Date.now() - 3600e3 });
+      };
+      var meta={ updatedAt:2, ids:[1,2,4], schema:CLOUD_SCHEMA, nextId:5 };
+      try{
+        window._cloudLayout='households'; window._cloudHid='hRT'; window._fbDb=fakeDb;
+        setup();
+        var r=await incrementalCloudLoad(meta, false, fakeDb);
+        var names=recipes.map(function(x){ return x.name; }).sort().join('|');
+        if(!r || r.changed!==2 || r.gone!==1) throw new Error('read: '+JSON.stringify(r));
+        if(names!=='Four|One, edited|Two') throw new Error('the kitchen now: '+names);
+        if(getsOne.indexOf('recipes/3')===-1) throw new Error('a recipe gone from the index was not checked by itself before it was taken away');
+        if(getsOne.indexOf('recipes/2')!==-1) throw new Error('an unchanged recipe was read');
+        if(_cloudRecipeBase[1]!==T0+H || _cloudRecipeBase[4]!==T0-24*H || 3 in _cloudRecipeBase) throw new Error('the versions held: '+JSON.stringify(_cloudRecipeBase));
+        if(cloudSyncMark().at!==7000) throw new Error('the newest seen: '+JSON.stringify(cloudSyncMark()));
+        if(!(recipes.filter(function(x){ return x.id===4; })[0]||{}).photo) throw new Error('the new recipe’s photo was not read');
+        // gone from the index but its document still there: kept (the index lags)
+        setup(); store.recipes['3']=doc(3,'Three',T0,3000);
+        r=await incrementalCloudLoad(meta, false, fakeDb);
+        if(!r || r.gone!==0 || !recipes.some(function(x){ return x.id===3; })) throw new Error('a recipe the index left out but the cloud still holds was taken away');
+        // listed but nowhere: it does not add up → everything is read instead (null), nothing changed here
+        setup(); var m2=Object.assign({}, meta, { ids:[1,2,4,9] });
+        r=await incrementalCloudLoad(m2, false, fakeDb);
+        if(r!==null || recipes.length!==3 || recipes[0].name!=='One') throw new Error('a recipe the index lists but nobody holds: '+JSON.stringify(r));
+        if(_cloudRecipeBase[1]!==T0-3*H || 4 in _cloudRecipeBase) throw new Error('giving up still recorded the newer versions (an older copy could then be written over them): '+JSON.stringify(_cloudRecipeBase));
+        // the full read is used: a day since the last, unsent changes here, no mark, another layout
+        setup(); setCloudSyncMark({ at:5000, fullAt:Date.now() - 25*3600e3 });
+        if(await incrementalCloudLoad(meta, false, fakeDb)!==null) throw new Error('a day since everything was read, and still only the changes');
+        setup(); if(await incrementalCloudLoad(meta, true, fakeDb)!==null) throw new Error('unsent changes here, and only the cloud’s changes read');
+        setup(); window._cloudLayout='shared'; if(await incrementalCloudLoad(meta, false, fakeDb)!==null) throw new Error('the first layout read in part'); window._cloudLayout='households';
+        // a write carries the server's own time
+        if(String(saveRecipeDoc).indexOf('syncedAt: firebase.firestore.FieldValue.serverTimestamp()')===-1) throw new Error('a recipe is written without syncedAt');
+      } finally {
+        recipes=real.recipes; window._cloudLayout=real.layout; window._cloudHid=real.hid; window._fbDb=real.db; _conflictIds=real.conflicts;
+        _cloudRestoreForTest(snap);
+      }
+    } },
+
+  { id:'linked_kitchen_kept_and_merged', group:'Sync', name:'🤝 A linked kitchen is kept on the device between visits (never another account’s), and what changed is merged into it — replaced or added, its photo asked again (v38.65)',
+    test: async()=>{
+      var c={ list:[normalizeRecipe({ id:1, name:'B' }), normalizeRecipe({ id:2, name:'C' })], photos:{ '1':'data:x' }, photoAsk:{ '1':1 } };
+      var d=function(id, name){ return { id:String(id), data:function(){ return { r:JSON.stringify({ id:id, name:name }), updatedAt:5 }; } }; };
+      var ch=linkedMerge(c, [d(1,'B, edited'), d(3,'A new')]);
+      if(ch.join()!=='1,3' || c.list.map(function(r){ return r.name; }).join('|')!=='A new|B, edited|C') throw new Error('merged: '+JSON.stringify(c.list.map(function(r){ return r.name; })));
+      if(c.photos['1'] || c.photoAsk['1']) throw new Error('a changed recipe kept its old photo');
+      if(String(localCopyClear).indexOf('mkn_(linked_|cloud_sync_)')===-1) throw new Error('clearing the device’s copy does not forget the kept kitchens');
+      if(String(linkLiveRecipes).indexOf('linkedForget(h)')===-1) throw new Error('a link removed keeps its kitchen on the device');
     } },
 
   { id:'beta_moved_to_its_domain', group:'Core', name:'🌐 The beta lives at mykitchennotes.community: its old address and www. send visitors on with the shared link and the extension’s text; nothing else moves; the family links to it there (v38.17)',
