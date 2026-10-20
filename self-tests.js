@@ -4689,7 +4689,13 @@ window.SELF_TESTS = [
         window.cloudLayout=real.layout; _household.role='editor'; renderAccessMembers();
         if(cloudLayout()!=='households' && document.getElementById('accessAddForm').style.display==='none') throw new Error('the first layout hides the form');
         // The log on the sign-in screen: the test copy only.
-        if(document.getElementById('loginCopyLogBtn').hidden !== !loginLogButtonShown()) throw new Error('the log button does not follow the copy');
+        // v38.64 — one "Trouble signing in?" on the first screen; the log appears with the check it opens (the test copy only)
+        var lb=document.getElementById('loginCopyLogBtn'), keepHidden=lb.hidden;
+        if(String(diagnoseSignIn).indexOf('loginLogButtonReveal()')===-1) throw new Error('the sign-in check does not offer the log');
+        loginLogButtonReveal();
+        if(lb.hidden !== !loginLogButtonShown()) throw new Error('the log button does not follow the copy');
+        lb.hidden=keepHidden;
+        if(!/Trouble signing in\?/.test(document.getElementById('signInDiagBtn').textContent)) throw new Error('the first screen does not say "Trouble signing in?"');
       } finally {
         _household=real.hh; _householdList=real.list; window._fbUser=real.user; window.cloudLayout=real.layout;
         try{ if(real.access===null) localStorage.removeItem(ACCESS_STORAGE_KEY); else localStorage.setItem(ACCESS_STORAGE_KEY, real.access); }catch(e){}
@@ -7809,6 +7815,16 @@ window.SELF_TESTS = [
         _household={ hid:'hT', name:'Dana <b>& Co</b> Kitchen Notes', role:'owner' };
         if(kitchenTitle()!=='Dana <b>& Co</b> Kitchen Notes') throw new Error('in a kitchen: '+kitchenTitle());
         var r={ id:'t1', name:'Soup', emoji:'🍲', category:'Dinner', prep:'5 min', servings:'2', ingredients:[{a:'1',n:'water'}], steps:['Boil'] };
+        // v38.64 — Tony: "Use each kitchen's name. Do not use my name unless something is indeed coming from me."
+        _household.name='Dana\u2019s Kitchen'; if(kitchenFileStem()!=='Danas_Kitchen') throw new Error('file name: '+kitchenFileStem());
+        _household.name='A/B: "C"?'; if(/[\\/:*?"<>|]/.test(kitchenFileStem())) throw new Error('a file name with forbidden characters: '+kitchenFileStem());
+        _household.name='Dana <b>& Co</b> Kitchen Notes';
+        [['the Word export',makeDocxBlob],['its file name',exportRecipesToWord],['the selected recipes in Word',exportSelWord],['the printed list',buildPrintHtml]].forEach(function(x){
+          if(typeof x[1]!=='function') return;
+          var src=String(x[1]).replace(/\/\/[^\n]*/g,'');   // (the code, not its comments)
+          if(/Tony'?s?[_ ]Recipes|Tony\\u2019s/.test(src)) throw new Error(x[0]+' still names Tony');
+        });
+        if(/Tony/.test(String(shareAppWhatsApp).replace(/\/\/[^\n]*/g,'').replace(/environment === 'live' \? "Tony's Recipes Collection"/,''))) throw new Error('sharing the app names Tony outside the family copy');
         var page=buildRecipePage(r), mail=rHtml(r);
         [['the shared page',page],['the e-mail',mail]].forEach(function(x){
           if(/Tony/.test(x[1])) throw new Error(x[0]+' names Tony');
@@ -7849,6 +7865,25 @@ window.SELF_TESTS = [
       // the owner's page
       var lines=serverAllowanceLines({ watch:true, notices:[], appReads:{ day:'2026-10-20', limit:50000, byProject:{ 'my-kitchen-notes-beta':36000, 'tonys-recipes-test':120 } } }).join('\n');
       if(!/⚠️ my-kitchen-notes-beta: 36,000 of 50,000 \(72%\)/.test(lines) || !/✓ tonys-recipes-test: 120 of 50,000 \(0%\)/.test(lines)) throw new Error('the page: '+lines);
+    } },
+
+  { id:'owner_test_alert', group:'Core', name:'📲 The owner can send himself a test alert, and is told what reached him — e-mail, and WhatsApp once its secrets are set (v38.64, Worker v84)',
+    test: async()=>{
+      if(!document.querySelector('[onclick*="sendTestAlert()"][data-owner-only]')) throw new Error('no owner-only "Send me a test alert"');
+      var t=testAlertText({ mail:true, mailTo:2, whatsapp:true, whatsappSet:true }).join('\n');
+      if(!/✅ E-mail: sent to your alert addresses \(2\)/.test(t) || !/✅ WhatsApp: sent/.test(t)) throw new Error('both sent: '+t);
+      t=testAlertText({ mail:true, mailTo:1, whatsapp:false, whatsappSet:false }).join('\n');
+      if(!/WhatsApp: not set up yet/.test(t) || !/WHATSAPP_PHONE and WHATSAPP_KEY/.test(t)) throw new Error('not set up: '+t);
+      t=testAlertText({ mail:false, mailTo:1, whatsapp:false, whatsappSet:true }).join('\n');
+      if(!/❌ E-mail/.test(t) || !/❌ WhatsApp: CallMeBot refused/.test(t)) throw new Error('refused: '+t);
+      var realOwner=window.isAppOwner, realUser=window._fbUser, realFetch=window.fetch, realConfirm=window.askConfirm, sent=null;
+      try{
+        window.isAppOwner=function(){ return true; }; window._fbUser={ getIdToken:async function(){ return 't'; } };
+        window.fetch=async function(u, o){ sent=JSON.parse(o.body); return new Response(JSON.stringify({ ok:true, mail:true, mailTo:1, whatsapp:true, whatsappSet:true }), { status:200 }); };
+        window.askConfirm=async function(){ return true; };
+        var d=await sendTestAlert();
+        if(!sent || sent.action!=='meter-admin' || sent.op!=='alert-test' || !d || d.whatsapp!==true) throw new Error('asked the server: '+JSON.stringify(sent));
+      } finally { window.isAppOwner=realOwner; window._fbUser=realUser; window.fetch=realFetch; window.askConfirm=realConfirm; }
     } },
 
   { id:'beta_moved_to_its_domain', group:'Core', name:'🌐 The beta lives at mykitchennotes.community: its old address and www. send visitors on with the shared link and the extension’s text; nothing else moves; the family links to it there (v38.17)',

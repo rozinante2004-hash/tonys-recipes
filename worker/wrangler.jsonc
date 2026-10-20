@@ -37,6 +37,6 @@
     { "name": "ALERTS" }
   ],
   // v75 — the daily six-month sweep (retentionSweep): 03:23 UTC.
-  "triggers": { "crons": ["23 3 * * *"] },
+  "triggers": { "crons": ["23 3 * * *", "17 * * * *"] },   // v84 — the second: the hourly usage check (HOURLY_CRON)
   "observability": { "enabled": true }
 }

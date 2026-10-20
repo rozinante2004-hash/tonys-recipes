@@ -1392,6 +1392,32 @@ console.log('\nAI per household (v60):');
     expect('v75: the spare owner account is an owner too', rs.status === 200, 'status ' + rs.status);
     expect('v75: …and its first use is told to every alert address (a refused one does not stop the rest)',
       toNow === 'owner@worker-test.example,second@example.com' && /Account: spare@worker-test\.example/.test(mails[mails.length - 1].raw), toNow);
+    // v84 — and on WhatsApp, through CallMeBot, when the number and its key are set.
+    const wa = [];
+    const envWa = Object.assign({}, envAlert, { WHATSAPP_PHONE: '+972 50-000-0000', WHATSAPP_KEY: 'k123',
+      __fetch: async (url) => { wa.push(String(url)); return new Response('Message queued. You will receive it in a few seconds.', { status: 200 }); } });
+    const mailsBeforeWa = mails.length;
+    await worker.fetch(post({ action: 'meter-admin', op: 'list', idToken: comOwner, device: 'dev-DDDD4444' }, TEST_ORIGIN), envWa);
+    const u = wa[0] ? new URL(wa[0]) : null;
+    expect('v84: an owner alert goes on WhatsApp too (CallMeBot: the number, the message, the key)', wa.length === 1 && u && u.host === 'api.callmebot.com'
+      && u.searchParams.get('phone') === '+972500000000' && u.searchParams.get('apikey') === 'k123' && /new device/.test(u.searchParams.get('text') || '')
+      && mails.length === mailsBeforeWa + 1, JSON.stringify([wa, mails.length - mailsBeforeWa]));
+    wa.length = 0;
+    await worker.fetch(post({ action: 'meter-admin', op: 'list', idToken: comOwner, device: 'dev-EEEE5555' }, TEST_ORIGIN), envAlert);
+    expect('v84: …and not without them', wa.length === 0, String(wa.length));
+    f = await (async () => { const rr = await worker.fetch(post({ action: 'meter-admin', op: 'alert-test', idToken: tA }, TEST_ORIGIN), envWa); return { status: rr.status }; })();
+    expect('v84: only the owner sends a test alert', f.status === 403 && wa.length === 0, JSON.stringify(f));
+    const mailsBeforeT = mails.length;
+    let ta = await (await worker.fetch(post({ action: 'meter-admin', op: 'alert-test', idToken: comOwner, device: 'dev-DDDD4444' }, TEST_ORIGIN), envWa)).json();
+    expect('v84: the owner\'s test alert reaches WhatsApp once and e-mail once', ta.ok === true && ta.whatsapp === true && ta.whatsappSet === true && ta.mail === true
+      && wa.length === 1 && /test/.test(new URL(wa[0]).searchParams.get('text')) && mails.length === mailsBeforeT + 1 && /a test alert/.test(mails[mails.length - 1].raw), JSON.stringify([ta, wa.length, mails.length - mailsBeforeT]));
+    const again = await worker.fetch(post({ action: 'meter-admin', op: 'alert-test', idToken: comOwner, device: 'dev-DDDD4444' }, TEST_ORIGIN), envWa);
+    expect('v84: …once a minute', again.status === 429, 'got ' + again.status);
+    const envBadKey = Object.assign({}, envWa, { __fetch: async () => new Response('APIKey is invalid. Please check it', { status: 200 }) });
+    const realNowWa = Date.now; Date.now = () => realNowWa() + 120e3;
+    try { ta = await (await worker.fetch(post({ action: 'meter-admin', op: 'alert-test', idToken: comOwner, device: 'dev-DDDD4444' }, TEST_ORIGIN), envBadKey)).json(); }
+    finally { Date.now = realNowWa; }
+    expect('v84: …and says so when CallMeBot refuses the key', ta.ok === true && ta.whatsapp === false && ta.whatsappSet === true, JSON.stringify(ta));
   } finally { globalThis.fetch = realFetch; }
 }
 
@@ -1714,6 +1740,33 @@ console.log('\nEvery allowance, told to the owner (v79):');
     const ern = db.raw.prepare("SELECT * FROM allowance_notices WHERE what = 'usage:workerErrors'").get();
     expect('v82: …3% of the day\'s requests is (owner, with where to look)', JSON.stringify(er2.warned) === '["workerErrors"]' && ern && ern.scope === 'owner'
       && /60 times today \(3% of requests\)/.test(ern.title) && /Logs/.test(ern.detail), JSON.stringify([er2, ern]));
+  }
+
+  // (e) v84 — the hourly check on Cloudflare's own clock, with an analytics-only token.
+  {
+    const db = d1(), calls = [];
+    const gql = { data: { viewer: { accounts: [{ kv: [{ sum: { requests: 850 }, dimensions: { actionType: 'write' } }, { sum: { requests: 4000 }, dimensions: { actionType: 'read' } }],
+      w: [{ sum: { requests: 9000, errors: 3 } }], d1: [{ sum: { rowsRead: 1000, rowsWritten: 2000 } }] }] } } };
+    const e = Object.assign(base(), { METER_DB: db, CF_ANALYTICS_TOKEN: 'cf-t',
+      __fetch: async (url, init) => { calls.push({ url: String(url), auth: init && init.headers && init.headers.Authorization }); return new Response(JSON.stringify(gql), { status: 200 }); } });
+    mails.length = 0;
+    db.raw.exec('CREATE TABLE IF NOT EXISTS usage_snapshot (id INTEGER PRIMARY KEY, at INTEGER, metrics TEXT)');
+    db.raw.prepare('INSERT INTO usage_snapshot (id, at, metrics) VALUES (1, ?, ?)').run(Date.now() - 3600e3, JSON.stringify({ pagesBuilds: { used: 120, limit: 500, period: 'month' } }));
+    const w1 = []; await worker.scheduled({ cron: '17 * * * *', scheduledTime: Date.now() }, e, { waitUntil: p => w1.push(p) }); await Promise.all(w1);
+    const kv = db.raw.prepare("SELECT * FROM allowance_notices WHERE what = 'usage:kvWrites'").get();
+    expect('v84: the hourly cron reads Cloudflare\'s analytics with its token and warns at 70%', calls.length === 1 && /graphql/.test(calls[0].url) && calls[0].auth === 'Bearer cf-t'
+      && kv && /KV writes at 85%/.test(kv.title) && mails.length === 1, JSON.stringify([calls, kv && kv.title, mails.length]));
+    const sn = JSON.parse(db.raw.prepare('SELECT metrics FROM usage_snapshot WHERE id = 1').get().metrics);
+    expect('v84: …and keeps the GitHub watch\'s figures beside its own (Pages builds)', sn.kvWrites.used === 850 && sn.pagesBuilds && sn.pagesBuilds.used === 120 && sn.workerErrors.of === 9000, JSON.stringify(sn));
+    const daily = []; const w2 = []; await worker.scheduled({ cron: '23 3 * * *', scheduledTime: Date.now() }, e, { waitUntil: p => w2.push(p) }); await Promise.all(w2);
+    expect('v84: the daily sweep does not read the analytics', calls.length === 1, String(calls.length));
+    const e2 = Object.assign(base(), { METER_DB: d1(), __fetch: async () => { throw new Error('no token, no call'); } });
+    const w3 = []; await worker.scheduled({ cron: '17 * * * *', scheduledTime: Date.now() }, e2, { waitUntil: p => w3.push(p) }); await Promise.all(w3);
+    expect('v84: without the token the hourly cron does nothing', !e2.METER_DB.raw.prepare("SELECT name FROM sqlite_master WHERE name = 'allowance_notices'").get(), 'made a table');
+    const db3 = d1(), e3 = Object.assign(base(), { METER_DB: db3, CF_ANALYTICS_TOKEN: 'old', __fetch: async () => new Response(JSON.stringify({ errors: [{ message: 'Authentication error' }] }), { status: 403 }) });
+    const w4 = []; await worker.scheduled({ cron: '17 * * * *', scheduledTime: Date.now() }, e3, { waitUntil: p => w4.push(p) }); await Promise.all(w4);
+    const wn = db3.raw.prepare("SELECT * FROM allowance_notices WHERE what = 'usage:watch'").get();
+    expect('v84: a token that stopped working is told to the owner', wn && wn.scope === 'owner' && /cannot read/.test(wn.title) && /403/.test(wn.detail), JSON.stringify(wn));
   }
 }
 

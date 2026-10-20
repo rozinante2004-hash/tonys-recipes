@@ -1,4 +1,8 @@
-// Tony's Recipes — Cloudflare Worker v83
+// Tony's Recipes — Cloudflare Worker v84
+// v84: THE OWNER ON WHATSAPP, AND THE HOURLY CHECK ON CLOUDFLARE'S CLOCK (Tony, 20 Oct 2026): `ownerAlert` also sends a
+// WhatsApp message through CallMeBot when WHATSAPP_PHONE and WHATSAPP_KEY are set; meter-admin `alert-test` sends a
+// test both ways. A cron at :17 every hour (HOURLY_CRON) reads today's Cloudflare use with CF_ANALYTICS_TOKEN (analytics
+// read only) and warns at 70% like the GitHub watch, which runs a few times a day; the snapshot merges both.
 // v83: FIRESTORE READS, AS THE APPS COUNT THEM (the audit, 20 Oct 2026): app-signals takes `reads` (documents this app
 // read since it last said, ≤ 20,000 a call) into D1 `counters` fsreads:<project>:<Firebase's day>; at 70% of the
 // 50,000 free reads an owner warning. Firebase's own count needs the Monitoring role and GitHub's clock, which drops
@@ -375,7 +379,7 @@
 //   AI_MAX_TOKENS   – the longest answer one call may ask for (32000; the
 //                     app's largest, reading several recipes at once, asks 8000).
 
-const WORKER_VERSION = 'v83';
+const WORKER_VERSION = 'v84';
 const VIDEO_MAX_MB_DEFAULT = 50;
 const GEMINI_API = 'https://generativelanguage.googleapis.com';
 const GEMINI_MODEL_DEFAULT = 'gemini-2.5-flash';
@@ -840,7 +844,12 @@ function sameText(a, b) {
 }
 async function usageReport(env, body) {
   if (!env.USAGE_KEY || !sameText(body.key, env.USAGE_KEY)) return jsonResp({ error: 'FORBIDDEN' }, 403);
-  const now = Date.now(), m = body.metrics || {}, warned = [];
+  return jsonResp({ ok: true, warned: await usageEvaluate(env, body.metrics || {}) });
+}
+// The warnings at 70%, and the snapshot the owner's 🩺 page shows — merged, so the Worker's hourly Cloudflare count
+// (v84) and the GitHub watch's Pages builds and Firestore keep each other's figures.
+async function usageEvaluate(env, m) {
+  const now = Date.now(), warned = [];
   for (const k of Object.keys(USAGE_NAMES)) {
     const x = m[k];
     if (!x || !(Number(x.limit) > 0)) continue;
@@ -870,11 +879,53 @@ async function usageReport(env, body) {
   if (env.METER_DB) {
     try {
       await tableOnce(env.METER_DB, 'usage_snapshot', 'CREATE TABLE IF NOT EXISTS usage_snapshot (id INTEGER PRIMARY KEY, at INTEGER, metrics TEXT)');
+      const before = await usageSnapshot(env), merged = Object.assign({}, (before && before.metrics) || {}, m);
       await env.METER_DB.prepare('INSERT INTO usage_snapshot (id, at, metrics) VALUES (1, ?1, ?2) ON CONFLICT (id) DO UPDATE SET at = excluded.at, metrics = excluded.metrics')
-        .bind(now, JSON.stringify(m).slice(0, 20000)).run();
+        .bind(now, JSON.stringify(merged).slice(0, 20000)).run();
     } catch (e) {}
   }
-  return jsonResp({ ok: true, warned });
+  return warned;
+}
+// v84 — the hourly watch on Cloudflare's own clock (Tony, 20 Oct 2026, agreed): GitHub drops most scheduled runs on
+// this repository (two of eleven one day), so at :17 every hour the Worker reads today's Cloudflare use itself, with a
+// token that may only read analytics (CF_ANALYTICS_TOKEN, from the GitHub secret of that name). Pages builds and
+// Firebase's own counts stay with the GitHub watch (other keys); the apps count their Firestore reads (v83).
+const CF_ACCOUNT = '4dbc420100c13bf94fda83047ce0a7ac';   // public: worker/wrangler.jsonc
+const HOURLY_CRON = '17 * * * *';                          // worker/wrangler.jsonc triggers
+async function cloudflareToday(env) {
+  const now = new Date(), since = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const query = `query($acct: string!, $since: Time!, $until: Time!) {
+    viewer { accounts(filter: { accountTag: $acct }) {
+      kv: kvOperationsAdaptiveGroups(limit: 20, filter: { datetime_geq: $since, datetime_lt: $until }) { sum { requests } dimensions { actionType } }
+      w: workersInvocationsAdaptive(limit: 20, filter: { datetime_geq: $since, datetime_lt: $until }) { sum { requests errors } }
+      d1: d1AnalyticsAdaptiveGroups(limit: 20, filter: { datetimeHour_geq: $since, datetimeHour_lt: $until }) { sum { rowsRead rowsWritten } }
+    } } }`;
+  const r = await (env.__fetch || fetch)('https://api.cloudflare.com/client/v4/graphql', { method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + env.CF_ANALYTICS_TOKEN, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query, variables: { acct: CF_ACCOUNT, since: since.toISOString(), until: now.toISOString() } }), signal: AbortSignal.timeout(20000) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || (j.errors && j.errors.length) || !j.data) throw new Error('Cloudflare analytics answered ' + r.status + (j.errors && j.errors[0] ? ': ' + String(j.errors[0].message).slice(0, 160) : ''));
+  const a = (j.data.viewer.accounts || [])[0] || {}, kv = {};
+  (a.kv || []).forEach(g => { kv[g.dimensions.actionType] = (kv[g.dimensions.actionType] || 0) + g.sum.requests; });
+  const sum = (list, f) => (list || []).reduce((t, g) => t + (g.sum[f] || 0), 0);
+  return {
+    workerRequests: { used: sum(a.w, 'requests'), limit: 100000 },
+    kvWrites: { used: kv.write || 0, limit: 1000 }, kvReads: { used: kv.read || 0, limit: 100000 },
+    kvDeletes: { used: kv.delete || 0, limit: 1000 }, kvLists: { used: kv.list || 0, limit: 1000 },
+    d1RowsWritten: { used: sum(a.d1, 'rowsWritten'), limit: 100000 }, d1RowsRead: { used: sum(a.d1, 'rowsRead'), limit: 5000000 },
+    workerErrors: { used: sum(a.w, 'errors'), of: sum(a.w, 'requests') }
+  };
+}
+async function hourlyUsage(env) {
+  if (!env.CF_ANALYTICS_TOKEN) return null;
+  try { return await usageEvaluate(env, await cloudflareToday(env)); }
+  catch (e) {
+    // a token that stopped working is said once a day, not every hour
+    await raiseNotice(env, { what: 'usage:watch', kind: 'warning', scope: 'owner', until: nextUtcMidnight(Date.now()), self: true,
+      title: 'The hourly usage check cannot read Cloudflare\'s figures', affects: 'the early warnings at 70%',
+      detail: String((e && e.message) || e).slice(0, 300) + ' — the token CF_ANALYTICS_TOKEN may have expired or lost its permission (Account Analytics: Read).' });
+    return null;
+  }
 }
 async function usageSnapshot(env) {
   if (!env.METER_DB) return null;
@@ -1762,11 +1813,12 @@ async function ownerWatch(env, db, claims, body, request) {
     ['The app\'s owner did "' + op + '"' + (body.hid ? ' on household ' + String(body.hid).slice(0, 64) : '') + (body.project ? ' in ' + String(body.project).slice(0, 40) : '') + '.']
       .concat(lines).join('\n'));
 }
-async function ownerAlert(env, subject, text) {
+async function ownerAlert(env, subject, text, opts) {
+  const wa = opts && opts.whatsapp === false ? false : await ownerWhatsApp(env, subject, text);   // v84
   // v75 — every address in ALERT_TO (comma-separated): with a spare owner key, each owner hears what the
   // other did, so whoever controls one mailbox cannot hide the other account's actions.
   const tos = Array.from(new Set(String(env.ALERT_TO || '').split(',').map(x => x.trim()).filter(x => /^[^\s@<>]+@[^\s@<>]+$/.test(x))));
-  if (!env.ALERTS || !tos.length) return false;
+  if (!env.ALERTS || !tos.length) return wa;
   const from = String(env.ALERT_FROM || ['alerts', 'mykitchennotes.community'].join('@'));   // v74 — not written out (harvested)
   const EmailMessage = env.__EmailMessage || (await import('cloudflare:email')).EmailMessage;
   let sent = 0;
@@ -1776,8 +1828,23 @@ async function ownerAlert(env, subject, text) {
       'MIME-Version: 1.0', 'Content-Type: text/plain; charset=utf-8', 'Content-Transfer-Encoding: 8bit', '', text].join('\r\n');
     try { await env.ALERTS.send(new EmailMessage(from, to, raw)); sent++; } catch (e) {}   // one refused address must not stop the others
   }
-  return sent > 0;
+  return sent > 0 || wa;
 }
+// v84 — and on WhatsApp (Tony, 20 Oct 2026: "Whatsapp is actually better for me"), through CallMeBot's free service:
+// a message to the owner's own number, with the key CallMeBot gave him on it. The Worker's secrets WHATSAPP_PHONE and
+// WHATSAPP_KEY (from the GitHub secrets of those names); without them, e-mail only. Never logged.
+async function ownerWhatsApp(env, subject, text) {
+  const phone = String(env.WHATSAPP_PHONE || '').replace(/[^\d+]/g, ''), key = String(env.WHATSAPP_KEY || '').trim();
+  if (phone.replace(/\D/g, '').length < 8 || !key) return false;
+  const msg = ('*' + String(subject || '').replace(/^My Kitchen Notes: /, '') + '*\n' + String(text || '')).slice(0, 1000);
+  try {
+    const r = await (env.__fetch || fetch)('https://api.callmebot.com/whatsapp.php?phone=' + encodeURIComponent(phone)
+      + '&text=' + encodeURIComponent(msg) + '&apikey=' + encodeURIComponent(key), { signal: AbortSignal.timeout(15000) });
+    const body = await r.text().catch(() => '');
+    return r.ok && !/APIKey is invalid|not (?:a )?valid|error/i.test(body.slice(0, 2000));
+  } catch (e) { return false; }
+}
+let _alertTestAt = 0;
 async function meterMembership(claims, hid, token, env) {
   const k = claims.aud + '/' + hid + '/' + claims.sub, c = _meterMembers.get(k);
   if (c && Date.now() - c.at < 600e3) return c;
@@ -1964,6 +2031,17 @@ async function meterAction(request, env, body) {
   if (/^error/.test(String(body.op || ''))) { const er = await signalsAdmin(env, db, body); if (er) return er; }   // v69
   // v76 — every copy's counts, added up by month and name, with how many households each came from.
   // v79 — the owner's 🩺 Server allowances: the usage watch's last reading and every notice running.
+  // v84 — "Send me a test alert" (the owner's 🩺 page): proves the e-mail and WhatsApp reach him. Once a minute.
+  if (body.op === 'alert-test') {
+    if (Date.now() - _alertTestAt < 60e3) return jsonResp({ error: 'ALERTS: a test was sent less than a minute ago.' }, 429);
+    _alertTestAt = Date.now();
+    const wa = await ownerWhatsApp(env, 'A test alert', 'If you can read this, the server can reach you here. Sent from the app at ' + ilTime(Date.now()) + ' (Israel time).');
+    const mailTo = String(env.ALERT_TO || '').split(',').filter(x => /@/.test(x)).length;
+    let mailed = false;
+    if (env.ALERTS && mailTo) mailed = await ownerAlert(env, 'My Kitchen Notes: a test alert',
+      'If you can read this, the server can reach you by e-mail. Sent from the app at ' + ilTime(Date.now()) + ' (Israel time).', { whatsapp: false });
+    return jsonResp({ ok: true, whatsapp: wa, whatsappSet: !!(env.WHATSAPP_PHONE && env.WHATSAPP_KEY), mail: mailed, mailTo });
+  }
   if (body.op === 'allowances') {
     return jsonResp({ ok: true, usage: await usageSnapshot(env), notices: await serverNotices(env, { owner: true }), watch: !!env.USAGE_KEY,
                       appReads: await appReadsToday(env) });   // v83
@@ -3008,6 +3086,8 @@ export default {
   // v75 — the daily sweep (cron in worker/wrangler.jsonc).
   async scheduled(event, env, ctx) {
     const at = (event && Number(event.scheduledTime)) || Date.now();
+    // v84 — the hourly usage check (its own cron); the daily sweep is the other
+    if (event && event.cron === HOURLY_CRON) { const h = hourlyUsage(env); if (ctx && ctx.waitUntil) ctx.waitUntil(h); else await h; return; }
     const p = retentionSweep(env, at).then(async function (done) {
       // v78 — the AI ceiling counters and the allowance notices that have run their time.
       if (env.METER_DB) {
@@ -3056,4 +3136,4 @@ export default {
   }
 };
 
-// ── END OF WORKER v83 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
+// ── END OF WORKER v84 ── If this is the last line in the Cloudflare editor, the whole file was pasted.

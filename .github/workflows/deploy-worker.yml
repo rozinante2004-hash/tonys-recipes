@@ -91,6 +91,22 @@ jobs:
           printf '%s' "$to" | npx --yes wrangler@4 secret put ALERT_TO --config worker/wrangler.jsonc >/dev/null
           echo "the alert addresses are set ($(printf '%s' "$to" | tr ',' '\n' | grep -c .) of them)"
 
+      # v84 — the owner on WhatsApp (CallMeBot: his number and the key it gave him) and the hourly usage check on
+      # Cloudflare's own clock (a token that may only read analytics). Each is set from the GitHub secret of the same
+      # name when there is one; never printed. Without them: e-mail only, and the GitHub watch only.
+      - name: WhatsApp and the hourly check
+        if: steps.token.outputs.ok == 'true'
+        env:
+          WHATSAPP_PHONE: ${{ secrets.WHATSAPP_PHONE }}
+          WHATSAPP_KEY: ${{ secrets.WHATSAPP_KEY }}
+          CF_ANALYTICS_TOKEN: ${{ secrets.CF_ANALYTICS_TOKEN }}
+        run: |
+          for name in WHATSAPP_PHONE WHATSAPP_KEY CF_ANALYTICS_TOKEN; do
+            value="${!name}"
+            if [ -n "$value" ]; then printf '%s' "$value" | npx --yes wrangler@4 secret put "$name" --config worker/wrangler.jsonc >/dev/null; echo "$name is set"
+            else echo "::notice::$name is not set (Settings → Secrets and variables → Actions) — left as it is"; fi
+          done
+
       # The Worker says which version it is; it must be the one just published —
       # with its database (METER_DB) and its storage (BRING_KV) still connected.
       - name: Check the live Worker answers with this version

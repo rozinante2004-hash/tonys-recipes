@@ -57,8 +57,13 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
     owner's powers, a way back in if the first is lost. Its fingerprint is the second entry of
     `APP_CONFIG.ownerKeys`; the Self Tests job checks the two match.
 - "I do not like my name appearing much": app texts name nobody.
-  Tony, 13 Oct 2026: no need to take his name out of the WhatsApp share text, the shared recipe list's
-  title or the Word export — leave those as they are.
+  Tony, 20 Oct 2026 (replacing his 13 Oct exception): "Use each kitchen's name. Do not use my name unless something
+  is indeed coming from me." The WhatsApp share, the printed list's title and the Word export (title and file name)
+  say the kitchen's name (`kitchenTitle()`, `kitchenFileStem()`); sharing the app says the app's name.
+- **Full, current URLs, always** (Tony, 20 Oct 2026: "as always (and make it a rule), provide full and updated URLs
+  when asking me to connect to various sites. This applies also to the list of decisions I need to make."). Every
+  step that sends him to a site gives the exact page address (https://…, with the project in it where there is one),
+  in chat AND in documents (the audit's "Needs Tony" list) — never "Firebase → Settings" alone.
 - **Times in Tony's local time** (13 Oct 2026: "Could you please use local time instead"): Israel — UTC+3 in
   summer time (until the last Sunday of October), UTC+2 in winter. Never quote UTC to him.
 - After each release:
@@ -468,6 +473,31 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
   `firestore_reads_counted` (397); 7 Worker checks.
 - **Released: v38.63 + Worker v83 (20 Oct 2026, 12:45 Israel time, CI green on affb9f7).** Worker v83 deployed, Pages,
   Cloudflare beta and test, Self Tests on main and test, languages: all success.
+- **Move step 9 done (20 Oct 2026, Tony: "If I have everything you suggest to delete … in the new one then it is OK to
+  delete the old. Please verify that before deleting.").** move-family.mjs now proves it before deleting: every
+  document to be deleted is in the community copy, the same, or changed there LATER (Firestore's own updateTime); one
+  newer in the family copy stops the clearing ("nothing was deleted"). Check 14:2x: all 139 verified (129 the same, 10
+  newer there); clear-source run 39414901326: 138 deleted, the household cut to its moved mark, 0 left. Kept: 4 not in
+  the community copy and shared/ 135. `clear-detail` (new, read-only) lists them SEALED for a private key held in the
+  session ($S/seal: RSA-OAEP + AES-GCM, deflated; the job prints the ciphertext as notes of 4,000 characters — the job
+  log host is unreachable from here, annotations are read via the API): the 4 = recipes 283 "בייקון מבטן חזיר"
+  (5 Oct) and 90 "בטן = בייקון + פנצ'טה" (3 Oct) with their photos, deleted in the community app after the move;
+  shared/ = 59 recipes (56 in the kitchen by id and name; not: Porketta 282, 283, 90), 57 photos (56 of recipes in
+  the kitchen; photo_90 not), meta, access, backups, 2 WhatsApp chat scans + 3 parts (9 Aug), 12 old i18n_* docs.
+  Asked Tony whether to delete those too (`all` + `shared`).
+- **v38.64 + Worker v84** (Tony's answers, 20 Oct): the sign-in screen says "Sign in" (was "Connect your storage");
+  one "Trouble signing in?" (was "Why can't I sign in?") — "🪵 Copy the log" now appears only with the check it
+  opens (`loginLogButtonReveal`); the terms and privacy statement say "the web app (in all its copies)" in all 11
+  languages (legal-keys re-keyed; TERMS_VERSION kept 1.2 — same meaning, no re-acceptance); a new recipe starts at
+  Dinner; the kitchen's name in the Word export (title, file), the printed list, the system share; sharing the app
+  says the app's name; "Services powering this app"; the Self Test report names the app. The "Welcome to the
+  kitchen!" toast and the header's "☁️ Shared · name" stay (Tony). **WhatsApp alerts** (Tony: "Whatsapp is actually
+  better for me"): `ownerAlert` also sends through CallMeBot (https://api.callmebot.com/whatsapp.php) when the Worker
+  secrets WHATSAPP_PHONE and WHATSAPP_KEY are set (deploy-worker.yml copies them from the GitHub secrets of those
+  names); ⚙️ → 👑 App owner → 📲 Send me a test alert (meter-admin `alert-test`, once a minute) says what reached him.
+  **The hourly check on Cloudflare's clock**: cron `17 * * * *` (HOURLY_CRON) reads today's Cloudflare analytics with
+  CF_ANALYTICS_TOKEN (Account Analytics: Read) → `usageEvaluate` (shared with usage-report; the snapshot now MERGES,
+  so Pages builds from the GitHub watch stay); a refused token → owner notice `usage:watch` once a day.
 - **GitHub drops most scheduled runs on this repository** (20 Oct): the usage watch (:11 and :41) ran at 01:13 and 06:31
   UTC only; Publish languages (every 10 min) runs every 2–5 h; the 02:17 backup starts 07:00–07:51 UTC. The watch is an
   early warning only (a real refusal is told at once by the Worker and the app), but hourly needs another clock: the

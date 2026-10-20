@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v38.63 -->
+<!-- Tony's Recipes Collection v38.64 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1732,7 +1732,7 @@ window.markCookedSelected = markCookedSelected;
 function exportSelWord() {
   if (!selectedIds.size) { toast('No recipes selected'); return; }
   var sel = recipes.filter(function(r) { return selectedIds.has(r.id); });
-  exportRecipesToWord(sel, 'Tonys_Recipes_Selected.docx');
+  exportRecipesToWord(sel, kitchenFileStem() + '_Selected.docx');   // v38.64 — the kitchen's name
 }
 
 function shareSelected() {
@@ -1744,7 +1744,7 @@ function shareSelected() {
   // silence and the console got an unhandled rejection. Never claim a copy that
   // did not happen.
   if (navigator.share) {
-    navigator.share({ title: "Tony's Recipes", text: text })
+    navigator.share({ title: kitchenTitle(), text: text })   // v38.64 — the kitchen's name
       .catch(function(){ /* cancelling a share is not an error */ });
   } else if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(text)
@@ -2970,7 +2970,7 @@ function selfTestReportText() {
   });
 
   var env = String(window.APP_CONFIG.environment || 'live');
-  L.push('SELF TEST REPORT — Tony\u2019s Recipes' + (env === 'live' ? '' : ' — ' + env.toUpperCase() + ' COPY'));
+  L.push('SELF TEST REPORT — ' + (env === 'live' ? 'Tony\u2019s Recipes' : String(APP_CONFIG.brandName || 'My Kitchen Notes')) + (env === 'live' ? '' : ' — ' + env.toUpperCase() + ' COPY'));
   L.push('='.repeat(52));
   L.push('copy:          ' + appCopyLabel());
   L.push('app version:   ' + APP_VERSION);
@@ -4343,6 +4343,28 @@ async function openServerAllowances() {
   }
 }
 window.openServerAllowances = openServerAllowances; window.serverAllowanceLines = serverAllowanceLines;
+// v38.64 — the server sends the owner a test alert by e-mail and on WhatsApp (Worker v84) and says what reached him.
+function testAlertText(d) {
+  var lines = [];
+  lines.push(d.mailTo ? (d.mail ? '✅ E-mail: sent to your alert address' + (d.mailTo > 1 ? 'es (' + d.mailTo + ')' : '') + ' — look in your inbox.' : '❌ E-mail: could not be sent.')
+                      : '⚠️ E-mail: no alert address is set on the server.');
+  lines.push(!d.whatsappSet ? '⚠️ WhatsApp: not set up yet — the GitHub secrets WHATSAPP_PHONE and WHATSAPP_KEY are missing (the steps are in the audit plan).'
+    : d.whatsapp ? '✅ WhatsApp: sent — it arrives within a minute.' : '❌ WhatsApp: CallMeBot refused it — check the number and the key in the GitHub secrets.');
+  return lines;
+}
+async function sendTestAlert() {
+  if (!(typeof isAppOwner === 'function' && isAppOwner()) || !window._fbUser) { toast('This is for the app’s owner.'); return false; }
+  toast('📲 Sending a test alert…');
+  try {
+    var r = await fetch(WORKER_ENDPOINT, { method: 'POST', headers: workerHeaders(),
+      body: workerBody({ action: 'meter-admin', op: 'alert-test', idToken: await _fbUser.getIdToken() }), signal: AbortSignal.timeout(30000) });
+    var d = await r.json();
+    if (!r.ok || !d || !d.ok) throw new Error((d && d.error) || ('HTTP ' + r.status));
+    await askConfirm({ icon: '📲', title: 'Test alert', message: testAlertText(d).join('\n'), okLabel: 'OK' });
+    return d;
+  } catch(e) { toast('❌ ' + String((e && e.message) || e).slice(0, 160), 8000); return false; }
+}
+window.sendTestAlert = sendTestAlert; window.testAlertText = testAlertText;
 function serverNoticeClosed() {
   try { return JSON.parse(localStorage.getItem(SERVER_NOTICE_KEY) || '{}') || {}; } catch(e) { return {}; }
 }
@@ -6381,6 +6403,12 @@ function kitchenTitle() {
   return (typeof _household !== 'undefined' && _household && _household.name) || APP_CONFIG.brandName || 'My Kitchen Notes';
 }
 window.kitchenTitle = kitchenTitle;
+// v38.64 — the same name as a file name (a Word export): Tony, 20 Oct — "Use each kitchen's name. Do not use my name
+// unless something is indeed coming from me."
+function kitchenFileStem() {
+  return String(kitchenTitle()).replace(/['\u2019"]/g, '').replace(/[\\/:*?<>|]+/g, ' ').trim().replace(/\s+/g, '_').slice(0, 60) || 'Recipes';
+}
+window.kitchenFileStem = kitchenFileStem;
 function householdCanManage() { return !!(_household && (_household.role === 'owner' || _household.role === 'admin')); }
 function householdRenderBar() {
   var bar = document.getElementById('householdBar');
@@ -8498,7 +8526,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v38.63';
+var APP_VERSION = 'v38.64';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -11529,9 +11557,9 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.63</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.64</div>
   <div class="login-card">
-    <h2>Connect your storage</h2>
+    <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
     <button class="google-signin-btn" id="googleSignInBtn" onclick="startGoogleSignIn()">
       <svg class="google-icon" viewBox="0 0 48 48">
@@ -11560,17 +11588,18 @@ body.banner-shown .header {
     <button id="signInDiagBtn" onclick="diagnoseSignIn()"
             style="margin-top:10px;background:none;border:none;color:var(--terracotta);cursor:pointer;
                    font-size:12px;font-weight:600;text-decoration:underline;font-family:'DM Sans','Heebo',sans-serif;">
-      Why can't I sign in?
+      Trouble signing in?
     </button>
-    <!-- v37.11 — the log, even signed out (after deleting an account it was out of reach) -->
+    <div id="signInDiag" style="display:none;margin-top:10px;text-align:start;font-size:11.5px;
+         line-height:1.6;color:var(--ink);background:var(--warn-bg);border:1px solid var(--gold);
+         border-radius:8px;padding:10px 12px;"></div>
+    <!-- v37.11 — the log, even signed out (after deleting an account it was out of reach). v38.64 — Tony (the audit):
+         one small "Trouble signing in?" on the first screen; the log appears with the check it opens. -->
     <button id="loginCopyLogBtn" onclick="copyLogFromLogin()" hidden
             style="margin-top:4px;background:none;border:none;color:var(--terracotta);cursor:pointer;
                    font-size:12px;font-weight:600;text-decoration:underline;font-family:'DM Sans','Heebo',sans-serif;">
       🪵 Copy the log
     </button>
-    <div id="signInDiag" style="display:none;margin-top:10px;text-align:start;font-size:11.5px;
-         line-height:1.6;color:var(--ink);background:var(--warn-bg);border:1px solid var(--gold);
-         border-radius:8px;padding:10px 12px;"></div>
     <div id="firebaseError" style="color:var(--bad-text);font-size:11px;margin-top:4px;display:none;">📶 Offline — tap "Sign in with Google" when connected to sync your changes.</div>
     <div id="autoLoginNotice" style="color:#5C3D2E;font-size:12px;margin-top:8px;display:none;background:#FFF0E8;padding:8px 12px;border-radius:6px;">
       ⏳ Signing in automatically in 3 seconds…
@@ -11616,7 +11645,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.63</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.64</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -11718,6 +11747,8 @@ body.banner-shown .header {
               <button class="drop-item" data-owner-only data-layout-only="households" title="Every household in this copy: members, AI spending and allowances, links, shares, last use. Only you can open it." onclick="closeDrop('settingsDrop');openManagement()">📊 Households (management)</button>
               <!-- v38.55 — Tony: "Please make sure the Admin gets a notification if any allowance is exceeded or blocked." -->
               <button class="drop-item" data-owner-only title="How much of the free daily allowances (Cloudflare) is used, and anything paused right now (the app&#39;s owner only)." onclick="closeDrop('settingsDrop');openServerAllowances()">🩺 Server allowances</button>
+              <!-- v38.64 — Tony: the warnings on WhatsApp too; this proves they reach him (Worker v84) -->
+              <button class="drop-item" data-owner-only title="Sends you a test alert by e-mail and WhatsApp, to check they reach you (the app&#39;s owner only)." onclick="closeDrop('settingsDrop');sendTestAlert()">📲 Send me a test alert</button>
               <!-- v38.42 — Tony: "Let's make the invitations sendable from the app, from the Admin account." -->
               <button class="drop-item" data-owner-only title="The tester invitation, in English or Hebrew, with this copy's link — sent through your Gmail, one e-mail to each person, or by WhatsApp or the mail app (the app's owner only)." onclick="closeDrop('settingsDrop');openInviteTesters()">✉️ Invite testers</button>
               <button class="drop-item" title="The app's running costs and billing (the app's owner only)." data-owner-only onclick="closeDrop('settingsDrop');openPayments()">💳 Payments</button>
@@ -20027,7 +20058,7 @@ function exportRecipesToWord(list, filename){
   if (typeof insightCount === 'function') insightCount('word');
   if(!list || !list.length){toast('No recipes to export');return;}
   var date = new Date().toISOString().slice(0,10);
-  downloadBlob(makeDocxBlob(list), filename || ('Tonys_Recipes_' + date + '.docx'));
+  downloadBlob(makeDocxBlob(list), filename || (kitchenFileStem() + '_' + date + '.docx'));   // v38.64 — the kitchen's name
   toast('📄 Exported ' + list.length + ' recipe' + (list.length!==1?'s':'') + ' to Word!');
 }
 window.exportRecipesToWord = exportRecipesToWord;
@@ -20121,7 +20152,7 @@ function makeDocxBlob(recipeList){
   var images = [];  // {name, bytes, ext} -> word/media/*, one relationship each
 
   // Title
-  bodyXml+=`<w:p><w:pPr><w:pStyle w:val="Title"/><w:jc w:val="center"/></w:pPr><w:r><w:t>Tony's Recipes Collection</w:t></w:r></w:p>`;
+  bodyXml+=`<w:p><w:pPr><w:pStyle w:val="Title"/><w:jc w:val="center"/></w:pPr><w:r><w:t>${esc(kitchenTitle())}</w:t></w:r></w:p>`;   // v38.64 — the kitchen's name
 
   recipeList.forEach((r,idx)=>{
     if(idx>0) bodyXml+=`<w:p><w:r><w:br w:type="page"/></w:r></w:p>`;
@@ -20786,7 +20817,8 @@ function openAddModal(id){
   _editBaseAt = r ? (r.updatedAt || 0) : null;
   document.getElementById('editTitle').textContent=r?'Edit Recipe':'Add a Recipe';
   document.getElementById('editSubmitBtn').textContent=r?'Update Recipe':'Save Recipe';
-  document.getElementById('f-category').innerHTML=CATS.filter(c=>c!=='All').map(c=>`<option${r&&r.category===c?' selected':''}>${c}</option>`).join('');
+  // v38.64 — a new recipe starts at Dinner, not the first in the list (Breakfast): Tony, the audit
+  document.getElementById('f-category').innerHTML=CATS.filter(c=>c!=='All').map(c=>`<option${(r ? r.category===c : c==='Dinner')?' selected':''}>${c}</option>`).join('');
   document.getElementById('f-diff').value=r?r.difficulty:'Easy';
   selEmoji=r?r.emoji:EMOJIS[0];
   pendingPhoto=r?r.photo||'':'';
@@ -26665,7 +26697,8 @@ function copyLogFromLogin() {
 window.copyLogFromLogin = copyLogFromLogin;
 // v37.12 — Tony: the test copy only, never the family's (its diagnostics are off).
 function loginLogButtonShown() { return !!(window.APP_CONFIG && APP_CONFIG.diagnostics && APP_CONFIG.diagnostics.logging); }
-(function(){ var b = document.getElementById('loginCopyLogBtn'); if (b) b.hidden = !loginLogButtonShown(); })();
+(function(){ var b = document.getElementById('loginCopyLogBtn'); if (b) b.hidden = true; })();   // v38.64 — shown by "Trouble signing in?"
+function loginLogButtonReveal() { var b = document.getElementById('loginCopyLogBtn'); if (b) b.hidden = !loginLogButtonShown(); }
 // v37.75 — the 🔬 Facebook reading test is gone (it found its answer in v37.38–39; Tony: a leftover).   // v37.38; v37.62 — the test copy only, not the beta
 setTimeout(function(){ try { refreshShortcutsSection(); } catch(e) {} }, 0);   // v37.46, v37.47
 window.authErrorText = authErrorText; window.renderSignInOptions = renderSignInOptions; window.toggleEmailSignIn = toggleEmailSignIn;
@@ -26902,6 +26935,7 @@ async function diagnoseSignIn() {
   if (!box) return;
   box.style.display = 'block';
   box.innerHTML = '<div data-no-i18n>⏳ Checking…</div>';
+  if (typeof loginLogButtonReveal === 'function') loginLogButtonReveal();
   var L = signInDiagLines();
   var key = await probeApiKey();
   L.push(['API key', key]);
@@ -28512,7 +28546,8 @@ function openShareAppModal() {
 }
 function shareAppWhatsApp() {
   const url = appShareUrl();
-  window.open('https://wa.me/?text=' + encodeURIComponent("Tony's Recipes Collection\n\n" + url));
+  // v38.64 — sharing the app says the app's name (the family's own copy keeps its title)
+  window.open('https://wa.me/?text=' + encodeURIComponent((APP_CONFIG.environment === 'live' ? "Tony's Recipes Collection" : (APP_CONFIG.brandName || 'My Kitchen Notes')) + "\n\n" + url));
 }
 function copyAppLink() {
   const url = appShareUrl();
@@ -28971,7 +29006,7 @@ function buildPrintHtml(list) {
       + '</div>';
   }).join('');
 
-  var title = list.length === 1 ? escH(list[0].name) : ("Tony's Recipes (" + list.length + ')');
+  var title = list.length === 1 ? escH(list[0].name) : (escH(kitchenTitle()) + ' (' + list.length + ')');   // v38.64 — the kitchen's name
   return '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>' + title + '</title>'
     + '<style>' + css + '</style></head><body>' + body
     + '<scr' + 'ipt>window.onload=function(){window.print();}</scr' + 'ipt>'
@@ -29803,7 +29838,7 @@ var HELP_SYSTEM_PROMPT = [
   "- Every item in ⚙️ explains itself when you point at it.",
   "",
   "=== FOR THE APP'S OWNER ===",
-  "- ⚙️ → 👑 App owner is shown only to the app's owner: 📊 Households, 🩺 Server allowances, ✉️ Invite testers, 💳 Payments, 🚀 Deployments, 🔑 Check the app's key, 🔐 Two-step sign-in for the owner, 📧 Gmail Setup, 🛒 Bring!",
+  "- ⚙️ → 👑 App owner is shown only to the app's owner: 📊 Households, 🩺 Server allowances, 📲 Send me a test alert, ✉️ Invite testers, 💳 Payments, 🚀 Deployments, 🔑 Check the app's key, 🔐 Two-step sign-in for the owner, 📧 Gmail Setup, 🛒 Bring!",
   "- ✉️ Invite testers: the tester invitation in English or עברית, with this copy's link; the wording can be changed (this device keeps it; 'The original words' brings it back). Paste the addresses; 📧 Send with Gmail sends each person their own e-mail, from the app's address when the owner's Gmail may send as it. Also ✉️ Mail app, 💬 WhatsApp and 📋 Copy. The first Gmail send needs the Gmail API switched on for the copy's Google Cloud project, and Google's permission",
   "- 🔐 Two-step sign-in: an authenticator app's 6-digit code on top of the Google sign-in, for the owner's tools",
   "- The owner's log panel and its pop-up offer 📋 Copy log (everyone else's send the report to the owner)",
@@ -34940,7 +34975,7 @@ window.onHeaderScroll = onHeaderScroll;
     </div>
     <div class="modal-header" style="margin-top:-8px;">
       <div class="modal-header-title">💳 Payments & Services</div>
-      <div style="font-size:12px;color:var(--muted);margin-top:4px;">Services powering Tony's Recipes Collection</div>
+      <div style="font-size:12px;color:var(--muted);margin-top:4px;">Services powering this app</div>
     </div>
     <div class="modal-body" style="padding:0 16px 16px;">
 
