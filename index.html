@@ -4299,7 +4299,8 @@ window.firebaseLimitHit = firebaseLimitHit; window.nextPacificMidnight = nextPac
 var USAGE_LABELS = { workerRequests: 'Worker requests', kvWrites: 'KV writes', kvReads: 'KV reads', kvDeletes: 'KV deletes', kvLists: 'KV lists',
   d1RowsWritten: 'D1 rows written', d1RowsRead: 'D1 rows read', pagesBuilds: 'Pages builds this month',
   firestoreReads: 'Firestore reads (Firebase’s day)', firestoreWrites: 'Firestore writes (Firebase’s day)', firestoreDeletes: 'Firestore deletes (Firebase’s day)' };
-var PAGES_COPY_NAMES = { 'my-kitchen-notes-beta': 'community app', 'tonys-recipes-test': 'test copy' };
+// Which Cloudflare Pages project is which copy — by its name's ending, since the projects' names belong in APP_CONFIG only
+function pagesCopyName(p) { return /-test$/.test(p) ? 'test copy' : /-beta$/.test(p) ? 'community app' : p; }
 function serverAllowanceLines(d) {
   var lines = [], u = d && d.usage, m = (u && u.metrics) || {};
   if (u && u.at) {
@@ -4309,7 +4310,7 @@ function serverAllowanceLines(d) {
       var pct = Math.round(100 * (x.used || 0) / x.limit);
       // v38.66 — over the Pages allowance is not stopped: Cloudflare kept building past 500 (⛔ only if it refused one)
       var stopped = pct >= 100 && !(k === 'pagesBuilds' && x.lastOk !== false);
-      var per = k === 'pagesBuilds' && x.per ? Object.keys(x.per).map(function(p){ return (PAGES_COPY_NAMES[p] || p) + ' ' + Number(x.per[p]).toLocaleString(); }).join(', ') : '';
+      var per = k === 'pagesBuilds' && x.per ? Object.keys(x.per).map(function(p){ return pagesCopyName(p) + ' ' + Number(x.per[p]).toLocaleString(); }).join(', ') : '';
       lines.push((stopped ? '⛔ ' : pct >= 70 ? '⚠️ ' : '✓ ') + USAGE_LABELS[k] + ': ' + (x.used || 0).toLocaleString() + ' of ' + x.limit.toLocaleString() + ' (' + pct + '%)'
         + (per ? ' — ' + per : '') + (k === 'pagesBuilds' && pct >= 100 ? (x.lastOk === false ? ' — Cloudflare refused the latest build' : ' — Cloudflare still builds') : ''));
     });
