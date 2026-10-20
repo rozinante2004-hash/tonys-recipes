@@ -59,9 +59,9 @@ require my input should be kept for the last stages."*
 |---|------|------|
 | A | Any change in a household makes each other device's next open read every recipe and photo again (151 reads in the test). Read only what changed (`updatedAt` > last read). The sync core — careful work and its own tests. | After the launch |
 | B | Stray requests per page load: the browser's look-ahead read text inside the app's code as image addresses. **Not harmless after all**: the site answers an unknown address with the whole app, ~500 KB each, ~2.5 MB of a first visit. | **Done** — v38.61 |
-| C | Playwright 1.56 → a version with Ubuntu 26.04 browsers, then unpin. | Before GitHub retires 24.04 |
+| C | Playwright 1.56 → a version with Ubuntu 26.04 browsers (1.64.1 is out, 20 Oct), then unpin. Not the week of the launch. | Before GitHub retires 24.04 |
 | D | Worker CPU: p99.9 16.5 ms against the free 10 ms (no errors in two days). Add the Worker's error rate to the hourly watch. | **Done** — v38.60 + Worker v82: warned at ≥25 errors and ≥2% of requests; a line on 🩺 Server allowances |
-| E | The page is 2,184 KB of its 2,200 KB budget: the next large feature should load rarely used panels on demand. | Before the next big feature |
+| E | The page is 2,112 KB of its 2,200 KB budget (20 Oct, v38.63): the next large feature should load rarely used panels on demand. | Before the next big feature |
 | F | The header says "☁️ Shared · <name>" for a kitchen of one, and the same again in the status line. | With Tony's wording (below) |
 | G | **First visit on a phone** (measured with compression, as the site serves it): sign-in screen after 0.55 s on a fast desktop, 2.6–2.9 s on a mid phone on 4G, 5.7 s on a slow phone on 3G; 811 KB. Later opens come from the device. The community app showed **"Tony's Recipes"** for the first 1.5–3 s, and a link preview of the invitation said "Tony's Recipes Collection". | **Done** — v38.61: its own name from the first frame and in link previews; the sign-in buttons no longer jump. The load itself: fine for a beta; a lighter first screen is a bigger job for later |
 

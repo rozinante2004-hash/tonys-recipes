@@ -447,6 +447,10 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
   Collection"; self-test `kitchen_title_in_shares`. Tony's three exceptions (13 Oct: WhatsApp share text, the shared
   list's title, the Word export) left as they are — asked again (audit "Needs Tony" 9), as testers get them too. The
   backup-restore error no longer says "Tony's Recipes backup".
+- **Released: v38.60 + Worker v82 and v38.61 together (20 Oct 2026, 12:26 Israel time, CI green on 916aa30).** All
+  jobs success (Worker v82 deployed, Pages, Cloudflare beta and test, Self Tests on main and test, languages).
+- **Released: v38.62 (20 Oct 2026, 12:35 Israel time, CI green on 0ef40e4).** Pages, Cloudflare beta and test,
+  languages: success.
 - **v38.62**: `#offlineBanner` + `#loginScreen` moved from after the header to before it (only their place changed):
   the page arrives in pieces and a slow phone painted the app's header ("Offline mode", the search box) for ~0.5 s
   before the sign-in screen that covers it had arrived; now the first frame with content is the sign-in screen, and it
@@ -462,6 +466,8 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
   warning `usage:firestoreReadsApps:<project>`; meter-admin `allowances` returns `appReads`, shown on 🩺 Server
   allowances. Checked on the emulator against `$S/e2e/reads2.mjs`: a new device 91 = 91, 109 = 109. Self-test
   `firestore_reads_counted` (397); 7 Worker checks.
+- **Released: v38.63 + Worker v83 (20 Oct 2026, 12:45 Israel time, CI green on affb9f7).** Worker v83 deployed, Pages,
+  Cloudflare beta and test, languages: success (Self Tests on main were still running when written).
 - **GitHub drops most scheduled runs on this repository** (20 Oct): the usage watch (:11 and :41) ran at 01:13 and 06:31
   UTC only; Publish languages (every 10 min) runs every 2–5 h; the 02:17 backup starts 07:00–07:51 UTC. The watch is an
   early warning only (a real refusal is told at once by the Worker and the app), but hourly needs another clock: the
