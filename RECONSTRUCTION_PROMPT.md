@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v38.69` — app. **Worker: v87**, deployed separately and versioned separately
+**Current version:** `v38.74` — app. **Worker: v87**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -678,9 +678,19 @@ JavaScript, CSS and markup comments) on every copy but the family's, refusing a 
 `tools/check-strip.js` proves in CI that the comments found are exactly acorn's. The page budget (1,800 KB) is for what
 a device downloads. Comments stay in the source — never let code or a test depend on one.
 
-**State on 20 Oct 2026 (v38.69, Worker v87):** testers are invited from Sunday 25 Oct; from then on every
+**Link requests, asked again (v38.70 – v38.74):** asking by e-mail offers 📨 Via My Kitchen Notes (recommended),
+✉️ Via Email ▸ (my default mail app, Gmail, Outlook), 💬 Via WhatsApp and 📋 Copy message to Clipboard; the message
+carries `?linkreq=<asking household>`, which opens 📬 Link requests. The request by e-mail (`<from>:<address>`) is
+passed on by whoever signs in with that confirmed address, as `<from>_<to>`, under the name and identifier it was
+asked with (a kitchen renamed since must not stop it). Reject is for now: asked again — by identifier or by e-mail —
+a refused request is asked afresh and waits again; 🚫 Block is for good (the rules read the asked household's
+requestLog), and the asking side always reads "waiting". One already waiting there makes a request by e-mail redundant:
+it is let go. In rule functions, look at a field only once it is there (`'to' in request.resource.data`): an error on
+the right of `||` refused, in the emulator, what the left allowed.
+
+**State on 21 Oct 2026 (v38.74, Worker v87):** testers are invited from Sunday 25 Oct; from then on every
 release waits for the owner's yes. Open: WhatsApp (CallMeBot was full), the AI models after the launch, the testing
-tools' update (Playwright, Ubuntu 26.04) after launch week, the page at 2,176 of its 2,200 KB budget.
+tools' update (Playwright, Ubuntu 26.04) after launch week, a lighter first screen.
 ---
 
 ## 2. File inventory (recreate all of these)

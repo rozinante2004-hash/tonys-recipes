@@ -399,53 +399,84 @@ service cloud.firestore {
     // Sent by the owner or an admin, under their household's real name and
     // identifier. The household asked sees it (its owner and admins); a
     // refusal is only marked, so the sender never sees "rejected".
+    function lrWellFormed() {
+      return request.resource.data.keys().hasOnly(['from', 'fromName', 'fromCode', 'to', 'email', 'via', 'by', 'at', 'declined', 'toLabel', 'note'])
+        // v37.81 — an optional note with the request (Tony).
+        && request.resource.data.get('note', '') is string && request.resource.data.get('note', '').size() <= 500
+        && request.resource.data.get('declined', false) == false
+        && request.resource.data.get('toLabel', '') is string && request.resource.data.get('toLabel', '').size() <= 120;
+    }
+    // Asking: under the asking household's real name and identifier, as they are now.
+    function lrAsNow() {
+      return request.resource.data.fromName == get(hh(request.resource.data.from)).data.name
+        && request.resource.data.get('fromCode', '') == get(hh(request.resource.data.from)).data.get('code', '');
+    }
+    // 1. by identifier, from the asking household's owner or an admin
+    function lrByCode(id) {
+      return request.resource.data.via == 'code' && request.resource.data.by == request.auth.uid
+        && id == request.resource.data.from + '_' + request.resource.data.to
+        && request.resource.data.from != request.resource.data.to
+        && !('email' in request.resource.data)
+        && atLeast(request.resource.data.from, 'admin')
+        && exists(hh(request.resource.data.to))
+        && get(hh(request.resource.data.to)).data.get('appRequests', true) == true
+        && !exists(linkPath(request.resource.data.to, request.resource.data.from));
+    }
+    // 2. by e-mail, the same people
+    function lrByMail(id) {
+      return request.resource.data.via == 'email' && request.resource.data.by == request.auth.uid
+        && !('to' in request.resource.data)
+        && request.resource.data.email is string
+        && request.resource.data.email == request.resource.data.email.lower()
+        && id == request.resource.data.from + ':' + request.resource.data.email
+        && atLeast(request.resource.data.from, 'admin');
+    }
+    // 3. passed on by the person it was sent to, to a household they are in, in the batch that removes the e-mail one.
+    //    v38.74 — under the name and identifier the e-mail one carries (checked when it was asked). Tony, 21 Oct 2026:
+    //    Tester2 asked Tester1 by e-mail and it never arrived. A copy under the asking kitchen's name of the moment was
+    //    refused once that kitchen had been renamed, and the request waited for ever.
+    //    ('to' is looked at only once it is there: an error here refused, in the emulator, a request by e-mail that
+    //    lrByMail allowed.)
+    function lrPassedOn(id) {
+      return request.resource.data.via == 'email' && verified()
+        && ('to' in request.resource.data) && request.resource.data.to is string
+        && id == request.resource.data.from + '_' + request.resource.data.to
+        && request.resource.data.from != request.resource.data.to
+        && isMember(request.resource.data.to)
+        && !('email' in request.resource.data)
+        && exists(lrAsked())
+        && get(lrAsked()).data.by == request.resource.data.by
+        && get(lrAsked()).data.get('fromName', '') == request.resource.data.fromName
+        && get(lrAsked()).data.get('fromCode', '') == request.resource.data.get('fromCode', '')
+        && !existsAfter(lrAsked())
+        && !exists(linkPath(request.resource.data.to, request.resource.data.from));
+    }
+    function lrAsked() { return reqPath(request.resource.data.from + ':' + myEmail()); }
+    // The household asked has blocked the asking one (its requestLog says so).
+    function lrLogPath(to, from) { return /databases/$(database)/documents/households/$(to)/requestLog/$(from); }
+    function lrBlocked(to, from) {
+      return exists(lrLogPath(to, from)) && get(lrLogPath(to, from)).data.get('status', '') == 'blocked';
+    }
     match /linkRequests/{id} {
       allow read: if signedIn() && (
         appAdmin()
         || (verified() && resource.data.get('email', '') == myEmail())
         || memberOf(resource.data.get('from', ''))
         || memberOf(resource.data.get('to', '')));
-      allow create: if signedIn()
-        && request.resource.data.keys().hasOnly(['from', 'fromName', 'fromCode', 'to', 'email', 'via', 'by', 'at', 'declined', 'toLabel', 'note'])
-        // v37.81 — an optional note with the request (Tony).
-        && request.resource.data.get('note', '') is string && request.resource.data.get('note', '').size() <= 500
-        && request.resource.data.get('declined', false) == false
-        && request.resource.data.get('toLabel', '') is string && request.resource.data.get('toLabel', '').size() <= 120
-        && request.resource.data.fromName == get(hh(request.resource.data.from)).data.name
-        && request.resource.data.get('fromCode', '') == get(hh(request.resource.data.from)).data.get('code', '')
-        && (
-          // 1. by identifier, from the asking household's owner or an admin
-          (request.resource.data.via == 'code' && request.resource.data.by == request.auth.uid
-            && id == request.resource.data.from + '_' + request.resource.data.to
-            && request.resource.data.from != request.resource.data.to
-            && !('email' in request.resource.data)
-            && atLeast(request.resource.data.from, 'admin')
-            && exists(hh(request.resource.data.to))
-            && get(hh(request.resource.data.to)).data.get('appRequests', true) == true
-            && !exists(linkPath(request.resource.data.to, request.resource.data.from)))
-          // 2. by e-mail, the same people
-          || (request.resource.data.via == 'email' && request.resource.data.by == request.auth.uid
-            && !('to' in request.resource.data)
-            && request.resource.data.email is string
-            && request.resource.data.email == request.resource.data.email.lower()
-            && id == request.resource.data.from + ':' + request.resource.data.email
-            && atLeast(request.resource.data.from, 'admin'))
-          // 3. passed on by the person it was sent to, to a household they are
-          //    in, in the batch that removes the e-mail one
-          || (request.resource.data.via == 'email' && verified()
-            && id == request.resource.data.from + '_' + request.resource.data.to
-            && request.resource.data.from != request.resource.data.to
-            && isMember(request.resource.data.to)
-            && !('email' in request.resource.data)
-            && exists(reqPath(request.resource.data.from + ':' + myEmail()))
-            && get(reqPath(request.resource.data.from + ':' + myEmail())).data.by == request.resource.data.by
-            && !existsAfter(reqPath(request.resource.data.from + ':' + myEmail()))
-            && !exists(linkPath(request.resource.data.to, request.resource.data.from)))
-        );
+      allow create: if signedIn() && lrWellFormed()
+        && ((lrAsNow() && (lrByCode(id) || lrByMail(id))) || lrPassedOn(id));
       // Refusing: the household asked marks it, and nothing else changes.
-      allow update: if adminOf(resource.data.get('to', ''))
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['declined'])
-        && request.resource.data.declined == true;
+      allow update: if (adminOf(resource.data.get('to', ''))
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['declined'])
+          && request.resource.data.declined == true)
+        // v38.74 — asked again after a refusal, by identifier or by e-mail (then passed on): the refused request is
+        // asked afresh, waiting again. Not after a block: that one stays refused, and the asking side sees "waiting",
+        // as ever. (Before, a refused request stood in the way of every later one — and "Unblocked — their next
+        // request reaches you again" was not true.)
+        || (signedIn() && resource.data.get('declined', false) == true && lrWellFormed()
+          && request.resource.data.from == resource.data.from && request.resource.data.to == resource.data.to
+          && !lrBlocked(resource.data.to, resource.data.from)
+          && ((lrAsNow() && lrByCode(id)) || lrPassedOn(id)));
       // Withdrawn by the sender, answered by the household asked, or passed on
       // (or let go) by the person an e-mail one was sent to.
       allow delete: if signedIn() && (

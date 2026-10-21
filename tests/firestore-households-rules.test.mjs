@@ -345,6 +345,49 @@ await check('a stranger cannot withdraw it',                 deleteDoc(doc(carol
 await check('the sender withdraws it',                       deleteDoc(doc(kim, 'linkRequests/L3_L2')), true);
 await check('the person asked by e-mail may let it go',      deleteDoc(doc(kim, 'linkRequests/L2:kim@example.com')), true);
 
+// v38.74 — Tony, 21 Oct 2026: Tester2 asked Tester1 by e-mail and it never arrived. The copy passed on had to carry
+// the asking kitchen's name of the moment (refused once it was renamed), and could not replace a request refused
+// before. lena owns L4; max owns L5, where nora reads.
+const lena = person('lena'), max = person('max'), nora = person('nora');
+await check('v38.74: two more households', (async () => {
+  await foundWithCode(lena, 'L4', 'lena', 'MKN-PPPP-5555'); await foundWithCode(max, 'L5', 'max', 'MKN-MMMM-6666');
+  await setDoc(doc(max, 'invites/INV-L5'), { hid: 'L5', role: 'viewer', createdBy: 'max', expiresAt: later });
+  await join(nora, 'L5', 'nora', 'viewer', 'INV-L5'); })(), true);
+const lenaMail = (extra) => setDoc(doc(lena, 'linkRequests/L4:nora@example.com'), Object.assign({ from: 'L4', fromName: 'Coded',
+  fromCode: 'MKN-PPPP-5555', email: 'nora@example.com', via: 'email', by: 'lena', at: 2 }, extra || {}));
+const noraPasses = (name, at) => { const b = writeBatch(nora);
+  b.set(doc(nora, 'linkRequests/L4_L5'), { from: 'L4', fromName: name, fromCode: 'MKN-PPPP-5555', to: 'L5', via: 'email', by: 'lena', at: at || 2 });
+  b.delete(doc(nora, 'linkRequests/L4:nora@example.com')); return b.commit(); };
+await check('lena asks nora by e-mail',                       lenaMail(), true);
+await check('…then renames her kitchen',                      updateDoc(doc(lena, 'households/L4'), { name: 'Lena\'s Kitchen' }), true);
+await check('nora cannot pass it on under a name of her own', noraPasses('Somebody Else'), false);
+await check('…but passes it on under the name it was asked with', noraPasses('Coded'), true);
+await check('max refuses it',                                 updateDoc(doc(max, 'linkRequests/L4_L5'), { declined: true }), true);
+await check('lena asks nora by e-mail again',                 lenaMail({ fromName: 'Lena\'s Kitchen', at: 3 }), true);
+await check('nora passes it on over the refused one: waiting again', (async () => {
+  await noraPasses('Lena\'s Kitchen', 3);
+  if ((await getDoc(doc(max, 'linkRequests/L4_L5'))).data().declined) throw new Error('still refused'); })(), true);
+await check('…but not over one still waiting',                (async () => { await lenaMail({ fromName: 'Lena\'s Kitchen', at: 4 });
+  await noraPasses('Lena\'s Kitchen', 4); })(), false);
+await check('…she lets that one go instead',                  deleteDoc(doc(nora, 'linkRequests/L4:nora@example.com')), true);
+await check('max refuses and blocks L4', (async () => {
+  await updateDoc(doc(max, 'linkRequests/L4_L5'), { declined: true });
+  await setDoc(doc(max, 'households/L5/requestLog/L4'), { hid: 'L4', name: 'Lena\'s Kitchen', code: 'MKN-PPPP-5555', status: 'blocked', at: 3, decidedAt: 5, by: 'max' }); })(), true);
+await check('lena may still ask by e-mail (she is not told)', lenaMail({ fromName: 'Lena\'s Kitchen', at: 6 }), true);
+await check('…but it is not passed on over the block',       noraPasses('Lena\'s Kitchen', 6), false);
+const lenaCode = (at, extra) => setDoc(doc(lena, 'linkRequests/L4_L5'), Object.assign({ from: 'L4', fromName: 'Lena\'s Kitchen', fromCode: 'MKN-PPPP-5555', to: 'L5', via: 'code', by: 'lena', at }, extra || {}));
+await check('…nor asked afresh by identifier',                lenaCode(7), false);
+await check('max unblocks (the log says rejected again)',     updateDoc(doc(max, 'households/L5/requestLog/L4'), { status: 'rejected', decidedAt: 8 }), true);
+await check('lena asks afresh by identifier: waiting again',  lenaCode(9), true);
+await check('…not over one still waiting',                    lenaCode(10), false);
+await check('max refuses it once more',                       updateDoc(doc(max, 'linkRequests/L4_L5'), { declined: true }), true);
+await check('nobody else asks afresh in her name',            setDoc(doc(carol, 'linkRequests/L4_L5'), { from: 'L4', fromName: 'Lena\'s Kitchen', fromCode: 'MKN-PPPP-5555', to: 'L5', via: 'code', by: 'carol', at: 11 }), false);
+await check('nora lets the e-mail one left over the block go', deleteDoc(doc(nora, 'linkRequests/L4:nora@example.com')), true);
+await check('…nor does nora without a request by e-mail',     noraPasses('Lena\'s Kitchen', 11), false);
+await check('…nor under an old name',                         lenaCode(12, { fromName: 'Coded' }), false);
+await check('…nor as refused',                                lenaCode(12, { declined: true }), false);
+await check('…nor towards another household',                 lenaCode(12, { to: 'L1' }), false);
+
 const unlink = (db) => { const b = writeBatch(db);
   b.delete(doc(db, 'households/L1/links/L2')); b.delete(doc(db, 'households/L2/links/L1')); return b.commit(); };
 await check('a reader cannot remove the link',               unlink(hank), false);

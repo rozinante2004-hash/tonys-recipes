@@ -7666,6 +7666,79 @@ window.SELF_TESTS = [
       }
     } },
 
+  { id:'link_request_passed_on_again', group:'Sharing', name:'🤝 A request by e-mail reaches the kitchen asked although an earlier one from the same kitchen was refused (it is asked afresh, waiting again — not after a block); one already waiting there is enough; asking again by identifier after a refusal works the same way, and a blocked one still reads "waiting"; a request asked afresh is NEW again (v38.74)',
+    test: async()=>{
+      // Tony, 21 Oct 2026: Tester2 asked Tester1 by e-mail; nothing reached Tester1, and asking again said "Already
+      // asked — waiting for them". (The other half — a kitchen renamed since it asked — is the rules': tested there.)
+      var store={}, failCommit=false;
+      function ref(path){ var parts=path.split('/'); return { id:parts[parts.length-1], path:path,
+        collection:function(c){ return coll(path+'/'+c); },
+        get:async function(){ var d=store[path]; return { id:parts[parts.length-1], ref:ref(path), exists:!!d, data:function(){ return d?JSON.parse(JSON.stringify(d)):undefined; } }; },
+        set:async function(d){ store[path]=JSON.parse(JSON.stringify(d)); },
+        update:async function(d){ if(!store[path]) throw new Error('no such document'); Object.assign(store[path], d); },
+        delete:async function(){ delete store[path]; } }; }
+      function coll(path){ var filters=[]; var q={
+        doc:function(id){ return ref(path+'/'+id); },
+        where:function(f,op,v){ filters.push([f,v]); return q; },
+        get:async function(){ var out=[]; Object.keys(store).forEach(function(k){
+            if(k.slice(0,k.lastIndexOf('/'))!==path) return;
+            if(filters.every(function(f){ return store[k][f[0]]===f[1]; })) out.push(k); });
+          return { size:out.length, forEach:function(fn){ out.forEach(function(k){ fn({ id:k.split('/').pop(), ref:ref(k), data:function(){ return JSON.parse(JSON.stringify(store[k])); } }); }); } }; } };
+        return q; }
+      var fake={ collection:coll, batch:function(){ var ops=[]; return { set:function(r,d){ ops.push(function(){ return r.set(d); }); }, update:function(r,d){ ops.push(function(){ return r.update(d); }); },
+        delete:function(r){ ops.push(function(){ return r.delete(); }); },
+        commit:async function(){ if(failCommit) throw new Error('Missing or insufficient permissions.'); for(var i=0;i<ops.length;i++) await ops[i](); } }; } };
+      var real={ db:window._fbDb, user:window._fbUser, hh:window._household, toast:window.toast, log:window.syncLog };
+      var logged=[];
+      var asked=function(at, extra){ return Object.assign({ from:'hA', fromName:'Kitchen A', fromCode:'MKN-AAAA-2222', email:'jo@example.com', via:'email', by:'uA', at:at }, extra||{}); };
+      try{
+        window._fbDb=fake; window.toast=function(){}; window.syncLog=function(t, m){ logged.push(t+': '+m); };
+        // Jo (Kitchen B, reads only) opens the app.
+        window._fbUser={ uid:'uJ', email:'jo@example.com', emailVerified:true };
+        _household={ hid:'hB', role:'viewer', name:'Kitchen B', code:'MKN-BBBB-3333', links:[] };
+        // 1. Kitchen B refused Kitchen A once; A asks again by e-mail → asked afresh, waiting again.
+        store['linkRequests/hA_hB']={ from:'hA', fromName:'Kitchen A', fromCode:'MKN-AAAA-2222', to:'hB', via:'code', by:'uA', at:1, declined:true };
+        store['households/hB/requestLog/hA']={ hid:'hA', status:'rejected', at:1 };
+        store['linkRequests/hA:jo@example.com']=asked(5, { fromName:'Kitchen A (renamed since)', note:'Again, please?' });
+        if(await hhPassOnLinkRequests()!==1) throw new Error('not passed on over the request refused before');
+        var p=store['linkRequests/hA_hB'];
+        if(!p || p.declined || p.at!==5 || p.via!=='email' || p.note!=='Again, please?' || store['linkRequests/hA:jo@example.com']) throw new Error('not asked afresh: '+JSON.stringify(p));
+        if(p.fromName!=='Kitchen A (renamed since)') throw new Error('the copy does not carry the name the request was asked with');
+        // 2. One already waiting there: the request by e-mail is let go, the waiting one stays as it is.
+        store['linkRequests/hA:jo@example.com']=asked(6);
+        if(await hhPassOnLinkRequests()!==0 || store['linkRequests/hA:jo@example.com'] || store['linkRequests/hA_hB'].at!==5) throw new Error('a second request by e-mail, with one waiting');
+        // 3. Blocked: left as it is — not passed on, no error, the asking side still sees "waiting".
+        store['linkRequests/hA_hB'].declined=true; store['households/hB/requestLog/hA'].status='blocked';
+        store['linkRequests/hA:jo@example.com']=asked(7); logged=[];
+        if(await hhPassOnLinkRequests()!==0 || !store['linkRequests/hA:jo@example.com'] || !store['linkRequests/hA_hB'].declined || store['linkRequests/hA_hB'].at!==5) throw new Error('passed on over a block');
+        if(logged.some(function(l){ return /^error/.test(l); })) throw new Error('a block made an error: '+logged.join(' | '));
+        // 4. Refused by the rules (anything else): said in the log, the request by e-mail kept for the next time.
+        delete store['linkRequests/hA_hB']; delete store['households/hB/requestLog/hA']; failCommit=true; logged=[];
+        if(await hhPassOnLinkRequests()!==0 || !store['linkRequests/hA:jo@example.com'] || !logged.some(function(l){ return /Could not pass on a link request/.test(l); })) throw new Error('a refused pass-on is not logged: '+logged.join(' | '));
+        failCommit=false; delete store['linkRequests/hA:jo@example.com'];
+        // 5. By identifier: Kitchen A's owner asks Kitchen B again after a refusal → asked afresh; still waiting → "already asked".
+        window._fbUser={ uid:'uA', email:'a@example.com', emailVerified:true };
+        _household={ hid:'hA', role:'owner', name:'Kitchen A', code:'MKN-AAAA-2222', links:[] };
+        store['codes/MKN-BBBB-3333']={ hid:'hB' };
+        store['linkRequests/hA_hB']={ from:'hA', fromName:'Kitchen A', fromCode:'MKN-AAAA-2222', to:'hB', via:'code', by:'uA', at:1, declined:true };
+        var r=await hhSendLinkRequest('MKN-BBBB-3333', 'Hello again');
+        p=store['linkRequests/hA_hB'];
+        if(!r.ok || r.again || !p || p.declined || p.at===1 || p.note!=='Hello again') throw new Error('not asked afresh by identifier: '+JSON.stringify([r, p]));
+        r=await hhSendLinkRequest('MKN-BBBB-3333');
+        if(!r.ok || !r.again) throw new Error('one still waiting, and asked again: '+JSON.stringify(r));
+        // …blocked (the rules refuse it): "already asked — waiting", as ever — never "does not take requests".
+        store['linkRequests/hA_hB'].declined=true; failCommit=true;
+        r=await hhSendLinkRequest('MKN-BBBB-3333');
+        if(!r.ok || !r.again || r.msg) throw new Error('a block shows on the asking side: '+JSON.stringify(r));
+        failCommit=false;
+        // 6. A request asked afresh is NEW again on the page and the red dots; one seen before v38.74 (a bare id) stays seen.
+        var rq={ id:'hA_hB', d:{ at:9 } };
+        if(linkIsSeen(['hA_hB@5'], rq) || !linkIsSeen(['hA_hB@9'], rq) || !linkIsSeen(['hA_hB'], rq)) throw new Error('seen or not, by id and time');
+      } finally {
+        window._fbDb=real.db; window._fbUser=real.user; window._household=real.hh; window.toast=real.toast; window.syncLog=real.log;
+      }
+    } },
+
   { id:'idle_quiet_and_server_notice', group:'Core', name:'🔕 An app nobody is using stops asking the server every two minutes (every 30 instead; at once on the first touch or return), and a used-up server allowance is said in a bar with what it stops and when it comes back — once, closable, never once its time has passed (v38.54); the owner reads what has stopped first, and a time not today carries its day (v38.66)',
     test: async()=>{
       var realAt=_userActiveAt, realPoll=_livePollAt, realLs=null, realNotices=Object.assign({}, _serverNotices);

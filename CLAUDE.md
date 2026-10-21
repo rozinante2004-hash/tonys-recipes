@@ -672,6 +672,27 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
 - **Released: v38.72 (21 Oct 2026, 14:46 Israel time, CI green on 995e761) and v38.73 (14:53, CI green on 3d03f4d).**
   All jobs success on both, including the new "Comments taken out exactly (acorn)" step and the suite on the
   comment-free test build.
+- **v38.74 — the REAL reason Tester2's request by e-mail never reached Tester1** (Tony, 21 Oct: "Tester1 has
+  confirmed the address a long time ago" — v38.73's diagnosis above was WRONG). Reproduced in the emulator: the
+  passed-on copy (`<from>_<to>`) was refused for ever when (a) the asking kitchen had been RENAMED since it asked —
+  the create rule compared fromName/fromCode with the household as it is NOW, for the pass-on too; or (b) an earlier
+  request `<from>_<to>` existed: refused before (declined: true, under "Answered" on the asked side, "waiting" on the
+  asking side) or still waiting — the copy is then an UPDATE, which only the "refuse" rule allowed. The e-mail one
+  stayed at `<from>:<email>` (hence "Already asked — waiting for them"). Same flaw by identifier: after a refusal the
+  asker could never ask again, and "Unblocked — their next request reaches you again" was untrue. Now —
+  **rules** (linkRequests, as functions lrWellFormed / lrAsNow / lrByCode / lrByMail / lrPassedOn / lrBlocked):
+  the pass-on carries the name and identifier of the request by e-mail (checked when it was asked); a REFUSED request
+  may be asked afresh (update back to waiting) by its asker by identifier, or by the pass-on of a new request by
+  e-mail — never when the asked household's requestLog says `blocked`. **App:** `hhPassOnLinkRequests` reads
+  `<from>_<to>` first — waiting → the e-mail one is let go; refused → asked afresh (unless blocked: left as is, no
+  error); `hhSendLinkRequest` by identifier asks afresh over a refused one (refused by the rules = blocked → "already
+  asked", never "does not take requests"); seen requests are kept as `id@at` (`linkIsSeen`), so one asked afresh is
+  NEW again. Help: "Reject is for now … 🚫 Block is for good". **Rules quirk found:** a function erroring on a missing
+  field (`request.resource.data.to` on an e-mail request) on the RIGHT of `||` made the emulator refuse what the left
+  allowed (`lrByMail(id) || lrPassedOn(id)` refused, the reverse allowed) — guard fields with `'x' in data` inside
+  rule functions. Rules test: 13 new checks (lena/max/nora, L4/L5; identifiers must avoid I, L, O, U — `MKN-PPPP-5555`);
+  self-test `link_request_passed_on_again`. A read-only diagnostic job against the beta was refused by the classifier
+  (a workflow holding the database key, running new code over everyone's accounts) — not attempted again.
 - **Move step 9 finished (20 Oct 2026, 18:05 Israel time; Tony: "OK to delete the 4 + 135 old family documents").**
   clear-source `all` + `shared` (run 39445140837): 139 deleted (households 4, shared 135), the household cut to its
   moved mark; clear-check after it (run 39445361414): recipes-f379d holds 1 document of the moved household (its own,

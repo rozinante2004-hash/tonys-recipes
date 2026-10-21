@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v38.73 -->
+<!-- Tony's Recipes Collection v38.74 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -5121,8 +5121,9 @@ async function hhSendLinkRequest(text, note) {
     if (to === me.hid) return { ok: false, msg: 'That is your own household’s identifier.' };
     var had = hhLinks().filter(function(l){ return l.hid === to; })[0];
     if (had) return { ok: false, msg: 'You are already linked with ' + hhLinkName(had) + '.' };
-    var ref = db.collection('linkRequests').doc(me.hid + '_' + to);
-    try { if ((await ref.get()).exists) return { ok: true, via: 'code', again: true, label: tg.code, id: ref.id }; } catch(e) {}
+    var ref = db.collection('linkRequests').doc(me.hid + '_' + to), renew = false;
+    // v38.74 — refused before (and not blocked): asked afresh, waiting again. Still waiting, or blocked: "already asked".
+    try { var ex = await ref.get(); if (ex.exists) { if (!(ex.data() || {}).declined) return { ok: true, via: 'code', again: true, label: tg.code, id: ref.id }; renew = true; } } catch(e) {}
     try {
       // v37.81 — the note is also the conversation's first message (same batch:
       // the rules let a message through only between households with a request).
@@ -5132,9 +5133,11 @@ async function hhSendLinkRequest(text, note) {
                        { from: me.hid, name: me.name || '', text: note, at: base.at, by: _fbUser.uid });
       await bq.commit();
     }
-    catch(e) { return { ok: false, blocked: true,
-      msg: 'This household does not take requests through the app. Ask them by e-mail instead: type the address of anyone in it.' }; }
-    syncLog('save', 'Asked to link with a household', tg.code);
+    catch(e) {
+      if (renew) return { ok: true, via: 'code', again: true, label: tg.code, id: ref.id };   // blocked: it stays "waiting", as ever
+      return { ok: false, blocked: true,
+        msg: 'This household does not take requests through the app. Ask them by e-mail instead: type the address of anyone in it.' }; }
+    syncLog('save', renew ? 'Asked again to link with a household' : 'Asked to link with a household', tg.code);
     return { ok: true, via: 'code', label: tg.code, id: ref.id };
   }
   var mine = String(_fbUser.email || '').toLowerCase();
@@ -5240,6 +5243,12 @@ async function openConnectHousehold() {
 // Someone asked by e-mail: whoever signs in with that (confirmed) address
 // passes it on to the household they are in, without a word — only its owner
 // and admins are asked.
+// v38.74 — Tony, 21 Oct 2026: Tester2 asked Tester1 by e-mail; nothing reached Tester1's 📬 Link requests, and asking
+// again said "Already asked — waiting for them" — the request by e-mail was never passed on. Two things stood in the
+// way, for ever: the asking kitchen renamed since it asked (the rules wanted the copy under its name of the moment —
+// they now take the name the request carries), and an earlier request from the same kitchen that had been refused
+// (the copy could not replace it). Now: one still waiting here → the e-mail one is let go (one is enough); one
+// refused → asked afresh, waiting again; one blocked → left as it is, unseen (the asking side sees "waiting").
 async function hhPassOnLinkRequests() {
   var u = window._fbUser;
   if (!u || u.emailVerified === false || !_household) return 0;
@@ -5253,14 +5262,23 @@ async function hhPassOnLinkRequests() {
       try { await docs[i].ref.delete(); } catch(e) {}
       continue;
     }
+    var pair = hhDb().collection('linkRequests').doc(x.from + '_' + _household.hid), had = null;
+    try { var ps = await pair.get(); had = ps.exists ? (ps.data() || {}) : null; } catch(e) {}
+    if (had && !had.declined) { try { await docs[i].ref.delete(); } catch(e) {} continue; }
+    if (had) {
+      var lg = null;
+      try { var ls = await hhRef(_household.hid).collection('requestLog').doc(x.from).get(); lg = ls.exists ? (ls.data() || {}) : null; } catch(e) {}
+      if (lg && lg.status === 'blocked') continue;
+    }
     var copy = { from: x.from, fromName: x.fromName || '', fromCode: x.fromCode || '', to: _household.hid,
                  via: 'email', by: x.by, at: x.at || Date.now() };
     if (x.toLabel) copy.toLabel = x.toLabel;
     if (x.note) copy.note = x.note;   // v37.81
     var b = hhDb().batch();
-    b.set(hhDb().collection('linkRequests').doc(x.from + '_' + _household.hid), copy);
+    b.set(pair, copy);
     b.delete(docs[i].ref);
-    try { await b.commit(); n++; } catch(e) { syncLog('error', 'Could not pass on a link request', String(e && e.message).slice(0, 160)); }
+    try { await b.commit(); n++; }
+    catch(e) { syncLog('error', had ? 'Could not pass on a link request (over one refused before)' : 'Could not pass on a link request', String(e && e.message).slice(0, 160)); }
   }
   return n;
 }
@@ -5297,14 +5315,16 @@ async function hhLoadIncoming() {
   return out;
 }
 function linkSeen() { try { return JSON.parse(localStorage.getItem(LINK_SEEN_KEY + (_household && _household.hid)) || '[]') || []; } catch(e) { return []; } }
+// v38.74 — a request asked afresh (same id, a later time) is new again: seen by id and time (a bare id, before v38.74)
+function linkIsSeen(seen, r) { return seen.indexOf(r.id + '@' + (r.d.at || 0)) !== -1 || seen.indexOf(r.id) !== -1; }
 function linkMarkSeen() {
-  try { localStorage.setItem(LINK_SEEN_KEY + _household.hid, JSON.stringify(_linkState.pending.map(function(r){ return r.id; }))); } catch(e) {}
+  try { localStorage.setItem(LINK_SEEN_KEY + _household.hid, JSON.stringify(_linkState.pending.map(function(r){ return r.id + '@' + (r.d.at || 0); }))); } catch(e) {}
   linkDotRefresh();
 }
 function linkNewCount() {
   if (!_household || _linkState.loadedFor !== _household.hid) return 0;
   var seen = linkSeen();
-  return _linkState.pending.filter(function(r){ return seen.indexOf(r.id) === -1; }).length;
+  return _linkState.pending.filter(function(r){ return !linkIsSeen(seen, r); }).length;
 }
 function linkDotRefresh() { var t = talkNewCount(); pathDots({ links: linkNewCount() + t, chats: t }); }
 async function hhLog(other, name, code, status, at, note) {
@@ -5479,7 +5499,7 @@ function renderLinkRequestsPage() {
               : '<div style="font-size:12.5px;color:var(--muted);margin-bottom:6px;">' + appReq + '</div>';
   h += '<div class="mg-h" style="font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);margin:10px 0 6px;">Waiting for an answer</div>';
   h += st.pending.length ? st.pending.map(function(r, i){
-      var isNew = seen.indexOf(r.id) === -1;
+      var isNew = !linkIsSeen(seen, r);
       return card(who(r.d.fromName, r.d.fromCode) + (isNew ? ' <span style="color:var(--danger);font-size:11px;font-weight:700;">NEW</span>' : '')
         + '<div style="font-size:12px;color:var(--muted);margin-top:2px;">asked ' + escH(when(r.d.at)) + (r.d.via === 'email' ? ' · by e-mail' : ' · by identifier') + '</div>'
         + talkHtml(r.d.from, r.d.note, r.d.from, r.d.fromName)
@@ -8814,7 +8834,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v38.73';
+var APP_VERSION = 'v38.74';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -11861,7 +11881,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.73</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.74</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -11949,7 +11969,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.73</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.74</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -30397,7 +30417,7 @@ var HELP_SYSTEM_PROMPT = [
   "- LINK WITH ANOTHER HOUSEHOLD: ⋯ More → 🤝 Connect with another household (the owner, or someone with full access). Type that household's identifier (MKN-…; yours is in ⚙️ → 🏠 My household → 🪪 Display my personal identifier) or the e-mail address of anyone in it. Its owner or an admin is asked at once if the app is open (otherwise the next time they open it): Accept, Reject or Remind me later — with the note that came with it. By e-mail address the request also goes through the app — it pops up for that person if they use My Kitchen Notes, or waits until they join with that address (the app never says whether an address has an account); you may also tell them yourself: Via Email (your default mail app, Gmail or Outlook — if no mail app opens, choose your e-mail on the web), Via WhatsApp, or Copy message to Clipboard. The message has a link that opens the request in their app, to accept it. Every step has ‹ Back, with what you typed kept. A refusal is never shown to the sender.",
   "- A REQUEST SENT TO YOUR E-MAIL ADDRESS shows in 📬 Link requests only once that address is CONFIRMED (an account made with e-mail and a password must confirm it from the e-mail sent to it). Not confirmed yet? The Link requests page says so and sends the confirmation e-mail again.",
   "- Once linked, each household sees the other's recipes, read-only — and live: a change in their kitchen shows in yours within seconds, the changed card glowing for a moment: after its own in the main list, under that household's name, on a faint blue (hover one: 'A recipe from …'). 🏠 Kitchens ▾ in the filter bar chooses whose recipes show — tick one, several or all. 📥 Save a copy to my recipes makes one your own. Links do not chain: a third household linked to theirs is not seen. Links are listed, and removed, in ⚙️ → 🏠 My household → 👥 Family Access. ⚙️ → 🏠 My household → 🤝 Link requests through the app: blocked stops requests by identifier; requests by e-mail always arrive.",
-  "- 📬 LINK REQUESTS: ⚙️ → 🏠 My household → 📬 Link requests — every request in one place: Waiting (Accept / Reject / 🚫 Block), Sent by your household (Withdraw), Linked now (Revoke access), and earlier answers. A request may carry a note, and the two households can write to each other there — the latest message shows, highlighted, with ↩ Reply; earlier ones are under 💬 Conversation. Only the household's name is shown, never a person's. A new message or request arrives while the app is open: a red dot (and a short notice with Open) within seconds, no reload needed. A red dot on ⚙️ leads to anything new. The switch there decides whether other households may ask through the app at all.",
+  "- 📬 LINK REQUESTS: ⚙️ → 🏠 My household → 📬 Link requests — every request in one place: Waiting (Accept / Reject / 🚫 Block), Sent by your household (Withdraw), Linked now (Revoke access), and earlier answers. A request may carry a note, and the two households can write to each other there — the latest message shows, highlighted, with ↩ Reply; earlier ones are under 💬 Conversation. Only the household's name is shown, never a person's. Reject is for now: if they ask again — by identifier or by e-mail — their request is back under Waiting. 🚫 Block is for good, until you Unblock it under the earlier answers; they are never told, and on their side it reads “waiting”. A new message or request arrives while the app is open: a red dot (and a short notice with Open) within seconds, no reload needed. A red dot on ⚙️ leads to anything new. The switch there decides whether other households may ask through the app at all.",
   "- 💬 CHATS WITH LINKED KITCHENS: ⋯ More → 💬 Chats with linked kitchens — or 💬 Chat beside a linked kitchen's name in your recipe list, or in 👥 Family Access. Every conversation, newest first, with what is new; open one to read it all and write (Enter sends, Shift+Enter starts a new line). The same conversations are also on 📬 Link requests. A red dot on ⋯ More and on ⚙️ says something new arrived.",
   "- A household's identifier works only within the same copy of the app: the family's copy and My Kitchen Notes keep their households apart.",
   "",
