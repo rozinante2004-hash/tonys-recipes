@@ -103,9 +103,8 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
 **Where things stand on 21 Oct 2026 (22:00 Israel time) — read this, then "What comes next"**
 - **Live:** the family app (`main`, which forwards to the community app) and the community app (`beta`,
   https://mykitchennotes.community, Firebase my-kitchen-notes-beta) run **v38.77** (released 22:22, all jobs
-  success), and **v38.78 — 👪 Chat with family members — is on its way** (check that it was released and that every
-  job succeeded, ESPECIALLY "Publish the database rules": the new `talk`/`talkIds` rules must be live, or every family
-  message is refused).
+  success); then **v38.78 — 👪 Chat with family members** (22:52; rules published) and **v38.79 — Scottish voices**
+  (23:04) — all jobs green (one Self Tests job on main re-run).
   **Worker v87.** The test copy (https://tonys-recipes-test.pages.dev, its own database) follows `test`.
 - **The testers go live on Sunday 25 Oct 2026** (Tony: "The plan is to start sending invitations to the testers
   this Sunday"). The community app is **by invitation only** (Tony switched it, 20 Oct): only addresses invited with
@@ -126,9 +125,8 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
   copy** — confirmed 21 Oct, Tester2's request arrived and was accepted.
 
 **What comes next**
-1. **v38.78:** check that it was released and every job on it succeeded (jobs-on; the rules job above all), record
-   it here, tell Tony. Then Tony tries 👪 Chat with family members in a household with at least two people: a message
-   to everyone, a 1-to-1, and the 💬 Chat buttons in 👥 Family Access.
+1. **Waiting on Tony:** 👪 Chat with family members in a household with at least two people (a message to everyone,
+   a 1-to-1, the 💬 Chat buttons in 👥 Family Access), and the farm window's "On this device: …" line (Scottish voices).
 2. **Releases:** until the testers go live (Sunday 25 Oct), release each version once the local suites and CI are
    green, without asking, and tell him after. **From Sunday 25 Oct: ask Tony before EVERY release.**
 3. **Reminder — Fri 23 Oct, 09:00 Israel time: try CallMeBot again** (WhatsApp alerts; the bot was full on 20 Oct).
@@ -848,6 +846,16 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
   (`farmUtterLang`). The farm window says which voice THIS device uses ("On this device: Fiona — Scottish", or
   "British — this device has no Scottish voice"). Help and the farm window's note updated; self-test farm_visitors
   extended (stand-in voice lists; a plain object cannot be given to an utterance's .voice — test farmUtterLang).
+- **Released: v38.78 (21 Oct 2026, 22:52 Israel time, CI green on b348efd)** — all jobs success, **Publish the database
+  rules included** (talk/talkIds live). **v38.79 (23:04, on de8331c** — the languages job had committed to `main`
+  between the two releases, so release-on-green stopped at "main is not an ancestor" (exit 5) and the merged
+  `de8331c Merge published languages into test` was released instead, after its CI). On de8331c every job succeeded
+  except **Self Tests on main: failure** in "Run the Self Test suite on the built TEST copy" — the same commit passed
+  that step on `test`; the job's annotations said only "exit code 1" (logs unreadable here). **Re-run: success** — a
+  one-off (which test, unknown: hence the change below). All of v38.79's jobs are now green.
+  **tests/run-self-tests.js now prints each failure (and each run-level problem: hygiene, load errors) as a `::error`
+  annotation in CI**, so the next failure names its test — read with
+  `gh api repos/rozinante2004-hash/tonys-recipes/check-runs/<job id>/annotations`.
 - **Move step 9 finished (20 Oct 2026, 18:05 Israel time; Tony: "OK to delete the 4 + 135 old family documents").**
   clear-source `all` + `shared` (run 39445140837): 139 deleted (households 4, shared 135), the household cut to its
   moved mark; clear-check after it (run 39445361414): recipes-f379d holds 1 document of the moved household (its own,

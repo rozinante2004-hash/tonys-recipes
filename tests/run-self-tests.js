@@ -290,30 +290,37 @@ const NETWORK_DEPENDENT = id => /^net_/.test(id) || id === 'stor_firebase';
     console.log('FAILURES');
     for (const f of failed) console.log(`  ✗ [${f.group}] ${f.id} — ${f.name}\n      ${f.err}`);
     console.log('');
+    // v38.80 — in CI, each failure also as an annotation: the job's log cannot be read from where the work is done
+    // (21 Oct 2026: Self Tests on main failed, and nothing said which test). Test names and fixture messages only.
+    if (process.env.GITHUB_ACTIONS === 'true')
+      failed.slice(0, 10).forEach(f => console.log('::error title=Self test failed: ' + String(f.id).replace(/[\r\n:,]/g, ' ') + '::'
+        + String(f.err || '').replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A').slice(0, 900)));
   }
 
   // A test that closes the suite, or strands a dialog, is a real defect even
   // when every assertion passed — it makes every later test run blind.
   let hygiene = 0;
+  // (v38.80 — each also as a CI annotation, like the failures above)
+  const say = (line) => { console.log(line); if (process.env.GITHUB_ACTIONS === 'true') console.log('::error title=Self test run::' + line.replace(/%/g, '%25').replace(/\n/g, '%0A').slice(0, 900)); };
   if (!results.suiteStillOpen) {
-    console.log('✗ HYGIENE: a test closed #selfTestOverlay — everything after it ran blind.');
+    say('✗ HYGIENE: a test closed #selfTestOverlay — everything after it ran blind.');
     hygiene++;
   }
   // …and one that leaves the interface in a different language from the one
   // it started in. On Tony's phone that is the whole app in English afterwards.
   if (results.langAfter !== results.langBefore) {
-    console.log(`✗ HYGIENE: the interface started in "${results.langBefore}" and was left in "${results.langAfter}".`);
+    say(`✗ HYGIENE: the interface started in "${results.langBefore}" and was left in "${results.langAfter}".`);
     hygiene++;
   }
   // …and one that does not hand back the person's own browser state.
   if (results.livedInLost.length) {
-    console.log(`✗ HYGIENE: the run did not give back ${results.livedInLost.join(', ')}.`);
+    say(`✗ HYGIENE: the run did not give back ${results.livedInLost.join(', ')}.`);
     hygiene++;
   }
   if (!results.clipSet) console.log('(the clipboard could not be filled here — the clipboard part of the lived-in browser was skipped)');
   const stranded = results.leftOpen.filter(id => id !== 'selfTestOverlay');
   if (stranded.length) {
-    console.log(`✗ HYGIENE: dialogs left open: ${stranded.join(', ')} — close them in finally, not try.`);
+    say(`✗ HYGIENE: dialogs left open: ${stranded.join(', ')} — close them in finally, not try.`);
     hygiene++;
   }
 
@@ -323,7 +330,7 @@ const NETWORK_DEPENDENT = id => /^net_/.test(id) || id === 'stor_firebase';
   }
   if (loadErrors.length) {
     console.log(`\n✗ THE APP THREW WHILE LOADING (${loadErrors.length}) — part of it never started:`);
-    loadErrors.slice(0, 5).forEach(e => console.log('  ' + e));
+    loadErrors.slice(0, 5).forEach(e => say('✗ THE APP THREW WHILE LOADING: ' + e));
   }
 
   await browser.close();
