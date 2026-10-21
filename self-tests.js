@@ -7574,7 +7574,7 @@ window.SELF_TESTS = [
       }
     } },
 
-  { id:'link_request_back_and_mail', group:'Sharing', name:'🤝 Asking a household by e-mail: ‹ Back on every step with what was typed kept; 📨 Send via My Kitchen Notes first, highlighted and recommended, with its tool tip; the other ways send it too and tell them; Cancel sends nothing; "My mail app" offers e-mail on the web when no mail program opens (v38.53)',
+  { id:'link_request_back_and_mail', group:'Sharing', name:'🤝 Asking a household by e-mail (v38.73: Via My Kitchen Notes / Via Email ▸ / Via WhatsApp / Copy message to Clipboard; the e-mail opens the request): ‹ Back on every step with what was typed kept; 📨 Send via My Kitchen Notes first, highlighted and recommended, with its tool tip; the other ways send it too and tell them; Cancel sends nothing; "My mail app" offers e-mail on the web when no mail program opens (v38.53)',
     test: async()=>{
       // ‹ Back is a real button in both windows, and answers ASK_BACK (never something typed).
       var p1=askConfirm({ title:'x', input:'kept', backLabel:'‹ Back' }); await wait(20);
@@ -7603,19 +7603,28 @@ window.SELF_TESTS = [
         if(sentTo.length!==1 || sentTo[0][0]!=='kim@example.com' || sentTo[0][1]!=='Hi there' || deleted.length) throw new Error('what was sent: '+JSON.stringify(sentTo)+' withdrawn: '+deleted);
         if(seen[0].back || !seen[1].back || seen[2].input!=='Hi there' || seen[3].input!=='jo@example.com') throw new Error('‹ Back lost what was typed: '+JSON.stringify(seen));
         var c=choices[0];
-        if(!c || c.o[0].value!=='app' || !c.o[0].primary || !/Send via My Kitchen Notes \(recommended\)/.test(c.o[0].label) || !/already a member/.test(c.o[0].title)) throw new Error('the recommended way: '+JSON.stringify(c && c.o[0]));
-        if(c.o.slice(1).some(function(x){ return x.primary; }) || !c.o.some(function(x){ return x.value==='mail'; }) || c.op.backLabel!=='‹ Back' || !/send nothing/.test(c.op.cancelLabel)) throw new Error('the other ways, ‹ Back or Cancel: '+JSON.stringify(c.op));
+        if(!c || c.o[0].value!=='app' || !c.o[0].primary || !/Via My Kitchen Notes \(recommended\)/.test(c.o[0].label) || !/already a member/.test(c.o[0].title)) throw new Error('the recommended way: '+JSON.stringify(c && c.o[0]));
+        // v38.73 — Tony: one "Via Email" (a sub-menu: my default mail app, Gmail, Outlook), "Via …", "Copy message to Clipboard"
+        var labels=c.o.map(function(x){ return x.label; }).join(' | ');
+        if(!/Via Email/.test(labels) || !/Via WhatsApp/.test(labels) || !/Copy message to Clipboard/.test(labels) || /Send, and|Gmail|Outlook|mail app/.test(labels)) throw new Error('the ways: '+labels);
+        if(c.o.slice(1).some(function(x){ return x.primary; }) || !c.o.some(function(x){ return x.value==='email'; }) || c.op.backLabel!=='‹ Back' || !/send nothing/.test(c.op.cancelLabel)) throw new Error('the other ways, ‹ Back or Cancel: '+JSON.stringify(c.op));
         if(/not registered|no account|isn.t registered/i.test(c.m+JSON.stringify(c.o))) throw new Error('the app says whether an address has an account (Tony chose not to)');
         if(!r || r.email!=='kim@example.com') throw new Error('the request returned: '+JSON.stringify(r));
         // 2. Gmail: sent through the app AND Gmail opened, ready.
-        sentTo=[]; opened=[]; await run(['lee@example.com', ''], ['gmail']);
+        sentTo=[]; opened=[]; choices=[]; await run(['lee@example.com', ''], ['email', 'gmail']);
         if(sentTo.length!==1 || !opened.length || opened[0].indexOf('mail.google.com')===-1 || opened[0].indexOf('lee%40example.com')===-1) throw new Error('Gmail: '+JSON.stringify(sentTo)+' '+opened.join());
+        if(choices[1].o.map(function(x){ return x.value; }).join()!=='mail,gmail,outlook' || !/My default mail app/.test(choices[1].o[0].label)) throw new Error('the e-mail sub-menu: '+JSON.stringify(choices[1].o));
+        // v38.73 — the message carries a link that opens the request (…?linkreq=<the asking household>)
+        if(decodeURIComponent(opened[0]).indexOf('?linkreq=hQ')===-1) throw new Error('the e-mail has no link to the request: '+decodeURIComponent(opened[0]).slice(0,300));
+        // ‹ Back from the sub-menu returns to the ways; Cancel there sends nothing
+        sentTo=[]; choices=[]; await run(['lee@example.com', ''], ['email', ASK_BACK, 'email', null]);
+        if(sentTo.length || choices.length!==4) throw new Error('‹ Back / Cancel in the e-mail sub-menu: '+sentTo.length+' sent, '+choices.length+' windows');
         // 3. Cancel on the last step sends nothing.
         sentTo=[]; await run(['max@example.com', 'x'], [null]);
         if(sentTo.length) throw new Error('Cancel sent it');
         // 4. "My mail app", none opens → the web choices → ‹ Back → Copy: sent ONCE.
         sentTo=[]; window.mailOpened=async function(){ return false; };
-        var picks=['mail', ASK_BACK, 'copy'];
+        var picks=['email', 'mail', ASK_BACK, 'copy'];
         window.askConfirm=async function(o){ return ['ana@example.com', ''][seen.push(o) % 2 === 1 ? 0 : 1]; };
         var n=0; window.askConfirm=async function(){ n++; return n===1 ? 'ana@example.com' : ''; };
         window.askChoice=async function(m, o, op){ choices.push({ m:m, o:o, op:op }); return picks.shift(); };
@@ -7628,6 +7637,27 @@ window.SELF_TESTS = [
         window.mailOpened=async function(){ return true; }; a5=0; window.askChoice=async function(){ a5++; return 'mail'; };
         if(await shareMessage({ to:'kim@example.com', text:'Body' })!=='mail' || a5!==1) throw new Error('a mail program opened, yet webmail was offered');
         if(String(linkLiveStart).indexOf("where('email', '=='")===-1) throw new Error('a request by e-mail does not arrive live');
+        // v38.73 — the link in the e-mail: linked already → said; address unconfirmed → why, and the confirmation offered;
+        // otherwise the Link requests page, and "nothing waiting" when it is not there
+        var realLinks=window.hhLinks, realOpenLR=window.openLinkRequests, realResend=window.resendConfirmation, asked=[];
+        try {
+          window.hhLinks=function(){ return [{ hid:'hZ', name:'Zed Kitchen' }]; };
+          sessionStorage.setItem(LINKREQ_KEY, 'hZ');
+          if(await linkReqFromUrl()!=='linked' || sessionStorage.getItem(LINKREQ_KEY)) throw new Error('a link from a kitchen already linked');
+          window.hhLinks=function(){ return []; };
+          window._fbUser={ uid:'uQ', email:'q@example.com', emailVerified:false };
+          window.askConfirm=async function(o){ asked.push(o.title); return true; }; var resent=0; window.resendConfirmation=async function(){ resent++; };
+          sessionStorage.setItem(LINKREQ_KEY, 'hY');
+          if(await linkReqFromUrl()!=='unconfirmed' || asked[0]!=='Confirm your e-mail address first' || resent!==1) throw new Error('an unconfirmed address: '+JSON.stringify(asked));
+          window._fbUser={ uid:'uQ', email:'q@example.com', emailVerified:true }; var openedLR=0;
+          window.openLinkRequests=async function(){ openedLR++; }; _linkState.pending=[];
+          sessionStorage.setItem(LINKREQ_KEY, 'hY'); asked=[];
+          if(await linkReqFromUrl()!=='shown' || openedLR!==1 || asked[0]!=='No request waiting from them') throw new Error('no request waiting: '+JSON.stringify(asked));
+          _linkState.pending=[{ id:'hY_hQ', d:{ from:'hY' } }]; asked=[];
+          sessionStorage.setItem(LINKREQ_KEY, 'hY');
+          if(await linkReqFromUrl()!=='shown' || openedLR!==2 || asked.length) throw new Error('a waiting request was not simply shown');
+          if(String(renderLinkRequestsPage).indexOf('appear here once that address is confirmed')===-1) throw new Error('the page does not say why e-mailed requests are missing');
+        } finally { window.hhLinks=realLinks; window.openLinkRequests=realOpenLR; window.resendConfirmation=realResend; _linkState.pending=[]; try{ sessionStorage.removeItem(LINKREQ_KEY); }catch(e){} }
       } finally {
         window.askConfirm=real.ask; window.askChoice=real.choice; window.hhSendLinkRequest=real.send; window.hhLoadLinks=real.links; window.householdRenderBar=real.bar;
         window._fbDb=real.db; window._household=real.hh; window._fbUser=real.user; window.toast=real.toast; window.mailOpened=real.opened; window.open=real.open; window.syncLog=real.log;

@@ -653,6 +653,22 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
   Dead code: 20 functions without a caller, most used by tests or kept as console helpers; removed
   `applyLogRetention`, `toggleLinkedFilter`, `toggleOwnFilter` (left from v38.49's chips). **Comments are free again —
   write them; never rely on one at run time or in a test.**
+- **v38.73 — link requests: "Via …", and the e-mail opens the request** (Tony, 21 Oct: "too many buttons on the 'Send the
+  request' modal … a single button … sub menu of the 3 options (My Default Mail App, Gmail, Outlook) … 'Via' … 'Copy
+  message to Clipboard'"; and "Tester2 sent a join request to Tester1 via email … did not arrive at the app's Link
+  Requests … the link in the mail should be a join link"; later "'already tried. Waiting for his reply', while there
+  was still no request in Tester1's requests page"). (1) openConnectHousehold step 3: 📨 Via My Kitchen Notes
+  (recommended) / ✉️ Via Email → a sub-menu (My default mail app, Gmail, Outlook; ‹ Back to the ways) / 💬 Via
+  WhatsApp / (📤 Via another app, phones) / 📋 Copy message to Clipboard — each still sends through the app first.
+  (2) **Why Tester1 saw nothing:** a request by e-mail (linkRequests/<from>:<email>) is read and passed on to the
+  household only by an account whose address is CONFIRMED (rules `verified()`; `hhPassOnLinkRequests`,
+  linkLiveStart's q4) — anyone can make an account with someone else's address. Tester1 is an e-mail+password
+  account (Proton): almost certainly unconfirmed, so the request waited unseen; Tester2's second try hit the same
+  document ("already asked"). Now: the 📬 page tells an unconfirmed account why e-mailed requests are missing, with
+  "Send the confirmation e-mail" (`resendConfirmation`); the message carries `?linkreq=<from hid>`
+  (`captureLinkReq` → sessionStorage `mkn_linkreq` → `linkReqFromUrl()` after hhCheckLinkRequests at the household's
+  load: linked already → said; unconfirmed → why + resend; else the 📬 page, or "No request waiting from them").
+  Help updated. Self-test `link_request_back_and_mail` extended.
 - **Move step 9 finished (20 Oct 2026, 18:05 Israel time; Tony: "OK to delete the 4 + 135 old family documents").**
   clear-source `all` + `shared` (run 39445140837): 139 deleted (households 4, shared 135), the household cut to its
   moved mark; clear-check after it (run 39445361414): recipes-f379d holds 1 document of the moved household (its own,

@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v38.72 -->
+<!-- Tony's Recipes Collection v38.73 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -4731,6 +4731,18 @@ function insFirstVia(search, hash, referrer, here, ua) {
   } catch(e) {}
 })();
 
+// v38.73 — Tony, 21 Oct: "the link in the mail should be a join link, so the household could join by clicking it".
+// The e-mail that tells someone about a link request carries …?linkreq=<the asking household>: kept (they may need to
+// sign in first) and taken out of the address; once their household is open, the request is shown to be answered.
+var LINKREQ_KEY = 'mkn_linkreq';
+(function captureLinkReq() {
+  try {
+    var m = /[?&]linkreq=([A-Za-z0-9]{1,64})(?=&|$)/.exec(location.search);
+    if (!m) return;
+    sessionStorage.setItem(LINKREQ_KEY, m[1]);
+    history.replaceState(null, '', location.pathname + location.search.replace(/([?&])linkreq=[^&]*&?/, '$1').replace(/[?&]$/, '') + location.hash);
+  } catch(e) {}
+})();
 // v37.58 — arrived through someone's share link (…?ref=MKN-…): kept until
 // this person founds a household, and taken out of the address.
 var REF_KEY = 'mkn_ref';
@@ -5178,20 +5190,32 @@ async function openConnectHousehold() {
     // request always goes through the app (that is what they accept); the other ways ALSO tell them, and need it too.
     // Tony chose (17 Oct 2026) that the app never says whether an address has an account: nobody can use it to find
     // out who uses My Kitchen Notes. Cancel here sends nothing.
-    var em = t.toLowerCase(), url = APP_CONFIG.siteOrigin + APP_CONFIG.sitePath;
+    // v38.73 — the message carries a link that opens the request in their app (…?linkreq=<this household>)
+    var em = t.toLowerCase(), url = APP_CONFIG.siteOrigin + APP_CONFIG.sitePath + '?linkreq=' + encodeURIComponent(_household.hid);
     var msg = { to: em, subject: 'Let’s link our kitchens',
       text: 'Hi! I’d like to link our kitchens on My Kitchen Notes, so we can see each other’s recipes.\n\n'
-        + 'Open the app (signed in as ' + em + ') and accept:\n' + url };
-    var opts3 = [{ value: 'app', primary: true, label: '\u{1F4E8} Send via My Kitchen Notes (recommended)',
-      title: 'Use this when the owner of ' + em + ' is already a member of My Kitchen Notes: it pops up in their app. If they are not a member yet, it waits until they join with this address — tell them below as well.' }]
-      .concat(shareOptions(msg).map(function(o){
-        var icon = o.label.split(' ')[0], name = { gmail: 'Gmail', outlook: 'Outlook', mail: 'my mail app', wa: 'WhatsApp', share: 'another app' }[o.value];
-        return { value: o.value, label: o.value === 'copy' ? icon + ' Send, and copy a message for them' : icon + ' Send, and tell them by ' + name,
-          title: 'Sends it through the app, and opens this to tell them too' }; }));
+        + 'Open this link, signed in as ' + em + ', to see the request and accept it:\n' + url };
+    // v38.73 — Tony, 21 Oct: "too many buttons … Instead of the 3 mails (Gmail, Outlook and My mail app) place a single
+    // button … Clicking it will open a sub menu of the 3 options (My Default Mail App, Gmail, Outlook) in that order …
+    // It is sufficient to use 'Via' instead (e.g. Via My Kitchen Notes, Via Email, Via WhatsApp). The Copy message
+    // option should simply say 'Copy message to Clipboard'". Every way still sends the request through the app first.
+    var opts3 = [{ value: 'app', primary: true, label: '\u{1F4E8} Via My Kitchen Notes (recommended)',
+      title: 'Use this when the owner of ' + em + ' is already a member of My Kitchen Notes: it pops up in their app. If they are not a member yet, it waits until they join with this address — tell them below as well.' },
+      { value: 'email', label: '\u2709\uFE0F Via Email', title: 'Sends it through the app, and opens an e-mail to tell them too: your mail app, Gmail or Outlook' },
+      { value: 'wa', label: '\u{1F4AC} Via WhatsApp', title: 'Sends it through the app, and opens WhatsApp to tell them too' }]
+      .concat(navigator.share ? [{ value: 'share', label: '\u{1F4E4} Via another app', title: 'Sends it through the app, and opens your phone\u2019s share menu to tell them too' }] : [])
+      .concat([{ value: 'copy', label: '\u{1F4CB} Copy message to Clipboard', title: 'Sends it through the app, and copies a message (with the link to accept it) to paste wherever you like' }]);
     var how = await askChoice('To ' + em + '.\n\nThrough the app, it pops up for them if they are a member, or waits until they join with that address. Or tell them yourself as well:',
       opts3, { icon: '\u{1F4E8}', title: 'Send the request', backLabel: '‹ Back', cancelLabel: 'Cancel — send nothing' });
     if (how === ASK_BACK) { step = 2; continue; }
     if (!how) { if (!sent) toast('Not sent.', 4000); return sent ? sent.r : null; }
+    if (how === 'email') {
+      how = await askChoice('Tell ' + em + ' by e-mail, with:', [
+        { value: 'mail', label: '\u2709\uFE0F My default mail app' }, { value: 'gmail', label: 'Gmail' }, { value: 'outlook', label: 'Outlook' }],
+        { icon: '\u2709\uFE0F', title: 'Via Email', backLabel: '‹ Back', cancelLabel: 'Cancel — send nothing' });
+      if (how === ASK_BACK) continue;                             // back to the ways
+      if (!how) { if (!sent) toast('Not sent.', 4000); return sent ? sent.r : null; }
+    }
     if (!await connectSend()) { step = 1; continue; }
     if (how === 'app') { toast(sent.r.again ? '⏳ Already asked — waiting for them.' : '\u{1F4E8} Sent through My Kitchen Notes.', 7000); return sent.r; }
     var did = await shareDo(how, msg);
@@ -5391,6 +5415,33 @@ async function hhSetBlocked(other, on) {
   renderLinkRequestsPage();
   return true;
 }
+// v38.73 — arrived from the e-mail about a request (…?linkreq=<hid>): by now it was passed on to this household and
+// asked about (hhCheckLinkRequests). Still waiting → the Link requests page, to answer it there; not there → why.
+async function linkReqFromUrl() {
+  var from = '';
+  try { from = sessionStorage.getItem(LINKREQ_KEY) || ''; } catch(e) {}
+  if (!from || !_household || !window._fbUser) return false;
+  try { sessionStorage.removeItem(LINKREQ_KEY); } catch(e) {}
+  for (var w = 0; w < 300 && document.getElementById('askOverlay'); w++) await wait(200);   // the request's own question first
+  var u = window._fbUser;
+  var linked = hhLinks().filter(function(l){ return l.hid === from; })[0];
+  if (linked) { toast('\u{1F91D} You are linked with ' + hhLinkName(linked) + ' — their recipes are in your list.', 7000); return 'linked'; }
+  if (from === _household.hid) return false;
+  if (u.emailVerified === false) {
+    var go = await askConfirm({ icon: '\u{1F4EC}', title: 'Confirm your e-mail address first',
+      message: 'A request to link kitchens was sent to ' + u.email + '. It shows here once that address is confirmed — open the link in the e-mail we send you, then open this app again.',
+      okLabel: '\u{1F4E8} Send the confirmation e-mail', cancelLabel: 'Not now' });
+    if (go === true && typeof resendConfirmation === 'function') await resendConfirmation();
+    return 'unconfirmed';
+  }
+  await openLinkRequests();
+  if (!_linkState.pending.some(function(r){ return r.d.from === from; }))
+    await askConfirm({ icon: '\u{1F4EC}', title: 'No request waiting from them',
+      message: 'Nothing from that kitchen is waiting for ' + (_household.name || 'your household') + '. It may have been withdrawn or answered already — or sent to another address: you are signed in as ' + u.email + '.',
+      okLabel: 'OK' });
+  return 'shown';
+}
+window.linkReqFromUrl = linkReqFromUrl;
 async function openLinkRequests() {
   if (!_household || !window._fbUser) { toast('Sign in first.', 5000); return null; }
   var prev = document.getElementById('linkReqOverlay'); if (prev) prev.remove();
@@ -5417,6 +5468,11 @@ function renderLinkRequestsPage() {
   var who = function(name, code){ return '<b dir="auto"' + (name || code ? ' data-no-i18n' : '') + '>' + escH(name || code || 'A household') + '</b>' + (code && name ? ' <span data-no-i18n style="color:var(--muted);font-family:ui-monospace,Menlo,monospace;font-size:12px;">' + escH(code) + '</span>' : ''); };
   var h = '<div style="font-size:12.5px;color:var(--muted);line-height:1.5;margin:4px 0 12px;">Households that asked to link kitchens with yours, the ones yours asked, and what became of each.'
     + (manage ? '' : ' The owner or an admin answers them.') + '</div>';
+  // v38.73 — Tony: Tester2 asked Tester1 by e-mail and nothing showed here. A request sent to an e-mail address reaches
+  // only that address once it is CONFIRMED (anyone can type someone else's address into a new account): said here.
+  if (window._fbUser && _fbUser.emailVerified === false)
+    h += '<div style="font-size:12.5px;line-height:1.5;margin:0 0 10px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;color:var(--ink);">\u{1F4EC} Requests sent to <b dir="ltr" data-no-i18n>' + escH(_fbUser.email || '') + '</b> by e-mail appear here once that address is confirmed. '
+      + '<button type="button" onclick="resendConfirmation()" style="' + btn + 'background:var(--card-bg);color:var(--heading);border:1px solid var(--border);margin-top:6px;">\u{1F4E8} Send the confirmation e-mail</button></div>';
   // v37.80 — the switch moved here from ⚙️ (v37.49): requests by identifier, allowed or not.
   var appReq = '\u{1F91D} Link requests through the app: ' + ((_household && _household.appRequests === false) ? 'blocked' : 'allowed');
   h += manage ? '<button type="button" id="appRequestsItem" onclick="toggleAppRequests().then(renderLinkRequestsPage)" title="Whether other households can ask to link with yours through the app, using your identifier. Requests by e-mail always arrive." style="' + btn + 'width:100%;text-align:start;background:var(--card-bg);color:var(--heading);border:1px solid var(--border);margin-bottom:6px;">' + appReq + '</button>'
@@ -6533,7 +6589,7 @@ async function householdUse(hid, role) {
   if (hhLinks().length) hhSetHome();
   householdRenderBar();
   if (typeof renderFilters === 'function' && document.getElementById('filterBar')) try { renderFilters(); } catch(e) {}
-  hhCheckLinkRequests().catch(function(){}).then(function(){ linkLiveStart(); });   // v38.49 — then live
+  hhCheckLinkRequests().catch(function(){}).then(function(){ linkLiveStart(); return linkReqFromUrl(); }).catch(function(){});   // v38.49 — then live; v38.73 — a request's link
   if (typeof fbRepliesCheck === 'function' && !_selfTestRunning) setTimeout(function(){ fbRepliesCheck().catch(function(){}); }, 3000);   // v38.00
   if (typeof applyOwnerOnlyItems === 'function') applyOwnerOnlyItems();
   if (typeof renderAccessMembers === 'function') try { renderAccessMembers(); } catch(e) {}
@@ -8758,7 +8814,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v38.72';
+var APP_VERSION = 'v38.73';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -11805,7 +11861,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.72</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.73</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -11893,7 +11949,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.72</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.73</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -30338,7 +30394,8 @@ var HELP_SYSTEM_PROMPT = [
   "- A new person is asked whether to start their own collection or join one they were invited to (paste the link).",
   "- DURING THE BETA, MY KITCHEN NOTES IS BY INVITATION ONLY: a new kitchen can be started only by someone the app's owner invited, signed in with the very address the invitation was sent to (forwarding the invitation lets nobody else in). Invited at another address? Sign out and sign in with that one.",
   "- To cook together with family or friends, invite them to YOUR kitchen: the 📲 share icon next to the language picker (or ⚙️ → 🏠 My household → 🔗 Invitation link…) makes a link that works for 14 days and lets them in with 👁 Read only; give them more once they have joined. Only the kitchen's owner and its managers can invite. Someone can also be added by e-mail in 👥 Family Access, or ask to join with your kitchen's identifier.",
-  "- LINK WITH ANOTHER HOUSEHOLD: ⋯ More → 🤝 Connect with another household (the owner, or someone with full access). Type that household's identifier (MKN-…; yours is in ⚙️ → 🏠 My household → 🪪 Display my personal identifier) or the e-mail address of anyone in it. Its owner or an admin is asked at once if the app is open (otherwise the next time they open it): Accept, Reject or Remind me later — with the note that came with it. By e-mail address the request also goes through the app — it pops up for that person if they use My Kitchen Notes, or waits until they join with that address (the app never says whether an address has an account); you may also tell them yourself (Gmail, Outlook, your mail app — if none opens, choose your e-mail on the web — WhatsApp, or copy). Every step has ‹ Back, with what you typed kept. A refusal is never shown to the sender.",
+  "- LINK WITH ANOTHER HOUSEHOLD: ⋯ More → 🤝 Connect with another household (the owner, or someone with full access). Type that household's identifier (MKN-…; yours is in ⚙️ → 🏠 My household → 🪪 Display my personal identifier) or the e-mail address of anyone in it. Its owner or an admin is asked at once if the app is open (otherwise the next time they open it): Accept, Reject or Remind me later — with the note that came with it. By e-mail address the request also goes through the app — it pops up for that person if they use My Kitchen Notes, or waits until they join with that address (the app never says whether an address has an account); you may also tell them yourself: Via Email (your default mail app, Gmail or Outlook — if no mail app opens, choose your e-mail on the web), Via WhatsApp, or Copy message to Clipboard. The message has a link that opens the request in their app, to accept it. Every step has ‹ Back, with what you typed kept. A refusal is never shown to the sender.",
+  "- A REQUEST SENT TO YOUR E-MAIL ADDRESS shows in 📬 Link requests only once that address is CONFIRMED (an account made with e-mail and a password must confirm it from the e-mail sent to it). Not confirmed yet? The Link requests page says so and sends the confirmation e-mail again.",
   "- Once linked, each household sees the other's recipes, read-only — and live: a change in their kitchen shows in yours within seconds, the changed card glowing for a moment: after its own in the main list, under that household's name, on a faint blue (hover one: 'A recipe from …'). 🏠 Kitchens ▾ in the filter bar chooses whose recipes show — tick one, several or all. 📥 Save a copy to my recipes makes one your own. Links do not chain: a third household linked to theirs is not seen. Links are listed, and removed, in ⚙️ → 🏠 My household → 👥 Family Access. ⚙️ → 🏠 My household → 🤝 Link requests through the app: blocked stops requests by identifier; requests by e-mail always arrive.",
   "- 📬 LINK REQUESTS: ⚙️ → 🏠 My household → 📬 Link requests — every request in one place: Waiting (Accept / Reject / 🚫 Block), Sent by your household (Withdraw), Linked now (Revoke access), and earlier answers. A request may carry a note, and the two households can write to each other there — the latest message shows, highlighted, with ↩ Reply; earlier ones are under 💬 Conversation. Only the household's name is shown, never a person's. A new message or request arrives while the app is open: a red dot (and a short notice with Open) within seconds, no reload needed. A red dot on ⚙️ leads to anything new. The switch there decides whether other households may ask through the app at all.",
   "- 💬 CHATS WITH LINKED KITCHENS: ⋯ More → 💬 Chats with linked kitchens — or 💬 Chat beside a linked kitchen's name in your recipe list, or in 👥 Family Access. Every conversation, newest first, with what is new; open one to read it all and write (Enter sends, Shift+Enter starts a new line). The same conversations are also on 📬 Link requests. A red dot on ⋯ More and on ⚙️ says something new arrived.",
