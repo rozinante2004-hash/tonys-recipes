@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v38.74` — app. **Worker: v87**, deployed separately and versioned separately
+**Current version:** `v38.76` — app. **Worker: v87**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -687,9 +687,22 @@ a refused request is asked afresh and waits again; 🚫 Block is for good (the r
 requestLog), and the asking side always reads "waiting". One already waiting there makes a request by e-mail redundant:
 it is let go. In rule functions, look at a field only once it is there (`'to' in request.resource.data`): an error on
 the right of `||` refused, in the emulator, what the left allowed.
+A request sent to an e-mail address reaches only an account whose address is CONFIRMED in that copy (each copy —
+family, test, community — confirms its own accounts). The 📬 page says so plainly when it is not ("Your address … is
+NOT confirmed yet — requests sent to it by e-mail cannot reach you until it is"), offers the confirmation e-mail
+(Firebase is asked first: already confirmed → passed on at once), and notices on opening a confirmation done
+meanwhile (fresh token, requests by e-mail passed on, the live listener started). Beside 📬 Link requests in ⚙️:
+"(n)" — the requests waiting for an answer (`#linkReqCount`, a span outside the label's translation key).
 
-**State on 21 Oct 2026 (v38.74, Worker v87):** testers are invited from Sunday 25 Oct; from then on every
-release waits for the owner's yes. Open: WhatsApp (CallMeBot was full), the AI models after the launch, the testing
+**Chats with linked kitchens (v38.49 – v38.76):** `linkTalk/<a>_<b>/messages` (a < b), signed with the kitchen's
+name, read live (onSnapshot per conversation). What is NEW is told by message ids the listener has already
+delivered — never by the list's length: Firestore hands a write to the listener BEFORE add() resolves (with or
+without persistence), so the sender must not push its own message into the list again, and a message from a device
+whose clock is behind sorts before the last one. The listener's first answer redraws an open chat, announcing nothing.
+
+**State on 21 Oct 2026 (v38.76, Worker v87):** testers are invited from Sunday 25 Oct; from then on every
+release waits for the owner's yes. The community app is by invitation only; "Share this App with family" goes back
+to "Share this App" at the official launch. Open: WhatsApp (CallMeBot was full), the AI models after the launch, the testing
 tools' update (Playwright, Ubuntu 26.04) after launch week, a lighter first screen.
 ---
 

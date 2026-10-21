@@ -3,37 +3,64 @@
 Read this before changing anything. It records decisions that are easy to
 accidentally undo, and conventions that keep the app deliverable.
 
-## START HERE — where things stand (13 Oct 2026)
+## START HERE — where things stand (21 Oct 2026, 22:00 Israel time)
 
-Read this section first in a new session. Then read the rest of this file as needed. The long
-history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, newest first.
-`RECONSTRUCTION_PROMPT.md` §1b has the same era as a specification.
+Read this section first in a new session — Tony re-signed in to Claude on 21 Oct, and a new session remembers nothing
+but these files. Then read the rest of this file as needed. The long history is under *Traps* ("WP-D — HOUSEHOLDS")
+and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has the same era as a specification;
+`AUDIT-2026-10-prelaunch.md` has the pre-launch audit and its "Needs Tony" list.
 
 **Setting up a new session**
-1. A cloud session may open in `rozinante2004-hash.github.io` (the site-root repository). Attach
-   `rozinante2004-hash/tonys-recipes` with push access (`add_repo`), clone it to
+1. A cloud session opens in `rozinante2004-hash.github.io` (the site-root repository — nothing to do there). Attach
+   `rozinante2004-hash/tonys-recipes` with push access (`add_repo`, access "push"), clone it to
    `/home/user/tonys-recipes`, then `git checkout test`. All work happens on `test`.
 2. Recreate `/root/.claude/settings.json`: bypassPermissions plus the allow-list (see *Decisions*:
    "Never ask Tony for permission").
-3. Tests, locally:
+3. Tests, locally (last result, v38.76: **403 pass, 0 fail, 7 skipped** on the source AND on the built test copy):
    - Builds: `node tools/build.js live && cmp dist/index.html index.html`, then
-     `SKIP_AUTH_HELPERS=1 node tools/build.js test --out <dir>` (and the same with `beta`).
-   - Self tests: serve each build with `python3 -m http.server <port> --bind 127.0.0.1`. Then run
-     `NODE_PATH=<kit>/node_modules node tests/run-self-tests.js --port <port>`.
-     - The kit: `npm i playwright@1.56.1 axe-core@4.10.2` in a scratch folder. Chromium is
-       preinstalled; never run `playwright install`.
-     - Last result: 365 pass on each of the three builds.
+     `SKIP_AUTH_HELPERS=1 node tools/build.js test` (writes dist/; the test and community copies are built WITHOUT
+     comments — tools/strip-comments.js, proved by `ACORN_PATH=/opt/node22/lib/node_modules/eslint/node_modules/acorn
+     node tools/check-strip.js index.html dist/index.html`).
+   - Self tests: serve with `python3 -m http.server 8137 --bind 127.0.0.1` (the source) and, from dist/, 8139 (the
+     build); then `node tests/run-self-tests.js --port <port>`. Playwright is found at
+     /opt/node22/lib/node_modules/playwright; Chromium is preinstalled — never run `playwright install`.
    - `node tests/worker-cors.mjs` needs no network.
-   - The rules suites and the family-move rehearsal run on the Firebase emulators (Java is
-     installed). Copy the exact steps from `.github/workflows/self-tests.yml`.
+   - Rules suites on the emulator (Java is installed): in a scratch folder `npm i firebase-tools@13
+     @firebase/rules-unit-testing@3 firebase@10`, copy firestore.rules and tests/firestore-households-rules.test.mjs
+     there (tests/ subfolder), then `npx firebase emulators:exec --only firestore --project demo-households "node
+     tests/firestore-households-rules.test.mjs"` (329 checks) — and tests/firestore-rules.test.mjs (35). Household
+     identifiers in a test must avoid I, L, O, U (`MKN-[A-HJKMNP-Z2-9]{4}-…`).
+   - **Never `pkill -f` a pattern that appears in your own command line** — it kills your shell (exit 144).
 4. What this environment can reach:
-   - `gh api` works for this repository: dispatching workflows, reading runs and jobs.
+   - `gh api` works for this repository: workflows, runs, jobs, check-runs, annotations.
    - Job LOGS cannot be read (GitHub's log redirect is blocked). The tools post their summaries as
      `::notice::` annotations; read those instead:
      `gh api repos/rozinante2004-hash/tonys-recipes/check-runs/<job id>/annotations`.
-   - Listing secrets is blocked.
+   - Listing secrets is blocked. The databases' key (FIREBASE_RULES_KEY) is only in GitHub: on 21 Oct a new read-only
+     job over the community copy's link requests and accounts was **refused by the session's safety check** — do not
+     try to get round it; ask Tony for a screenshot or a 🪵 log report instead (that is what found the cause).
    - workers.dev, github.io and mykitchennotes.community are NOT reachable from here, so trust the
      jobs' own live checks. googleapis.com is reachable.
+5. Releasing (scripts — recreate them in the scratchpad; `gh api` must work):
+   ```bash
+   # release-on-green.sh <full sha>: waits for every check on the commit; all green → pushes it to main AND beta
+   SHA=$1; R=repos/rozinante2004-hash/tonys-recipes; cd /home/user/tonys-recipes || exit 3; stable=0
+   for i in $(seq 1 160); do
+     out=$(gh api $R/commits/$SHA/check-runs --jq '.check_runs[] | [.name, .status, (.conclusion // "")] | @tsv' 2>/dev/null)
+     n=$(printf '%s\n' "$out" | grep -c .); pending=$(printf '%s\n' "$out" | awk -F'\t' 'NF && $2!="completed"' | wc -l)
+     if [ "$n" -gt 0 ] && [ "$pending" -eq 0 ]; then stable=$((stable+1)); [ $stable -ge 3 ] && break; else stable=0; fi
+     sleep 30
+   done
+   echo "$out"; bad=$(printf '%s\n' "$out" | awk -F'\t' 'NF && $3!="success" && $3!="skipped" && $3!="neutral"' | wc -l)
+   [ "$pending" -ne 0 ] || [ "$n" -eq 0 ] && { echo "TIMEOUT"; exit 2; }; [ "$bad" -ne 0 ] && { echo "NOT GREEN"; exit 1; }
+   git fetch -q origin main beta; git merge-base --is-ancestor origin/main $SHA && git merge-base --is-ancestor origin/beta $SHA || exit 5
+   git push origin $SHA:refs/heads/main $SHA:refs/heads/beta; echo "RELEASED $SHA at $(TZ=Asia/Jerusalem date '+%d %b %H:%M')"
+   # jobs-on.sh <sha>: after a release, lists every workflow run on it (Pages, Worker, rules, languages, Self Tests)
+   gh api "repos/rozinante2004-hash/tonys-recipes/actions/runs?head_sha=$SHA&per_page=50" \
+     --jq '.workflow_runs[] | [.name, .head_branch, .status, (.conclusion // "")] | @tsv'
+   ```
+   Use the FULL sha (a typo in a short one waits 80 minutes for nothing). `origin/test` moves under you (the
+   languages job commits translations to it): `git fetch origin test && git rebase origin/test` before pushing.
 
 **Tony's standing rules**
 - Permissions: "Please stop asking for permissions. This is slowing the work significantly. The only
@@ -73,7 +100,55 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
   - Record the release here.
 - No model names in commits.
 
-**Where things are now**
+**Where things stand on 21 Oct 2026 (22:00 Israel time) — read this, then "What comes next"**
+- **Live:** the family app (`main`, which forwards to the community app) and the community app (`beta`,
+  https://mykitchennotes.community, Firebase my-kitchen-notes-beta) run **v38.75**, and **v38.76 is on its way**
+  (CI green on 45f3778; the release script was pushing it as the session ended — check with jobs-on, see step 5).
+  **Worker v87.** The test copy (https://tonys-recipes-test.pages.dev, its own database) follows `test`.
+- **The testers go live on Sunday 25 Oct 2026** (Tony: "The plan is to start sending invitations to the testers
+  this Sunday"). The community app is **by invitation only** (Tony switched it, 20 Oct): only addresses invited with
+  ⚙️ → 👑 → ✉️ Invite testers may found a kitchen (rules `invitedTester()`, `testerInvites/<sha256 of the address>`);
+  testers bring family in with their own kitchen's invitation link. The menu says "Share this App with family"
+  while it is by invitation only — **change it back to "Share this App" at the official launch** (Tony: "We will
+  change it back once we launch officially"; `shareAppLabels()`).
+- **What happened on 21 Oct** (each with its own note further down): v38.70 the share labels · v38.71 Bring! on
+  Samsung Internet (an intent link that keeps the list; stores when Bring! is missing) and stale index ids no longer
+  forcing full reads · v38.72 comments stripped from the built copies (2,198 → 1,650 KB) and dead code removed ·
+  v38.73 the link-request window ("Via My Kitchen Notes / Via Email ▸ / Via WhatsApp / Copy message to Clipboard",
+  the e-mail's link opens the request) · v38.74 the rules: a request by e-mail passed on under the name it was asked
+  with; Reject is for that request only (asked again → waiting again), 🚫 Block is for good (Tony confirmed:
+  "A rejection should be applicable only to the request it answers … For that we have the Block/Unblock mechanism")
+  · v38.75 "(n)" waiting beside 📬 Link requests, the "NOT confirmed yet" notice said plainly, a confirmation done
+  meanwhile noticed · v38.76 a chat message arrives the first time (Firestore hands a write to the listener before
+  add() resolves; the app added it twice). **Tester1's request trouble was an UNCONFIRMED address in the community
+  copy** — confirmed 21 Oct, Tester2's request arrived and was accepted.
+
+**What comes next**
+1. **v38.76:** check every job on it (jobs-on), record the release in this file, tell Tony it is out. Then Tony
+   reloads both testers' apps (badge v38.76) and sends ONE message each way: it must arrive the first time (a pop-up
+   within seconds; an open chat redraws at once).
+2. **Releases:** until the testers go live (Sunday 25 Oct), release each version once the local suites and CI are
+   green, without asking, and tell him after. **From Sunday 25 Oct: ask Tony before EVERY release.**
+3. **Reminder — Fri 23 Oct, 09:00 Israel time: try CallMeBot again** (WhatsApp alerts; the bot was full on 20 Oct).
+   The reminder was set in the OLD session; a new session must remind him itself. Steps: AUDIT-2026-10-prelaunch.md
+   "Needs Tony" item 1 (https://www.callmebot.com/blog/free-api-whatsapp-messages/ → contact → "I allow callmebot to
+   send me messages" → secrets WHATSAPP_PHONE and WHATSAPP_KEY at
+   https://github.com/rozinante2004-hash/tonys-recipes/settings/secrets/actions/new → redeploy the Worker → ⚙️ → 👑 →
+   📲 WhatsApp alerts → Send me a test alert). No Telegram (Tony).
+4. **Waiting on Tony's family:** his wife retries Bring! on her Samsung (v38.71's intent link) after reloading; if
+   Samsung Internet still goes to the store: its Settings → Useful features → "Open links in other apps".
+5. **Watch:** the sign-in links (5 a day free on Firebase's plan; 🩺 Server allowances counts them — stay on the free
+   plan unless the counts show 5 is not enough, Tony); Cloudflare Pages builds (500 a month; previews are off); the
+   page size (budget 1,800 KB for what a device downloads; ~1,653 KB built).
+6. **Later:** audit C — Playwright 1.56 → a version with Ubuntu 26.04 browsers, then unpin (NOT the launch week;
+   before GitHub retires 24.04); audit G — a lighter first screen; a look at the AI models after the launch.
+7. **Lessons of 21 Oct:** a notice can be read the opposite way — Tony read "…appear here once that address is
+   confirmed" as "confirmed": say what IS, plainly. Before blaming data, check what the app on the person's screen
+   believes (a screenshot settled it). Firestore raises local writes to listeners before the write's promise
+   resolves — never also push the written document into the same list. A rule function erroring on a missing field
+   on the right of `||` refused (in the emulator) what the left allowed — guard with `'x' in request.resource.data`.
+
+**Where things are now** (the history, 13–21 Oct, oldest first)
 - The family app (`main`) and the community app (`beta`, https://mykitchennotes.community) run
   **v38.29** with **Worker v75** (released 13 Oct; see the release note below): the spare owner key, the
   daily sweep (logs and names go after six months; notes, replies and statistics stay — Tony's correction),
