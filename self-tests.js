@@ -13171,8 +13171,9 @@ window.SELF_TESTS = [
 
       // The importer must actually call the gate before any relay fetch.
       var src = await (await fetch(new URL('index.html?t='+Date.now(), location.href), {cache:'no-store'})).text();
-      var i = src.indexOf('Fall back to browser CORS proxies');
-      var block = src.slice(i, src.indexOf('Extract recipe from page text'));
+      // v38.72 — found by its code, not its comment: the built copies carry no comments
+      var i = src.indexOf("if ((!pageText || pageText.length < 100) && !videoPost) {");
+      var block = i < 0 ? '' : src.slice(i, src.indexOf("if (!pageText || pageText.length < (videoPost === 'facebook' ? 40 : 100))", i));
       if(!block) throw new Error('could not find the relay fallback to check');
       if(block.indexOf('proxyConsent(')===-1)
         throw new Error('the relay fallback does not ask for consent — URLs would leave silently');
@@ -13210,8 +13211,8 @@ window.SELF_TESTS = [
 
         // ...and the importer must not have gone back to innerHTML.
         var src = await (await fetch(new URL('index.html?t='+Date.now(), location.href), {cache:'no-store'})).text();
-        var proxyBlock = src.slice(src.indexOf('Fall back to browser CORS proxies'),
-                                   src.indexOf('Extract recipe from page text'));
+        var pi = src.indexOf("if ((!pageText || pageText.length < 100) && !videoPost) {");   // v38.72 — by its code
+        var proxyBlock = pi < 0 ? '' : src.slice(pi, src.indexOf("if (!pageText || pageText.length < (videoPost === 'facebook' ? 40 : 100))", pi));
         if(!proxyBlock) throw new Error('could not find the CORS-proxy fallback to check');
         // Only the FETCHED html matters here; `res.innerHTML = spinner(...)` in
         // the same block is the app's own markup and is fine.
@@ -13289,7 +13290,24 @@ window.SELF_TESTS = [
       // requests and messages, the chat window, every ✕ kept in view, the Self
       // Test's grinder and locks, the Ginger notice, the repeated-examples
       // clean-up) and the page reached 2104 KB.
-      if(kb > 2200) throw new Error('index.html is '+kb+' KB. The suite itself is NOT inlined — that is '
+      // v38.72 — Tony, 21 Oct: "Where is the 2200 KB limit coming from? If no progress is possible without
+      // overcoming this limitation then please do whatever is required to reduce the size." A third of the page was
+      // comments (712 KB in the scripts alone) — kept in the source, taken out of the community and test copies by
+      // tools/build.js (tools/strip-comments.js, checked against acorn). The budget is now for what a device DOWNLOADS:
+      // the page without its comments (measured here directly on a built copy; on the source, stripped the same way).
+      // 1,647 KB on 21 Oct (438 KB compressed); 1800 leaves room for real features, raised the same way when needed.
+      var lean = src;
+      if (/\n\s*\/\/ /.test(src)) {
+        // loaded as a script of this site (the page's security policy allows no eval)
+        if (!window.MknStrip) await new Promise(function(res, rej){
+          var t = document.createElement('script'); t.src = 'tools/strip-comments.js?t=' + Date.now();
+          t.onload = res; t.onerror = rej; document.head.appendChild(t);
+        }).catch(function(){});
+        if (!window.MknStrip) throw new Error('the page carries its comments and tools/strip-comments.js could not be loaded to measure it without them');
+        lean = window.MknStrip.stripHtml(src);
+      }
+      kb = Math.round(lean.length/1024);
+      if(kb > 1800) throw new Error('index.html is '+kb+' KB without its comments (what a device downloads). The suite itself is NOT inlined — that is '
         + 'checked above — so this is the app growing. Either something large went in that should not '
         + 'have, or the budget needs raising on purpose rather than by accident.');
 

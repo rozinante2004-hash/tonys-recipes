@@ -673,6 +673,11 @@ invitation-only (unless adding to the tester's household)."
 - The database rules are published by the "Publish the database rules" job (deploy-rules.yml) after the rules
   tests pass on the emulator; `tests/firestore-households-rules.test.mjs` covers every may and may not.
 
+**The built copies carry no comments (v38.72):** `tools/build.js` runs `tools/strip-comments.js` (an exact lexer for
+JavaScript, CSS and markup comments) on every copy but the family's, refusing a build whose scripts no longer parse;
+`tools/check-strip.js` proves in CI that the comments found are exactly acorn's. The page budget (1,800 KB) is for what
+a device downloads. Comments stay in the source — never let code or a test depend on one.
+
 **State on 20 Oct 2026 (v38.69, Worker v87):** testers are invited from Sunday 25 Oct; from then on every
 release waits for the owner's yes. Open: WhatsApp (CallMeBot was full), the AI models after the launch, the testing
 tools' update (Playwright, Ubuntu 26.04) after launch week, the page at 2,176 of its 2,200 KB budget.

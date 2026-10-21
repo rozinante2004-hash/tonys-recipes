@@ -124,6 +124,13 @@ jobs:
           node tools/build.js live && cmp dist/index.html index.html
           node tools/build.js test
 
+      # v38.72 — the test and community copies are built without their comments (tools/strip-comments.js). Every
+      # comment the stripper finds must be exactly one a real parser (acorn) finds, and every stripped script must parse.
+      - name: Comments taken out exactly (acorn)
+        run: |
+          npm install --no-save --no-audit --no-fund --prefix "$RUNNER_TEMP/acorn" acorn@8 >/dev/null
+          ACORN_PATH="$RUNNER_TEMP/acorn/node_modules/acorn" node tools/check-strip.js index.html dist/index.html
+
       - name: Run the Self Test suite on the built TEST copy
         run: |
           (cd dist && python3 -m http.server 8139 --bind 127.0.0.1 &)

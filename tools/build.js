@@ -207,6 +207,21 @@ if (overrides.brand && overrides.brand.icons) {
     fs.copyFileSync(path.join(repo, overrides.brand.icons, name), path.join(outDir, 'icons', name));
   }
 }
+// v38.72 — what a device downloads, without the comments (tools/strip-comments.js): the community and test copies
+// lose a quarter of their weight; the family's copy stays the source, byte for byte. Every stripped inline script must
+// still parse, or the build is refused.
+if (envName !== 'live') {
+  const { stripHtml } = require('./strip-comments');
+  const full = fs.readFileSync(path.join(outDir, 'index.html'), 'utf8'), lean = stripHtml(full);
+  const re = /<!--[\s\S]*?-->|(<script\b[^>]*>)([\s\S]*?)<\/script\s*>/gi;
+  let m;
+  while ((m = re.exec(lean))) {
+    if (!m[1] || /\bsrc\s*=/i.test(m[1]) || /\btype\s*=\s*["']?(?!text\/javascript|module)/i.test(m[1])) continue;
+    try { new vm.Script(m[2]); } catch (e) { fail('a script no longer parses once its comments are taken out (' + e.message + ') — see tools/check-strip.js'); }
+  }
+  fs.writeFileSync(path.join(outDir, 'index.html'), lean);
+  console.log('comments taken out: ' + Math.round(Buffer.byteLength(full) / 1024) + ' KB → ' + Math.round(Buffer.byteLength(lean) / 1024) + ' KB');
+}
 // Which build this is, for anyone looking at the deployed files.
 fs.writeFileSync(path.join(outDir, 'build-info.json'), JSON.stringify({
   environment: envName, builtAt: new Date().toISOString(),

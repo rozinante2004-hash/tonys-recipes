@@ -637,6 +637,22 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
   next save. Self-tests `reads_only_what_changed` (absent → adds up, remembered, not asked again, dropped from the
   index; a failed look-up still records nothing), `bring_official_import` (window stays, Samsung intent, stores).
   402 ×3 suites, e2e-sync households, phone, close-in-view, axe, contrast pass. **Page 2,197 KB of 2,200 KB.**
+- **Released: v38.71 (21 Oct 2026, 14:14 Israel time, CI green on bd4878a).** All jobs success.
+- **v38.72 — the page without its comments** (Tony, 21 Oct: "Where is the 2200 KB limit coming from? If no progress is
+  possible without overcoming this limitation then please do whatever is required to reduce the size. Also … scan …
+  for blocks of dead code"). The limit was our own self-test (`selftests_are_a_separate_download`, raised by 100 KB
+  every few weeks since v36.40). A third of the page was comments (712 KB in the scripts, 42 KB CSS, 18 KB markup).
+  **tools/strip-comments.js** — a small exact lexer (strings, template literals with ${}, regular expressions vs
+  division, comments; markup comments skipped before finding scripts — the CSP note mentions "<script>") — and
+  **tools/build.js** strips every non-live copy (the family's stays the source byte for byte; every stripped script
+  must parse or the build is refused): 2,198 KB → 1,647 KB, gzip 658 → 438 KB. **tools/check-strip.js** proves the
+  comment list equals acorn's for every inline script (CI step "Comments taken out exactly (acorn)", acorn@8 in
+  $RUNNER_TEMP). The budget now measures what a device downloads — the page without comments (on the source, the test
+  loads tools/strip-comments.js as a script: the CSP has no unsafe-eval, so `new Function` threw) — at 1,800 KB.
+  Two tests found their code by a comment (`sec_proxy_needs_consent`, `sec_remote_html_is_inert`): now by code.
+  Dead code: 20 functions without a caller, most used by tests or kept as console helpers; removed
+  `applyLogRetention`, `toggleLinkedFilter`, `toggleOwnFilter` (left from v38.49's chips). **Comments are free again —
+  write them; never rely on one at run time or in a test.**
 - **Move step 9 finished (20 Oct 2026, 18:05 Israel time; Tony: "OK to delete the 4 + 135 old family documents").**
   clear-source `all` + `shared` (run 39445140837): 139 deleted (households 4, shared 135), the household cut to its
   moved mark; clear-check after it (run 39445361414): recipes-f379d holds 1 document of the moved household (its own,
