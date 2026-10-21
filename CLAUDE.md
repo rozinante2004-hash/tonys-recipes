@@ -669,6 +669,9 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
   (`captureLinkReq` → sessionStorage `mkn_linkreq` → `linkReqFromUrl()` after hhCheckLinkRequests at the household's
   load: linked already → said; unconfirmed → why + resend; else the 📬 page, or "No request waiting from them").
   Help updated. Self-test `link_request_back_and_mail` extended.
+- **Released: v38.72 (21 Oct 2026, 14:46 Israel time, CI green on 995e761) and v38.73 (14:53, CI green on 3d03f4d).**
+  All jobs success on both, including the new "Comments taken out exactly (acorn)" step and the suite on the
+  comment-free test build.
 - **Move step 9 finished (20 Oct 2026, 18:05 Israel time; Tony: "OK to delete the 4 + 135 old family documents").**
   clear-source `all` + `shared` (run 39445140837): 139 deleted (households 4, shared 135), the household cut to its
   moved mark; clear-check after it (run 39445361414): recipes-f379d holds 1 document of the moved household (its own,
