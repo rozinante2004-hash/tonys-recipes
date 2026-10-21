@@ -693,6 +693,11 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
   rule functions. Rules test: 13 new checks (lena/max/nora, L4/L5; identifiers must avoid I, L, O, U — `MKN-PPPP-5555`);
   self-test `link_request_passed_on_again`. A read-only diagnostic job against the beta was refused by the classifier
   (a workflow holding the database key, running new code over everyone's accounts) — not attempted again.
+- **Released: v38.74 (21 Oct 2026, 15:48 Israel time, CI green on 120df61).** All jobs success: Pages, Cloudflare
+  (beta and test), Self Tests (main and test), languages, and **Publish the database rules** (the new linkRequests
+  rules are live). Waiting on Tony: Tester1 opens the community app (newest version) — Tester2's waiting request by
+  e-mail should then be passed on and pop up; if it does not, check under 📬 → earlier answers whether Tester2's
+  kitchen is 🚫 Blocked (Unblock), and that Tester2 typed exactly the address Tester1 signs in with.
 - **Move step 9 finished (20 Oct 2026, 18:05 Israel time; Tony: "OK to delete the 4 + 135 old family documents").**
   clear-source `all` + `shared` (run 39445140837): 139 deleted (households 4, shared 135), the household cut to its
   moved mark; clear-check after it (run 39445361414): recipes-f379d holds 1 document of the moved household (its own,
