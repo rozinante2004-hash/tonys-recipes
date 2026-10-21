@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v38.75 -->
+<!-- Tony's Recipes Collection v38.76 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -5717,7 +5717,11 @@ async function talkSend(other, given) {
       showServiceError('Your message could not be sent: ' + (e && e.message) + '\n\nIt is still in the box.');
     return false;
   }
-  (_talk[pair] = _talk[pair] || []).push(m);
+  // v38.76 — Tony: "I have to send the same message twice for it to appear in the other's household." Firestore hands
+  // a new message to the live listener at once, BEFORE add() resolves (checked on the emulator); pushing it again made
+  // this list one too long, and the other kitchen's next message then looked like nothing new. Added only if missing.
+  var mine = (_talk[pair] = _talk[pair] || []);
+  if (!m.id || !mine.some(function(x){ return x.id === m.id; })) mine.push(m);
   if (box && given == null) box.value = '';      // v38.50 — sent: not kept in the box by the redraw (v38.49 keeps what is typed)
   talkMarkSeen(other, given != null);
   syncLog('save', 'Wrote to a household about linking', { chars: m.text.length });
@@ -6150,13 +6154,15 @@ function linkLiveTalk() {
     try {
       var q = db.collection('linkTalk').doc(pair).collection('messages').orderBy('at').limit(200);
       if (typeof q.onSnapshot !== 'function') return;
-      var first = true;
+      // v38.76 — what is new is told by the messages' ids, not by how long the list was: a list one too long (see
+      // talkSend), or a message from a device whose clock is behind (the list is in time order), hid the next one.
+      var first = true, known = {};
       _live.talk[pair] = q.onSnapshot(function(snap){
-        var list = [], before = (_talk[pair] || []).length;
-        snap.forEach(function(d){ var m = d.data() || {}; m.id = d.id; list.push(m); });
+        var list = [], fresh = [];
+        snap.forEach(function(d){ var m = d.data() || {}; m.id = d.id; list.push(m); if (!first && !known[d.id]) fresh.push(m); known[d.id] = 1; });
         _talk[pair] = list;
-        if (first) { first = false; linkDotRefresh(); return; }
-        linkLiveTalkArrived(other, list.slice(before));
+        if (first) { first = false; linkLiveTalkArrived(other, []); return; }   // drawn up to date, nothing announced
+        linkLiveTalkArrived(other, fresh);
       }, function(){ delete _live.talk[pair]; });
     } catch(e) {}
   });
@@ -8871,7 +8877,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v38.75';
+var APP_VERSION = 'v38.76';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -11918,7 +11924,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.75</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.76</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -12006,7 +12012,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.75</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.76</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">

@@ -714,6 +714,20 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
   for an answer), nothing when 0. Tony also confirmed the v38.74 rule: "A rejection should be applicable only to the
   request it answers … For that we have the Block/Unblock mechanism". The i18n harvest draws the 📬 page with an
   unconfirmed stand-in so the notice's words are translated. Self-tests extended.
+  **Then Tony: Tester1 confirmed (from the community copy's e-mail) and Tester2's request arrived and was accepted** —
+  the diagnosis held. (Tester1's log: confirmation e-mails sent 16 Oct 16:46/16:50 UTC, never opened.)
+- **v38.76 — chat messages arriving only the second time** (Tony, 21 Oct: "I have to send the same message twice for
+  it to appear in the other's household … waited for about 4 minutes but nothing arrived. Upon clicking Send the
+  second time, it appeared immediately"; both testers' logs show each message written twice). **Checked on the
+  emulator (scratchpad chatprobe/):** Firestore hands a new document to onSnapshot BEFORE add() resolves
+  (pending=true), with or without persistence. `talkSend` then pushed the message into `_talk[pair]` again — the
+  list one too long — and `linkLiveTalk` found what is new by `list.slice(before)` (the old length), so the other
+  kitchen's next message looked like nothing new: no pop-up, no redraw news (only the red dot); the one after it was
+  "said". Also a message from a device whose clock is behind sorts before the last one and was missed the same way.
+  Now: talkSend adds only if the id is not there; the listener tells what is new by ids it has delivered (`known`),
+  and its first answer redraws an open chat/page (nothing announced). Self-test `link_live` extended (an add() that
+  calls the listener first, as Firestore does; a clock behind) — it FAILS on the old code ("my message is in the list
+  twice"), checked.
 - **Move step 9 finished (20 Oct 2026, 18:05 Israel time; Tony: "OK to delete the 4 + 135 old family documents").**
   clear-source `all` + `shared` (run 39445140837): 139 deleted (households 4, shared 135), the household cut to its
   moved mark; clear-check after it (run 39445361414): recipes-f379d holds 1 document of the moved household (its own,

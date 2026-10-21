@@ -7429,7 +7429,7 @@ window.SELF_TESTS = [
       }
     } },
 
-  { id:'link_live', group:'Sharing', name:'⚡ Live, without a reload: a new message lights the red dot and says who wrote; a new request asks at once; a link accepted on the other side is said and brings their recipes (v38.49)',
+  { id:'link_live', group:'Sharing', name:'⚡ Live, without a reload: a new message lights the red dot and says who wrote; a new request asks at once; a link accepted on the other side is said and brings their recipes (v38.49); the answer to a message just sent is said at once — never only the second time (v38.76)',
     test: async()=>{
       var subs={}, toasts=[], checked=0;
       var real={ db:window._fbDb, user:window._fbUser, hh:window._household, toastA:window.toastAction, toast:window.toast, check:window.hhCheckLinkRequests,
@@ -7439,9 +7439,13 @@ window.SELF_TESTS = [
       function listen(key){ return function(f){ subs[key]=f; return function(){ delete subs[key]; }; }; }
       var fake={ collection:function(c){
         if(c==='linkRequests') return { where:function(){ return { onSnapshot:listen('req') }; } };
-        if(c==='linkTalk') return { doc:function(pair){ return { collection:function(){ return { orderBy:function(){ return { limit:function(){ return { onSnapshot:listen('talk:'+pair) }; } }; } }; } }; } };
+        // v38.76 — add() as Firestore does it: the listener hears of the new message BEFORE add() resolves
+        if(c==='linkTalk') return { doc:function(pair){ return { collection:function(){ return { orderBy:function(){ return { limit:function(){ return { onSnapshot:listen('talk:'+pair) }; } }; },
+          add:async function(m){ var x=Object.assign({ id:'own'+(++ownN) }, m); (talkDb[pair]=talkDb[pair]||[]).push(x); if(subs['talk:'+pair]) subs['talk:'+pair](snapIds(talkDb[pair])); await wait(5); return { id:x.id }; } }; } }; } };
         if(c==='households') return { doc:function(h){ return { collection:function(sub){ return { onSnapshot:listen(sub==='recipes' ? 'recipes:'+h : sub), get:async function(){ return snap([]); } }; } }; } };
         return { get:async function(){ return snap([]); } }; } };
+      var talkDb={}, ownN=0;
+      function snapIds(a){ return { forEach:function(f){ a.forEach(function(m){ f({ id:m.id, data:function(){ var c=Object.assign({}, m); delete c.id; return c; } }); }); } }; }
       // v38.52 — a linked kitchen's recipes as the database hands them: { r: <JSON> }, with what changed.
       function rsnap(list, changes){ return { forEach:function(f){ list.forEach(function(x){ f({ id:String(x.id), data:function(){ return { r:JSON.stringify(x), id:x.id }; } }); }); },
         docChanges:function(){ return (changes||[]).map(function(c){ return { type:c[0], doc:{ id:String(c[1]) } }; }); } }; }
@@ -7482,6 +7486,20 @@ window.SELF_TESTS = [
         toasts=[]; subs.links(snap([])); subs.links(snap([{}])); await wait(30);
         if(!toasts.some(function(t){ return /Third Kitchen accepted/.test(t); })) throw new Error('an accepted link is not said: '+JSON.stringify(toasts));
         if(!subs['talk:hL1_hL3']) throw new Error('the new link’s conversation is not listened to');
+        // v38.76 — Tony: "I have to send the same message twice for it to appear in the other's household … Upon clicking
+        // Send the second time, it appeared immediately". Writing to Third Kitchen, then its answer: said at once.
+        var p3='hL1_hL3'; talkDb[p3]=[{ id:'t1', from:'hL3', name:'Third Kitchen', text:'Welcome!', at:Date.now()-5000 }];
+        subs['talk:'+p3](snapIds(talkDb[p3]));                       // the first answer: what is already there
+        var realPriv=window.talkPrivacyOk; window.talkPrivacyOk=async function(){ return true; };
+        try{ if(!await talkSend('hL3', 'Thank you, see you soon')) throw new Error('could not send'); } finally { window.talkPrivacyOk=realPriv; }
+        if((_talk[p3]||[]).filter(function(m){ return m.text==='Thank you, see you soon'; }).length!==1) throw new Error('my message is in the list twice: '+JSON.stringify(_talk[p3]));
+        toasts=[]; talkDb[p3].push({ id:'t2', from:'hL3', name:'Third Kitchen', text:'Great, Sunday then', at:Date.now() });
+        subs['talk:'+p3](snapIds(talkDb[p3]));
+        if(!toasts.some(function(t){ return /Third Kitchen.*Great, Sunday then/.test(t); })) throw new Error('their answer to a message just sent is not said: '+JSON.stringify(toasts));
+        // …and one from a device whose clock is behind (it sorts before mine): said all the same.
+        toasts=[]; talkDb[p3].splice(1, 0, { id:'t3', from:'hL3', name:'Third Kitchen', text:'Bring dessert', at:Date.now()-4000 });
+        subs['talk:'+p3](snapIds(talkDb[p3]));
+        if(!toasts.some(function(t){ return /Bring dessert/.test(t); })) throw new Error('a message from a clock behind is not said: '+JSON.stringify(toasts));
         // One's own accept is not news on one's own screen.
         _live.mine.hL4=Date.now(); window.hhLoadLinks=async function(){ _household.links=_household.links.concat([{ hid:'hL4', name:'Fourth Kitchen', code:'', at:3 }]); return _household.links; };
         toasts=[]; subs.links(snap([{},{}])); await wait(30);
