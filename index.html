@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v38.78 -->
+<!-- Tony's Recipes Collection v38.79 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -9105,7 +9105,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v38.78';
+var APP_VERSION = 'v38.79';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -12152,7 +12152,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.78</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.79</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -12240,7 +12240,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.78</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.79</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -27798,7 +27798,7 @@ window.cancelAutoLogin = cancelAutoLogin;
 // may come, are HIS choice for everyone in every copy (an owner-only window in
 // the family app, kept in i18n/_farm — the app's own words, public to read
 // like the translations); always English, in a British voice (he may change
-// that later); never while someone is typing. Each person can switch them off
+// that later — and did, 21 Oct 2026: Scottish, see farmVoice); never while someone is typing. Each person can switch them off
 // under ⚙️ → 🎨 How it looks (on by default, on this device).
 var FARM_ON_KEY = 'mkn_farm_on', FARM_CFG_KEY = 'mkn_farm_cfg', FARM_DOC = '_farm';
 // How often is Tony's to set too ("Please make the frequency changeable as
@@ -28278,7 +28278,7 @@ function farmPickAnimal() {
   return farmAnimal(ids[Math.floor(Math.random() * ids.length)]) || FARM_ANIMALS[0];
 }
 
-// ── The voice: this device's own British English voice.
+// ── The voice: this device's own Scottish English voice (v38.79), or else its British one.
 // v37.99 — Tony: "Something with the voices is off. It is breaking … add the
 // option to select the voice … Male, Female, Child & Random". v37.93 had pushed
 // the pitch to the browser's top (2) on top of a higher voice — the speech then
@@ -28297,11 +28297,23 @@ function farmVoiceKind(kind) {
   if (kind === 'random') return ['male', 'female', 'child'][Math.floor(Math.random() * 3)];
   return FARM_VOICE_TUNE[kind] ? kind : 'female';
 }
+// v38.79 — Tony, 21 Oct 2026: "Please change the animals' accents from British to Scottish". A Scottish voice where
+// the device has one — Apple's Fiona (iPhone, iPad, Mac), "English (Scotland)" from eSpeak on Linux; Windows and
+// Android have none, so there the British voice stays. Fiona is the only Scottish voice most devices have, so the
+// male and the child speak with it too, deeper or higher (FARM_VOICE_TUNE). The farm window says which voice this
+// device uses. (eSpeak's en-gb-x-gbclan is Lancashire, not Scotland.)
+function farmScottish(v) { return !!v && (/scot/i.test(v.lang || '') || /scot|\bfiona\b/i.test(v.name || '')); }
 var _farmVoices = {};
 function farmVoice(kind) {
   var key = kind === 'male' ? 'male' : 'female';            // a child speaks with the female voice
   if (_farmVoices[key] || !window.speechSynthesis) return _farmVoices[key] || null;
   var vs = speechSynthesis.getVoices() || [];
+  var scots = vs.filter(farmScottish);
+  if (scots.length) {
+    var want = key === 'male' ? /\bmale\b|man\b/i : /fiona|female|woman/i;
+    return (_farmVoices[key] = scots.filter(function(v){ return want.test(v.name); })[0]
+      || scots.filter(function(v){ return /fiona/i.test(v.name); })[0] || scots[0]);
+  }
   var gb = vs.filter(function(v){ return /en[-_]GB/i.test(v.lang); }), en = vs.filter(function(v){ return /^en/i.test(v.lang); });
   var prefer = FARM_VOICE_PREFER[key], found = null;
   [gb, en].forEach(function(list) {
@@ -28322,17 +28334,26 @@ var _farmWarm = false, _farmUtter = null;
 function farmWarm() {
   if (_farmWarm || !window.speechSynthesis || typeof SpeechSynthesisUtterance === 'undefined') return;
   _farmWarm = true;
-  try { farmVoice('female'); var w = new SpeechSynthesisUtterance(' '); w.volume = 0; w.lang = 'en-GB'; speechSynthesis.speak(w); } catch(e) {}
+  try { var fv = farmVoice('female'); var w = new SpeechSynthesisUtterance(' '); w.volume = 0; w.lang = (fv && fv.lang) || 'en-GB'; if (fv) w.voice = fv; speechSynthesis.speak(w); } catch(e) {}
 }
 document.addEventListener('pointerdown', farmWarm, true);
 document.addEventListener('keydown', farmWarm, true);
+// The language an utterance is marked with: the Scottish voice's own (v38.79), else British English.
+function farmUtterLang(v) { return (v && farmScottish(v) && v.lang) || 'en-GB'; }
+// The farm window: which voice THIS device speaks with (v38.79).
+function farmVoiceHereHtml() {
+  var v = null; try { v = farmVoice('female'); } catch(e) {}
+  return '<div class="fv-note" id="farmVoiceHere">On this device: '
+    + (v ? '<b data-no-i18n>' + escH(v.name) + '</b> — ' + (farmScottish(v) ? 'Scottish' : 'British — this device has no Scottish voice')
+         : 'no English voice found yet') + '</div>';
+}
 // kind: male | female | child (already chosen — see farmSay). Each animal keeps
 // a little of its own pitch around the voice's (v37.88), never above 1.8.
 function farmUtterance(text, pitch, kind) {
   var k = FARM_VOICE_TUNE[kind] ? kind : 'female', t = FARM_VOICE_TUNE[k];
   var u = new SpeechSynthesisUtterance(text);
   var v = farmVoice(k); if (v) u.voice = v;
-  u.lang = 'en-GB'; u.rate = t.rate; u.pitch = Math.max(0.55, Math.min(1.8, t.pitch + ((pitch || 1) - 1) * .3));
+  u.lang = farmUtterLang(v); u.rate = t.rate; u.pitch = Math.max(0.55, Math.min(1.8, t.pitch + ((pitch || 1) - 1) * .3));
   return u;
 }
 // voice: male | female | child | random — the farm window's choice by default.
@@ -28634,7 +28655,8 @@ function farmSettingsDraw() {
   ov.innerHTML = '<div class="ask-card fv-card" role="dialog" aria-modal="true" aria-labelledby="farmTitle">'
     + '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><div class="ask-title" id="farmTitle">\u{1F404} The farm visitors</div>'
     + '<button type="button" class="modal-close" style="position:relative;top:auto;right:auto;" aria-label="Close" onclick="document.getElementById(\'farmOverlay\').remove()">✕</button></div>'
-    + '<div class="fv-note">For everyone, in every copy. When someone taps a visiting animal, it says one of the ticked sentences, picked at random, in English with a British voice. Each person can still switch the animals off in ⚙️ → How it looks.</div>'
+    + '<div class="fv-note">For everyone, in every copy. When someone taps a visiting animal, it says one of the ticked sentences, picked at random, in English with a Scottish voice where the device has one (an iPhone, an iPad or a Mac has Fiona), otherwise a British one. Each person can still switch the animals off in ⚙️ → How it looks.</div>'
+    + farmVoiceHereHtml()
     + '<div class="fv-h">What they say</div><div id="farmSayings">' + c.sayings.map(farmSayingRow).join('') + '</div>'
     + '<button type="button" class="fv-add" id="farmAddSaying" onclick="farmAddSaying()">➕ Add a sentence</button>'
     + '<div class="fv-h">How often</div><div class="fv-often">Between <input type="number" id="farmMin" min="1" max="' + FARM_MINUTES_CAP + '" value="' + c.minMinutes + '" aria-label="Shortest wait, in minutes"> and '
@@ -30726,7 +30748,7 @@ var HELP_SYSTEM_PROMPT = [
   "- 📲 The share icon next to the language picker (and ⋯ More → Share this app): while the app takes newcomers by invitation only it is called 'Share this app with family' and invites someone to your kitchen (see the household section) instead of sending the app's link; otherwise it sends a link to the app",
   "",
   "=== THE FARM VISITORS ===",
-  "- Now and then a cartoon farm animal strolls across the screen. Tap it and it turns to you and says something; then, still looking at you, it vanishes in a puff of smoke",
+  "- Now and then a cartoon farm animal strolls across the screen. Tap it and it turns to you and says something — in a Scottish voice where the device has one (an iPhone, an iPad or a Mac has Fiona), otherwise a British one; then, still looking at you, it vanishes in a puff of smoke",
   "- You can pick an animal up and move it (press and drag)",
   "- Switch them off or on: ⚙️ → 🎨 How it looks → 🐑 Farm guests? (this device only)",
   "",

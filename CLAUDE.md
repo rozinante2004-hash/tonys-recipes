@@ -839,6 +839,15 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
   1-to-1, alone). **Privacy statement 1.7 (21 Oct 2026), all 11 languages:** a row "Messages within your household"
   and, under "Your household", who reads which (everyone / only the two), deleted with the household;
   `python3 tools/legal-keys.py` re-keyed. Help and ✨ list updated. Self-test `family_chat`.
+- **v38.79 — the farm animals speak with a Scottish accent** (Tony, 21 Oct: "Please change the animals' accents from
+  British to Scottish"). Browsers can only use the device's own voices: `farmVoice` now prefers a Scottish one —
+  `farmScottish(v)`: lang /scot/ or name /scot|fiona/ (Apple's Fiona on iPhone, iPad and Mac; eSpeak's "English
+  (Scotland)", en-GB-scotland, on Linux; NOT en-gb-x-gbclan, which is Lancashire). Most devices have one Scottish
+  voice (Fiona, female), so male and child use it too, with FARM_VOICE_TUNE's deeper/higher pitch. Windows and Android
+  have none: the British voice stays there. The utterance is marked with the Scottish voice's own lang
+  (`farmUtterLang`). The farm window says which voice THIS device uses ("On this device: Fiona — Scottish", or
+  "British — this device has no Scottish voice"). Help and the farm window's note updated; self-test farm_visitors
+  extended (stand-in voice lists; a plain object cannot be given to an utterance's .voice — test farmUtterLang).
 - **Move step 9 finished (20 Oct 2026, 18:05 Israel time; Tony: "OK to delete the 4 + 135 old family documents").**
   clear-source `all` + `shared` (run 39445140837): 139 deleted (households 4, shared 135), the household cut to its
   moved mark; clear-check after it (run 39445361414): recipes-f379d holds 1 document of the moved household (its own,

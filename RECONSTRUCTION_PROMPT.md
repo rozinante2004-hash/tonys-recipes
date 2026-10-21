@@ -375,7 +375,7 @@ under its plain path only (a `?url=` request goes network-first).
 
 - **The farm visitors** — now and then one of 14 hand-drawn farm animals walks across the app
   (three looks: 3D cartoon, Storybook, Pixel art — the pixel art sampled from the SVG at run time);
-  tapped, it turns, speaks a saying in a British voice (Male / Female / Child / random), then
+  tapped, it turns, speaks a saying in a Scottish voice where the device has one (Apple’s Fiona, eSpeak’s English (Scotland); v38.79), else a British one (Male / Female / Child / random), then
   vanishes in a puff of smoke; it can be grabbed and moved. The owner chooses the sayings, animals,
   look, voice and how often (`i18n/_farm`, read by every copy); everyone has "🐑 Farm guests?" on
   their device. Never while typing, never in a Self Test.

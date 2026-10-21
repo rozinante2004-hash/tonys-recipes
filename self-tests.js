@@ -8939,7 +8939,7 @@ window.SELF_TESTS = [
         if(prev) root.style.setProperty('--top-safe', prev); else root.style.removeProperty('--top-safe');
       }
     }},
-  { id:'farm_visitors', group:'UI', name:'🐑 The farm visitors: one strolls across, turns to you when tapped and says one of the ticked sentences in a British voice, then vanishes in a puff of smoke (v38.19); never while typing; on by default (v37.88)',
+  { id:'farm_visitors', group:'UI', name:'🐑 The farm visitors: one strolls across, turns to you when tapped and says one of the ticked sentences in a Scottish voice (British where the device has none, v38.79), then vanishes in a puff of smoke (v38.19); never while typing; on by default (v37.88)',
     test: async()=>{
       var real={ speak:window.speechSynthesis && speechSynthesis.speak, cfg:localStorage.getItem('mkn_farm_cfg'), on:localStorage.getItem('mkn_farm_on') }, spoken=[];
       var inp=null;
@@ -8968,7 +8968,24 @@ window.SELF_TESTS = [
         // Tapped: it stops, turns, speaks.
         el.click(); await wait(320);
         if(!el.querySelector('.fv-art').classList.contains('turned') || !el.classList.contains('fv-said') || el.querySelector('.fv-bubble').textContent!=='Not yet!') throw new Error('tapping did not turn it to say its sentence');
-        if(window.speechSynthesis && (!spoken.length || spoken[0][0]!=='Not yet!' || spoken[0][1]!=='en-GB')) throw new Error('it did not speak in British English: '+JSON.stringify(spoken));
+        if(window.speechSynthesis && (!spoken.length || spoken[0][0]!=='Not yet!' || !/^en-GB/i.test(spoken[0][1]) && !/scot/i.test(spoken[0][1]))) throw new Error('it did not speak in Scottish or British English: '+JSON.stringify(spoken));
+        // v38.79 — Tony: "Please change the animals' accents from British to Scottish": a Scottish voice is chosen first
+        // wherever the device has one (Apple's Fiona; eSpeak's English (Scotland)) — never Lancashire's gbclan
+        if(window.speechSynthesis){ var realGV=speechSynthesis.getVoices, realFV=Object.assign({}, _farmVoices);
+        try{
+          speechSynthesis.getVoices=function(){ return [{ name:'Google UK English Male', lang:'en-GB' }, { name:'Daniel', lang:'en-GB' },
+            { name:'English (Lancaster)', lang:'en-GB-x-gbclan' }, { name:'Fiona', lang:'en-GB' }]; };
+          _farmVoices={};
+          if(farmVoice('female').name!=='Fiona' || farmVoice('male').name!=='Fiona') throw new Error('Fiona is not chosen: '+farmVoice('female').name+' / '+farmVoice('male').name);
+          speechSynthesis.getVoices=function(){ return [{ name:'Google UK English Male', lang:'en-GB' }, { name:'English (Lancaster)', lang:'en-GB-x-gbclan' }, { name:'English (Scotland)', lang:'en-GB-scotland' }]; };
+          _farmVoices={};
+          if(farmVoice('male').name!=='English (Scotland)') throw new Error('eSpeak\u2019s Scottish voice is not chosen: '+farmVoice('male').name);
+          if(farmUtterLang(farmVoice('male'))!=='en-GB-scotland') throw new Error('the utterance is not marked Scottish English');
+          speechSynthesis.getVoices=function(){ return [{ name:'Google UK English Male', lang:'en-GB' }, { name:'English (Lancaster)', lang:'en-GB-x-gbclan' }]; };
+          _farmVoices={};
+          if(farmVoice('male').name!=='Google UK English Male' || farmUtterLang(farmVoice('male'))!=='en-GB') throw new Error('no Scottish voice: the British one is not kept');
+          if(!/no Scottish voice/.test(farmVoiceHereHtml())) throw new Error('the farm window does not say this device has no Scottish voice');
+        } finally { speechSynthesis.getVoices=realGV; _farmVoices=realFV; } }
         // v37.99 — Tony: the voice was breaking (pitch at the browser's top). Natural pitches now.
         if(window.speechSynthesis && !(spoken[0][2]>=0.55 && spoken[0][2]<=1.8)) throw new Error('the voice is pushed too far: pitch '+spoken[0][2]);
         var stopped=el.getBoundingClientRect().left; await wait(200);
