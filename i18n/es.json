@@ -1,7 +1,7 @@
 {
  "lang": "es",
- "updatedAt": 1792583729276,
- "count": 2335,
+ "updatedAt": 1792607658554,
+ "count": 2336,
  "strings": {
   "\"Add to Home Screen\"": "Añadir a pantalla de inicio",
   "\"Open Bring!\"": "Abrir Bring!",
@@ -1152,6 +1152,7 @@
   "The {1} event(s) recorded all came from the Self Test suite, which fails on purpose to prove the app notices. None of them say anything about how the app is behaving for you.": "Los {1} eventos registrados vienen del conjunto de Self Test, que falla a propósito para demostrar que la app se da cuenta. Ninguno dice nada sobre cómo se está comportando la app para ti.",
   "Their request is refused and nothing more from them reaches you. They are not told: on their side it stays “waiting”. You can unblock them here at any time.": "Su solicitud se rechaza y no te llegará nada más de ellos. No se les avisa: en su lado se queda «en espera». Puedes desbloquearlos aquí cuando quieras.",
   "Their voice": "Su voz",
+  "Then open the link in that e-mail, and come back here.": "Luego abre el enlace de ese correo y vuelve aquí.",
   "Then reload the app": "Luego recarga la app",
   "There are changes on this device not yet sent — sync first, then switch.": "Hay cambios en este dispositivo sin enviar — sincroniza primero y luego cambia.",
   "There are changes on this device not yet sent — sync first.": "Hay cambios en este dispositivo sin enviar — sincroniza primero.",

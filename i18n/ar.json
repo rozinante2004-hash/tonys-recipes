@@ -1,7 +1,7 @@
 {
  "lang": "ar",
- "updatedAt": 1792583729276,
- "count": 2340,
+ "updatedAt": 1792607658554,
+ "count": 2341,
  "strings": {
   "\"Add to Home Screen\"": "إضافة إلى الشاشة الرئيسية",
   "\"Open Bring!\"": "فتح Bring!",
@@ -1154,6 +1154,7 @@
   "The {1} event(s) recorded all came from the Self Test suite, which fails on purpose to prove the app notices. None of them say anything about how the app is behaving for you.": "كل الأحداث المسجَّلة البالغ عددها {1} جاءت من مجموعة الاختبار الذاتي، التي تفشل عمدًا لإثبات أن التطبيق ينتبه لذلك. لا شيء منها يخبرك بشيء عن كيفية عمل التطبيق لديك.",
   "Their request is refused and nothing more from them reaches you. They are not told: on their side it stays “waiting”. You can unblock them here at any time.": "يُرفض طلبهم ولن يصلك منهم شيء بعد الآن. لا يُخبَرون بذلك: يبقى الطلب لديهم على حالة \"قيد الانتظار\". يمكنك إلغاء الحظر عنهم هنا في أي وقت.",
   "Their voice": "صوتهم",
+  "Then open the link in that e-mail, and come back here.": "ثم افتح الرابط الموجود في تلك الرسالة، وارجع إلى هنا.",
   "Then reload the app": "ثم أعد تحميل التطبيق",
   "There are changes on this device not yet sent — sync first, then switch.": "هناك تغييرات على هذا الجهاز لم تُرسَل بعد — زامن أولاً، ثم بدّل.",
   "There are changes on this device not yet sent — sync first.": "هناك تغييرات على هذا الجهاز لم تُرسَل بعد — زامن أولاً.",

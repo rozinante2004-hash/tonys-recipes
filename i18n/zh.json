@@ -1,7 +1,7 @@
 {
  "lang": "zh",
- "updatedAt": 1792583729276,
- "count": 2367,
+ "updatedAt": 1792607658554,
+ "count": 2368,
  "strings": {
   "\"Add to Home Screen\"": "添加到主屏幕",
   "\"Open Bring!\"": "打开 Bring!",
@@ -1159,6 +1159,7 @@
   "The {1} event(s) recorded all came from the Self Test suite, which fails on purpose to prove the app notices. None of them say anything about how the app is behaving for you.": "记录的 {1} 个事件都来自自测套件——它故意制造失败,以验证应用能否察觉。这些事件并不反映应用在你这边的实际运行情况。",
   "Their request is refused and nothing more from them reaches you. They are not told: on their side it stays “waiting”. You can unblock them here at any time.": "他们的请求会被拒绝，之后也不会再收到他们的任何消息。他们不会收到通知：在他们那边会一直显示“等待中”。你可以随时在这里取消屏蔽。",
   "Their voice": "他们的声音",
+  "Then open the link in that e-mail, and come back here.": "然后打开那封邮件里的链接，再回到这里。",
   "Then reload the app": "然后重新加载应用",
   "There are changes on this device not yet sent — sync first, then switch.": "此设备上有尚未发送的更改——请先同步，再切换。",
   "There are changes on this device not yet sent — sync first.": "此设备上有尚未发送的更改——请先同步。",

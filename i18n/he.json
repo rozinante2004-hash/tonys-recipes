@@ -1,7 +1,7 @@
 {
  "lang": "he",
- "updatedAt": 1792583729276,
- "count": 2881,
+ "updatedAt": 1792607658554,
+ "count": 2882,
  "strings": {
   "\"Add to Home Screen\"": "הוספה למסך הבית",
   "\"One item away\" filter ({1}f.{2})": "פילטר \"פריט אחד חסר\" ({1}f.{2})",
@@ -1481,6 +1481,7 @@
   "The {1} event(s) recorded all came from the Self Test suite, which fails on purpose to prove the app notices. None of them say anything about how the app is behaving for you.": "כל {1} האירועים שנרשמו הגיעו מחבילת בדיקת העצמי, שנכשלת בכוונה כדי להוכיח שהאפליקציה שמה לב. אף אחד מהם לא אומר משהו על איך האפליקציה מתנהגת אצלך.",
   "Their request is refused and nothing more from them reaches you. They are not told: on their side it stays “waiting”. You can unblock them here at any time.": "הבקשה שלהם תידחה ושום דבר נוסף מהם לא יגיע אליכם. הם לא יקבלו על כך הודעה: אצלם זה יישאר \"ממתין\". אפשר לבטל את החסימה כאן בכל עת.",
   "Their voice": "הקול שלהם",
+  "Then open the link in that e-mail, and come back here.": "אחר כך פתחו את הקישור במייל הזה, וחזרו לכאן.",
   "Then reload the app": "אחר כך טען/י את האפליקציה מחדש",
   "There are changes on this device not yet sent — sync first, then switch.": "יש שינויים במכשיר הזה שעדיין לא נשלחו — סנכרן קודם, ואז החלף.",
   "There are changes on this device not yet sent — sync first.": "יש שינויים במכשיר הזה שעדיין לא נשלחו — סנכרן קודם.",

@@ -1,7 +1,7 @@
 {
  "lang": "ru",
- "updatedAt": 1792583729276,
- "count": 2671,
+ "updatedAt": 1792607658554,
+ "count": 2672,
  "strings": {
   "\"Add to Home Screen\"": "Добавить на главный экран",
   "\"One item away\" filter ({1}f.{2})": "Фильтр «Не хватает одного» ({1}ф.{2})",
@@ -1407,6 +1407,7 @@
   "The {1} event(s) recorded all came from the Self Test suite, which fails on purpose to prove the app notices. None of them say anything about how the app is behaving for you.": "Все {1} событий записаны из набора самопроверки, который специально ломается, чтобы показать, что приложение это замечает. Они никак не говорят о том, как приложение ведёт себя у вас.",
   "Their request is refused and nothing more from them reaches you. They are not told: on their side it stays “waiting”. You can unblock them here at any time.": "Их запрос отклонён, и больше ничего от них к вам не попадёт. Им ничего не сообщат: на их стороне всё останется «в ожидании». Разблокировать их можно здесь в любой момент.",
   "Their voice": "Их голос",
+  "Then open the link in that e-mail, and come back here.": "Затем откройте ссылку из этого письма и возвращайтесь сюда.",
   "Then reload the app": "Потом перезапустите приложение",
   "There are changes on this device not yet sent — sync first, then switch.": "На этом устройстве есть неотправленные изменения — сначала синхронизируйте, потом переключайтесь.",
   "There are changes on this device not yet sent — sync first.": "На этом устройстве есть неотправленные изменения — сначала синхронизируйте.",

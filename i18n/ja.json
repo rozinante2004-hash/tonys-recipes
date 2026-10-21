@@ -1,7 +1,7 @@
 {
  "lang": "ja",
- "updatedAt": 1792583729276,
- "count": 2681,
+ "updatedAt": 1792607658554,
+ "count": 2682,
  "strings": {
   "\"Add to Home Screen\"": "ホーム画面に追加",
   "\"One item away\" filter ({1}f.{2})": "「あと1品」フィルター（{1}f.{2}）",
@@ -1410,6 +1410,7 @@
   "The {1} event(s) recorded all came from the Self Test suite, which fails on purpose to prove the app notices. None of them say anything about how the app is behaving for you.": "記録された{1}件のイベントはすべて、アプリが検知することを確認するためにわざと失敗するセルフテストスイートによるものです。あなたに対するアプリの動作については何も示していません。",
   "Their request is refused and nothing more from them reaches you. They are not told: on their side it stays “waiting”. You can unblock them here at any time.": "相手のリクエストは拒否され、以後連絡は届きません。相手には通知されず、向こうでは「保留中」のままになります。ここでいつでもブロックを解除できます。",
   "Their voice": "その声",
+  "Then open the link in that e-mail, and come back here.": "そのメールのリンクを開いたら、ここに戻ってきてください。",
   "Then reload the app": "アプリを再読み込みしてください",
   "There are changes on this device not yet sent — sync first, then switch.": "この端末にまだ送信されていない変更があります。先に同期してから切り替えてください。",
   "There are changes on this device not yet sent — sync first.": "この端末にまだ送信されていない変更があります。先に同期してください。",
