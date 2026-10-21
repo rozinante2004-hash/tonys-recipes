@@ -616,6 +616,27 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
   first, and tells someone without the right to invite to ask the owner); his choice: keep both (option 1).
 - **Released: v38.70 (21 Oct 2026, 01:02 Israel time, CI green on db075ef — Tony: "Option 1, keep both and release
   v38.70").** All jobs success (Pages, Cloudflare beta and test, Self Tests on main and test, languages).
+- **v38.71 — Bring! on Samsung; the index's long-deleted ids** (Tony, 21 Oct: his wife's Samsung "insists on going to
+  the App store … she clicks Open … Bring opens, but the list … is already gone", with her log; then "if Bring! is not
+  installed then it will direct them to the Bring installation page in their default App store (or the Bring download
+  page, if they are connecting from a PC)"). (1) **Samsung Internet blocks an https link from opening another app**
+  unless ☰ → Settings → Useful features → "Open links in other apps" is on (Samsung's developer forum: use intent://).
+  `bringLinkFor(link, ua)`: on SamsungBrowser the deeplink goes as `intent://<host/path>#Intent;scheme=https;package=
+  ch.publisheria.bring;S.browser_fallback_url=<the https link>;end` (fallback = the old behaviour; UNTESTED on a real
+  Samsung — her next try tells); the Send to Bring! window now STAYS OPEN with the ticks (#bringStatus: "If Bring!
+  opened without it, press 📲 Open in Bring! again"), #bringSamsungTip (the setting, or Chrome) only on Samsung;
+  the hand-off and its failure are logged ("Handed a list to Bring!" {items, samsung, intent}). (2) `bringGetLink(ua)`:
+  "No Bring! app yet?" → App Store (id580669177) on iPhone/iPad, Google Play (ch.publisheria.bring) on Android,
+  https://getbring.com/en/home on a computer (a web page cannot tell whether an app is installed; Bring!'s own link
+  already opens the store when it is not). (3) **Her log: "Reading only what changed did not add up — reading
+  everything {missing: 23}" on every reopen**: the family kitchen's `state/meta.ids` lists 23 recipes deleted long ago
+  (writeCloudMeta's union: a device still holding a deleted recipe writes it back); v38.65 read each by itself, found
+  no document and gave up — every reopen cost 23 + 63 reads, more than before v38.65. Now an id listed without a
+  document is as the full read sees it (absent), remembered in the sync mark (`mkn_cloud_sync_<hid>`.absent; the full
+  read records them too) and not asked for again, and `writeCloudMeta` drops them from the index on this device's
+  next save. Self-tests `reads_only_what_changed` (absent → adds up, remembered, not asked again, dropped from the
+  index; a failed look-up still records nothing), `bring_official_import` (window stays, Samsung intent, stores).
+  402 ×3 suites, e2e-sync households, phone, close-in-view, axe, contrast pass. **Page 2,197 KB of 2,200 KB.**
 - **Move step 9 finished (20 Oct 2026, 18:05 Israel time; Tony: "OK to delete the 4 + 135 old family documents").**
   clear-source `all` + `shared` (run 39445140837): 139 deleted (households 4, shared 135), the household cut to its
   moved mark; clear-check after it (run 39445361414): recipes-f379d holds 1 document of the moved household (its own,

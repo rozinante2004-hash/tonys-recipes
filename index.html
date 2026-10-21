@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v38.70 -->
+<!-- Tony's Recipes Collection v38.71 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -8765,7 +8765,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v38.70';
+var APP_VERSION = 'v38.71';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -11812,7 +11812,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.70</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.71</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -11900,7 +11900,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.70</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.71</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -13111,6 +13111,11 @@ body.banner-shown .header {
     <div id="bringScaleNote" style="padding:0 20px 6px;font-size:12px;color:var(--terracotta);font-weight:600;"></div>
     <div id="bringCombineNote" class="bring-combine-note" aria-live="polite"></div>
     <div class="bring-ing-list" id="bringIngList"></div>
+    <!-- v38.71 — Samsung Internet sends Bring!'s import link to the store; the way out, said where it happens -->
+    <div id="bringSamsungTip" hidden style="margin:6px 20px 0;font-size:12px;line-height:1.5;color:var(--ink);background:var(--cream,#FDF8F0);border:1px solid var(--border,#E8DDD0);border-radius:8px;padding:8px 10px;">On Samsung Internet, Bring! may open the Galaxy Store or Play Store instead of your list. To fix it once: ☰ menu → Settings → Useful features → turn on <b>Open links in other apps</b>, then press 📲 Open in Bring! again. Or use this app in Chrome.</div>
+    <div id="bringStatus" aria-live="polite" style="margin:6px 20px 0;font-size:12px;line-height:1.5;color:var(--ink);"></div>
+    <!-- v38.71 — Tony: not everyone has Bring! installed; the store for this device, or Bring!'s own page on a computer -->
+    <div style="margin:6px 20px 0;font-size:12px;line-height:1.5;color:var(--muted);"><span id="bringGetIntro">No Bring! app yet?</span> <a id="bringGetLink" target="_blank" rel="noopener noreferrer" style="color:var(--terracotta);font-weight:600;"></a></div>
     <div class="bring-footer">
       <button class="bring-select-all" onclick="bringToggleAll()">Select all</button>
       <button class="bring-cancel-btn" onclick="closeM('bringOverlay')">Cancel</button>
@@ -15218,6 +15223,8 @@ window.i18nBuildPatterns = i18nBuildPatterns; window.i18nMatchPattern = i18nMatc
 // translating a string nobody sees. A `{1}` makes it a shape, matched the same
 // way a built toast is.
 var I18N_EXTRA = [
+  // v38.71 — Send to Bring!: where to get it
+  'Get it from the App Store', 'Get it on Google Play', 'Get Bring! for your phone, or use it on the web',
   // v38.70 — the share labels while the copy is by invitation only
   'Share this app with family', 'Share This App with Family',
   // the long-job panel
@@ -25822,6 +25829,9 @@ async function writeCloudMeta(list, nextIdVal, db) {
     (cur.ids || []).forEach(function(i){ ids[i] = true; });
     list.forEach(function(r){ ids[r.id] = true; });
     Object.keys(_pendingCloudDeletes).forEach(function(i){ delete ids[i]; delete ids[parseInt(i,10)]; });
+    // v38.71 — ids this device found listed without a document (deleted long ago) leave the index
+    if (_cloudLayout === 'households') (cloudSyncMark().absent || []).forEach(function(i){
+      if (!list.some(function(r){ return String(r.id) === String(i); })) { delete ids[i]; delete ids[parseInt(i,10)]; } });
     tx.set(ref, {
       // nextId must never regress — two devices minting the same id would hand
       // two different recipes the same document.
@@ -26005,8 +26015,13 @@ async function incrementalCloudLoad(meta, offlineQueued, db) {
   var cloudIds = {}, heldIds = {};
   meta.ids.forEach(function(i){ cloudIds[String(i)] = true; });
   recipes.forEach(function(r){ heldIds[String(r.id)] = true; });
+  // v38.71 — the index keeps ids of recipes deleted long ago (the family's kitchen: 23 of them — a device that still
+  // held a deleted recipe wrote it back into the union). Their documents are gone, so the full read never sees them
+  // either; once found absent they are remembered (mark.absent) and not asked for again.
+  var absent = {};
+  (Array.isArray(mark.absent) ? mark.absent : []).forEach(function(i){ absent[String(i)] = true; });
   // Listed there, held nowhere here and not just read — and any recipe in conflict: read each by itself.
-  var oneByOne = Object.keys(cloudIds).filter(function(i){ return !heldIds[i] && !got[i]; });
+  var oneByOne = Object.keys(cloudIds).filter(function(i){ return !heldIds[i] && !got[i] && !absent[i]; });
   Object.keys(_conflictIds).forEach(function(i){ if (cloudIds[String(i)] && !got[String(i)] && oneByOne.indexOf(String(i)) === -1) oneByOne.push(String(i)); });
   // Held here, not listed there: gone only if its document really is.
   var maybeGone = Object.keys(heldIds).filter(function(i){ return !cloudIds[i] && !got[i]; });
@@ -26015,6 +26030,7 @@ async function incrementalCloudLoad(meta, offlineQueued, db) {
   for (var a = 0; a < oneByOne.length; a++) {
     var s1 = await cloudDoc(recipeDocId(oneByOne[a]), db).get(); reads++;
     if (s1.exists) got[oneByOne[a]] = { id: recipeDocId(oneByOne[a]), data: s1.data() };
+    else absent[oneByOne[a]] = true;   // v38.71 — listed, but no document: as the full read would find it
   }
   for (var b = 0; b < maybeGone.length; b++) {
     var s2 = await cloudDoc(recipeDocId(maybeGone[b]), db).get(); reads++;
@@ -26028,7 +26044,7 @@ async function incrementalCloudLoad(meta, offlineQueued, db) {
   var willHave = {};
   Object.keys(heldIds).forEach(function(i){ if (gone.indexOf(i) === -1) willHave[i] = true; });
   Object.keys(got).forEach(function(i){ willHave[i] = true; });
-  var short = Object.keys(cloudIds).filter(function(i){ return !willHave[i] && !_cloudUnreadable[i] && !_cloudUnreadable[+i]; });
+  var short = Object.keys(cloudIds).filter(function(i){ return !willHave[i] && !absent[i] && !_cloudUnreadable[i] && !_cloudUnreadable[+i]; });
   if (short.length) { syncLog('load', 'Reading only what changed did not add up — reading everything', { missing: short.length }); return null; }
   var docs = Object.keys(got).map(function(k){ return got[k]; });
   var list = migrateRecipes(parseCloudRecipeDocs(docs, { partial: true }));
@@ -26062,7 +26078,8 @@ async function incrementalCloudLoad(meta, offlineQueued, db) {
   recipes = next;
   noteCloudIdsFromMeta(meta);
   saveCloudBase();
-  setCloudSyncMark({ at: Math.max(mark.at || 0, _cloudSyncedMax), fullAt: mark.fullAt });
+  setCloudSyncMark({ at: Math.max(mark.at || 0, _cloudSyncedMax), fullAt: mark.fullAt,
+    absent: Object.keys(absent).filter(function(i){ return cloudIds[i] && !got[i]; }) });   // v38.71 — while still listed
   syncLog('load', 'Read ' + list.length + ' changed recipe(s) from the cloud, ' + gone.length + ' gone', { reads: reads, recovered: recovered });
   return { changed: list.length, gone: gone.length, reads: reads, recovered: recovered };
 }
@@ -26501,7 +26518,12 @@ async function _loadFromFirestoreInner(user) {
         countCloudRead(docs.length);
         fsRecipes = parseCloudRecipeDocs(docs);
         cloudNextId = meta.nextId || 0;
-        if (_cloudLayout === 'households' && _cloudHid) setCloudSyncMark({ at: _cloudSyncedMax, fullAt: Date.now() });   // v38.65
+        if (_cloudLayout === 'households' && _cloudHid) {
+          // v38.71 — and which ids the index lists without a document (not asked for again by the next partial read)
+          var seen = {}; docs.forEach(function(d){ seen[String(d.id || '').replace(/^recipe_/, '')] = true; });
+          setCloudSyncMark({ at: _cloudSyncedMax, fullAt: Date.now(),
+            absent: (meta.ids || []).map(String).filter(function(i){ return !seen[i] && !_cloudUnreadable[i] && !_cloudUnreadable[+i]; }) });   // v38.65
+        }
       }
     }
 
@@ -30260,6 +30282,8 @@ var HELP_SYSTEM_PROMPT = [
   "- Open a recipe → tap 🛒 Send to Bring!",
   "- Select which ingredients to send (all checked by default)",
   "- Tap 📲 Open in Bring! — Bring!'s own page opens with those ingredients; choose your list there",
+  "- NO BRING! APP YET? The Send to Bring! window links to it: the App Store on an iPhone or iPad, Google Play on Android, Bring!'s own page on a computer (its phone apps, and Bring! on the web). On a phone without Bring!, 📲 Open in Bring! itself goes to the store",
+  "- SAMSUNG PHONES (Samsung Internet): Bring! may open the Galaxy Store or Play Store instead of the list, and opening Bring! from there loses it. Fix it once: Samsung Internet's ☰ menu → Settings → Useful features → turn on 'Open links in other apps'; or use the app in Chrome. The Send to Bring! window stays open with the ingredients still ticked, so 📲 Open in Bring! can simply be pressed again",
   "",
   "=== FAVOURITES & CLIPS ===",
   "- Tap the ❤ heart on any recipe card to favourite it",
@@ -33996,6 +34020,11 @@ function openBringModal(recipeId) {
   _bringRecipeId = recipeId;
   var r = findRecipeRef(recipeId);
   if (!r) return;
+  // v38.71 — a fresh window: no word from the last hand-off; the Samsung tip only where it applies
+  var bst = document.getElementById('bringStatus'); if (bst) bst.textContent = '';
+  var btip = document.getElementById('bringSamsungTip'); if (btip) btip.hidden = !bringIsSamsung();
+  var bget = document.getElementById('bringGetLink'), gl = bringGetLink();
+  if (bget) { bget.href = gl.href; if (bget.textContent !== gl.label) bget.textContent = gl.label; }
   // Use the scale (×N) and unit (metric/imperial) currently set in the recipe view —
   // Send to Bring! is only reachable from there, so they describe this exact recipe.
   // Falls back to ×1 metric if called any other way (defensive, e.g. future call sites).
@@ -34179,6 +34208,31 @@ function bringConfirmSend() {
 // link points Bring!'s servers at that page, and the person's own Bring! app
 // opens with the ingredients ready to add to whichever list they choose. No
 // token, no bookmarklet, no list id — it works for anyone with Bring!.
+// v38.71 — Tony, 21 Oct: his wife's Samsung phone "insists on going to the App store and asking her to install it (it
+// is already installed). In the App store she clicks Open … and Bring opens, but the list she was planning to export
+// to it is already gone." Samsung Internet blocks a web link from opening another app ("use the intent:// scheme" —
+// Samsung's developer forum) unless "Open links in other apps" is on. There the link goes as an Android intent for
+// Bring!'s own app (ch.publisheria.bring), with the web link as its fallback (exactly what happened before); the
+// window stays open with the ingredients still ticked, says what to do, and the hand-off is in the log.
+function bringIsSamsung(ua) { return /SamsungBrowser\//.test(String(ua == null ? navigator.userAgent : ua)); }
+function bringLinkFor(link, ua) {
+  if (!bringIsSamsung(ua) || !/^https:\/\//.test(link)) return link;
+  return 'intent://' + link.replace(/^https:\/\//, '') + '#Intent;scheme=https;package=ch.publisheria.bring;S.browser_fallback_url='
+    + encodeURIComponent(link) + ';end';
+}
+// v38.71 — Tony, 21 Oct: "if Bring! is not installed then it will direct them to the Bring installation page in their
+// default App store (or the Bring download page, if they are connecting from a PC)". A web page cannot tell whether an
+// app is installed; Bring!'s own link already opens the store when it is not. The window also offers the store for
+// this device: the App Store on an iPhone or iPad, Google Play on Android, Bring!'s own page on a computer (its phone
+// apps and Bring! on the web).
+function bringGetLink(ua) {
+  ua = String(ua == null ? navigator.userAgent : ua);
+  var ios = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && typeof navigator !== 'undefined' && navigator.maxTouchPoints > 1 && ua === navigator.userAgent);
+  if (ios) return { href: 'https://apps.apple.com/app/id580669177', label: 'Get it from the App Store' };
+  if (/Android/.test(ua)) return { href: 'https://play.google.com/store/apps/details?id=ch.publisheria.bring', label: 'Get it on Google Play' };
+  return { href: 'https://getbring.com/en/home', label: 'Get Bring! for your phone, or use it on the web' };
+}
+window.bringIsSamsung = bringIsSamsung; window.bringLinkFor = bringLinkFor; window.bringGetLink = bringGetLink;
 async function bringOpenImport() {
   if (!featureOn('bring')) return featureOffNotice('bring');
   var r = findRecipeRef(_bringRecipeId);
@@ -34197,13 +34251,19 @@ async function bringOpenImport() {
       body: workerBody({ action: 'bring-recipe-page', name: r.name, ingredients: lines, servings: r.servings || '' }) });
     var data = await resp.json();
     if (!resp.ok || !data.deeplink) throw new Error(data.error || ('the server answered ' + resp.status));
-    closeM('bringOverlay');
-    if (win) win.location.href = data.deeplink; else window.open(data.deeplink, '_blank');
+    var link = bringLinkFor(data.deeplink);
+    if (win) win.location.href = link; else window.open(link, '_blank');
+    // v38.71 — the window stays, the ticks too: if Bring! did not get the list, one more press sends it again
+    var st = document.getElementById('bringStatus');
+    if (st) st.textContent = '\u{1F4F2} Sent to Bring! \u2014 choose the list there. If Bring! opened without it, press \u{1F4F2} Open in Bring! again'
+      + (bringIsSamsung() ? ' (and see the tip above).' : '.');
     toast('\u{1F4F2} Opening Bring! \u2014 choose the list there', 7000);
+    syncLog('save', 'Handed a list to Bring!', { items: lines.length, samsung: bringIsSamsung(), intent: link !== data.deeplink });
     return data;
   } catch(e) {
     try { if (win) win.close(); } catch(e2) {}
     toast('\u274c Could not hand the list to Bring!: ' + (e && e.message ? e.message : e), 9000);
+    syncLog('error', 'Could not hand a list to Bring!', String((e && e.message) || e).slice(0, 200));
     return null;
   }
 }

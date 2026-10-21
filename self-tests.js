@@ -4758,7 +4758,7 @@ window.SELF_TESTS = [
       if(String(i18nIndexFetch).indexOf('i18nCentralIndex')===-1) throw new Error('the language picker does not list the central languages');
     } },
 
-  { id:'bring_official_import', group:'Features', name:'Bring!\u2019s own import: the chosen lines go to Bring!, no token (v36.89)',
+  { id:'bring_official_import', group:'Features', name:'Bring!\u2019s own import: the chosen lines go to Bring!, no token (v36.89); the window stays with them, and Samsung Internet gets an Android intent with the web link as fallback (v38.71)',
     test: async()=>{
       if(typeof bringOpenImport!=='function') throw new Error('bringOpenImport not defined');
       var fix=normalizeRecipe({ id:888986, name:'Bring test soup', servings:'4', ingredients:[{a:'2',n:'onions'},{a:'1 l',n:'water'},{a:'',n:'salt'}], steps:['x'] });
@@ -4781,6 +4781,23 @@ window.SELF_TESTS = [
         if(opened[0]!==''||fakeWin.location.href.indexOf('https://api.getbring.com/rest/bringrecipes/deeplink?')!==0)
           throw new Error('Bring!\u2019s link was not opened in a window made inside the tap: '+JSON.stringify(opened)+' '+fakeWin.location.href);
         if(!r) throw new Error('the call reported failure');
+        // v38.71 — the window stays, the ingredients still ticked, saying to press again if Bring! opened without them
+        if(!document.getElementById('bringOverlay').classList.contains('open')) throw new Error('the window closed: the list is gone if Bring! does not get it');
+        if(!/press 📲 Open in Bring! again/.test(document.getElementById('bringStatus').textContent)) throw new Error('nothing says what to do if Bring! opened without the list');
+        // Samsung Internet: an Android intent for Bring!'s own app, with the web link as its fallback
+        var SAM='Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/30.0 Chrome/143.0.0.0 Mobile Safari/537.36';
+        var dl='https://api.getbring.com/rest/bringrecipes/deeplink?url=https%3A%2F%2Fw.test%2Fbring-recipe%2Fab&source=web', il=bringLinkFor(dl, SAM);
+        if(il!=='intent://api.getbring.com/rest/bringrecipes/deeplink?url=https%3A%2F%2Fw.test%2Fbring-recipe%2Fab&source=web#Intent;scheme=https;package=ch.publisheria.bring;S.browser_fallback_url='+encodeURIComponent(dl)+';end')
+          throw new Error('Samsung\u2019s link: '+il);
+        if(bringLinkFor(dl, 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Mobile Safari/537.36')!==dl) throw new Error('Chrome\u2019s link was changed');
+        if(!bringIsSamsung(SAM) || bringIsSamsung('Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Mobile/15E148 Safari/604.1')) throw new Error('which browser is Samsung\u2019s');
+        // v38.71 — where to get Bring!: this device's store, or Bring!'s own page on a computer
+        var gi=bringGetLink('Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Mobile/15E148 Safari/604.1'), ga=bringGetLink(SAM), gd=bringGetLink('Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36');
+        if(gi.href!=='https://apps.apple.com/app/id580669177' || ga.href!=='https://play.google.com/store/apps/details?id=ch.publisheria.bring' || gd.href!=='https://getbring.com/en/home') throw new Error('the stores: '+[gi.href, ga.href, gd.href].join(' | '));
+        var gl=document.getElementById('bringGetLink');
+        if(!gl || gl.getAttribute('href')!==bringGetLink().href || !gl.textContent || gl.getAttribute('target')!=='_blank') throw new Error('the window does not offer where to get Bring!');
+        var tip=document.getElementById('bringSamsungTip');
+        if(!tip || tip.hidden!==!bringIsSamsung() || !/Open links in other apps/.test(tip.textContent)) throw new Error('the Samsung tip');
       } finally {
         recipes=realR; window.fetch=realFetch; window.open=realOpen; window.toast=realToast;
         Object.keys(_featureOverride).forEach(function(k){ delete _featureOverride[k]; }); Object.assign(_featureOverride, wasOver); applyFeatureFlags();
@@ -7986,10 +8003,26 @@ window.SELF_TESTS = [
         setup(); store.recipes['3']=doc(3,'Three',T0,3000);
         r=await incrementalCloudLoad(meta, false, fakeDb);
         if(!r || r.gone!==0 || !recipes.some(function(x){ return x.id===3; })) throw new Error('a recipe the index left out but the cloud still holds was taken away');
-        // listed but nowhere: it does not add up → everything is read instead (null), nothing changed here
+        // v38.71 — listed in the index but no document anywhere (the family's kitchen: 23 deleted long ago): the full read
+        // would not find it either, so it adds up — remembered as absent and not asked for again
         setup(); var m2=Object.assign({}, meta, { ids:[1,2,4,9] });
         r=await incrementalCloudLoad(m2, false, fakeDb);
-        if(r!==null || recipes.length!==3 || recipes[0].name!=='One') throw new Error('a recipe the index lists but nobody holds: '+JSON.stringify(r));
+        if(!r || r.changed!==2 || getsOne.filter(function(g){ return g==='recipes/9'; }).length!==1) throw new Error('a recipe the index lists but nobody holds: '+JSON.stringify([r, getsOne]));
+        if((cloudSyncMark().absent||[]).join()!=='9') throw new Error('not remembered as absent: '+JSON.stringify(cloudSyncMark()));
+        getsOne=[]; store.recipes['1'].syncedAt=TS.fromMillis(9000);
+        r=await incrementalCloudLoad(m2, false, fakeDb);
+        if(!r || getsOne.indexOf('recipes/9')!==-1) throw new Error('an id known to have no document was asked for again: '+JSON.stringify(getsOne));
+        // …and it leaves the index with this device's next save
+        var written=null, txDb={ collection:fakeDb.collection, runTransaction:async function(fn){ return fn({ get:async function(){ return { exists:true, data:function(){ return { ids:[1,2,4,9], nextId:10 }; } }; }, set:function(ref, d){ written=d; } }); } };
+        await writeCloudMeta(recipes, 10, txDb);
+        if(!written || written.ids.indexOf(9)!==-1 || written.ids.indexOf(4)===-1) throw new Error('the index kept the absent id: '+JSON.stringify(written));
+        // a failure part-way records nothing: the full read takes over with the versions held untouched
+        setup();
+        var m3=Object.assign({}, meta, { ids:[1,2,4,5] }), threw=false;
+        var colApiReal=colApi; colApi=function(c){ var o=colApiReal(c), d0=o.doc; o.doc=function(id){ if(String(id)==='5') return { get:async function(){ throw new Error('unavailable'); } }; return d0(id); }; return o; };
+        try { await incrementalCloudLoad(m3, false, fakeDb); } catch(e) { threw=true; }
+        colApi=colApiReal;
+        if(!threw) throw new Error('a failed look-up was not passed on (the full read must take over)');
         if(_cloudRecipeBase[1]!==T0-3*H || 4 in _cloudRecipeBase) throw new Error('giving up still recorded the newer versions (an older copy could then be written over them): '+JSON.stringify(_cloudRecipeBase));
         // the full read is used: a day since the last, unsent changes here, no mark, another layout
         setup(); setCloudSyncMark({ at:5000, fullAt:Date.now() - 25*3600e3 });
