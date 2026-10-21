@@ -698,6 +698,22 @@ history of the household era is the bullet "WP-D — HOUSEHOLDS" under *Traps*, 
   rules are live). Waiting on Tony: Tester1 opens the community app (newest version) — Tester2's waiting request by
   e-mail should then be passed on and pop up; if it does not, check under 📬 → earlier answers whether Tester2's
   kitchen is 🚫 Blocked (Unblock), and that Tester2 typed exactly the address Tester1 signs in with.
+- **v38.75 — Tony's screenshot of Tester1's 📬 page settled it: the notice "Requests sent to … by e-mail appear here
+  once that address is confirmed" was ON — it shows only when Firebase says the address is NOT confirmed (the app
+  reloads the user at every sign-in, householdEnter). Tony read it as "confirmed"** ("I see 'that address is
+  confirmed'"; "I can see the confirmation request in its mailbox" — a mail sent, not proof its link was opened, nor
+  that it came from the community copy: each copy confirms its own accounts). So for Tester1 on the community copy,
+  hhPassOnLinkRequests stopped at `emailVerified === false` (v38.74's rule fixes are real but were not what stopped
+  this one). Now: the notice reads "⚠️ Your address … is NOT confirmed yet — requests sent to it by e-mail cannot
+  reach you until it is", red border, "Then open the link in that e-mail, and come back here"; its button
+  (`linkReqConfirm`) asks Firebase first (resendConfirmation) — already confirmed → `linkAfterConfirmed()` (fresh token,
+  hhPassOnLinkRequests, live listeners restarted so q4 attaches) and the page again; `openLinkRequests` reloads an
+  unconfirmed user first and does the same when it turns out confirmed (no app reload needed). Tony: "add next to the
+  'Link Requests' menu item the number of waiting requests (in brackets)" → `#linkReqCount` (a data-no-i18n span, so
+  the label's translation key is unchanged), `linkCountShow()` from `linkDotRefresh()` = _linkState.pending (Waiting
+  for an answer), nothing when 0. Tony also confirmed the v38.74 rule: "A rejection should be applicable only to the
+  request it answers … For that we have the Block/Unblock mechanism". The i18n harvest draws the 📬 page with an
+  unconfirmed stand-in so the notice's words are translated. Self-tests extended.
 - **Move step 9 finished (20 Oct 2026, 18:05 Israel time; Tony: "OK to delete the 4 + 135 old family documents").**
   clear-source `all` + `shared` (run 39445140837): 139 deleted (households 4, shared 135), the household cut to its
   moved mark; clear-check after it (run 39445361414): recipes-f379d holds 1 document of the moved household (its own,

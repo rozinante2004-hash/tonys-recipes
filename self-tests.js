@@ -7656,7 +7656,7 @@ window.SELF_TESTS = [
           _linkState.pending=[{ id:'hY_hQ', d:{ from:'hY' } }]; asked=[];
           sessionStorage.setItem(LINKREQ_KEY, 'hY');
           if(await linkReqFromUrl()!=='shown' || openedLR!==2 || asked.length) throw new Error('a waiting request was not simply shown');
-          if(String(renderLinkRequestsPage).indexOf('appear here once that address is confirmed')===-1) throw new Error('the page does not say why e-mailed requests are missing');
+          if(String(renderLinkRequestsPage).indexOf('is NOT confirmed yet')===-1) throw new Error('the page does not say why e-mailed requests are missing');
         } finally { window.hhLinks=realLinks; window.openLinkRequests=realOpenLR; window.resendConfirmation=realResend; _linkState.pending=[]; try{ sessionStorage.removeItem(LINKREQ_KEY); }catch(e){} }
       } finally {
         window.askConfirm=real.ask; window.askChoice=real.choice; window.hhSendLinkRequest=real.send; window.hhLoadLinks=real.links; window.householdRenderBar=real.bar;
@@ -7666,7 +7666,7 @@ window.SELF_TESTS = [
       }
     } },
 
-  { id:'link_request_passed_on_again', group:'Sharing', name:'🤝 A request by e-mail reaches the kitchen asked although an earlier one from the same kitchen was refused (it is asked afresh, waiting again — not after a block); one already waiting there is enough; asking again by identifier after a refusal works the same way, and a blocked one still reads "waiting"; a request asked afresh is NEW again (v38.74)',
+  { id:'link_request_passed_on_again', group:'Sharing', name:'🤝 A request by e-mail reaches the kitchen asked although an earlier one from the same kitchen was refused (it is asked afresh, waiting again — not after a block); one already waiting there is enough; asking again by identifier after a refusal works the same way, and a blocked one still reads "waiting"; a request asked afresh is NEW again (v38.74); (n) waiting beside 📬 Link requests, the page says plainly when the address is NOT confirmed, and notices a confirmation done meanwhile (v38.75)',
     test: async()=>{
       // Tony, 21 Oct 2026: Tester2 asked Tester1 by e-mail; nothing reached Tester1, and asking again said "Already
       // asked — waiting for them". (The other half — a kitchen renamed since it asked — is the rules': tested there.)
@@ -7734,8 +7734,33 @@ window.SELF_TESTS = [
         // 6. A request asked afresh is NEW again on the page and the red dots; one seen before v38.74 (a bare id) stays seen.
         var rq={ id:'hA_hB', d:{ at:9 } };
         if(linkIsSeen(['hA_hB@5'], rq) || !linkIsSeen(['hA_hB@9'], rq) || !linkIsSeen(['hA_hB'], rq)) throw new Error('seen or not, by id and time');
+        // 7. v38.75 — Tony: "add next to the 'Link Requests' menu item the number of waiting requests (in brackets)".
+        var lsWas=_linkState;
+        try{
+          _household={ hid:'hB', role:'owner', name:'Kitchen B', code:'MKN-BBBB-3333', links:[] };
+          _linkState={ loadedFor:'hB', pending:[{ id:'hA_hB', d:{ at:1 } }, { id:'hC_hB', d:{ at:2 } }], declined:[], log:{} };
+          linkDotRefresh();
+          var cnt=document.getElementById('linkReqCount'), item=document.getElementById('linkRequestsItem');
+          if(!cnt || cnt.textContent!=='\u00a0(2)' || !item || item.textContent.indexOf('Link requests')===-1) throw new Error('no (2) beside Link requests: '+(item && item.textContent));
+          _linkState.pending=[]; linkDotRefresh();
+          if(cnt.textContent!=='') throw new Error('a count with nothing waiting: '+cnt.textContent);
+          // 8. Tony read "…appear here once that address is confirmed" as "confirmed": now it says NOT confirmed, plainly.
+          var lb=document.createElement('div'); lb.id='lrBody'; lb.style.display='none'; document.body.appendChild(lb);
+          window._fbUser={ uid:'uB', email:'b@example.com', emailVerified:false };
+          try{ renderLinkRequestsPage();
+            if(!/is NOT confirmed yet/.test(lb.textContent) || !lb.querySelector('[onclick*="linkReqConfirm"]')) throw new Error('the unconfirmed notice: '+lb.textContent.slice(0,200));
+          } finally { lb.remove(); }
+          // …and a confirmation done meanwhile is noticed when the page opens: a fresh token, requests by e-mail passed on.
+          var passed=0, fresh=0, realPass=window.hhPassOnLinkRequests, realTalk=window.talkLoad;
+          window.hhPassOnLinkRequests=async function(){ passed++; return 1; }; window.talkLoad=async function(){};
+          window._fbUser={ uid:'uB', email:'b@example.com', emailVerified:false, reload:async function(){ this.emailVerified=true; }, getIdToken:async function(f){ if(f) fresh++; return 't'; } };
+          try{ var ov=await openLinkRequests(); if(ov) ov.remove(); } finally { window.hhPassOnLinkRequests=realPass; window.talkLoad=realTalk; }
+          if(!passed || !fresh) throw new Error('a confirmation done meanwhile was not noticed: '+JSON.stringify({ passed:passed, fresh:fresh }));
+        } finally { _linkState=lsWas; try{ localStorage.removeItem(LINK_SEEN_KEY+'hB'); }catch(e){} }
       } finally {
         window._fbDb=real.db; window._fbUser=real.user; window._household=real.hh; window.toast=real.toast; window.syncLog=real.log;
+        var lo=document.getElementById('linkReqOverlay'); if(lo) lo.remove();
+        linkDotRefresh();
       }
     } },
 

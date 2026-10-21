@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v38.74 -->
+<!-- Tony's Recipes Collection v38.75 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -5326,7 +5326,15 @@ function linkNewCount() {
   var seen = linkSeen();
   return _linkState.pending.filter(function(r){ return !linkIsSeen(seen, r); }).length;
 }
-function linkDotRefresh() { var t = talkNewCount(); pathDots({ links: linkNewCount() + t, chats: t }); }
+function linkDotRefresh() { var t = talkNewCount(); linkCountShow(); pathDots({ links: linkNewCount() + t, chats: t }); }
+// v38.75 — Tony: "add next to the 'Link Requests' menu item the number of waiting requests (in brackets)".
+function linkWaitingCount() { return (_household && _linkState.loadedFor === _household.hid) ? _linkState.pending.length : 0; }
+function linkCountShow() {
+  var c = document.getElementById('linkReqCount'); if (!c) return 0;
+  var n = linkWaitingCount();
+  c.textContent = n ? '\u00a0(' + n + ')' : '';
+  return n;
+}
 async function hhLog(other, name, code, status, at, note) {
   var doc = { hid: other, name: String(name || '').slice(0, 80), code: String(code || '').slice(0, 20), status: status,
               at: at || Date.now(), decidedAt: Date.now(), by: _fbUser.uid };
@@ -5473,7 +5481,15 @@ async function openLinkRequests() {
     + '<div id="lrBody"><div style="color:var(--muted);font-size:13px;padding:14px 0;">⏳ Reading the requests…</div></div></div>';
   ov.onclick = function(e){ if (e.target === ov) ov.remove(); };
   document.body.appendChild(ov);
-  await hhLoadLinks(); await hhLoadIncoming(); await talkLoad();
+  await hhLoadLinks();
+  // v38.75 — confirmed meanwhile (the link in the e-mail, opened here or on another device): noticed now, and what
+  // was sent to the address by e-mail is passed on at once — no reload needed.
+  var u = window._fbUser;
+  if (u && u.emailVerified === false && typeof u.reload === 'function') {
+    try { await u.reload(); } catch(e) {}
+    if (u.emailVerified) await linkAfterConfirmed();
+  }
+  await hhLoadIncoming(); await talkLoad();
   renderLinkRequestsPage();
   linkMarkSeen();
   return ov;
@@ -5490,9 +5506,11 @@ function renderLinkRequestsPage() {
     + (manage ? '' : ' The owner or an admin answers them.') + '</div>';
   // v38.73 — Tony: Tester2 asked Tester1 by e-mail and nothing showed here. A request sent to an e-mail address reaches
   // only that address once it is CONFIRMED (anyone can type someone else's address into a new account): said here.
+  // v38.75 — Tony read "…appear here once that address is confirmed" as "that address is confirmed". Said plainly now.
   if (window._fbUser && _fbUser.emailVerified === false)
-    h += '<div style="font-size:12.5px;line-height:1.5;margin:0 0 10px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;color:var(--ink);">\u{1F4EC} Requests sent to <b dir="ltr" data-no-i18n>' + escH(_fbUser.email || '') + '</b> by e-mail appear here once that address is confirmed. '
-      + '<button type="button" onclick="resendConfirmation()" style="' + btn + 'background:var(--card-bg);color:var(--heading);border:1px solid var(--border);margin-top:6px;">\u{1F4E8} Send the confirmation e-mail</button></div>';
+    h += '<div id="lrUnconfirmed" style="font-size:12.5px;line-height:1.5;margin:0 0 10px;padding:8px 10px;border:1px solid var(--danger);border-radius:8px;color:var(--ink);">\u26A0\uFE0F Your address <b dir="ltr" data-no-i18n>' + escH(_fbUser.email || '') + '</b> is NOT confirmed yet — requests sent to it by e-mail cannot reach you until it is. '
+      + '<button type="button" onclick="linkReqConfirm()" style="' + btn + 'background:var(--card-bg);color:var(--heading);border:1px solid var(--border);margin-top:6px;">\u{1F4E8} Send the confirmation e-mail</button>'
+      + '<div style="margin-top:6px;color:var(--muted);">Then open the link in that e-mail, and come back here.</div></div>';
   // v37.80 — the switch moved here from ⚙️ (v37.49): requests by identifier, allowed or not.
   var appReq = '\u{1F91D} Link requests through the app: ' + ((_household && _household.appRequests === false) ? 'blocked' : 'allowed');
   h += manage ? '<button type="button" id="appRequestsItem" onclick="toggleAppRequests().then(renderLinkRequestsPage)" title="Whether other households can ask to link with yours through the app, using your identifier. Requests by e-mail always arrive." style="' + btn + 'width:100%;text-align:start;background:var(--card-bg);color:var(--heading);border:1px solid var(--border);margin-bottom:6px;">' + appReq + '</button>'
@@ -5833,6 +5851,25 @@ async function linkReqAct(i, what) {
   return true;
 }
 window.openLinkRequests = openLinkRequests; window.renderLinkRequestsPage = renderLinkRequestsPage; window.linkReqAct = linkReqAct;
+// v38.75 — the address just confirmed: the rules read a fresh token, requests by e-mail are passed on, and the live
+// listener for them (linkLiveStart's q4, only for a confirmed address) starts.
+async function linkAfterConfirmed() {
+  var u = window._fbUser;
+  if (!u || u.emailVerified === false) return false;
+  try { await u.getIdToken(true); } catch(e) {}
+  var n = 0;
+  try { n = await hhPassOnLinkRequests(); } catch(e) {}
+  linkLiveStop(); linkLiveStart();
+  syncLog('auth', 'Address confirmed — link requests by e-mail looked for', String(n));
+  return true;
+}
+// The page's "Send the confirmation e-mail": already confirmed (Firebase is asked first) → the page again, up to date.
+async function linkReqConfirm() {
+  var r = await resendConfirmation();
+  if (r === 'confirmed') { await linkAfterConfirmed(); await openLinkRequests(); }
+  return r;
+}
+window.linkAfterConfirmed = linkAfterConfirmed; window.linkReqConfirm = linkReqConfirm;
 window.hhSetBlocked = hhSetBlocked; window.hhLoadIncoming = hhLoadIncoming; window.linkNewCount = linkNewCount; window.hhRejectLink = hhRejectLink;
 
 // ─── RED DOTS ALONG THE PATH (v37.80) ────────────────────────────────────────
@@ -8834,7 +8871,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v38.74';
+var APP_VERSION = 'v38.75';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -11881,7 +11918,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.74</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.75</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -11969,7 +12006,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.74</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.75</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -12018,7 +12055,7 @@ body.banner-shown .header {
             <div class="set-body">
               <button class="drop-item" title="Who shares this collection and what each person can do: add people, invitation links, roles, renaming and handing over the household." onclick="closeDrop('settingsDrop');openAccessControl()">👥 Family Access</button>
               <button class="drop-item" data-layout-only="households" title="Your household's identifier: give it to people you know so they can link their kitchen with yours. It shows no e-mail address." onclick="closeDrop('settingsDrop');openMyIdentifier()">🪪 Display my personal identifier</button>
-              <button class="drop-item" data-layout-only="households" id="linkRequestsItem" title="Households that asked to link kitchens with yours, the ones yours asked, and what became of each — accept, reject or block. Requests through the app can be switched off there." onclick="closeDrop('settingsDrop');openLinkRequests()">📬 Link requests</button>
+              <button class="drop-item" data-layout-only="households" id="linkRequestsItem" title="Households that asked to link kitchens with yours, the ones yours asked, and what became of each — accept, reject or block. Requests through the app can be switched off there." onclick="closeDrop('settingsDrop');openLinkRequests()">📬 Link requests<span id="linkReqCount" data-no-i18n></span></button>
               <button class="drop-item" title="What you have at home, so recipe ideas can use it." onclick="closeDrop('settingsDrop');openPantry()">🥫 My Pantry</button>
             </div>
           </div>
@@ -14720,7 +14757,8 @@ function i18nHarvestDemand() {
       function(){ legalShowGate({ uid: 'i18n-harvest' }); },
       function(){
         // The Link requests page, drawn straight from a stand-in state (openLinkRequests would read Firestore).
-        window._fbUser = window._fbUser || { uid: 'i18n-harvest', email: 'someone@example.invalid' };
+        // (unconfirmed: its notice is drawn too — v38.75)
+        window._fbUser = { uid: 'i18n-harvest', email: 'someone@example.invalid', emailVerified: false };
         window._household = { hid: 'hH', role: 'owner', name: '\u00b7', code: '', appRequests: true,
           links: [{ hid: 'hL', name: '\u00b7', code: '', at: 1 }], asking: [{ id: 'hH_hT', to: 'hT', label: '\u00b7', note: '' }] };
         _linkState = { loadedFor: 'hH', pending: [{ id: 'hN_hH', ref: {}, d: { from: 'hN', fromName: '\u00b7', via: 'code', at: 1 } }],
@@ -30415,9 +30453,9 @@ var HELP_SYSTEM_PROMPT = [
   "- DURING THE BETA, MY KITCHEN NOTES IS BY INVITATION ONLY: a new kitchen can be started only by someone the app's owner invited, signed in with the very address the invitation was sent to (forwarding the invitation lets nobody else in). Invited at another address? Sign out and sign in with that one.",
   "- To cook together with family or friends, invite them to YOUR kitchen: the 📲 share icon next to the language picker (or ⚙️ → 🏠 My household → 🔗 Invitation link…) makes a link that works for 14 days and lets them in with 👁 Read only; give them more once they have joined. Only the kitchen's owner and its managers can invite. Someone can also be added by e-mail in 👥 Family Access, or ask to join with your kitchen's identifier.",
   "- LINK WITH ANOTHER HOUSEHOLD: ⋯ More → 🤝 Connect with another household (the owner, or someone with full access). Type that household's identifier (MKN-…; yours is in ⚙️ → 🏠 My household → 🪪 Display my personal identifier) or the e-mail address of anyone in it. Its owner or an admin is asked at once if the app is open (otherwise the next time they open it): Accept, Reject or Remind me later — with the note that came with it. By e-mail address the request also goes through the app — it pops up for that person if they use My Kitchen Notes, or waits until they join with that address (the app never says whether an address has an account); you may also tell them yourself: Via Email (your default mail app, Gmail or Outlook — if no mail app opens, choose your e-mail on the web), Via WhatsApp, or Copy message to Clipboard. The message has a link that opens the request in their app, to accept it. Every step has ‹ Back, with what you typed kept. A refusal is never shown to the sender.",
-  "- A REQUEST SENT TO YOUR E-MAIL ADDRESS shows in 📬 Link requests only once that address is CONFIRMED (an account made with e-mail and a password must confirm it from the e-mail sent to it). Not confirmed yet? The Link requests page says so and sends the confirmation e-mail again.",
+  "- A REQUEST SENT TO YOUR E-MAIL ADDRESS shows in 📬 Link requests only once that address is CONFIRMED (an account made with e-mail and a password must confirm it from the e-mail sent to it). Not confirmed yet? The Link requests page says so (\"is NOT confirmed yet\"), sends the confirmation e-mail again, and notices by itself, when opened, that it has been confirmed.",
   "- Once linked, each household sees the other's recipes, read-only — and live: a change in their kitchen shows in yours within seconds, the changed card glowing for a moment: after its own in the main list, under that household's name, on a faint blue (hover one: 'A recipe from …'). 🏠 Kitchens ▾ in the filter bar chooses whose recipes show — tick one, several or all. 📥 Save a copy to my recipes makes one your own. Links do not chain: a third household linked to theirs is not seen. Links are listed, and removed, in ⚙️ → 🏠 My household → 👥 Family Access. ⚙️ → 🏠 My household → 🤝 Link requests through the app: blocked stops requests by identifier; requests by e-mail always arrive.",
-  "- 📬 LINK REQUESTS: ⚙️ → 🏠 My household → 📬 Link requests — every request in one place: Waiting (Accept / Reject / 🚫 Block), Sent by your household (Withdraw), Linked now (Revoke access), and earlier answers. A request may carry a note, and the two households can write to each other there — the latest message shows, highlighted, with ↩ Reply; earlier ones are under 💬 Conversation. Only the household's name is shown, never a person's. Reject is for now: if they ask again — by identifier or by e-mail — their request is back under Waiting. 🚫 Block is for good, until you Unblock it under the earlier answers; they are never told, and on their side it reads “waiting”. A new message or request arrives while the app is open: a red dot (and a short notice with Open) within seconds, no reload needed. A red dot on ⚙️ leads to anything new. The switch there decides whether other households may ask through the app at all.",
+  "- 📬 LINK REQUESTS: ⚙️ → 🏠 My household → 📬 Link requests — the number in brackets beside it is how many wait for an answer. Every request in one place: Waiting (Accept / Reject / 🚫 Block), Sent by your household (Withdraw), Linked now (Revoke access), and earlier answers. A request may carry a note, and the two households can write to each other there — the latest message shows, highlighted, with ↩ Reply; earlier ones are under 💬 Conversation. Only the household's name is shown, never a person's. Reject is for now: if they ask again — by identifier or by e-mail — their request is back under Waiting. 🚫 Block is for good, until you Unblock it under the earlier answers; they are never told, and on their side it reads “waiting”. A new message or request arrives while the app is open: a red dot (and a short notice with Open) within seconds, no reload needed. A red dot on ⚙️ leads to anything new. The switch there decides whether other households may ask through the app at all.",
   "- 💬 CHATS WITH LINKED KITCHENS: ⋯ More → 💬 Chats with linked kitchens — or 💬 Chat beside a linked kitchen's name in your recipe list, or in 👥 Family Access. Every conversation, newest first, with what is new; open one to read it all and write (Enter sends, Shift+Enter starts a new line). The same conversations are also on 📬 Link requests. A red dot on ⋯ More and on ⚙️ says something new arrived.",
   "- A household's identifier works only within the same copy of the app: the family's copy and My Kitchen Notes keep their households apart.",
   "",
