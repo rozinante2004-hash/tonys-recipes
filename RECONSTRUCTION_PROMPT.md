@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v38.76` — app. **Worker: v87**, deployed separately and versioned separately
+**Current version:** `v38.77` — app. **Worker: v87**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -699,8 +699,10 @@ name, read live (onSnapshot per conversation). What is NEW is told by message id
 delivered — never by the list's length: Firestore hands a write to the listener BEFORE add() resolves (with or
 without persistence), so the sender must not push its own message into the list again, and a message from a device
 whose clock is behind sorts before the last one. The listener's first answer redraws an open chat, announcing nothing.
+A redraw keeps what is typed in a box; after a send, the box on the screen NOW is emptied (the redraw may have
+replaced the one the send began with), and only if it still holds what was sent.
 
-**State on 21 Oct 2026 (v38.76, Worker v87):** testers are invited from Sunday 25 Oct; from then on every
+**State on 21 Oct 2026 (v38.77, Worker v87):** testers are invited from Sunday 25 Oct; from then on every
 release waits for the owner's yes. The community app is by invitation only; "Share this App with family" goes back
 to "Share this App" at the official launch. Open: WhatsApp (CallMeBot was full), the AI models after the launch, the testing
 tools' update (Playwright, Ubuntu 26.04) after launch week, a lighter first screen.

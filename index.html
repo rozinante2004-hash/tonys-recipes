@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v38.76 -->
+<!-- Tony's Recipes Collection v38.77 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -5722,7 +5722,12 @@ async function talkSend(other, given) {
   // this list one too long, and the other kitchen's next message then looked like nothing new. Added only if missing.
   var mine = (_talk[pair] = _talk[pair] || []);
   if (!m.id || !mine.some(function(x){ return x.id === m.id; })) mine.push(m);
-  if (box && given == null) box.value = '';      // v38.50 — sent: not kept in the box by the redraw (v38.49 keeps what is typed)
+  // v38.77 — Tony: "the last message sent still appears in the message box … I need to clear the last message from
+  // the box before I start typing a new message" (📬 Link requests). That same early listener redrew the page while
+  // add() was pending, and a redraw keeps what is in a box (v38.49): the box cleared here was the old one. The box
+  // on the page NOW is cleared — if it still holds what was sent (anything typed since stays).
+  var nowBox = document.getElementById('talkIn-' + other);
+  if (nowBox && given == null && nowBox.value.trim() === text) nowBox.value = '';
   talkMarkSeen(other, given != null);
   syncLog('save', 'Wrote to a household about linking', { chars: m.text.length });
   renderLinkRequestsPage();
@@ -5834,7 +5839,7 @@ async function kitchenChatSend() {
   var btn = document.getElementById('kcSend'); if (btn) btn.disabled = true;
   var ok = false;
   try { ok = await talkSend(_chatWith, text); } finally { if (btn) btn.disabled = false; }
-  if (ok) { box = document.getElementById('kcIn'); if (box) { box.value = ''; box.focus(); } renderKitchenChats(); }
+  if (ok) { box = document.getElementById('kcIn'); if (box) { if (box.value.trim() === text) box.value = ''; box.focus(); } renderKitchenChats(); }
   return ok;
 }
 window.openKitchenChats = openKitchenChats; window.closeKitchenChats = closeKitchenChats; window.renderKitchenChats = renderKitchenChats;
@@ -8877,7 +8882,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v38.76';
+var APP_VERSION = 'v38.77';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -11924,7 +11929,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.76</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.77</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -12012,7 +12017,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.76</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.77</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">

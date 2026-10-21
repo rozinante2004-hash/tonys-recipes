@@ -102,8 +102,9 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
 
 **Where things stand on 21 Oct 2026 (22:00 Israel time) — read this, then "What comes next"**
 - **Live:** the family app (`main`, which forwards to the community app) and the community app (`beta`,
-  https://mykitchennotes.community, Firebase my-kitchen-notes-beta) run **v38.75**, and **v38.76 is on its way**
-  (CI green on 45f3778; the release script was pushing it as the session ended — check with jobs-on, see step 5).
+  https://mykitchennotes.community, Firebase my-kitchen-notes-beta) run **v38.76** (released 21:55, all jobs
+  success; Tony: chats arrive the first time), and **v38.77 is on its way** (the chat box emptied after sending — check
+  that it was released and every job on it succeeded, with jobs-on, see step 5).
   **Worker v87.** The test copy (https://tonys-recipes-test.pages.dev, its own database) follows `test`.
 - **The testers go live on Sunday 25 Oct 2026** (Tony: "The plan is to start sending invitations to the testers
   this Sunday"). The community app is **by invitation only** (Tony switched it, 20 Oct): only addresses invited with
@@ -124,9 +125,8 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
   copy** — confirmed 21 Oct, Tester2's request arrived and was accepted.
 
 **What comes next**
-1. **v38.76:** check every job on it (jobs-on), record the release in this file, tell Tony it is out. Then Tony
-   reloads both testers' apps (badge v38.76) and sends ONE message each way: it must arrive the first time (a pop-up
-   within seconds; an open chat redraws at once).
+1. **v38.77:** check that it was released and every job on it succeeded (jobs-on), record it here, tell Tony. Then
+   Tony sends a message from 📬 Link requests (and from 💬 Chats): the box must be empty afterwards.
 2. **Releases:** until the testers go live (Sunday 25 Oct), release each version once the local suites and CI are
    green, without asking, and tell him after. **From Sunday 25 Oct: ask Tony before EVERY release.**
 3. **Reminder — Fri 23 Oct, 09:00 Israel time: try CallMeBot again** (WhatsApp alerts; the bot was full on 20 Oct).
@@ -803,6 +803,16 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
   and its first answer redraws an open chat/page (nothing announced). Self-test `link_live` extended (an add() that
   calls the listener first, as Firestore does; a clock behind) — it FAILS on the old code ("my message is in the list
   twice"), checked.
+- **Released: v38.75 (21 Oct 2026, 21:33 Israel time, CI green on 80c6915) and v38.76 (21:55, CI green on 45f3778).**
+  All jobs success on both (Pages, Cloudflare beta and test, Self Tests main and test, languages). **Tony, 22:0x: "The
+  chat works now — messages arrive the first time."**
+- **v38.77 — the box keeps the message just sent** (Tony: "In the chat box, the last message sent still appears in
+  the message box … I need to clear the last message from the box before I start typing a new message" — the
+  conversation on 📬 Link requests). The same early listener redrew the page while add() was pending, and the redraw
+  keeps what is in a box (v38.49): talkSend then cleared the OLD textarea. Now it clears the box on the page now
+  (`talkIn-<other>`), if it still holds what was sent (anything typed since stays); the chat window
+  (`kitchenChatSend`) likewise only clears what was sent. Self-test `link_live`: a message sent from the page
+  leaves its box empty — fails on the old code ("the message sent is still in the box"), checked.
 - **Move step 9 finished (20 Oct 2026, 18:05 Israel time; Tony: "OK to delete the 4 + 135 old family documents").**
   clear-source `all` + `shared` (run 39445140837): 139 deleted (households 4, shared 135), the household cut to its
   moved mark; clear-check after it (run 39445361414): recipes-f379d holds 1 document of the moved household (its own,

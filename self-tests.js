@@ -7429,7 +7429,7 @@ window.SELF_TESTS = [
       }
     } },
 
-  { id:'link_live', group:'Sharing', name:'⚡ Live, without a reload: a new message lights the red dot and says who wrote; a new request asks at once; a link accepted on the other side is said and brings their recipes (v38.49); the answer to a message just sent is said at once — never only the second time (v38.76)',
+  { id:'link_live', group:'Sharing', name:'⚡ Live, without a reload: a new message lights the red dot and says who wrote; a new request asks at once; a link accepted on the other side is said and brings their recipes (v38.49); the answer to a message just sent is said at once — never only the second time (v38.76); a message sent from 📬 Link requests leaves its box empty (v38.77)',
     test: async()=>{
       var subs={}, toasts=[], checked=0;
       var real={ db:window._fbDb, user:window._fbUser, hh:window._household, toastA:window.toastAction, toast:window.toast, check:window.hhCheckLinkRequests,
@@ -7500,6 +7500,18 @@ window.SELF_TESTS = [
         toasts=[]; talkDb[p3].splice(1, 0, { id:'t3', from:'hL3', name:'Third Kitchen', text:'Bring dessert', at:Date.now()-4000 });
         subs['talk:'+p3](snapIds(talkDb[p3]));
         if(!toasts.some(function(t){ return /Bring dessert/.test(t); })) throw new Error('a message from a clock behind is not said: '+JSON.stringify(toasts));
+        // v38.77 — Tony: "the last message sent still appears in the message box" on 📬 Link requests: the listener redraws
+        // the page while add() is pending, and a redraw keeps what is in a box. Sent → the box on the page is empty.
+        var lb2=document.createElement('div'); lb2.id='lrBody'; lb2.style.display='none'; document.body.appendChild(lb2);
+        try{
+          renderLinkRequestsPage();
+          var ta=document.getElementById('talkIn-hL3'); if(!ta) throw new Error('no box on the page to write to Third Kitchen');
+          ta.value='One more thing'; window.talkPrivacyOk=async function(){ return true; };
+          try{ if(!await talkSend('hL3')) throw new Error('could not send from the page'); } finally { window.talkPrivacyOk=realPriv; }
+          var ta2=document.getElementById('talkIn-hL3');
+          if(!ta2 || ta2.value!=='') throw new Error('the message sent is still in the box: '+JSON.stringify(ta2 && ta2.value));
+          if((_talk[p3]||[]).filter(function(m){ return m.text==='One more thing'; }).length!==1) throw new Error('sent from the page: not once in the list');
+        } finally { lb2.remove(); }
         // One's own accept is not news on one's own screen.
         _live.mine.hL4=Date.now(); window.hhLoadLinks=async function(){ _household.links=_household.links.concat([{ hid:'hL4', name:'Fourth Kitchen', code:'', at:3 }]); return _household.links; };
         toasts=[]; subs.links(snap([{},{}])); await wait(30);
