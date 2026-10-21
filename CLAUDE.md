@@ -102,9 +102,10 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
 
 **Where things stand on 21 Oct 2026 (22:00 Israel time) — read this, then "What comes next"**
 - **Live:** the family app (`main`, which forwards to the community app) and the community app (`beta`,
-  https://mykitchennotes.community, Firebase my-kitchen-notes-beta) run **v38.76** (released 21:55, all jobs
-  success; Tony: chats arrive the first time), and **v38.77 is on its way** (the chat box emptied after sending — check
-  that it was released and every job on it succeeded, with jobs-on, see step 5).
+  https://mykitchennotes.community, Firebase my-kitchen-notes-beta) run **v38.77** (released 22:22, all jobs
+  success), and **v38.78 — 👪 Chat with family members — is on its way** (check that it was released and that every
+  job succeeded, ESPECIALLY "Publish the database rules": the new `talk`/`talkIds` rules must be live, or every family
+  message is refused).
   **Worker v87.** The test copy (https://tonys-recipes-test.pages.dev, its own database) follows `test`.
 - **The testers go live on Sunday 25 Oct 2026** (Tony: "The plan is to start sending invitations to the testers
   this Sunday"). The community app is **by invitation only** (Tony switched it, 20 Oct): only addresses invited with
@@ -125,8 +126,9 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
   copy** — confirmed 21 Oct, Tester2's request arrived and was accepted.
 
 **What comes next**
-1. **v38.77:** check that it was released and every job on it succeeded (jobs-on), record it here, tell Tony. Then
-   Tony sends a message from 📬 Link requests (and from 💬 Chats): the box must be empty afterwards.
+1. **v38.78:** check that it was released and every job on it succeeded (jobs-on; the rules job above all), record
+   it here, tell Tony. Then Tony tries 👪 Chat with family members in a household with at least two people: a message
+   to everyone, a 1-to-1, and the 💬 Chat buttons in 👥 Family Access.
 2. **Releases:** until the testers go live (Sunday 25 Oct), release each version once the local suites and CI are
    green, without asking, and tell him after. **From Sunday 25 Oct: ask Tony before EVERY release.**
 3. **Reminder — Fri 23 Oct, 09:00 Israel time: try CallMeBot again** (WhatsApp alerts; the bot was full on 20 Oct).
@@ -813,6 +815,30 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
   (`talkIn-<other>`), if it still holds what was sent (anything typed since stays); the chat window
   (`kitchenChatSend`) likewise only clears what was sent. Self-test `link_live`: a message sent from the page
   leaves its box empty — fails on the old code ("the message sent is still in the box"), checked.
+- **Released: v38.77 (21 Oct 2026, 22:22 Israel time, CI green on 5530dc3).** All jobs success.
+- **v38.78 — 👪 Chat with family members** (Tony, 21 Oct: "extend the ability to chat with Joined Kitchens to the
+  family members in a household as well. Add another button, above the 'Chat with joint kitchens' button, titled 'Chat
+  with family members' … 2 modes of communication: 1-to-1 and 1-to all (announcements) … next to each family member in
+  the 'Family Access' modal, add a 'Chat' button as well"; and "The request is for members within the same
+  household"). **Data:** `households/<hid>/talk/<id>` = { by, name, text (≤500), at, to: 'all' | a member's uid } —
+  the existing `chats/` is the WhatsApp exports, hence the new name — plus `talkIds/<id>` = {} written in the same
+  batch (rules: existsAfter / getAfter.by), so the OWNER's householdWipe can delete 1-to-1 messages it may not read
+  (lists talkIds → deletes talk/<id> and talkIds/<id>; the rules let the owner delete, not read). **Rules:** read if
+  a member AND (to 'all' or to me or by me) — or beingDeleted; create by any member (readers too), by == me, to 'all'
+  or another member (exists(memberPath)); no update; delete owner/beingDeleted; manage.js deletes talk + talkIds.
+  Rules test +27 (L5: max owner, nora and otto readers; otto cannot read nora↔max, by query or by id). **App:**
+  `famLiveStart` — three queries (to=='all', to==me, by==me; no orderBy, so no composite index; sorted on the device),
+  started from linkLiveStart and after householdLoadMembers, NONE while nobody else is in the household (reads);
+  stopped in linkLiveStop. What is new by ids (v38.76's lesson); the window (⋯ More → 👪 above 💬; `openFamilyChat(room)`
+  — room 'all' or a uid) lists 📣 Everyone in <kitchen> first, then each person (owner included, places kept by e-mail
+  not), with the last line and "• n new"; a conversation shows names in the room for everyone; Enter sends; the box is
+  emptied the v38.77 way. A notice "👪 <name> (to everyone): “…”" with Open; a red dot on ⋯ More and on the item
+  (`pathDots` now sums per place: ⋯ More is marked by both chats). Family Access: 💬 Chat beside each member with a uid
+  and beside the owner (`#ownerChatBtn`, hidden when the owner is me). Unread per room on the device
+  (`mkn_fam_seen_<hid>`). Names are data: "📣 Everyone in {1}". The phrase harvest draws the window (list, everyone,
+  1-to-1, alone). **Privacy statement 1.7 (21 Oct 2026), all 11 languages:** a row "Messages within your household"
+  and, under "Your household", who reads which (everyone / only the two), deleted with the household;
+  `python3 tools/legal-keys.py` re-keyed. Help and ✨ list updated. Self-test `family_chat`.
 - **Move step 9 finished (20 Oct 2026, 18:05 Israel time; Tony: "OK to delete the 4 + 135 old family documents").**
   clear-source `all` + `shared` (run 39445140837): 139 deleted (households 4, shared 135), the household cut to its
   moved mark; clear-check after it (run 39445361414): recipes-f379d holds 1 document of the moved household (its own,

@@ -927,7 +927,7 @@
     async function refsOf(q) { var out = []; (await q.get()).forEach(function (d) { out.push(d.ref); }); return out; }
     onStep('Marking it for deletion…');
     await ref.update({ deleting: true });
-    var kinds = ['recipes', 'photos', 'chats', 'state', 'requests', 'requestLog'];   // v37.80 — and its request history
+    var kinds = ['recipes', 'photos', 'chats', 'state', 'requests', 'requestLog', 'talk', 'talkIds'];   // v37.80 — and its request history; v38.78 — its own chat
     for (var k = 0; k < kinds.length; k++) {
       onStep('Deleting its ' + kinds[k] + '…');
       await inBatches(await refsOf(ref.collection(kinds[k])));

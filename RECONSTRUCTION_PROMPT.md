@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v38.77` — app. **Worker: v87**, deployed separately and versioned separately
+**Current version:** `v38.78` — app. **Worker: v87**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -702,7 +702,15 @@ whose clock is behind sorts before the last one. The listener's first answer red
 A redraw keeps what is typed in a box; after a send, the box on the screen NOW is emptied (the redraw may have
 replaced the one the send began with), and only if it still holds what was sent.
 
-**State on 21 Oct 2026 (v38.77, Worker v87):** testers are invited from Sunday 25 Oct; from then on every
+**Chat with family members (v38.78):** inside ONE household only. `households/<hid>/talk/<id>` = { by, name, text
+(≤500), at, to: 'all' | a member's uid } plus `talkIds/<id>` = {} in the same batch. Everyone in the household reads
+`to: 'all'` (📣 announcements); a 1-to-1 message only its writer and the person it is to — the owner neither; the owner
+deletes them all, unread, through talkIds when deleting the household. Any member writes (readers too). Three live
+queries (to all, to me, by me), none while alone in the household. ⋯ More → 👪 Chat with family members (above 💬 Chats
+with linked kitchens) and 💬 Chat beside each person in 👥 Family Access; notices, red dots, unread per conversation.
+Privacy statement 1.7 names these messages.
+
+**State on 21 Oct 2026 (v38.78, Worker v87):** testers are invited from Sunday 25 Oct; from then on every
 release waits for the owner's yes. The community app is by invitation only; "Share this App with family" goes back
 to "Share this App" at the official launch. Open: WhatsApp (CallMeBot was full), the AI models after the launch, the testing
 tools' update (Playwright, Ubuntu 26.04) after launch week, a lighter first screen.

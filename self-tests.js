@@ -7794,6 +7794,117 @@ window.SELF_TESTS = [
       }
     } },
 
+  { id:'family_chat', group:'Sharing', name:'👪 Chat with family members (v38.78): ⋯ More → 👪 above the linked kitchens’ chats; a room for everyone (announcements) and one per person (only the two read it); live — a notice, a red dot, read when opened; the message and its id in one batch; the box empty after sending; 💬 Chat beside each person (and the owner) in Family Access; deleting the household deletes the chat by its ids; nothing listened to while nobody else is there',
+    test: async()=>{
+      // Tony, 21 Oct 2026: "extend the ability to chat with Joined Kitchens to the family members in a household … 1-to-1
+      // and 1-to all (announcements) … next to each family member in the 'Family Access' modal, add a 'Chat' button".
+      var store={}, subs={}, idn=0, failCommit=false, toasts=[];
+      function snapOf(list){ return { forEach:function(f){ list.forEach(function(x){ f({ id:x.id, data:function(){ return JSON.parse(JSON.stringify(x.d)); } }); }); } }; }
+      function matching(k){ var p=k.split('='); return Object.keys(store).filter(function(path){ return /^households\/hF\/talk\//.test(path) && String(store[path][p[0]])===p[1]; })
+        .map(function(path){ return { id:path.split('/').pop(), d:store[path] }; }); }
+      function fire(){ Object.keys(subs).forEach(function(k){ subs[k](snapOf(matching(k))); }); }
+      function coll(path){ return {
+        doc:function(id){ var full=path+'/'+(id||('auto'+(++idn))); return { id:full.split('/').pop(), path:full }; },
+        where:function(f,op,v){ return { onSnapshot:function(cb){ var k=f+'='+v; subs[k]=cb; setTimeout(function(){ if(subs[k]===cb) cb(snapOf(matching(k))); }, 0); return function(){ delete subs[k]; }; } }; },
+        get:async function(){ var out=Object.keys(store).filter(function(x){ return x.indexOf(path+'/')===0 && x.slice(path.length+1).indexOf('/')===-1; });
+          return { forEach:function(f){ out.forEach(function(x){ f({ id:x.split('/').pop(), ref:{ path:x } }); }); } }; } }; }
+      var fake={ collection:function(c){ return { doc:function(h){ return { collection:function(sub){ return coll(c+'/'+h+'/'+sub); } }; } }; },
+        batch:function(){ var ops=[]; return { set:function(r,d){ ops.push([r.path, d]); }, delete:function(r){ ops.push([r.path, null]); },
+          commit:async function(){ if(failCommit) throw new Error('Missing or insufficient permissions.');
+            ops.forEach(function(o){ if(o[1]===null) delete store[o[0]]; else store[o[0]]=JSON.parse(JSON.stringify(o[1])); });
+            fire(); await wait(5); } }; } };   // as Firestore: the listeners hear of it BEFORE the write resolves
+      var real={ db:window._fbDb, user:window._fbUser, hh:window._household, toastA:window.toastAction, toast:window.toast, acc:null, seen:null, dots:Object.assign({}, _pathDots) };
+      try{ real.acc=localStorage.getItem(ACCESS_STORAGE_KEY); real.seen=localStorage.getItem(FAM_SEEN_KEY+'hF'); }catch(e){}
+      try{
+        linkLiveStop();
+        window._fbDb=fake; window.toastAction=function(m){ toasts.push(m); }; window.toast=function(m){ toasts.push(m); };
+        window._fbUser={ uid:'uMe', email:'me@example.com', displayName:'Me Myself' };
+        window._household={ hid:'hF', role:'viewer', name:'Fam Kitchen', code:'', ownerUid:'uO', ownerName:'Olga', ownerEmail:'olga@example.com', links:[], asking:[] };
+        localStorage.setItem(ACCESS_STORAGE_KEY, JSON.stringify([{ uid:'uB', name:'Ben', email:'ben@example.com', role:'read', hhRole:'viewer' },
+          { email:'kept@example.com', name:'', role:'read', hhRole:'viewer', pending:true }]));
+        var old={ by:'uO', name:'Olga', text:'Welcome home', at:Date.now()-60000, to:'all' };
+        store['households/hF/talk/old1']=old;
+        var seen={ all:old.at }; localStorage.setItem(FAM_SEEN_KEY+'hF', JSON.stringify(seen));
+        // the menu: above the linked kitchens' chats
+        var fi=document.getElementById('familyChatItem'), ki=document.getElementById('kitchenChatsItem');
+        if(!fi || !ki || !(fi.compareDocumentPosition(ki) & Node.DOCUMENT_POSITION_FOLLOWING) || !/Chat with family members/.test(fi.textContent)) throw new Error('no 👪 Chat with family members above the linked kitchens’ chats');
+        // who: the owner and Ben — not me, not a place kept for an address
+        if(famPeople().map(function(p){ return p.uid; }).join()!=='uO,uB') throw new Error('the people: '+JSON.stringify(famPeople()));
+        if(!famLiveStart(true)) throw new Error('not listening');
+        await wait(20);
+        if(Object.keys(subs).sort().join()!=='by=uMe,to=all,to=uMe') throw new Error('the live questions: '+Object.keys(subs).join());
+        if(toasts.length) throw new Error('what was already there was announced');
+        await openFamilyChat();
+        var body=document.getElementById('famBody');
+        var rows=body.querySelectorAll('.kc-row');
+        if(rows.length!==3 || !/Everyone in.*Fam Kitchen/.test(rows[0].textContent) || !/Welcome home/.test(rows[0].textContent)) throw new Error('the list: '+body.textContent.slice(0,200));
+        if(!/Olga/.test(body.textContent) || !/Ben/.test(body.textContent) || /kept@/.test(body.textContent)) throw new Error('the people in the list: '+body.textContent.slice(0,240));
+        // to everyone
+        await openFamilyChat('all');
+        if(!/Everyone in your household reads this/.test(body.textContent)) throw new Error('the room for everyone does not say who reads it');
+        document.getElementById('famIn').value='Dinner at 7';
+        if(!await famSend()) throw new Error('could not send to everyone');
+        var sent=Object.keys(store).filter(function(k){ return store[k].text==='Dinner at 7'; });
+        if(sent.length!==1) throw new Error('not written once: '+sent.length);
+        var m=store[sent[0]], id=sent[0].split('/').pop();
+        if(m.by!=='uMe' || m.to!=='all' || m.name!=='Me Myself' || !(m.at>0) || Object.keys(m).sort().join()!=='at,by,name,text,to') throw new Error('the message: '+JSON.stringify(m));
+        if(!store['households/hF/talkIds/'+id] || Object.keys(store['households/hF/talkIds/'+id]).length) throw new Error('its id was not written beside it, empty');
+        if(document.getElementById('famIn').value!=='') throw new Error('the box keeps the message sent');
+        if(famIn('all').filter(function(x){ return x.text==='Dinner at 7'; }).length!==1) throw new Error('my message is not in the room once');
+        // Ben writes to me alone, while I am in the room for everyone: a notice, a red dot, one new in his conversation
+        toasts=[]; store['households/hF/talk/b1']={ by:'uB', name:'Ben', text:'Can you buy milk?', at:Date.now(), to:'uMe' }; fire();
+        if(!toasts.some(function(t){ return /Ben: .*Can you buy milk/.test(t); })) throw new Error('his message is not said: '+JSON.stringify(toasts));
+        if(famNewIn('uB')!==1 || !document.querySelector('#familyChatItem > .path-dot')) throw new Error('no red dot for his message');
+        // a message to everyone says so in the notice
+        toasts=[]; store['households/hF/talk/o2']={ by:'uO', name:'Olga', text:'Shabbat at our place', at:Date.now(), to:'all' }; fire();
+        if(toasts.length) throw new Error('the room on the screen announced its own message: '+JSON.stringify(toasts));
+        _fam.with=null; renderFamilyChat();
+        toasts=[]; store['households/hF/talk/o3']={ by:'uO', name:'Olga', text:'Bring wine', at:Date.now()+1, to:'all' }; fire();
+        if(!toasts.some(function(t){ return /Olga \(to everyone\): .*Bring wine/.test(t); })) throw new Error('a message to everyone is not said as such: '+JSON.stringify(toasts));
+        // his conversation, opened: read, the dot gone; only the two of us
+        await openFamilyChat('uB');
+        if(!/Only the two of you read this/.test(body.textContent) || !/Can you buy milk/.test(body.textContent) || /Dinner at 7/.test(body.textContent)) throw new Error('his conversation: '+body.textContent.slice(0,200));
+        if(famNewIn('uB')!==0) throw new Error('opened, still new');
+        document.getElementById('famIn').value='Sure';
+        if(!await famSend() || !Object.keys(store).some(function(k){ return store[k].text==='Sure' && store[k].to==='uB'; })) throw new Error('could not answer him alone');
+        // someone who has left: nothing is sent
+        _fam.with='uGone'; var before=Object.keys(store).length;
+        var ta=document.getElementById('famIn'); if(ta) ta.value='Hello?';
+        if(await famSend() || Object.keys(store).length!==before) throw new Error('written to someone no longer in the household');
+        closeFamilyChat();
+        // Family Access: 💬 Chat beside each person (not beside a place kept for an address) and beside the owner
+        renderAccessMembers();
+        var list=document.getElementById('accessMembersList');
+        if(!list || !list.querySelector('[onclick*=\'openFamilyChat("uB")\']')) throw new Error('no 💬 Chat beside Ben in Family Access');
+        if(list.querySelectorAll('[onclick*="openFamilyChat"]').length!==1) throw new Error('a 💬 Chat beside a place kept for an address');
+        householdRenderBar();
+        var oc=document.getElementById('ownerChatBtn');
+        if(!oc || oc.style.display==='none') throw new Error('no 💬 Chat beside the owner');
+        // one dot on ⋯ More whichever chat has news (the kitchens' or the family's)
+        pathDots({ chats:0, family:1 }); var moreDot=!!document.querySelector('[onclick="toggleDrop(\'moreDrop\')"] > .path-dot');
+        pathDots({ chats:1, family:0 }); var moreDot2=!!document.querySelector('[onclick="toggleDrop(\'moreDrop\')"] > .path-dot');
+        pathDots({ chats:0, family:0 });
+        if(!moreDot || !moreDot2) throw new Error('⋯ More loses its dot when one of the two chats has nothing new');
+        // deleting the household: the chat goes too, found by its ids
+        if(String(householdWipe).indexOf("collection('talkIds')")===-1) throw new Error('deleting the household leaves its chat');
+        famLiveStop();
+        if(Object.keys(subs).length) throw new Error('listeners left behind');
+        // alone in the household: nothing is listened to (reads), and the window says how to invite
+        localStorage.setItem(ACCESS_STORAGE_KEY, '[]'); _household.ownerUid='uMe';
+        if(famLiveStart(true) || Object.keys(subs).length) throw new Error('listening with nobody else in the household');
+        await openFamilyChat();
+        if(!/Nobody else is in your household yet/.test(document.getElementById('famBody').textContent)) throw new Error('alone: no word on inviting');
+        closeFamilyChat();
+      } finally {
+        famLiveStop(); closeFamilyChat();
+        window._fbDb=real.db; window._fbUser=real.user; window._household=real.hh; window.toastAction=real.toastA; window.toast=real.toast;
+        try{ if(real.acc===null) localStorage.removeItem(ACCESS_STORAGE_KEY); else localStorage.setItem(ACCESS_STORAGE_KEY, real.acc);
+             if(real.seen===null) localStorage.removeItem(FAM_SEEN_KEY+'hF'); else localStorage.setItem(FAM_SEEN_KEY+'hF', real.seen); }catch(e){}
+        pathDots(real.dots);
+        try{ renderAccessMembers(); householdRenderBar(); }catch(e){}
+      }
+    } },
+
   { id:'idle_quiet_and_server_notice', group:'Core', name:'🔕 An app nobody is using stops asking the server every two minutes (every 30 instead; at once on the first touch or return), and a used-up server allowance is said in a bar with what it stops and when it comes back — once, closable, never once its time has passed (v38.54); the owner reads what has stopped first, and a time not today carries its day (v38.66)',
     test: async()=>{
       var realAt=_userActiveAt, realPoll=_livePollAt, realLs=null, realNotices=Object.assign({}, _serverNotices);

@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v38.77 -->
+<!-- Tony's Recipes Collection v38.78 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -4589,10 +4589,13 @@ function renderAccessMembers() {
   var roleColors  = { read:'#EEF2FF:#3451CC', write:'#EAF5E9:#2E7D32', admin:'#FFF0E8:#C1440E' };
   el.innerHTML = members.map(function(m, i) {
     var parts = (roleColors[m.role]||'#F5F5F5:#555').split(':');
+    // v38.78 — 💬 Chat beside each person in the household (not beside a place kept for an address: nobody yet)
+    var chatBtn = (m.uid && window._fbUser && m.uid !== _fbUser.uid)
+      ? '<button class="access-role-btn" onclick="openFamilyChat(' + jsA(m.uid) + ')" style="margin-right:4px;">\u{1F4AC} Chat</button>' : '';
     if (viewOnly) return '<div class="access-row">' +
       '<div class="access-avatar">' + escH(m.email[0].toUpperCase()) + '</div>' +
       '<div class="access-info"><div class="access-name" data-no-i18n>' + escH(m.name||m.email.split('@')[0]) + '</div>' +
-      '<div class="access-email" data-no-i18n>' + escH(m.email) + '</div></div>' +
+      '<div class="access-email" data-no-i18n>' + escH(m.email) + '</div></div>' + chatBtn +
       '<div class="access-badge">' + roleLabels[m.role] + '</div></div>';
     return '<div class="access-row">' +
       '<div class="access-avatar">' + escH(m.email[0].toUpperCase()) + '</div>' +
@@ -4601,6 +4604,7 @@ function renderAccessMembers() {
       '<div class="access-info"><div class="access-name" data-no-i18n>' + escH(m.name||m.email.split('@')[0]) + '</div>' +
       '<div class="access-email" data-no-i18n>' + escH(m.email) + '</div>' +
       (m.asks ? '<div class="access-email" style="color:var(--terracotta);font-weight:600;">\u270b asks to add and change recipes</div>' : '') + '</div>' +
+      chatBtn +
       (m.asks ? '<button class="access-role-btn" style="margin-right:4px;background:var(--gold);" onclick="householdAnswerAsk(' + i + ',true)">\u2705 Allow</button>'
               + '<button class="access-remove-btn" style="margin-right:4px;" onclick="householdAnswerAsk(' + i + ',false)">Decline</button>' : '') +
       '<select class="access-role-btn" data-i18n-skip-attrs="aria-label" aria-label="Role for ' + escA(m.email) + '" onchange="changeAccessRole(' + i + ',this.value)" style="margin-right:4px;">' +
@@ -5846,6 +5850,212 @@ window.openKitchenChats = openKitchenChats; window.closeKitchenChats = closeKitc
 window.kitchenChatSend = kitchenChatSend; window.kitchenChatKey = kitchenChatKey; window.talkOtherName = talkOtherName;
 window.talkSend = talkSend; window.talkMarkSeen = talkMarkSeen; window.talkReply = talkReply; window.talkLastFrom = talkLastFrom; window.talkLoad = talkLoad; window.talkPersonal = talkPersonal;
 window.talkNewCount = talkNewCount; window.talkPair = talkPair; window.talkPrivacyOk = talkPrivacyOk; window.talkHtml = talkHtml;
+// ─── CHAT WITH FAMILY MEMBERS (v38.78) ───────────────────────────────────────
+// Tony, 21 Oct 2026: "Please extend the ability to chat with Joined Kitchens to the family members in a household as
+// well. Add another button, above the 'Chat with joint kitchens' button, titled 'Chat with family members' and use the
+// same mechanism … Allow 2 modes of communication: 1-to-1 and 1-to all (announcements). I should be able to select with
+// which family members I wish to chat, or send a chat to all family members together (a joint chat room). Also, next to
+// each family member in the 'Family Access' modal, add a 'Chat' button" — "for members within the same household".
+// The household's own `talk/<id>` = { by, name, text, at, to: 'all' | a member's uid } (and `talkIds/<id>`, the id
+// alone, so that deleting the household finds 1-to-1 messages its owner may not read). Three live questions — to
+// everyone, to me, by me — however many people (each costs a read only when something arrives), and none while nobody
+// else is in the household. A conversation ("room") is 'all' or the other person's uid. What is new is told by ids
+// (v38.76's lesson: Firestore hands a write to its listener before the write resolves).
+var FAM_SEEN_KEY = 'mkn_fam_seen_';
+var _fam = { hid: '', parts: [{}, {}, {}], local: {}, unsubs: [], with: null, standIn: null };
+function famPeople() {
+  if (_fam.standIn) return _fam.standIn;                                       // the phrase harvest's stand-ins
+  if (!_household || !window._fbUser) return [];
+  var me = _fbUser.uid, out = [];
+  if (_household.ownerUid && _household.ownerUid !== me)
+    out.push({ uid: _household.ownerUid, name: _household.ownerName || '', email: _household.ownerEmail || '' });
+  getAccessMembers().forEach(function(m){
+    if (m.uid && m.uid !== me && !out.some(function(x){ return x.uid === m.uid; })) out.push({ uid: m.uid, name: m.name || '', email: m.email || '' });
+  });
+  return out;
+}
+function famPersonName(uid) {
+  var p = famPeople().filter(function(x){ return x.uid === uid; })[0];
+  if (p) return p.name || String(p.email || '').split('@')[0] || 'Someone';
+  var all = famAll();
+  for (var i = all.length - 1; i >= 0; i--) if (all[i].by === uid && all[i].name) return all[i].name;
+  return 'Someone who left';
+}
+function famMyName() {
+  var u = window._fbUser || {};
+  return String(u.displayName || String(u.email || '').split('@')[0] || 'Me').slice(0, 80);
+}
+function famAll() {
+  var map = {};
+  Object.keys(_fam.local).forEach(function(k){ map[k] = _fam.local[k]; });
+  _fam.parts.forEach(function(p){ Object.keys(p).forEach(function(k){ map[k] = p[k]; delete _fam.local[k]; }); });
+  return Object.keys(map).map(function(k){ return map[k]; });
+}
+function famRoomOf(m) { var me = window._fbUser && _fbUser.uid; return m.to === 'all' ? 'all' : (m.by === me ? m.to : m.by); }
+function famIn(room) {
+  return famAll().filter(function(m){ return famRoomOf(m) === room; })
+    .sort(function(a, b){ return (a.at || 0) - (b.at || 0) || String(a.id).localeCompare(String(b.id)); });
+}
+function famSeenMap() { try { return JSON.parse(localStorage.getItem(FAM_SEEN_KEY + (_household && _household.hid)) || '{}') || {}; } catch(e) { return {}; } }
+function famNewIn(room) {
+  var me = window._fbUser && _fbUser.uid, seen = famSeenMap()[room] || 0;
+  return famIn(room).filter(function(m){ return m.by !== me && (m.at || 0) > seen; }).length;
+}
+function famNewCount() { return ['all'].concat(famPeople().map(function(p){ return p.uid; })).reduce(function(n, r){ return n + famNewIn(r); }, 0); }
+function famMarkSeen(room) {
+  if (!_household || !room) return;
+  var map = famSeenMap(), last = 0;
+  famIn(room).forEach(function(m){ if ((m.at || 0) > last) last = m.at; });
+  map[room] = Math.max(last, map[room] || 0);
+  try { localStorage.setItem(FAM_SEEN_KEY + _household.hid, JSON.stringify(map)); } catch(e) {}
+  famDotRefresh();
+}
+function famDotRefresh() { pathDots({ family: famNewCount() }); }
+function famLiveStop() {
+  _fam.unsubs.forEach(function(u){ try { u(); } catch(e) {} });
+  _fam.unsubs = []; _fam.hid = ''; _fam.parts = [{}, {}, {}]; _fam.local = {};
+}
+function famLiveStart(force) {
+  var db = hhDb();
+  if (!_household || !db || !window._fbUser || cloudLayout() !== 'households' || (_selfTestRunning && !force)) return false;
+  if (_fam.hid === _household.hid && _fam.unsubs.length) return true;
+  famLiveStop();
+  if (!famPeople().length) { famDotRefresh(); return false; }                 // nobody to talk to: nothing asked
+  var hid = _fam.hid = _household.hid, me = _fbUser.uid, col = hhRef(hid).collection('talk');
+  [col.where('to', '==', 'all'), col.where('to', '==', me), col.where('by', '==', me)].forEach(function(q, qi){
+    if (typeof q.onSnapshot !== 'function') return;
+    var first = true;
+    _fam.unsubs.push(q.onSnapshot(function(snap){
+      if (_fam.hid !== hid) return;
+      var before = {}, part = {}, fresh = [];
+      famAll().forEach(function(m){ before[m.id] = 1; });
+      snap.forEach(function(d){ var m = d.data() || {}; m.id = d.id; part[d.id] = m; if (!first && !before[d.id]) fresh.push(m); });
+      _fam.parts[qi] = part;
+      first = false;
+      famArrived(fresh);
+    }, function(e){ syncLog('error', 'Could not listen to the family chat', String(e && (e.code || e.message)).slice(0, 120)); }));
+  });
+  return true;
+}
+function famArrived(fresh) {
+  var me = window._fbUser && _fbUser.uid, theirs = (fresh || []).filter(function(m){ return m.by !== me; });
+  var win = !!document.getElementById('famBody');
+  if (win) renderFamilyChat();
+  famDotRefresh();
+  if (!theirs.length) return;
+  var m = theirs[theirs.length - 1], room = famRoomOf(m);
+  if (win && _fam.with === room) return;                                       // on the screen already
+  var text = String(m.text || '');
+  toastAction('\u{1F46A} ' + (m.name || famPersonName(m.by)) + (m.to === 'all' ? ' (to everyone)' : '') + ': “'
+    + (text.length > 70 ? text.slice(0, 70) + '…' : text) + '”', 'Open', function(){ openFamilyChat(room); }, 9000);
+}
+async function openFamilyChat(room) {
+  if (!_household || !window._fbUser) { toast('Sign in first.', 5000); return null; }
+  _fam.with = room || null;
+  var ov = document.getElementById('familyChatOverlay');
+  if (!ov) {
+    ov = document.createElement('div');
+    ov.id = 'familyChatOverlay'; ov.className = 'modal-overlay open';
+    ov.innerHTML = '<div class="ask-card" role="dialog" aria-modal="true" aria-labelledby="famTitle" style="max-width:540px;width:94%;text-align:start;max-height:88vh;overflow-y:auto;">'
+      + '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><div class="ask-title" id="famTitle" style="margin:0;">\u{1F46A} Chat with family members</div>'
+      + '<button type="button" class="modal-close" style="position:relative;top:auto;right:auto;" aria-label="Close" onclick="closeFamilyChat()">✕</button></div>'
+      + '<div id="famBody"></div></div>';
+    ov.onclick = function(e){ if (e.target === ov) closeFamilyChat(); };
+    document.body.appendChild(ov);
+  }
+  famLiveStart();                                                              // someone may have joined since
+  renderFamilyChat(true);
+  return ov;
+}
+function closeFamilyChat() { var o = document.getElementById('familyChatOverlay'); if (o) o.remove(); _fam.with = null; }
+function famKey(e) { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); famSend(); } }
+// (names are data: apart from the words, so "Everyone in {1}" is one phrase to translate, whatever the kitchen)
+function famRoomTitleHtml(room) {
+  var name = function(t){ return '<span data-no-i18n dir="auto">' + escH(t) + '</span>'; };
+  return room === 'all' ? '\u{1F4E3} Everyone in ' + name((_household && _household.name) || '\u00b7') : name(famPersonName(room));
+}
+function renderFamilyChat(focus) {
+  var body = document.getElementById('famBody');
+  if (!body || !_household) return;
+  var me = window._fbUser && _fbUser.uid, people = famPeople(), when = function(t){ return t ? new Date(t).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }) : ''; };
+  if (!people.length) {
+    body.innerHTML = '<div style="font-size:13px;line-height:1.6;padding:10px 0 4px;">Nobody else is in your household yet. Invite your family — ⚙️ → \u{1F3E0} My household → \u{1F465} Family Access → \u{1F517} Invitation link — and you can write to them here: to everyone at once, or to one person.</div>';
+    return;
+  }
+  var room = _fam.with;
+  if (room && room !== 'all' && !people.some(function(p){ return p.uid === room; }) && !famIn(room).length) room = _fam.with = null;
+  if (!room) {
+    var rows = [{ r: 'all', title: famRoomTitleHtml('all'), sub: 'Announcements — everyone in your household reads them' }]
+      .concat(people.map(function(p){ return { r: p.uid, title: famRoomTitleHtml(p.uid), sub: 'Only the two of you read this' }; }));
+    rows.forEach(function(x){ var l = famIn(x.r); x.last = l[l.length - 1]; x.at = x.last ? (x.last.at || 0) : 0; x.n = famNewIn(x.r); });
+    var head = rows.shift();
+    rows.sort(function(a, b){ return b.at - a.at; });
+    rows.unshift(head);
+    body.innerHTML = '<div style="font-size:12.5px;color:var(--muted);margin:6px 0 10px;line-height:1.5;">Only the people in your household. Write to everyone at once, or to one person.</div>'
+      + rows.map(function(x){
+          var txt = x.last ? String(x.last.text || '') : '';
+          return '<button type="button" class="kc-row" onclick="openFamilyChat(' + jsA(x.r) + ')" style="display:block;width:100%;text-align:start;background:var(--card-bg);border:1px solid var(--border);'
+            + (x.n ? 'border-inline-start:4px solid var(--danger);' : '') + 'border-radius:10px;padding:10px 12px;margin-bottom:8px;cursor:pointer;font-family:inherit;color:var(--ink);">'
+            + '<span style="display:flex;justify-content:space-between;gap:8px;align-items:baseline;"><b>' + x.title + '</b>'
+            + '<span style="font-size:11px;color:var(--muted);white-space:nowrap;">' + escH(when(x.at)) + (x.n ? ' <b style="color:var(--danger);">• ' + x.n + ' new</b>' : '') + '</span></span>'
+            + '<span style="display:block;font-size:12px;color:var(--muted);margin-top:2px;">' + escH(x.sub) + '</span>'
+            + (txt ? '<span data-no-i18n dir="auto" style="display:block;font-size:13px;margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + (x.last.by === me ? '↪ ' : (x.r === 'all' ? escH(x.last.name || famPersonName(x.last.by)) + ': ' : '')) + escH(txt) + '</span>'
+                   : '<span style="display:block;font-size:12.5px;color:var(--muted);margin-top:4px;">No messages yet — say hello.</span>')
+            + '</button>';
+        }).join('');
+    return;
+  }
+  var msgs = famIn(room);
+  var keep = document.getElementById('famIn'), typed = keep ? keep.value : '', hadFocus = !!keep && document.activeElement === keep;
+  var list = msgs.map(function(m){
+    var mine = m.by === me;
+    return '<div style="display:flex;justify-content:' + (mine ? 'flex-end' : 'flex-start') + ';margin:5px 0;">'
+      + '<div style="max-width:84%;padding:7px 10px;border-radius:12px;font-size:13.5px;line-height:1.45;white-space:pre-wrap;'
+      + (mine ? 'background:var(--note-bg);' : 'background:var(--card-bg);border:1px solid var(--border);') + '">'
+      + '<div dir="auto" data-no-i18n>' + escH(m.text || '') + '</div>'
+      + '<div style="font-size:10.5px;color:var(--muted);margin-top:3px;text-align:end;">' + (mine ? 'You' : '<span data-no-i18n>' + escH(m.name || famPersonName(m.by)) + '</span>') + (m.at ? ' · ' + escH(when(m.at)) : '') + '</div>'
+      + '</div></div>';
+  }).join('');
+  body.innerHTML = '<button type="button" onclick="_fam.with=null;renderFamilyChat()" style="background:none;border:none;color:var(--terracotta);font-weight:600;font-size:13px;cursor:pointer;padding:6px 0;font-family:inherit;">‹ All chats</button>'
+    + '<div style="margin:4px 0 8px;"><b style="font-size:15px;color:var(--heading);">' + famRoomTitleHtml(room) + '</b>'
+    + '<div style="font-size:12px;color:var(--muted);">' + (room === 'all' ? 'Everyone in your household reads this.' : 'Only the two of you read this.') + '</div></div>'
+    + '<div id="famMsgs" style="max-height:48vh;overflow-y:auto;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:6px 10px;">'
+    + (list || '<div style="font-size:13px;color:var(--muted);padding:10px 0;text-align:center;">No messages yet — say hello. \u{1F44B}</div>') + '</div>'
+    + '<div style="display:flex;gap:6px;margin-top:8px;align-items:flex-end;">'
+    + '<textarea id="famIn" rows="2" maxlength="500" dir="auto" onkeydown="famKey(event)" aria-label="Your message" placeholder="Write a message… (Enter sends, Shift+Enter for a new line)" '
+    + 'style="flex:1;padding:9px;border:1px solid var(--border);border-radius:10px;background:var(--card-bg);color:var(--ink);font:inherit;font-size:13.5px;resize:vertical;"></textarea>'
+    + '<button type="button" id="famSendBtn" onclick="famSend()" style="padding:10px 14px;border-radius:10px;border:none;background:var(--terracotta-fill);color:#fff;font-weight:700;cursor:pointer;min-height:42px;font-family:inherit;">Send</button></div>';
+  var box = document.getElementById('famIn');
+  if (box) { box.value = typed; if (focus || hadFocus) box.focus(); }
+  var ml = document.getElementById('famMsgs'); if (ml) ml.scrollTop = ml.scrollHeight;
+  if (famNewIn(room)) famMarkSeen(room);                                       // on the screen: read
+}
+async function famSend() {
+  var box = document.getElementById('famIn'), text = box ? box.value.trim() : '', room = _fam.with;
+  if (!text || !room || !_household || !window._fbUser) return false;
+  if (room !== 'all' && !famPeople().some(function(p){ return p.uid === room; })) { toast('They are no longer in your household.', 6000); return false; }
+  var btn = document.getElementById('famSendBtn'); if (btn) btn.disabled = true;
+  var col = hhRef(_household.hid).collection('talk'), ref = col.doc(), b = hhDb().batch();
+  var m = { by: _fbUser.uid, name: famMyName(), text: text.slice(0, 500), at: Date.now(), to: room };
+  b.set(ref, m);
+  b.set(hhRef(_household.hid).collection('talkIds').doc(ref.id), {});
+  try { await b.commit(); }
+  catch(e) {
+    showServiceError('Your message could not be sent: ' + ((e && e.message) || e) + '\n\nIt is still in the box.');
+    return false;
+  } finally { btn = document.getElementById('famSendBtn'); if (btn) btn.disabled = false; }
+  m.id = ref.id;
+  if (!famAll().some(function(x){ return x.id === m.id; })) _fam.local[m.id] = m;   // the listener has it already, as a rule
+  box = document.getElementById('famIn');                                    // the box on the screen NOW (v38.77)
+  if (box) { if (box.value.trim() === text) box.value = ''; box.focus(); }
+  famMarkSeen(room);
+  syncLog('save', 'Wrote to the family', { to: room === 'all' ? 'everyone' : 'one person', chars: m.text.length });
+  renderFamilyChat();
+  return true;
+}
+window.openFamilyChat = openFamilyChat; window.closeFamilyChat = closeFamilyChat; window.renderFamilyChat = renderFamilyChat;
+window.famSend = famSend; window.famKey = famKey; window.famLiveStart = famLiveStart; window.famLiveStop = famLiveStop;
+window.famPeople = famPeople; window.famNewCount = famNewCount; window._fam = _fam;
 async function linkReqAct(i, what) {
   var r = _linkState.pending[i];
   if (!r || !householdCanManage()) return false;
@@ -5890,19 +6100,22 @@ var PATH_DOTS = {
   links:    ['.set-group[data-group="household"] > .set-head', '#linkRequestsItem'],
   feedback: ['.set-group[data-group="owner"] > .set-head', '#settingsDrop [onclick*="openManagement"]'],
   replies:  ['.set-group[data-group="help"] > .set-head', '#fbRepliesItem'],     // v38.00 — an answer to my note
-  chats:    ['[onclick="toggleDrop(\'moreDrop\')"]', '#kitchenChatsItem']        // v38.50 — a new message, by this way too
+  chats:    ['[onclick="toggleDrop(\'moreDrop\')"]', '#kitchenChatsItem'],       // v38.50 — a new message, by this way too
+  family:   ['[onclick="toggleDrop(\'moreDrop\')"]', '#familyChatItem']          // v38.78 — a message in the household
 };
 function pathDots(counts) {
   Object.keys(counts || {}).forEach(function(k){ _pathDots[k] = Math.max(0, +counts[k] || 0); });
-  var any = 0;
+  // v38.78 — a place several sources mark (⋯ More: the kitchens' chats and the family's) shows a dot while ANY has news
+  var any = 0, per = {}, order = [];
   Object.keys(PATH_DOTS).forEach(function(k){
     var n = _pathDots[k] || 0; any += n;
-    PATH_DOTS[k].forEach(function(sel){
-      var el = document.querySelector(sel); if (!el) return;
-      var dot = el.querySelector(':scope > .path-dot');
-      if (n && !dot) { dot = document.createElement('span'); dot.className = 'path-dot'; dot.setAttribute('aria-hidden', 'true'); dot.setAttribute('data-no-i18n', ''); el.appendChild(dot); }
-      if (!n && dot) dot.remove();
-    });
+    PATH_DOTS[k].forEach(function(sel){ if (!(sel in per)) { per[sel] = 0; order.push(sel); } per[sel] += n; });
+  });
+  order.forEach(function(sel){
+    var el = document.querySelector(sel); if (!el) return;
+    var n = per[sel], dot = el.querySelector(':scope > .path-dot');
+    if (n && !dot) { dot = document.createElement('span'); dot.className = 'path-dot'; dot.setAttribute('aria-hidden', 'true'); dot.setAttribute('data-no-i18n', ''); el.appendChild(dot); }
+    if (!n && dot) dot.remove();
   });
   var d = document.getElementById('feedbackDot');
   if (d) { d.hidden = !any; d.className = any ? 'fb-dot-new' : ''; }
@@ -5921,6 +6134,7 @@ window.pathDots = pathDots;
 // which cannot call back: asked every two minutes while the app is on screen, and as soon as it is back on screen.
 var _live = { hid: '', unsubs: [], talk: {}, mine: {} };
 function linkLiveStop() {
+  if (typeof famLiveStop === 'function') famLiveStop();           // v38.78
   _live.unsubs.forEach(function(u){ try { u(); } catch(e) {} });
   Object.keys(_live.talk).forEach(function(k){ try { _live.talk[k](); } catch(e) {} });
   Object.keys(_live.recipes || {}).forEach(function(k){ try { _live.recipes[k](); } catch(e) {} if (_linkCache[k]) _linkCache[k].live = false; });   // v38.52
@@ -5947,6 +6161,7 @@ function linkLiveStart(force) {
   }
   linkLiveTalk();
   linkLiveRecipes();                                              // v38.52 — their recipes, live
+  famLiveStart(force);                                            // v38.78 — the household's own chat
   return true;
 }
 // v38.52 — Tony: "Tester1 has updated its recipes, but Admin, who is joined to their kitchen cannot see the changes
@@ -6697,6 +6912,7 @@ async function householdLoadMembers() {
     } catch(e) {}
   }
   try { localStorage.setItem(ACCESS_STORAGE_KEY, JSON.stringify(list)); } catch(e) {}
+  if (typeof famLiveStart === 'function' && _live.hid === _household.hid) famLiveStart();   // v38.78 — someone joined: now there is someone to talk to
   return list;
 }
 var _hhAsksTold = {};
@@ -6799,6 +7015,8 @@ function householdRenderBar() {
   var on = document.getElementById('ownerName'), oe = document.getElementById('ownerEmail');
   if (on) on.textContent = h.ownerName || (h.ownerEmail || '').split('@')[0] || '—';
   if (oe) oe.textContent = h.ownerEmail || '—';
+  var oc = document.getElementById('ownerChatBtn');                             // v38.78 — the owner too, if that is not me
+  if (oc) oc.style.display = (h.ownerUid && window._fbUser && h.ownerUid !== _fbUser.uid) ? '' : 'none';
 }
 // v37.12 — joining another household later, from an invitation link that
 // was sent (the welcome takes one only at the very first sign-in).
@@ -7085,6 +7303,11 @@ async function householdWipe(hid, onStep) {
     snap.forEach(function(d){ refs.push(d.ref); });
     await inBatches(refs);
   }
+  try {   // v38.78 — the household's own chat: by its ids (1-to-1 messages are not the owner's to read)
+    var ti = await hhRef(hid).collection('talkIds').get(), trefs = [];
+    ti.forEach(function(d){ trefs.push(hhRef(hid).collection('talk').doc(d.id)); trefs.push(d.ref); });
+    await inBatches(trefs);
+  } catch(e) { syncLog('error', 'Could not delete the household\u2019s chat', String(e && e.message).slice(0, 160)); }
   if (onStep) onStep(4, 'Removing the members…');
   var rq = await hhRef(hid).collection('requests').get(), rrefs = [];
   rq.forEach(function(d){ rrefs.push(d.ref); });
@@ -8882,7 +9105,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v38.77';
+var APP_VERSION = 'v38.78';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -11929,7 +12152,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.77</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.78</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -12017,7 +12240,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.77</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.78</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -12161,6 +12384,8 @@ body.banner-shown .header {
           <button class="drop-item" id="waLinksItem" data-feature="whatsapp" onclick="closeDrop('moreDrop');openWaLinks()">🧺 Recipes hiding in my chats</button>
           <button class="drop-item" onclick="closeDrop('moreDrop');openWhatCanIMake()">🥫 What can I make with what I have?</button>
           <button class="drop-item" data-layout-only="households" title="Link your kitchen with another household: once they agree, each of you sees the other's recipes, read-only." onclick="closeDrop('moreDrop');openConnectHousehold()">🤝 Connect with another household</button>
+          <!-- v38.78 — Tony: "Add another button, above the 'Chat with joint kitchens' button, titled 'Chat with family members'" -->
+          <button class="drop-item" id="familyChatItem" data-layout-only="households" onclick="closeDrop('moreDrop');openFamilyChat()">👪 Chat with family members</button>
           <button class="drop-item" id="kitchenChatsItem" data-layout-only="households" onclick="closeDrop('moreDrop');openKitchenChats()">💬 Chats with linked kitchens</button>
           <button class="drop-item" onclick="closeDrop('moreDrop');openShareAppModal()"><span aria-hidden="true" data-no-i18n style="display:inline-flex;"><svg class="share-ico" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="11.5" fill="#C1440E"/><path d="M7.2 12 14.8 7.6M7.2 12 14.8 16.4" stroke="#FFFFFF" stroke-width="1.9" stroke-linecap="round"/><circle cx="15" cy="7.4" r="2.6" fill="#FFFFFF"/><circle cx="7" cy="12" r="2.6" fill="#FFFFFF"/><circle cx="15" cy="16.6" r="2.6" fill="#FFFFFF"/></svg></span> <span id="shareAppMenuText">Share this app</span></button>
         <div style="height:1px;background:var(--border);margin:4px 0;"></div>
@@ -14757,7 +14982,7 @@ function i18nHarvestSignIn() {
 // the one it saw. Read-only: no reader or writer is called.
 function i18nHarvestDemand() {
   var keep = { hh: window._household, user: window._fbUser, ls: _linkState, talk: _talk, open: _talkOpen, recipes: recipes };
-  var gone = ['aboutOverlay', 'termsGate', 'linkReqOverlay', 'feedbackOverlay', 'deviceOfferOverlay', 'extOfferOverlay',
+  var gone = ['aboutOverlay', 'termsGate', 'linkReqOverlay', 'familyChatOverlay', 'feedbackOverlay', 'deviceOfferOverlay', 'extOfferOverlay',
               'logNudge', 'importErrorModal', 'serviceErrorOverlay', 'emailModalOverlay', 'farmOverlay'];
   var clear = function(){ gone.forEach(function(id){ var o = document.getElementById(id); if (o) o.remove(); }); };
   var fixtureId = 888701;
@@ -14783,6 +15008,19 @@ function i18nHarvestDemand() {
         renderLinkRequestsPage(); i18nCollect();
         _household.role = 'viewer'; renderLinkRequestsPage();
       },
+      function(){
+        // v38.78 — the family chat: its list, the room for everyone, a 1-to-1, and "nobody else yet" — from stand-ins
+        window._household = window._household || { hid: 'hH', role: 'owner', name: '\u00b7', code: '' };
+        window._fbUser = window._fbUser || { uid: 'i18n-harvest', email: 'someone@example.invalid' };
+        var ov = document.createElement('div'); ov.id = 'familyChatOverlay'; ov.className = 'modal-overlay open';
+        ov.innerHTML = '<div class="ask-card"><div id="famBody"></div></div>';
+        document.body.appendChild(ov);
+        _fam.standIn = [{ uid: 'uP', name: '\u00b7', email: '' }];
+        _fam.with = null; renderFamilyChat(); i18nCollect();
+        _fam.with = 'all'; renderFamilyChat(); i18nCollect();
+        _fam.with = 'uP'; renderFamilyChat(); i18nCollect();
+        _fam.standIn = []; _fam.with = null; renderFamilyChat();
+      },
       function(){ openFeedbackForm(); },
       function(){ farmSettingsDraw(); },
       function(){ deviceOfferDialog('ios', true); i18nCollect(); deviceOfferDialog('android', true); i18nCollect(); deviceOfferDialog('computer', true); },
@@ -14800,6 +15038,7 @@ function i18nHarvestDemand() {
     clear();
     recipes = keep.recipes;
     window._household = keep.hh; window._fbUser = keep.user; _linkState = keep.ls; _talk = keep.talk; _talkOpen = keep.open;
+    _fam.standIn = null; _fam.with = null;
     document.body.classList.remove('i18n-harvesting');
   }
 }
@@ -28831,6 +29070,7 @@ function appFeatureSections(all) {
     { icon: '\u{1F91D}', title: 'Cook together', items: [
       'One cookbook for your household: invite family and friends by e-mail or with a link, and everyone sees and adds the same recipes.',
       'Choose who may change things: owners, admins, editors and viewers.',
+      'Chat with the people in your household: one person at a time, or everyone at once for announcements.',
       'Link with other households you know: each sees the other’s recipes, and you can write to each other in the app.',
       'Keep your own copy of a recipe from a linked household.',
       'Ask to join a household, or to link with one, by e-mail or by its identifier (MKN-…) — and accept, decline or block the requests you get.',
@@ -30467,6 +30707,7 @@ var HELP_SYSTEM_PROMPT = [
   "- A REQUEST SENT TO YOUR E-MAIL ADDRESS shows in 📬 Link requests only once that address is CONFIRMED (an account made with e-mail and a password must confirm it from the e-mail sent to it). Not confirmed yet? The Link requests page says so (\"is NOT confirmed yet\"), sends the confirmation e-mail again, and notices by itself, when opened, that it has been confirmed.",
   "- Once linked, each household sees the other's recipes, read-only — and live: a change in their kitchen shows in yours within seconds, the changed card glowing for a moment: after its own in the main list, under that household's name, on a faint blue (hover one: 'A recipe from …'). 🏠 Kitchens ▾ in the filter bar chooses whose recipes show — tick one, several or all. 📥 Save a copy to my recipes makes one your own. Links do not chain: a third household linked to theirs is not seen. Links are listed, and removed, in ⚙️ → 🏠 My household → 👥 Family Access. ⚙️ → 🏠 My household → 🤝 Link requests through the app: blocked stops requests by identifier; requests by e-mail always arrive.",
   "- 📬 LINK REQUESTS: ⚙️ → 🏠 My household → 📬 Link requests — the number in brackets beside it is how many wait for an answer. Every request in one place: Waiting (Accept / Reject / 🚫 Block), Sent by your household (Withdraw), Linked now (Revoke access), and earlier answers. A request may carry a note, and the two households can write to each other there — the latest message shows, highlighted, with ↩ Reply; earlier ones are under 💬 Conversation. Only the household's name is shown, never a person's. Reject is for now: if they ask again — by identifier or by e-mail — their request is back under Waiting. 🚫 Block is for good, until you Unblock it under the earlier answers; they are never told, and on their side it reads “waiting”. A new message or request arrives while the app is open: a red dot (and a short notice with Open) within seconds, no reload needed. A red dot on ⚙️ leads to anything new. The switch there decides whether other households may ask through the app at all.",
+  "- 👪 CHAT WITH FAMILY MEMBERS (the people in YOUR household only): ⋯ More → 👪 Chat with family members — or 💬 Chat beside a person in 👥 Family Access. 📣 Everyone in <your kitchen> is the room for announcements: everyone in the household reads it. Or choose one person: only the two of you read that conversation. Everyone in the household can write, readers too. Messages arrive live: a short notice with Open, and a red dot on ⋯ More until you have read them. Nothing is changed or deleted afterwards; deleting the household deletes them.",
   "- 💬 CHATS WITH LINKED KITCHENS: ⋯ More → 💬 Chats with linked kitchens — or 💬 Chat beside a linked kitchen's name in your recipe list, or in 👥 Family Access. Every conversation, newest first, with what is new; open one to read it all and write (Enter sends, Shift+Enter starts a new line). The same conversations are also on 📬 Link requests. A red dot on ⋯ More and on ⚙️ says something new arrived.",
   "- A household's identifier works only within the same copy of the app: the family's copy and My Kitchen Notes keep their households apart.",
   "",
@@ -36042,6 +36283,7 @@ window.onHeaderScroll = onHeaderScroll;
             <div class="access-name" id="ownerName" data-no-i18n>—</div>
             <div class="access-email" id="ownerEmail" data-no-i18n>—</div>
           </div>
+          <button class="access-role-btn" id="ownerChatBtn" style="display:none;margin-right:4px;" onclick="openFamilyChat(_household &amp;&amp; _household.ownerUid)">💬 Chat</button>
           <div class="access-badge access-badge-full">Full access</div>
         </div>
       </div>

@@ -95,6 +95,8 @@ service cloud.firestore {
     //   linkRequests/{id}                   asking to link (v37.53, below)
     //   households/{hid}/requestLog/{other} what became of a request, and who is blocked (v37.80)
     //   linkTalk/{a}_{b}/messages/{id}      two households talking about a link (v37.81)
+    //   households/{hid}/talk/{id}          the household talking among itself: to everyone, or one person (v38.78)
+    //   households/{hid}/talkIds/{id}       the same ids, nothing else — for deleting the household (v38.78)
     //   i18n/{lang}                         interface translations, for EVERY household
     //   users/{uid}/…                       each person's own, and nobody else's
     //
@@ -323,6 +325,38 @@ service cloud.firestore {
         allow read: if isMember(hid) || beingDeleted(hid);
         allow create, update: if atLeast(hid, 'editor');
         allow delete: if atLeast(hid, 'admin') || beingDeleted(hid);
+      }
+      // v38.78 — Tony, 21 Oct 2026: "extend the ability to chat with Joined Kitchens to the family members in a
+      // household … 2 modes of communication: 1-to-1 and 1-to all (announcements)" — "for members within the same
+      // household". `talk/<id>` = { by, name, text, at, to }: `to` 'all' — everyone in the household reads it — or one
+      // member's uid — only the two of them. Anyone in it writes (a reader too: talking is not editing recipes),
+      // signed with their own uid; nothing is changed afterwards. `talkIds/<id>` = {} — the same id and nothing else,
+      // written in the same batch: how the owner's "Delete this household" finds the 1-to-1 messages it may not read.
+      match /talk/{id} {
+        allow read: if (isMember(hid) && (resource.data.to == 'all' || resource.data.to == request.auth.uid
+                                          || resource.data.by == request.auth.uid))
+          || beingDeleted(hid);
+        allow create: if isMember(hid)
+          && request.resource.data.keys().hasOnly(['by', 'name', 'text', 'at', 'to'])
+          && request.resource.data.by == request.auth.uid
+          && request.resource.data.name is string && request.resource.data.name.size() <= 80
+          && request.resource.data.text is string && request.resource.data.text.size() > 0
+          && request.resource.data.text.size() <= 500
+          && request.resource.data.at is int
+          && request.resource.data.to is string
+          && (request.resource.data.to == 'all'
+              || (request.resource.data.to != request.auth.uid && exists(memberPath(hid, request.resource.data.to))))
+          && existsAfter(/databases/$(database)/documents/households/$(hid)/talkIds/$(id));
+        allow update: if false;
+        allow delete: if atLeast(hid, 'owner') || beingDeleted(hid);
+      }
+      match /talkIds/{id} {
+        allow read: if isMember(hid) || beingDeleted(hid);
+        allow create: if isMember(hid) && request.resource.data.keys().size() == 0
+          && existsAfter(/databases/$(database)/documents/households/$(hid)/talk/$(id))
+          && getAfter(/databases/$(database)/documents/households/$(hid)/talk/$(id)).data.by == request.auth.uid;
+        allow update: if false;
+        allow delete: if atLeast(hid, 'owner') || beingDeleted(hid);
       }
       match /state/{doc} {
         // v38.65 — and a linked household reads the index (`meta`: which recipes there are) and nothing else in state,

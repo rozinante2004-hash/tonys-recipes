@@ -388,6 +388,45 @@ await check('…nor under an old name',                         lenaCode(12, { f
 await check('…nor as refused',                                lenaCode(12, { declined: true }), false);
 await check('…nor towards another household',                 lenaCode(12, { to: 'L1' }), false);
 
+// v38.78 — the household talking among itself: households/<hid>/talk/<id> { by, name, text, at, to: 'all' | uid },
+// with households/<hid>/talkIds/<id> = {} in the same batch. In L5: max (owner), nora and otto (readers).
+const otto = person('otto');
+await check('v38.78: otto joins L5 too', join(otto, 'L5', 'otto', 'viewer', 'INV-L5'), true);
+const famMsg = (by, to, extra) => Object.assign({ by, name: by, text: 'Dinner at 7?', at: 5, to }, extra || {});
+const famSend = (db, id, data, opts) => { const b = writeBatch(db);
+  b.set(doc(db, 'households/L5/talk/' + id), data);
+  if (!(opts && opts.noIndex)) b.set(doc(db, 'households/L5/talkIds/' + id), (opts && opts.index) || {});
+  return b.commit(); };
+await check('nora (a reader) writes to everyone in her household', famSend(nora, 'f1', famMsg('nora', 'all')), true);
+await check('…not without its id beside it',                  famSend(nora, 'f2', famMsg('nora', 'all'), { noIndex: true }), false);
+await check('…nor with anything in the id\'s document',       famSend(nora, 'f3', famMsg('nora', 'all'), { index: { text: 'x' } }), false);
+await check('…nor in someone else\'s name',                   famSend(nora, 'f4', famMsg('max', 'all')), false);
+await check('…nor to someone outside the household',          famSend(nora, 'f5', famMsg('nora', 'lena')), false);
+await check('…nor to herself',                                famSend(nora, 'f6', famMsg('nora', 'nora')), false);
+await check('…nor longer than 500 characters',                famSend(nora, 'f7', famMsg('nora', 'all', { text: 'x'.repeat(501) })), false);
+await check('…nor with anything else in it',                  famSend(nora, 'f8', famMsg('nora', 'all', { phone: '1' })), false);
+await check('a stranger does not write to L5',                (() => { const b = writeBatch(carol);
+  b.set(doc(carol, 'households/L5/talk/f9'), famMsg('carol', 'all')); b.set(doc(carol, 'households/L5/talkIds/f9'), {}); return b.commit(); })(), false);
+await check('nora writes to max alone (1-to-1)',               famSend(nora, 'g1', famMsg('nora', 'max', { text: 'Just between us' })), true);
+await check('nora writes to otto alone',                       famSend(nora, 'g2', famMsg('nora', 'otto', { text: 'Hi Otto' })), true);
+const famQ = (db, f, v) => getDocs(query(collection(db, 'households/L5/talk'), where(f, '==', v)));
+await check('everyone in L5 reads the messages to everyone',  Promise.all([famQ(max, 'to', 'all'), famQ(otto, 'to', 'all')]), true);
+await check('…a linked or other household does not',          famQ(lena, 'to', 'all'), false);
+await check('max reads what is written to him',               famQ(max, 'to', 'max'), true);
+await check('nora reads what she wrote',                      famQ(nora, 'by', 'nora'), true);
+await check('otto does not read what is written to max',      famQ(otto, 'to', 'max'), false);
+await check('…nor what nora wrote (to anyone)',               famQ(otto, 'by', 'nora'), false);
+await check('…nor the whole conversation',                    getDocs(collection(otto, 'households/L5/talk')), false);
+await check('…nor one 1-to-1 message by its id',              getDoc(doc(otto, 'households/L5/talk/g1')), false);
+await check('nobody changes a message',                       updateDoc(doc(nora, 'households/L5/talk/f1'), { text: 'changed' }), false);
+await check('nora cannot delete one',                         deleteDoc(doc(nora, 'households/L5/talk/f1')), false);
+await check('the ids alone are listed by anyone in it',       getDocs(collection(otto, 'households/L5/talkIds')), true);
+await check('…not by a stranger',                             getDocs(collection(carol, 'households/L5/talkIds')), false);
+await check('the owner deletes a 1-to-1 message he cannot read, and its id (deleting the household)', (async () => {
+  const b = writeBatch(max); b.delete(doc(max, 'households/L5/talk/g2')); b.delete(doc(max, 'households/L5/talkIds/g2')); await b.commit(); })(), true);
+await check('…and reads what was written to him by its id',   getDoc(doc(max, 'households/L5/talk/g1')), true);
+await check('…but not nora\'s message to otto, by its id',    famSend(nora, 'g3', famMsg('nora', 'otto')).then(() => getDoc(doc(max, 'households/L5/talk/g3'))), false);
+
 const unlink = (db) => { const b = writeBatch(db);
   b.delete(doc(db, 'households/L1/links/L2')); b.delete(doc(db, 'households/L2/links/L1')); return b.commit(); };
 await check('a reader cannot remove the link',               unlink(hank), false);
