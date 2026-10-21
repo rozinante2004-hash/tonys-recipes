@@ -1,7 +1,7 @@
 {
  "lang": "ar",
- "updatedAt": 1792612524561,
- "count": 2355,
+ "updatedAt": 1792613162445,
+ "count": 2357,
  "strings": {
   "\"Add to Home Screen\"": "إضافة إلى الشاشة الرئيسية",
   "\"Open Bring!\"": "فتح Bring!",
@@ -394,6 +394,7 @@
   "Firebase’s free daily allowance for the database (Firestore) is used up": "انتهت الحصة اليومية المجانية من Firebase لقاعدة البيانات (Firestore)",
   "Folder URL saved": "تم حفظ رابط المجلد",
   "For everyone, in every copy. When someone taps a visiting animal, it says one of the ticked sentences, picked at random, in English with a British voice. Each person can still switch the animals off in ⚙️ → How it looks.": "للجميع، في كل نسخة. عند النقر على حيوان زائر، يقول إحدى الجمل المحددة، عشوائيًا، بالإنجليزية بصوت بريطاني. يمكن لكل شخص إيقاف الحيوانات من ⚙️ ← كيف يبدو التطبيق.",
+  "For everyone, in every copy. When someone taps a visiting animal, it says one of the ticked sentences, picked at random, in English with a Scottish voice where the device has one (an iPhone, an iPad or a Mac has Fiona), otherwise a British one. Each person can still switch the animals off in ⚙️ → How it looks.": "للجميع، في كل نسخة. عند الضغط على حيوان زائر، يقول إحدى الجمل المحددة عشوائيًا، بالإنجليزية بصوت اسكتلندي إن توفر على الجهاز (آيفون أو آيباد أو ماك يحتوي على Fiona)، وإلا فبصوت بريطاني. يمكن لكل شخص إيقاف الحيوانات من ⚙️ ← المظهر.",
   "Forget it": "تجاهل",
   "Forget the saved list and read the chats from scratch next time": "نسيان القائمة المحفوظة وقراءة المحادثات من الصفر في المرة القادمة",
   "Forgot password?": "نسيت كلمة المرور؟",
@@ -701,6 +702,7 @@
   "On Samsung Internet, Bring! may open the Galaxy Store or Play Store instead of your list. To fix it once: ☰ menu → Settings → Useful features → turn on {1}, then press 📲 Open in Bring! again. Or use this app in Chrome.": "في متصفح Samsung Internet، قد يفتح Bring! متجر Galaxy أو Play Store بدلاً من قائمتك. لإصلاح ذلك مرة واحدة: ☰ القائمة ← الإعدادات ← ميزات مفيدة ← فعّل {1}، ثم اضغط 📲 فتح في Bring! مرة أخرى. أو استخدم هذا التطبيق في Chrome.",
   "On a computer: drag the button below onto your bookmarks bar (Ctrl+Shift+B shows the bar). Then, on a Facebook post or reel, click that bookmark: it opens “See more”, takes the text and opens this app with it. On an iPhone (Safari): press “Copy the bookmark code”, bookmark any page, edit that bookmark and paste the code as its ADDRESS. The code is not a recipe — never paste it into the recipe box. It runs in your own browser, on your own Facebook page; your login never leaves it.": "على الكمبيوتر: اسحب الزر أدناه إلى شريط المفضلة (اضغط Ctrl+Shift+B لإظهار الشريط). بعدها، في منشور أو ريل على فيسبوك، اضغط على هذه المفضلة: ستفتح \"عرض المزيد\"، وتأخذ النص وتفتح هذا التطبيق به. على آيفون (Safari): اضغط \"نسخ كود المفضلة\"، أضف أي صفحة إلى المفضلة، عدّل هذه المفضلة والصق الكود في خانة العنوان. الكود ليس وصفة — لا تلصقه أبدًا في صندوق الوصفات. يعمل الكود في متصفحك الخاص، على صفحة فيسبوك الخاصة بك؛ بيانات تسجيل دخولك لا تغادره أبدًا.",
   "On a phone, a tablet or a computer: it installs like an app and works offline.": "على الهاتف أو الجهاز اللوحي أو الكمبيوتر: يُثبَّت كتطبيق ويعمل بلا إنترنت.",
+  "On this device: no English voice found yet": "على هذا الجهاز: لم يتم العثور على صوت إنجليزي بعد",
   "On your own other devices: open {1} there and sign in with the same account.": "على أجهزتك الأخرى: افتح {1} هناك وسجّل الدخول بنفس الحساب.",
   "On {1} press {2} → Console, run {3}, then paste it here.": "على {1} اضغط {2} ← Console، وشغّل {3}، ثم الصقه هنا.",
   "Once they agree, each of you sees the other’s recipes — read-only. Nothing is copied or changed. Type their household’s identifier (MKN-…), or the e-mail address of anyone in it.": "بعد موافقتهم، يرى كل منكما وصفات الآخر — للقراءة فقط. لا شيء يُنسخ أو يتغيّر. اكتب معرّف أسرتهم (MKN-…)، أو البريد الإلكتروني لأي فرد فيها.",

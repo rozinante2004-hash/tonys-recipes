@@ -1,7 +1,7 @@
 {
  "lang": "de",
- "updatedAt": 1792612524561,
- "count": 2352,
+ "updatedAt": 1792613162445,
+ "count": 2354,
  "strings": {
   "\"Add to Home Screen\"": "Zum Home-Bildschirm hinzufügen",
   "\"Open Bring!\"": "Bring! öffnen",
@@ -393,6 +393,7 @@
   "Firebase’s free daily allowance for the database (Firestore) is used up": "Firebases kostenloses Tageskontingent für die Datenbank (Firestore) ist aufgebraucht",
   "Folder URL saved": "Ordner-URL gespeichert",
   "For everyone, in every copy. When someone taps a visiting animal, it says one of the ticked sentences, picked at random, in English with a British voice. Each person can still switch the animals off in ⚙️ → How it looks.": "Für alle, in jeder Kopie. Wenn jemand ein vorbeikommendes Tier antippt, sagt es einen der angehakten Sätze, zufällig gewählt, auf Englisch mit britischer Stimme. Jeder kann die Tiere trotzdem einzeln unter ⚙️ → Aussehen abschalten.",
+  "For everyone, in every copy. When someone taps a visiting animal, it says one of the ticked sentences, picked at random, in English with a Scottish voice where the device has one (an iPhone, an iPad or a Mac has Fiona), otherwise a British one. Each person can still switch the animals off in ⚙️ → How it looks.": "Für alle, in jeder Kopie. Wenn jemand auf ein vorbeikommendes Tier tippt, sagt es einen der angehakten Sätze, zufällig ausgewählt, auf Englisch – mit schottischem Akzent, wenn das Gerät eine solche Stimme hat (ein iPhone, iPad oder Mac hat Fiona), sonst mit britischem Akzent. Jede Person kann die Tiere trotzdem unter ⚙️ → Aussehen ausschalten.",
   "Forget it": "Vergessen",
   "Forget the saved list and read the chats from scratch next time": "Die gespeicherte Liste vergessen und die Chats beim nächsten Mal von vorn lesen",
   "Forgot password?": "Passwort vergessen?",
@@ -700,6 +701,7 @@
   "On Samsung Internet, Bring! may open the Galaxy Store or Play Store instead of your list. To fix it once: ☰ menu → Settings → Useful features → turn on {1}, then press 📲 Open in Bring! again. Or use this app in Chrome.": "Im Samsung Internet öffnet Bring! manchmal den Galaxy Store oder Play Store statt deiner Liste. So behebst du das einmalig: ☰-Menü → Einstellungen → Nützliche Funktionen → {1} aktivieren, dann noch einmal auf 📲 In Bring! öffnen tippen. Oder nutze diese App in Chrome.",
   "On a computer: drag the button below onto your bookmarks bar (Ctrl+Shift+B shows the bar). Then, on a Facebook post or reel, click that bookmark: it opens “See more”, takes the text and opens this app with it. On an iPhone (Safari): press “Copy the bookmark code”, bookmark any page, edit that bookmark and paste the code as its ADDRESS. The code is not a recipe — never paste it into the recipe box. It runs in your own browser, on your own Facebook page; your login never leaves it.": "Am Computer: Zieh den Button unten in deine Lesezeichenleiste (Strg+Umschalt+B zeigt die Leiste). Klick dann bei einem Facebook-Beitrag oder Reel auf dieses Lesezeichen: Es öffnet „Mehr anzeigen“, nimmt den Text und öffnet diese App damit. Am iPhone (Safari): Tippe auf „Lesezeichen-Code kopieren“, setze ein Lesezeichen auf eine beliebige Seite, bearbeite es und füge den Code als ADRESSE ein. Der Code ist kein Rezept — füge ihn niemals ins Rezeptfeld ein. Er läuft in deinem eigenen Browser, auf deiner eigenen Facebook-Seite; dein Login verlässt ihn nie.",
   "On a phone, a tablet or a computer: it installs like an app and works offline.": "Auf dem Handy, Tablet oder Computer: Lässt sich wie eine App installieren und funktioniert offline.",
+  "On this device: no English voice found yet": "Auf diesem Gerät: noch keine englische Stimme gefunden",
   "On your own other devices: open {1} there and sign in with the same account.": "Auf deinen anderen Geräten: Öffne dort {1} und melde dich mit demselben Konto an.",
   "On {1} press {2} → Console, run {3}, then paste it here.": "Drücke auf {1} {2} → Konsole, führe {3} aus und füge es hier ein.",
   "Once they agree, each of you sees the other’s recipes — read-only. Nothing is copied or changed. Type their household’s identifier (MKN-…), or the e-mail address of anyone in it.": "Sobald der zustimmt, seht ihr gegenseitig die Rezepte des anderen — nur lesbar. Es wird nichts kopiert oder verändert. Gib die Haushalts-ID (MKN-…) ein oder die E-Mail-Adresse von jemandem aus diesem Haushalt.",

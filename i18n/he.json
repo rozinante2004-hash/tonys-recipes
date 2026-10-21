@@ -1,7 +1,7 @@
 {
  "lang": "he",
- "updatedAt": 1792612524561,
- "count": 2896,
+ "updatedAt": 1792613162445,
+ "count": 2898,
  "strings": {
   "\"Add to Home Screen\"": "הוספה למסך הבית",
   "\"One item away\" filter ({1}f.{2})": "פילטר \"פריט אחד חסר\" ({1}f.{2})",
@@ -534,6 +534,7 @@
   "Firestore {1} MiB error detected": "זוהתה שגיאת Firestore של {1} MiB",
   "Folder URL saved": "כתובת התיקייה נשמרה",
   "For everyone, in every copy. When someone taps a visiting animal, it says one of the ticked sentences, picked at random, in English with a British voice. Each person can still switch the animals off in ⚙️ → How it looks.": "לכולם, בכל עותק. כשמישהו נוגע בחיה שמבקרת, היא אומרת אחד מהמשפטים המסומנים, שנבחר אקראית, באנגלית בקול בריטי. כל אחד עדיין יכול לכבות את החיות ב-⚙️ ← איך זה נראה.",
+  "For everyone, in every copy. When someone taps a visiting animal, it says one of the ticked sentences, picked at random, in English with a Scottish voice where the device has one (an iPhone, an iPad or a Mac has Fiona), otherwise a British one. Each person can still switch the animals off in ⚙️ → How it looks.": "לכולם, בכל עותק. כשמישהו נוגע בחיה שמבקרת, היא אומרת אחד מהמשפטים המסומנים, שנבחר אקראית, באנגלית בקול סקוטי אם יש כזה במכשיר (באייפון, באייפד או במק יש Fiona), ואם לא — בקול בריטי. כל אחד עדיין יכול לכבות את החיות ב-⚙️ → איך זה נראה.",
   "Forget it": "לא משנה",
   "Forget the saved list and read the chats from scratch next time": "שכח את הרשימה השמורה וקרא את הצ'אטים מחדש בפעם הבאה",
   "Forgot password?": "שכחת סיסמה?",
@@ -895,6 +896,7 @@
   "On Samsung Internet, Bring! may open the Galaxy Store or Play Store instead of your list. To fix it once: ☰ menu → Settings → Useful features → turn on {1}, then press 📲 Open in Bring! again. Or use this app in Chrome.": "בדפדפן Samsung Internet, ‏Bring! עלול לפתוח את ה-Galaxy Store או את Play Store במקום הרשימה שלכם. לתיקון חד-פעמי: ☰ תפריט ← הגדרות ← תכונות שימושיות ← הפעילו את {1}, ואז לחצו שוב על 📲 פתיחה ב-Bring!. לחלופין, השתמשו באפליקציה הזו ב-Chrome.",
   "On a computer: drag the button below onto your bookmarks bar (Ctrl+Shift+B shows the bar). Then, on a Facebook post or reel, click that bookmark: it opens “See more”, takes the text and opens this app with it. On an iPhone (Safari): press “Copy the bookmark code”, bookmark any page, edit that bookmark and paste the code as its ADDRESS. The code is not a recipe — never paste it into the recipe box. It runs in your own browser, on your own Facebook page; your login never leaves it.": "במחשב: גררו את הכפתור למטה לשורת המועדפים (Ctrl+Shift+B מציג את השורה). אחר כך, בפוסט או רילס בפייסבוק, לחצו על המועדף הזה: הוא פותח את ״הצג עוד״, לוקח את הטקסט ופותח איתו את האפליקציה הזו. באייפון (Safari): לחצו על ״העתק את קוד המועדף״, הוסיפו לסימניות כל עמוד, ערכו את הסימנייה הזו והדביקו את הקוד בשדה הכתובת שלה. הקוד הזה אינו מתכון — לעולם אל תדביקו אותו בתיבת המתכון. הוא פועל בדפדפן שלכם, בעמוד הפייסבוק שלכם; ההתחברות שלכם לעולם לא יוצאת ממנו.",
   "On a phone, a tablet or a computer: it installs like an app and works offline.": "בטלפון, בטאבלט או במחשב: זה מתקין כמו אפליקציה ועובד גם בלי אינטרנט.",
+  "On this device: no English voice found yet": "במכשיר הזה: עדיין לא נמצא קול באנגלית",
   "On your own other devices: open {1} there and sign in with the same account.": "במכשירים אחרים שלך: פתחו שם את {1} והתחברו עם אותו חשבון.",
   "On {1} press {2} → Console, run {3}, then paste it here.": "ב-{1} לחצו {2} ← מסוף (Console), הריצו {3}, ואז הדביקו את זה כאן.",
   "Once they agree, each of you sees the other’s recipes — read-only. Nothing is copied or changed. Type their household’s identifier (MKN-…), or the e-mail address of anyone in it.": "לאחר שהם יאשרו, כל אחד מכם יראה את המתכונים של האחר — לקריאה בלבד. שום דבר לא מועתק או משתנה. הקלידו את המזהה של בית האב שלהם (MKN-…), או את כתובת האימייל של מישהו מתוכו.",

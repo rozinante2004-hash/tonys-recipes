@@ -1,7 +1,7 @@
 {
  "lang": "ru",
- "updatedAt": 1792612524561,
- "count": 2686,
+ "updatedAt": 1792613162445,
+ "count": 2688,
  "strings": {
   "\"Add to Home Screen\"": "Добавить на главный экран",
   "\"One item away\" filter ({1}f.{2})": "Фильтр «Не хватает одного» ({1}ф.{2})",
@@ -506,6 +506,7 @@
   "Firestore {1} MiB error detected": "Обнаружена ошибка Firestore {1} МиБ",
   "Folder URL saved": "Ссылка на папку сохранена",
   "For everyone, in every copy. When someone taps a visiting animal, it says one of the ticked sentences, picked at random, in English with a British voice. Each person can still switch the animals off in ⚙️ → How it looks.": "Для всех, во всех копиях. Когда кто-то нажимает на заглянувшее животное, оно произносит одну из отмеченных фраз, выбранную случайно, на английском с британским акцентом. Каждый может отключить животных в ⚙️ → Внешний вид.",
+  "For everyone, in every copy. When someone taps a visiting animal, it says one of the ticked sentences, picked at random, in English with a Scottish voice where the device has one (an iPhone, an iPad or a Mac has Fiona), otherwise a British one. Each person can still switch the animals off in ⚙️ → How it looks.": "Для всех и в каждой копии. Когда кто-то нажимает на забежавшее животное, оно произносит одну из отмеченных фраз — выбранную случайно — на английском языке, шотландским голосом, если он есть на устройстве (на iPhone, iPad или Mac это Fiona), иначе — британским. Каждый всё равно может отключить животных в ⚙️ → Внешний вид.",
   "Forget it": "Не важно",
   "Forget the saved list and read the chats from scratch next time": "Забыть сохранённый список и читать чаты заново в следующий раз",
   "Forgot password?": "Забыли пароль?",
@@ -855,6 +856,7 @@
   "On Samsung Internet, Bring! may open the Galaxy Store or Play Store instead of your list. To fix it once: ☰ menu → Settings → Useful features → turn on {1}, then press 📲 Open in Bring! again. Or use this app in Chrome.": "В Samsung Internet вместо списка может открыться Galaxy Store или Play Store. Чтобы это исправить: ☰ меню → Настройки → Полезные функции → включите {1}, затем снова нажмите 📲 Открыть в Bring!. Или используйте это приложение в Chrome.",
   "On a computer: drag the button below onto your bookmarks bar (Ctrl+Shift+B shows the bar). Then, on a Facebook post or reel, click that bookmark: it opens “See more”, takes the text and opens this app with it. On an iPhone (Safari): press “Copy the bookmark code”, bookmark any page, edit that bookmark and paste the code as its ADDRESS. The code is not a recipe — never paste it into the recipe box. It runs in your own browser, on your own Facebook page; your login never leaves it.": "На компьютере: перетащите кнопку ниже на панель закладок (Ctrl+Shift+B показывает панель). Затем на посте или ролике Facebook нажмите эту закладку: она откроет «Показать ещё», возьмёт текст и откроет это приложение с ним. На iPhone (Safari): нажмите «Скопировать код закладки», добавьте в закладки любую страницу, отредактируйте эту закладку и вставьте код в поле АДРЕС. Этот код — не рецепт, никогда не вставляйте его в поле рецепта. Он выполняется в вашем браузере, на вашей странице Facebook; ваш логин никуда не уходит.",
   "On a phone, a tablet or a computer: it installs like an app and works offline.": "На телефоне, планшете или компьютере: устанавливается как приложение и работает без интернета.",
+  "On this device: no English voice found yet": "На этом устройстве: английский голос пока не найден",
   "On your own other devices: open {1} there and sign in with the same account.": "На других своих устройствах: откройте там {1} и войдите с тем же аккаунтом.",
   "On {1} press {2} → Console, run {3}, then paste it here.": "На {1} нажмите {2} → Консоль, выполните {3}, затем вставьте сюда.",
   "Once they agree, each of you sees the other’s recipes — read-only. Nothing is copied or changed. Type their household’s identifier (MKN-…), or the e-mail address of anyone in it.": "Как только они согласятся, вы оба увидите рецепты друг друга — только для чтения. Ничего не копируется и не меняется. Введите идентификатор их домохозяйства (MKN-…) или e-mail любого его участника.",

@@ -1,7 +1,7 @@
 {
  "lang": "zh",
- "updatedAt": 1792612524561,
- "count": 2382,
+ "updatedAt": 1792613162445,
+ "count": 2384,
  "strings": {
   "\"Add to Home Screen\"": "添加到主屏幕",
   "\"Open Bring!\"": "打开 Bring!",
@@ -397,6 +397,7 @@
   "Firebase’s free daily allowance for the database (Firestore) is used up": "Firebase 数据库（Firestore）的每日免费额度已用完",
   "Folder URL saved": "文件夹网址已保存",
   "For everyone, in every copy. When someone taps a visiting animal, it says one of the ticked sentences, picked at random, in English with a British voice. Each person can still switch the animals off in ⚙️ → How it looks.": "对所有人、所有副本生效。有人点击来访的动物时，它会用英式口音随机说出一句已勾选的句子。每个人仍可在 ⚙️ →「外观」中关闭动物。",
+  "For everyone, in every copy. When someone taps a visiting animal, it says one of the ticked sentences, picked at random, in English with a Scottish voice where the device has one (an iPhone, an iPad or a Mac has Fiona), otherwise a British one. Each person can still switch the animals off in ⚙️ → How it looks.": "适用于所有人、所有副本。当有人点击来访的动物时，它会随机说出一句已勾选的句子，使用英语朗读——如果设备有苏格兰语音（iPhone、iPad 或 Mac 上有 Fiona）就用苏格兰口音，否则用英式口音。每个人仍可以在 ⚙️ → 外观设置 中关闭动物。",
   "Forget it": "算了",
   "Forget the saved list and read the chats from scratch next time": "忘记已保存的列表，下次从头读取聊天记录",
   "Forgot password?": "忘记密码？",
@@ -705,6 +706,7 @@
   "On Samsung Internet, Bring! may open the Galaxy Store or Play Store instead of your list. To fix it once: ☰ menu → Settings → Useful features → turn on {1}, then press 📲 Open in Bring! again. Or use this app in Chrome.": "在三星浏览器中，Bring! 可能会打开 Galaxy Store 或 Play Store，而不是你的清单。只需设置一次：☰ 菜单 → 设置 → 实用功能 → 开启 {1}，然后再次点击 📲 在 Bring! 中打开。或者改用 Chrome 使用本应用。",
   "On a computer: drag the button below onto your bookmarks bar (Ctrl+Shift+B shows the bar). Then, on a Facebook post or reel, click that bookmark: it opens “See more”, takes the text and opens this app with it. On an iPhone (Safari): press “Copy the bookmark code”, bookmark any page, edit that bookmark and paste the code as its ADDRESS. The code is not a recipe — never paste it into the recipe box. It runs in your own browser, on your own Facebook page; your login never leaves it.": "电脑端：把下面的按钮拖到书签栏（按 Ctrl+Shift+B 显示书签栏）。然后在 Facebook 帖子或 Reels 上点击这个书签：它会打开“查看更多”，获取文字并用这些内容打开本应用。iPhone 端（Safari）：点击“复制书签代码”，收藏任意页面，编辑这个书签，把代码粘贴为它的网址。这段代码不是食谱——千万不要把它粘贴到食谱框里。它只在你自己的浏览器里、你自己的 Facebook 页面上运行，你的登录信息不会被发送出去。",
   "On a phone, a tablet or a computer: it installs like an app and works offline.": "无论手机、平板还是电脑：像App一样安装，离线也能用。",
+  "On this device: no English voice found yet": "此设备上：尚未找到英语语音",
   "On your own other devices: open {1} there and sign in with the same account.": "在你自己的其他设备上：打开 {1}，用同一个账号登录。",
   "On {1} press {2} → Console, run {3}, then paste it here.": "在 {1} 上按 {2} → 控制台，运行 {3}，然后粘贴到这里。",
   "Once they agree, each of you sees the other’s recipes — read-only. Nothing is copied or changed. Type their household’s identifier (MKN-…), or the e-mail address of anyone in it.": "对方同意后，双方都能查看彼此的菜谱 — 只读，不会复制或更改任何内容。请输入对方家庭组的识别码（MKN-…），或其中任意成员的邮箱地址。",

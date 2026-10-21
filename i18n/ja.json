@@ -1,7 +1,7 @@
 {
  "lang": "ja",
- "updatedAt": 1792612524561,
- "count": 2696,
+ "updatedAt": 1792613162445,
+ "count": 2698,
  "strings": {
   "\"Add to Home Screen\"": "ホーム画面に追加",
   "\"One item away\" filter ({1}f.{2})": "「あと1品」フィルター（{1}f.{2}）",
@@ -507,6 +507,7 @@
   "Firestore {1} MiB error detected": "Firestoreの{1} MiBエラーを検出しました",
   "Folder URL saved": "フォルダURLを保存しました",
   "For everyone, in every copy. When someone taps a visiting animal, it says one of the ticked sentences, picked at random, in English with a British voice. Each person can still switch the animals off in ⚙️ → How it looks.": "全員の、すべてのコピーに適用されます。訪れた動物をタップすると、チェックしたセリフの中からランダムに1つをイギリス訛りの英語で話します。各自で ⚙️ →「見た目」から動物をオフにすることもできます。",
+  "For everyone, in every copy. When someone taps a visiting animal, it says one of the ticked sentences, picked at random, in English with a Scottish voice where the device has one (an iPhone, an iPad or a Mac has Fiona), otherwise a British one. Each person can still switch the animals off in ⚙️ → How it looks.": "誰にとっても、どのコピーでも同じです。訪問動物をタップすると、チェック済みの文からランダムに1つを英語で読み上げます。端末にスコットランド訛りの音声があればそれを使い(iPhone、iPad、Macには Fiona が入っています)、なければイギリス訛りの音声になります。各自、⚙️→「見た目」で動物をオフにすることもできます。",
   "Forget it": "やめる",
   "Forget the saved list and read the chats from scratch next time": "保存済みリストを破棄して、次回はチャットを最初から読み込む",
   "Forgot password?": "パスワードをお忘れですか?",
@@ -856,6 +857,7 @@
   "On Samsung Internet, Bring! may open the Galaxy Store or Play Store instead of your list. To fix it once: ☰ menu → Settings → Useful features → turn on {1}, then press 📲 Open in Bring! again. Or use this app in Chrome.": "Samsung Internetでは、Bring!がリストの代わりにGalaxy StoreやPlay Storeを開いてしまうことがあります。直すには一度だけ：☰ メニュー → 設定 → 便利な機能 → {1}をオンにして、もう一度「📲 Bring!で開く」を押してください。またはChromeでこのアプリを使ってください。",
   "On a computer: drag the button below onto your bookmarks bar (Ctrl+Shift+B shows the bar). Then, on a Facebook post or reel, click that bookmark: it opens “See more”, takes the text and opens this app with it. On an iPhone (Safari): press “Copy the bookmark code”, bookmark any page, edit that bookmark and paste the code as its ADDRESS. The code is not a recipe — never paste it into the recipe box. It runs in your own browser, on your own Facebook page; your login never leaves it.": "パソコンでは、下のボタンをブックマークバーにドラッグしてください（Ctrl+Shift+Bでバーを表示）。Facebookの投稿やリールで、そのブックマークをクリックすると「もっと見る」を開いてテキストを取得し、このアプリで開きます。iPhone（Safari）では、「ブックマークコードをコピー」を押して、どのページでもいいのでブックマークし、そのブックマークを編集してコードをアドレスとして貼り付けてください。このコードはレシピではありません — レシピ欄には絶対に貼り付けないでください。コードは自分のブラウザ内、自分のFacebookページ上で動作し、ログイン情報が外部に送られることはありません。",
   "On a phone, a tablet or a computer: it installs like an app and works offline.": "スマホでもタブレットでもパソコンでも、アプリのようにインストールでき、オフラインでも使えます。",
+  "On this device: no English voice found yet": "この端末ではまだ英語の音声が見つかりません",
   "On your own other devices: open {1} there and sign in with the same account.": "他のデバイスでは：{1}を開いて同じアカウントでサインインしてください。",
   "On {1} press {2} → Console, run {3}, then paste it here.": "{1}で{2}を押してコンソールを開き、{3}を実行してここに貼り付けてください。",
   "Once they agree, each of you sees the other’s recipes — read-only. Nothing is copied or changed. Type their household’s identifier (MKN-…), or the e-mail address of anyone in it.": "相手が同意すると、お互いのレシピが閲覧専用で見られるようになります。コピーや変更は行われません。相手の世帯のID（MKN-…）か、世帯のメンバーのメールアドレスを入力してください。",

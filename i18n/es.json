@@ -1,7 +1,7 @@
 {
  "lang": "es",
- "updatedAt": 1792612524561,
- "count": 2350,
+ "updatedAt": 1792613162445,
+ "count": 2352,
  "strings": {
   "\"Add to Home Screen\"": "Añadir a pantalla de inicio",
   "\"Open Bring!\"": "Abrir Bring!",
@@ -392,6 +392,7 @@
   "Firebase’s free daily allowance for the database (Firestore) is used up": "Se agotó la cuota diaria gratuita de Firebase para la base de datos (Firestore)",
   "Folder URL saved": "URL de la carpeta guardada",
   "For everyone, in every copy. When someone taps a visiting animal, it says one of the ticked sentences, picked at random, in English with a British voice. Each person can still switch the animals off in ⚙️ → How it looks.": "Para todos, en todas las copias. Cuando alguien toca a un animal visitante, dice una de las frases marcadas, elegida al azar, en inglés con voz británica. Cada persona puede desactivar los animales en ⚙️ → Cómo se ve.",
+  "For everyone, in every copy. When someone taps a visiting animal, it says one of the ticked sentences, picked at random, in English with a Scottish voice where the device has one (an iPhone, an iPad or a Mac has Fiona), otherwise a British one. Each person can still switch the animals off in ⚙️ → How it looks.": "Para todos, en cada copia. Cuando alguien toca un animal visitante, dice una de las frases marcadas, elegida al azar, en inglés con voz escocesa si el dispositivo tiene una (un iPhone, un iPad o un Mac tienen Fiona), o si no, con voz británica. Cada persona puede desactivar los animales en ⚙️ → Cómo se ve.",
   "Forget it": "Olvídalo",
   "Forget the saved list and read the chats from scratch next time": "Olvidar la lista guardada y leer los chats desde cero la próxima vez",
   "Forgot password?": "¿Olvidaste tu contraseña?",
@@ -699,6 +700,7 @@
   "On Samsung Internet, Bring! may open the Galaxy Store or Play Store instead of your list. To fix it once: ☰ menu → Settings → Useful features → turn on {1}, then press 📲 Open in Bring! again. Or use this app in Chrome.": "En Samsung Internet, Bring! puede abrir Galaxy Store o Play Store en lugar de tu lista. Para solucionarlo una vez: menú ☰ → Ajustes → Funciones útiles → activa {1}, y vuelve a pulsar 📲 Abrir en Bring!. O usa esta app en Chrome.",
   "On a computer: drag the button below onto your bookmarks bar (Ctrl+Shift+B shows the bar). Then, on a Facebook post or reel, click that bookmark: it opens “See more”, takes the text and opens this app with it. On an iPhone (Safari): press “Copy the bookmark code”, bookmark any page, edit that bookmark and paste the code as its ADDRESS. The code is not a recipe — never paste it into the recipe box. It runs in your own browser, on your own Facebook page; your login never leaves it.": "En un ordenador: arrastra el botón de abajo a tu barra de marcadores (Ctrl+Shift+B muestra la barra). Luego, en una publicación o reel de Facebook, haz clic en ese marcador: abre «Ver más», toma el texto y abre esta app con él. En un iPhone (Safari): pulsa «Copiar el código del marcador», guarda cualquier página en marcadores, edita ese marcador y pega el código como su DIRECCIÓN. El código no es una receta — nunca lo pegues en el cuadro de recetas. Se ejecuta en tu propio navegador, en tu propia página de Facebook; tu sesión nunca sale de ahí.",
   "On a phone, a tablet or a computer: it installs like an app and works offline.": "En el móvil, la tablet o el ordenador: se instala como una app y funciona sin conexión.",
+  "On this device: no English voice found yet": "En este dispositivo: todavía no se ha encontrado ninguna voz en inglés",
   "On your own other devices: open {1} there and sign in with the same account.": "En tus otros dispositivos: abre {1} ahí e inicia sesión con la misma cuenta.",
   "On {1} press {2} → Console, run {3}, then paste it here.": "En {1} pulsa {2} → Consola, ejecuta {3} y luego pégalo aquí.",
   "Once they agree, each of you sees the other’s recipes — read-only. Nothing is copied or changed. Type their household’s identifier (MKN-…), or the e-mail address of anyone in it.": "En cuanto acepten, cada uno verá las recetas del otro, solo lectura. No se copia ni se cambia nada. Escribe el identificador de su hogar (MKN-…) o el correo de alguien de ese hogar.",
