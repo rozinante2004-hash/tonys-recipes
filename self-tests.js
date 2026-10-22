@@ -751,7 +751,8 @@ window.SELF_TESTS = [
         if(!g || g.hidden) throw new Error('no grip on a computer');
         if(Math.abs(gr.right-r0.right)>6 || Math.abs(gr.bottom-r0.bottom)>6) throw new Error('the grip is not in the window’s corner');
         // Drag the corner out by 60 × 40: the window grows by twice that (it stays centred), and the corner follows.
-        var W=window.innerWidth, H=window.innerHeight;
+        // (the room inside the window's scrollbar, as the app measures it — v38.80: 15 px of scrollbar on Tony's Linux)
+        var ovEl=document.getElementById('viewOverlay'), W=(ovEl && ovEl.clientWidth) || window.innerWidth, H=(ovEl && ovEl.clientHeight) || window.innerHeight;
         var want={ w:Math.min(W-16, r0.width+120), h:Math.min(H-16, r0.height+80) };
         pe(g, 'pointerdown', gr.left+10, gr.top+10); pe(document.body, 'pointermove', gr.left+40, gr.top+30); pe(document.body, 'pointermove', gr.left+70, gr.top+50);
         pe(document.body, 'pointerup', gr.left+70, gr.top+50);
@@ -1882,7 +1883,11 @@ window.SELF_TESTS = [
   { id:'tester_errors_reported', group:'Sharing', name:'⚠️ The beta reports its own errors to the app’s server — the site, never the page’s address or an e-mail; the same error once, counted; kept on the device until the server has it; never in the family app (v38.15)',
     test: async()=>{
       var real={ fetch:window.fetch, h:_workerHealth, user:window._fbUser, hh:window._household, ov:Object.assign({}, window._featureOverride) };
-      var kept={}; [INS_ERR_KEY, INS_USE_KEY].forEach(function(k){ try{ kept[k]=localStorage.getItem(k); }catch(e){} });
+      // (v38.80 — and the device's own count of database reads, set aside: sent to this test's stand-in server, it was
+      // lost from the real statistics — Tony's 144)
+      try{ fsReadsSave(); }catch(e){}
+      var kept={}; [INS_ERR_KEY, INS_USE_KEY, FS_READS_KEY].forEach(function(k){ try{ kept[k]=localStorage.getItem(k); }catch(e){} });
+      try{ localStorage.removeItem(FS_READS_KEY); }catch(e){}
       var sent=[], down=false;
       try{
         // The family app never sends any of it.
@@ -1924,7 +1929,7 @@ window.SELF_TESTS = [
         if(await insightsSend()!==false || JSON.parse(localStorage.getItem(INS_ERR_KEY)||'[]').length!==3) throw new Error('lost while the server was away');
         down=false; sent=[];
         if(await insightsSend()!==true) throw new Error('not sent');
-        var b=sent[0];
+        var b=sent.filter(function(x){ return x && x.errors; })[0] || sent[0];   // (v38.80 — the one with the errors)
         if(!b || b.action!=='app-signals' || b.idToken!=='tokT' || b.hid!=='hT' || !b.errors || b.errors.length!==3) throw new Error('what was sent: '+JSON.stringify(b));
         var e0=b.errors.filter(function(e){ return e.kind==='import'; })[0];
         if(!e0 || e0.n!==2 || !e0.env || !e0.device || !e0.lang || e0.version!==APP_VERSION) throw new Error('an error without its count, copy, device or language: '+JSON.stringify(e0));
@@ -1939,7 +1944,9 @@ window.SELF_TESTS = [
   { id:'tester_feature_counts', group:'Sharing', name:'📈 The beta counts how recipes arrive and which features are used — names and numbers per household, nothing else; a tap repeated is one use; sent and taken off the device (v38.15)',
     test: async()=>{
       var real={ fetch:window.fetch, h:_workerHealth, user:window._fbUser, hh:window._household, ov:Object.assign({}, window._featureOverride), once:_insOnce, via:_insVia };
-      var kept={}; [INS_USE_KEY, INS_ERR_KEY].forEach(function(k){ try{ kept[k]=localStorage.getItem(k); }catch(e){} });
+      try{ fsReadsSave(); }catch(e){}   // (v38.80 — the device's reads count, set aside: see tester_errors_reported)
+      var kept={}; [INS_USE_KEY, INS_ERR_KEY, FS_READS_KEY].forEach(function(k){ try{ kept[k]=localStorage.getItem(k); }catch(e){} });
+      try{ localStorage.removeItem(FS_READS_KEY); }catch(e){}
       var sent=[], status=200;
       function counts(){ var u=JSON.parse(localStorage.getItem(INS_USE_KEY)||'{"list":[]}'); var b=u.list.filter(function(x){ return x.hid==='hC'; })[0]; return (b && b.counts) || {}; }
       try{
@@ -1971,7 +1978,7 @@ window.SELF_TESTS = [
         window.fetch=async function(u, init){ var b={}; try{ b=JSON.parse(init.body); }catch(e){} sent.push(b);
           return new Response(JSON.stringify(status===200 ? { ok:true } : { error:'no' }), { status:status }); };
         if(await insightsSend()!==true) throw new Error('not sent');
-        var b=sent[0];
+        var b=sent.filter(function(x){ return x && x.usage; })[0] || sent[0];    // (v38.80 — the one with the counts)
         if(!b || b.action!=='app-signals' || b.hid!=='hC' || !b.usage || b.usage.counts.view!==2 || b.usage.month!==new Date().toISOString().slice(0,7)) throw new Error('what was sent: '+JSON.stringify(b));
         if(Object.keys(counts()).length) throw new Error('still on the device after the server had it');
         // A household they are no longer in: the counts are dropped, not resent for ever.
@@ -1989,8 +1996,10 @@ window.SELF_TESTS = [
   { id:'more_statistics', group:'Sharing', name:'📊 More to learn from: visits and weeks, how people sign in and first came, the device, the farm — names and numbers only; sent in parts; nothing while the Self Test runs (v38.30)',
     test: async()=>{
       var real={ fetch:window.fetch, h:_workerHealth, user:window._fbUser, hh:window._household, ov:Object.assign({}, window._featureOverride), once:_insOnce };
-      var keys=[INS_USE_KEY, INS_ERR_KEY, INS_SESSION_KEY, INS_WEEK_KEY, INS_MONTHLY_KEY, INS_FIRST_KEY, SIGNIN_VIA_KEY, INS_DAY_KEY];
+      try{ fsReadsSave(); }catch(e){}   // (v38.80 — the device's reads count, set aside: see tester_errors_reported)
+      var keys=[INS_USE_KEY, INS_ERR_KEY, INS_SESSION_KEY, INS_WEEK_KEY, INS_MONTHLY_KEY, INS_FIRST_KEY, SIGNIN_VIA_KEY, INS_DAY_KEY, FS_READS_KEY];
       var kept={}; keys.forEach(function(k){ try{ kept[k]=localStorage.getItem(k); }catch(e){} });
+      try{ localStorage.removeItem(FS_READS_KEY); }catch(e){}
       function counts(){ var u=JSON.parse(localStorage.getItem(INS_USE_KEY)||'{"list":[]}'); var b=u.list.filter(function(x){ return x.hid==='hS'; })[0]; return (b && b.counts) || {}; }
       try{
         window._featureOverride.insights=true; window._insUnderTest=true; _insOnce={};
@@ -2489,7 +2498,9 @@ window.SELF_TESTS = [
       var askWas=window.askConfirm, logWas=window.syncLog, asked=[], fake=document.createElement('div');
       try{
         window.askConfirm=async function(o){ asked.push(o); return true; }; window.syncLog=function(){}; window._gingerUnderTest=true;
-        if(gingerCheck() || asked.length) throw new Error('told about Ginger without it there');
+        // (v38.80 — "without it there" is staged: Tony's own Chrome HAS Ginger, and this failed there)
+        var presentWas=window.gingerPresent; window.gingerPresent=function(){ return false; };
+        try{ if(gingerCheck() || asked.length) throw new Error('told about Ginger without it there'); } finally { window.gingerPresent=presentWas; }
         fake.className='ginger-module-highlighter ginger-module-highlighter-ghost'; document.body.appendChild(fake);
         if(!gingerCheck() || asked.length!==1 || !/Ginger/.test(asked[0].title) || !/switch it off for this site/.test(asked[0].message)) throw new Error('Ginger there, nothing said: '+JSON.stringify(asked));
         if(gingerCheck() || asked.length!==1) throw new Error('told twice');
@@ -2821,6 +2832,11 @@ window.SELF_TESTS = [
     test: async()=>{
       var realUA=Object.getOwnPropertyDescriptor(Navigator.prototype, 'userAgent');
       var a=document.getElementById('iosShortcutOffer');
+      // (v38.80 — staged as a device and a person that have NOT used the shortcut: Tony has, on his iPhone — the
+      // account remembers it — so his computer, rightly, is not offered it, and this failed there)
+      var usedWas=null; try{ usedWas=localStorage.getItem(IOS_SHORTCUT_USED_KEY); localStorage.removeItem(IOS_SHORTCUT_USED_KEY); }catch(e){}
+      var cloudUsedWas=(typeof _offersCloud!=='undefined' && _offersCloud) ? _offersCloud.iosUsed : undefined;
+      if(typeof _offersCloud!=='undefined' && _offersCloud) _offersCloud.iosUsed=false;
       try{
         if(!a) throw new Error('no offer in the import window');
         // v37.40 — each copy offers its OWN shortcut (Tony's links, 2 Oct 2026).
@@ -2851,6 +2867,8 @@ window.SELF_TESTS = [
         delete window._iosShortcutOverride;
         try{ delete navigator.userAgent; delete navigator.maxTouchPoints; }catch(e){}
         try{ closeM('urlImportOverlay'); }catch(e){}
+        try{ if(usedWas!==null) localStorage.setItem(IOS_SHORTCUT_USED_KEY, usedWas); }catch(e){}
+        if(typeof _offersCloud!=='undefined' && _offersCloud){ if(cloudUsedWas===undefined) delete _offersCloud.iosUsed; else _offersCloud.iosUsed=cloudUsedWas; }
       }
     } },
 
@@ -7079,6 +7097,8 @@ window.SELF_TESTS = [
         // A real problem: it shows, and it names the problem rather than saying
         // "1 issue", which would tell nobody whether to care.
         put('conflict','Save refused for "Soup" — changed on another device');
+        // (v38.80 — staged as an ordinary person: the app's owner reads "📋 Copy log" — he does not send it to himself)
+        var ownerCopiesWas=window.logOwnerCopies; window.logOwnerCopies=function(){ return false; };
         if(maybeNudgeAboutLog()!=='shown') throw new Error('the nudge did not fire on a real problem');
         var el=document.getElementById('logNudge');
         if(!el) throw new Error('the nudge reported "shown" but rendered nothing');
@@ -7114,6 +7134,7 @@ window.SELF_TESTS = [
         if(logNudgeSignature([{level:'ok',title:'Nothing looks wrong'}])!=='')
           throw new Error('a healthy finding contributed to the signature');
       } finally {
+        if(typeof ownerCopiesWas==='function') window.logOwnerCopies=ownerCopiesWas;
         dismissLogNudge();
         _logNudgeShownThisSession=shownWas;
         if(nudgeEl && nudgeParent) nudgeParent.appendChild(nudgeEl);   // it was his, so it goes back
@@ -7138,6 +7159,9 @@ window.SELF_TESTS = [
 
       var kOn=null,kLog=null;
       try{ kOn=localStorage.getItem('tonys_log_enabled'); kLog=localStorage.getItem('tonys_sync_log'); }catch(e){}
+      // (v38.80 — staged as an ordinary person: the app's owner reads "📋 Copy log" instead — he does not send reports to
+      // himself — and this failed in Tony's own browser)
+      var ownerCopiesWas=window.logOwnerCopies; window.logOwnerCopies=function(){ return false; };
       try{
         setLogEnabled(true); purgeSyncLog();
         // A recipe name reaches the log and then the panel. Names are user data
@@ -7155,6 +7179,11 @@ window.SELF_TESTS = [
         var html=body.innerHTML;
         if(html.indexOf('sendLogReportToAdmin()')===-1 || !/Transmit report to admin/.test(body.textContent)) throw new Error('no Transmit report to admin button');
         if(html.indexOf('copySyncLogReport()')!==-1) throw new Error('Copy report is still there');
+        // …and the owner copies his own instead of sending it to himself
+        window.logOwnerCopies=function(){ return true; }; renderLoggingPanel();
+        var ob=document.getElementById('loggingBody');
+        if(!/Copy log/.test(ob.textContent) || /Transmit report to admin/.test(ob.textContent)) throw new Error('the owner is offered to send his report to himself');
+        window.logOwnerCopies=function(){ return false; }; renderLoggingPanel(); body=document.getElementById('loggingBody');
         if(html.indexOf('purgeSyncLogUI()')===-1) throw new Error('no Purge logs button');
         if(html.indexOf('setLogFilter(')===-1) throw new Error('no filter controls in the viewer');
         if(html.indexOf('What this looks like')===-1) throw new Error('the panel shows no analysis');
@@ -7179,6 +7208,7 @@ window.SELF_TESTS = [
         // The findings must be visible, not just computed.
         if(html.indexOf('Try:')===-1) throw new Error('the findings are shown without their proposed fixes');
       } finally {
+        window.logOwnerCopies=ownerCopiesWas;
         try{
           if(kOn===null) localStorage.removeItem('tonys_log_enabled'); else localStorage.setItem('tonys_log_enabled',kOn);
           if(kLog===null) localStorage.removeItem('tonys_sync_log'); else localStorage.setItem('tonys_sync_log',kLog);
@@ -9533,8 +9563,13 @@ window.SELF_TESTS = [
         window.PasswordCredential=function(o){ this.o=o; };
         try{ Object.defineProperty(navigator, 'credentials', { configurable:true, value:{ store:function(c){ stored.push(c.o); return Promise.resolve(); } } }); }catch(e){}
         if(navigator.credentials && navigator.credentials.store && navigator.credentials.store.length===1){
-          rememberSet(true); rememberPassword('t@x.example', 'pw-123456');
-          rememberSet(false); rememberPassword('u@x.example', 'pw-123456');
+          // v38.80 — outside this stand-in, a test never reaches the browser's own password keeper
+          if(rememberSet(true), rememberPassword('t@x.example', 'pw-123456')) throw new Error('a Self Test offered a password to the browser itself');
+          window._rememberOfferUnderTest=true;
+          try{
+            rememberSet(true); rememberPassword('t@x.example', 'pw-123456');
+            rememberSet(false); rememberPassword('u@x.example', 'pw-123456');
+          } finally { window._rememberOfferUnderTest=false; }
           if(stored.length!==1 || stored[0].id!=='t@x.example') throw new Error('the password offered to the browser: '+JSON.stringify(stored));
         }
         // v38.47 — Tony: Enter in the password signs in ("an industry standard UI"); in the address it goes on.
