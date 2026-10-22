@@ -105,7 +105,7 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
   https://mykitchennotes.community, Firebase my-kitchen-notes-beta) run **v38.77** (released 22:22, all jobs
   success); then **v38.78 — 👪 Chat with family members** (22:52; rules published) and **v38.79 — Scottish voices**
   (23:04) — all jobs green (one Self Tests job on main re-run); **v38.80 — the Self Test in the owner's own browser**
-  (22 Oct; see its note).
+  (23 Oct 00:46) and **v38.81 — auto-fetch waits out a busy Pixabay** (01:00) — all jobs green (see their notes).
   **Worker v87.** The test copy (https://tonys-recipes-test.pages.dev, its own database) follows `test`.
 - **The testers go live on Sunday 25 Oct 2026** (Tony: "The plan is to start sending invitations to the testers
   this Sunday"). The community app is **by invitation only** (Tony switched it, 20 Oct): only addresses invited with
@@ -887,6 +887,10 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
   category) go to every source, not only the first (Pexels, keyless on the server). The manual 🔍 Find a photo waits a
   short pause (≤ 10 s) once before moving on. Self-test `photo_autofetch_waits_for_busy_source` (that server as a
   stand-in). Pexels/Unsplash keys would add two more libraries: offered to Tony, his choice.
+- **Released: v38.80 (23 Oct 2026, 00:46 Israel time, on 80d6a70) and v38.81 (01:00, on 0cfbd6b)** — every job
+  success on both: Deploy to GitHub Pages, Publish languages, Translate new phrases, Self Tests on main and test,
+  Cloudflare Pages (community and test copies). No Worker or rules change in either. Tony closed Chrome's "Save
+  password?" (22 Oct).
 - **Move step 9 finished (20 Oct 2026, 18:05 Israel time; Tony: "OK to delete the 4 + 135 old family documents").**
   clear-source `all` + `shared` (run 39445140837): 139 deleted (households 4, shared 135), the household cut to its
   moved mark; clear-check after it (run 39445361414): recipes-f379d holds 1 document of the moved household (its own,

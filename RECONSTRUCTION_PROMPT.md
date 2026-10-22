@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v38.80` — app. **Worker: v87**, deployed separately and versioned separately
+**Current version:** `v38.81` — app. **Worker: v87**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -716,7 +716,13 @@ give it back: the pending database-reads count (`FS_READS_KEY`, saved first with
 shortcut's "used" mark, Ginger's presence, the owner's "Copy log" (`logOwnerCopies`). Reports sent to a stand-in
 server are picked by what they carry, not by order. `viewSizeSet` measures the overlay's client size (a scrollbar).
 
-**State on 22 Oct 2026 (v38.80, Worker v87):** testers are invited from Sunday 25 Oct; from then on every
+**Auto-fetch and a busy photo library (v38.81):** the Worker has a key for Pixabay only (Pexels and Unsplash answer
+`notConfigured`), and Pixabay refuses after a search or two ("too many searches in the last minute", 429, a few
+seconds). `photoSearchOnce` marks an empty answer `rateLimited`/`retryAfter`/`notConfigured`; the run waits
+`photoPauseSecs` (asked + 1 s, 2–30 s) and asks again up to 3 times, skips a no-key source for the rest of the run,
+sends the broader attempts to every source, and names a source that stayed busy. The manual search waits once (≤ 10 s).
+
+**State on 23 Oct 2026 (v38.81, Worker v87):** testers are invited from Sunday 25 Oct; from then on every
 release waits for the owner's yes. The community app is by invitation only; "Share this App with family" goes back
 to "Share this App" at the official launch. Open: WhatsApp (CallMeBot was full), the AI models after the launch, the testing
 tools' update (Playwright, Ubuntu 26.04) after launch week, a lighter first screen.
