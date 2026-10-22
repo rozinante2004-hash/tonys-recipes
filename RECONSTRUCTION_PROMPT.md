@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v38.78` — app. **Worker: v87**, deployed separately and versioned separately
+**Current version:** `v38.80` — app. **Worker: v87**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -710,7 +710,13 @@ queries (to all, to me, by me), none while alone in the household. ⋯ More → 
 with linked kitchens) and 💬 Chat beside each person in 👥 Family Access; notices, red dots, unread per conversation.
 Privacy statement 1.7 names these messages.
 
-**State on 21 Oct 2026 (v38.78, Worker v87):** testers are invited from Sunday 25 Oct; from then on every
+**The Self Test in the owner's own browser (v38.80):** while `_selfTestRunning`, `rememberPassword` offers nothing to
+the browser's password keeper (only inside `_rememberOfferUnderTest`). Tests that touch device state set it aside and
+give it back: the pending database-reads count (`FS_READS_KEY`, saved first with `fsReadsSave()`), the iPhone
+shortcut's "used" mark, Ginger's presence, the owner's "Copy log" (`logOwnerCopies`). Reports sent to a stand-in
+server are picked by what they carry, not by order. `viewSizeSet` measures the overlay's client size (a scrollbar).
+
+**State on 22 Oct 2026 (v38.80, Worker v87):** testers are invited from Sunday 25 Oct; from then on every
 release waits for the owner's yes. The community app is by invitation only; "Share this App with family" goes back
 to "Share this App" at the official launch. Open: WhatsApp (CallMeBot was full), the AI models after the launch, the testing
 tools' update (Playwright, Ubuntu 26.04) after launch week, a lighter first screen.

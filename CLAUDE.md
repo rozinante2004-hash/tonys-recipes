@@ -100,11 +100,12 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
   - Record the release here.
 - No model names in commits.
 
-**Where things stand on 21 Oct 2026 (22:00 Israel time) — read this, then "What comes next"**
+**Where things stand on 22 Oct 2026 — read this, then "What comes next"**
 - **Live:** the family app (`main`, which forwards to the community app) and the community app (`beta`,
   https://mykitchennotes.community, Firebase my-kitchen-notes-beta) run **v38.77** (released 22:22, all jobs
   success); then **v38.78 — 👪 Chat with family members** (22:52; rules published) and **v38.79 — Scottish voices**
-  (23:04) — all jobs green (one Self Tests job on main re-run).
+  (23:04) — all jobs green (one Self Tests job on main re-run); **v38.80 — the Self Test in the owner's own browser**
+  (22 Oct; see its note).
   **Worker v87.** The test copy (https://tonys-recipes-test.pages.dev, its own database) follows `test`.
 - **The testers go live on Sunday 25 Oct 2026** (Tony: "The plan is to start sending invitations to the testers
   this Sunday"). The community app is **by invitation only** (Tony switched it, 20 Oct): only addresses invited with
@@ -856,6 +857,25 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
   **tests/run-self-tests.js now prints each failure (and each run-level problem: hygiene, load errors) as a `::error`
   annotation in CI**, so the next failure names its test — read with
   `gh api repos/rozinante2004-hash/tonys-recipes/check-runs/<job id>/annotations`.
+- **v38.80 — the Self Test passes in the owner's own browser, and never offers a password to Chrome** (Tony, 22 Oct:
+  "The Save Password popup popped during self test, and wouldn't go … some items failed": 405 passed, 6 failed in his
+  own Chrome, signed in as the owner). Causes and fixes:
+  - **The popup:** the credentials test's stand-in sign-up reached `rememberPassword`, which hands the address and
+    password to Chrome's password keeper (PasswordCredential). Now `rememberPassword` returns false while
+    `_selfTestRunning`, unless `_rememberOfferUnderTest` (set only around the test's own stand-in). If Chrome kept it:
+    delete new@example.com at chrome://password-manager/passwords. The popup closes with ✕ (not "Never").
+  - **recipe_window_resize:** the full-size window came out 15 px short where the page has a scrollbar —
+    `viewSizeSet` now measures `#viewOverlay`'s clientWidth/clientHeight (falls back to innerWidth/innerHeight).
+  - **tester_errors_reported, usage, session tests:** the device's pending database-reads count (`mkn_fs_reads`) was
+    "sent" to the test's stand-in server first and the test read the wrong report. The tests now `fsReadsSave()`, set
+    `FS_READS_KEY` aside, restore it after, and pick the report by what it carries (`x.errors` / `x.usage`).
+  - **ginger_told_once:** Ginger was present in Tony's kitchen — `gingerPresent` stubbed false for the "absent" check.
+  - **import_ios_share_menu_offer:** the device had used the iPhone shortcut — `IOS_SHORTCUT_USED_KEY` and
+    `_offersCloud.iosUsed` set aside and restored.
+  - **log_panel_controls, log_nudge_is_quiet_and_per_device:** the owner sees "Copy log" everywhere —
+    `window.logOwnerCopies` stubbed false (restored in the outer finally); the panel test also checks the owner's.
+  Local: 404 pass on a fresh browser, 404 with the owner's device state (`--prefs
+  '{"mkn_fs_reads":"144","mkn_ios_shortcut_used":"1"}'`), 404 on the built copy.
 - **Move step 9 finished (20 Oct 2026, 18:05 Israel time; Tony: "OK to delete the 4 + 135 old family documents").**
   clear-source `all` + `shared` (run 39445140837): 139 deleted (households 4, shared 135), the household cut to its
   moved mark; clear-check after it (run 39445361414): recipes-f379d holds 1 document of the moved household (its own,
