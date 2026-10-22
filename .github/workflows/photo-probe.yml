@@ -1,0 +1,59 @@
+# 22 Oct 2026 — one-off: "Auto-fetch missing photos" adds only one photo per run. This replays the app's own
+# run against the Worker (same searches, same order, same pauses) and says what each step got, as notices.
+# Removed after use.
+name: Photo probe
+on:
+  push:
+    branches: [test]
+    paths: ['.github/workflows/photo-probe.yml']
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Replay an auto-fetch run, twice
+        run: |
+          cat > probe.mjs <<'JS'
+          const W = 'https://lively-bread-273a.rozinante2004.workers.dev';
+          const H = { 'Content-Type': 'application/json', 'Origin': 'https://mykitchennotes.community' };
+          const SOURCES = ['pexels', 'unsplash', 'pixabay', 'wikimedia'];
+          const sleep = ms => new Promise(r => setTimeout(r, ms));
+          const t0 = Date.now(), at = () => ((Date.now() - t0) / 1000).toFixed(1) + 's';
+          async function call(body, timeout) {
+            const s = Date.now();
+            try {
+              const r = await fetch(W, { method: 'POST', headers: H, body: JSON.stringify(Object.assign({ appKey: 'tonys-recipes-web-v1' }, body)), signal: AbortSignal.timeout(timeout) });
+              const ct = r.headers.get('content-type') || '';
+              const buf = Buffer.from(await r.arrayBuffer());
+              let j = null; if (/json/.test(ct)) { try { j = JSON.parse(buf.toString()); } catch (e) {} }
+              return { status: r.status, ct, size: buf.length, j, ms: Date.now() - s };
+            } catch (e) { return { status: 'ERR ' + (e.name || '') + ' ' + (e.message || ''), ms: Date.now() - s }; }
+          }
+          const names = ['Spaghetti Carbonara', 'Greek Salad', 'Chicken Tikka Masala', 'Avocado Toast', 'Chocolate Lava Cake'];
+          for (const run of [1, 2]) {
+            for (const n of names) {
+              const term = 'Tester 2 ' + n, broad = n.split(' ').slice(-1)[0];
+              const plan = SOURCES.map(s => ({ q: term, s })).concat([{ q: broad, s: SOURCES[0] }]);
+              let images = [], log = [];
+              for (const p of plan) {
+                const r = await call({ action: 'photo-search', query: p.q, source: p.s }, 10000);
+                images = (r.j && r.j.images) || [];
+                log.push(p.s + (p.q === broad ? '(broad)' : '') + ' ' + r.status + ' ' + r.ms + 'ms ' + images.length
+                  + (r.j && r.j.error ? ' [' + String(r.j.error).slice(0, 90) + ']' : '') + (r.j && r.j.notConfigured ? ' [no key]' : ''));
+                if (images.length) break;
+                await sleep(200);
+              }
+              let fetched = '';
+              if (images.length) {
+                const u = images[0].url, host = (() => { try { return new URL(u).host; } catch (e) { return '?'; } })();
+                const f = await call({ action: 'photo-fetch', url: u }, 20000);
+                fetched = ' | fetch ' + host + ' → ' + f.status + ' ' + f.ct + ' ' + f.size + 'B ' + f.ms + 'ms'
+                  + (f.j && f.j.error ? ' [' + String(f.j.error).slice(0, 120) + ']' : '');
+              }
+              console.log(`::notice title=Run ${run} · ${at()} · ${n}::${log.join(' ; ')}${fetched}`);
+              await sleep(400);
+            }
+            await sleep(20000);
+          }
+          JS
+          node probe.mjs
