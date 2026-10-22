@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v38.80 -->
+<!-- Tony's Recipes Collection v38.81 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -3577,8 +3577,10 @@ function photoCreditOf(img) {
 window.photoCreditOf = photoCreditOf;
 
 // One search, one source. Returns [] rather than throwing so a dead source never
-// takes the whole run down.
+// takes the whole run down. v38.81 — an empty answer also says WHY, where the Worker said:
+// `rateLimited` (with `retryAfter`, in seconds) and `notConfigured` (the server has no key for it).
 async function photoSearchOnce(query, source) {
+  var out = [];
   try {
     var resp = await fetch(WORKER_ENDPOINT, {
       method: 'POST', headers: workerHeaders(),
@@ -3586,19 +3588,29 @@ async function photoSearchOnce(query, source) {
       signal: AbortSignal.timeout(10000)
     });
     var data = await resp.json();
-    return (data && data.images) || [];
-  } catch (e) { return []; }
+    out = (data && data.images) || [];
+    if (data && data.rateLimited) { out.rateLimited = true; out.retryAfter = parseInt(data.retryAfter, 10) || 0; }
+    if (data && data.notConfigured) out.notConfigured = true;
+  } catch (e) {}
+  return out;
 }
 // The ladder: the dish term across every source, in PHOTO_SOURCES order (v38.45: the stock libraries
-// first, the keyless Wikimedia Commons last), then one broader attempt on the first.
+// first, the keyless Wikimedia Commons last), then the broader attempts. v38.81 — those across every
+// source too: on the first alone they went to Pexels, which has no key on the server.
 function photoAttemptPlan(term, category) {
   var broad = String(term || '').split(/\s+/).slice(-1)[0] || '';
   var plan = [];
   PHOTO_SOURCES.forEach(function(src){ if (term) plan.push({ q: term, source: src }); });
-  if (broad && broad.toLowerCase() !== String(term).toLowerCase()) plan.push({ q: broad, source: PHOTO_SOURCES[0] });
-  if (category) plan.push({ q: category + ' food', source: PHOTO_SOURCES[0] });
+  if (broad && broad.toLowerCase() !== String(term).toLowerCase()) PHOTO_SOURCES.forEach(function(src){ plan.push({ q: broad, source: src }); });
+  if (category) PHOTO_SOURCES.forEach(function(src){ plan.push({ q: category + ' food', source: src }); });
   return plan;
 }
+// v38.81 — how long to wait for a source that said "too many searches in the last minute": what it
+// asked for and a second more, at least 2 s and at most 30 s.
+function photoPauseSecs(answer) {
+  return Math.min(30, Math.max(2, ((answer && answer.retryAfter) || 5) + 1));
+}
+window.photoPauseSecs = photoPauseSecs;
 window.photoAttemptPlan = photoAttemptPlan; window.photoSearchOnce = photoSearchOnce;
 
 // WHICH recipes are actually missing a photo. This is the whole incident of
@@ -3775,16 +3787,31 @@ async function autoFetchMissingPhotos() {
   var terms = await photoSearchTerms(noPhoto.map(function(r){ return r.name; }));
 
   var fetched = 0, noResults = [], failed = [], skipped = [], undoItems = [];
+  var noKey = {};   // v38.81 — sources the server has no key for: not asked again in this run
   for (var i = 0; i < noPhoto.length; i++) {
     var r = noPhoto[i];
     var term = terms[i] || photoQueryFromName(r.name) || r.name;
     toast('🔍 ' + (i+1) + '/' + noPhoto.length + ': ' + term.slice(0, 24));
-    var images = [], plan = photoAttemptPlan(term, r.category);
+    var images = [], plan = photoAttemptPlan(term, r.category), busy = '';
     for (var a = 0; a < plan.length && !images.length; a++) {
+      if (noKey[plan[a].source]) continue;
       images = await photoSearchOnce(plan[a].q, plan[a].source);
+      // v38.81 — Tony, 22 Oct: "every time I click it, it updates only a single photo". Pixabay (the one
+      // stock library with a key) answers a search or two, then "too many searches in the last minute; try
+      // again in about 1–8 s". That was read as "no picture", so each run got one photo. Now: wait as long
+      // as it asks, and ask again (three times at most).
+      for (var w = 0; images.rateLimited && w < 3; w++) {
+        var secs = photoPauseSecs(images);
+        toast('⏳ ' + (i+1) + '/' + noPhoto.length + ': ' + (PHOTO_SOURCE_LABELS[plan[a].source] || plan[a].source)
+          + ' asks for a pause — ' + secs + ' s');
+        await new Promise(function(res){ setTimeout(res, secs * 1000); });
+        images = await photoSearchOnce(plan[a].q, plan[a].source);
+      }
+      if (images.rateLimited) busy = PHOTO_SOURCE_LABELS[plan[a].source] || plan[a].source;
+      if (images.notConfigured) noKey[plan[a].source] = true;
       if (!images.length) await new Promise(function(res){ setTimeout(res, 200); });
     }
-    if (!images.length) { noResults.push(r.name + ' → "' + term + '"'); continue; }
+    if (!images.length) { noResults.push(r.name + ' → "' + term + '"' + (busy ? ' (' + busy + ' was still busy)' : '')); continue; }
     try {
       var blob = await fetchPhotoBlob(images[0].url);      // v36.24 — via the Worker
       var file = new File([blob], 'auto-photo.jpg', { type: blob.type || 'image/jpeg' });
@@ -9105,7 +9132,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v38.80';
+var APP_VERSION = 'v38.81';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -12152,7 +12179,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.80</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.81</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -12240,7 +12267,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.80</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.81</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -30433,6 +30460,15 @@ async function doPhotoSearch() {
     try {
       var data = await photoFetch(source, _photoPage);
       if (gen !== _photoGen) return;
+      // v38.81 — Pixabay: "too many searches in the last minute; try again in about 1–8 s". A short pause
+      // is waited out once (the refusal is not kept, so it is asked again), rather than passed over.
+      if (data.rateLimited && photoPauseSecs(data) <= 10) {
+        grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--muted);font-size:13px;">⏳ ' + label + ' asks for a pause — ' + photoPauseSecs(data) + ' s…</div>';
+        await new Promise(function (res) { setTimeout(res, photoPauseSecs(data) * 1000); });
+        if (gen !== _photoGen) return;
+        data = await photoFetch(source, _photoPage);
+        if (gen !== _photoGen) return;
+      }
       if (data.notConfigured) {
         // No API key for this source — skip to the next one automatically
         tried++;
@@ -30715,7 +30751,7 @@ var HELP_SYSTEM_PROMPT = [
   "- 🕐 Recently Viewed: a 'Recent' chip appears in the filter bar after you open any recipe — shows your last 8 viewed",
   "- ⇅ Sort: click the Sort button next to Grid/List to sort by Default, Recently viewed, A–Z, Prep time, Difficulty, or Most cooked",
   "- 🍳 Cook count: open any recipe and tap '🍳 Cooked!' to track how many times you've made it. Recipes cooked 3+ times show a 🔥 badge. Sort by 'Most cooked' to find your favourites",
-  "- 📸 Auto-fetch missing photos: ··· More → 📸 Auto-fetch missing photos — AI translates Hebrew names to English and finds a matching photo (Pexels, Unsplash, Pixabay or Wikimedia Commons) for every recipe that has none; Undo puts things back",
+  "- 📸 Auto-fetch missing photos: ··· More → 📸 Auto-fetch missing photos — AI translates Hebrew names to English and finds a matching photo (Pexels, Unsplash, Pixabay or Wikimedia Commons) for every recipe that has none; a library that asks for a pause (\"too many searches\") is waited for and asked again; Undo puts things back",
   "- 🏅 The recipe counter: the rosette next to your household's name counts its recipes (a collection counts as its recipes). Its metal rises with the count — First steps, then Bronze at 10, Silver 25, Gold 50, Platinum 100, Ruby 250, Diamond 500 and Legendary at 1000 — and each new rank is celebrated once. Tap it to see all the ranks and how far the next one is",
   "- 📏 Scaling memory: the app remembers the last serving size multiplier you used for each recipe",
   "- 🌙 Screen stay-on (Wake Lock): when you open a recipe, the screen stays on automatically so your hands can stay clean while cooking. It goes back to normal sleep when you close the recipe. Works in Chrome and Edge on Android; not supported in Safari.",

@@ -10082,6 +10082,74 @@ window.SELF_TESTS = [
       }
     } },
 
+  { id:'photo_autofetch_waits_for_busy_source', group:'Features', name:'Auto-fetch waits out a busy photo source and gets every photo (v38.81)',
+    test:async function(){
+      // Tony, 22 Oct 2026: "every time I click it, it updates only a single photo". Measured from GitHub's servers:
+      // Pexels and Unsplash have no key on the server, and Pixabay answers a search or two, then "too many searches
+      // in the last minute; try again in about 1–8 s" — which the run read as "no picture". The stand-in below is
+      // that server.
+      var kR=recipes, kHyd=window.hydratePhotosFromIDB, kAll=window.idbGetAll, kAsk=window.askConfirm,
+          kTerms=window.photoSearchTerms, kOnce=window.photoSearchOnce, kFetch=window.fetch,
+          kUp=window.compressPhotoToDataUrl, kToast=window.toast, kErr=window.showServiceError,
+          kSave=window.saveData, kGrid=window.renderGrid, kPause=window.photoPauseSecs, kUndo=await autoFetchUndoLoad();
+      var asked=[], said='', calls=0;
+      try{
+        window.toast=function(){}; window.showServiceError=function(m){ said=String(m); };
+        window.saveData=function(){}; window.renderGrid=function(){};
+        window.hydratePhotosFromIDB=function(){ return Promise.resolve(); };
+        window.idbGetAll=function(){ return Promise.resolve([]); };
+        window.askConfirm=function(){ return Promise.resolve(true); };
+        window.photoSearchTerms=function(n){ var o={}; n.forEach(function(x,i){ o[i]=x; }); return Promise.resolve(o); };
+        window.photoPauseSecs=function(){ return 0.01; };
+        window.photoSearchOnce=function(q, src){
+          asked.push(src);
+          var out=[];
+          if(src==='pexels'||src==='unsplash'){ out.notConfigured=true; return Promise.resolve(out); }
+          if(src==='pixabay'){
+            if(++calls%2===0){ out.rateLimited=true; out.retryAfter=3; return Promise.resolve(out); }
+            return Promise.resolve([{ url:'https://x/'+encodeURIComponent(q)+'.jpg', credit:'P' }]);
+          }
+          return Promise.resolve(out);
+        };
+        window.fetch=function(){ return Promise.resolve({ ok:true, status:200,
+          headers:{ get:function(k){ return /content-type/i.test(k) ? 'image/jpeg' : null; } },
+          blob:function(){ return Promise.resolve(new Blob(['x'],{type:'image/jpeg'})); } }); };
+        window.compressPhotoToDataUrl=function(){ return Promise.resolve('data:image/jpeg;base64,GOT'); };
+        recipes=[{ id:41, name:'Greek Salad', photo:'' }, { id:42, name:'Avocado Toast', photo:'' },
+                 { id:43, name:'Chocolate Lava Cake', photo:'' }];
+        await autoFetchMissingPhotos();
+        var got=recipes.filter(function(r){ return r.photo; }).length;
+        if(got!==3) throw new Error('only '+got+' of 3 got a photo — a busy source is still read as "no picture": '+said.slice(0,160));
+        if(asked.filter(function(x){ return x==='pexels'; }).length!==1)
+          throw new Error('a source with no key on the server was asked again in the same run: '+asked.join(','));
+
+        // Busy to the end: the run says so, rather than "no picture found" as if none existed.
+        window.photoSearchOnce=function(q, src){
+          var out=[];
+          if(src==='pixabay'){ out.rateLimited=true; out.retryAfter=3; } else if(src!=='wikimedia') out.notConfigured=true;
+          return Promise.resolve(out);
+        };
+        recipes=[{ id:44, name:'Shakshuka', photo:'' }]; said='';
+        await autoFetchMissingPhotos();
+        if(recipes[0].photo) throw new Error('a photo appeared with every source busy or empty');
+        if(!/Pixabay was still busy/.test(said)) throw new Error('a run that ended on a busy source did not say so: '+said.slice(0,160));
+      } finally {
+        recipes=kR; window.hydratePhotosFromIDB=kHyd; window.idbGetAll=kAll; window.askConfirm=kAsk;
+        window.photoSearchTerms=kTerms; window.photoSearchOnce=kOnce; window.fetch=kFetch;
+        window.compressPhotoToDataUrl=kUp; window.toast=kToast; window.showServiceError=kErr;
+        window.saveData=kSave; window.renderGrid=kGrid; window.photoPauseSecs=kPause;
+        try { if(kUndo) await autoFetchUndoSave(kUndo.items); else await autoFetchUndoClear(); } catch(e){}
+      }
+      // The broader attempts go to every source, not only to the first (which may have no key).
+      var plan=photoAttemptPlan('lava cake','Dessert');
+      ['pixabay','wikimedia'].forEach(function(src){
+        if(!plan.some(function(p){ return p.q==='cake' && p.source===src; }))
+          throw new Error('the broader search never reaches '+src);
+      });
+      if(photoPauseSecs({ rateLimited:true, retryAfter:6 })!==7) throw new Error('a source asking for 6 s is not waited 7 s');
+      if(photoPauseSecs({ rateLimited:true, retryAfter:600 })!==30) throw new Error('a long pause is not capped at 30 s');
+    }
+  },
   { id:'photo_never_overwrites', group:'Features', name:'Auto-fetch never touches a recipe that already has a photo (5g.2)',
     test: async()=>{
       if(typeof recipesWithNoPhoto!=='function') throw new Error('recipesWithNoPhoto not defined');

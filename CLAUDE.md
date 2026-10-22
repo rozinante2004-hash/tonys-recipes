@@ -876,6 +876,17 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
     `window.logOwnerCopies` stubbed false (restored in the outer finally); the panel test also checks the owner's.
   Local: 404 pass on a fresh browser, 404 with the owner's device state (`--prefs
   '{"mkn_fs_reads":"144","mkn_ios_shortcut_used":"1"}'`), 404 on the built copy.
+- **v38.81 — "📸 Auto-fetch missing photos" got one photo a run** (Tony, 22 Oct, in Tester 2's kitchen: "it says it
+  covers all recipes, but every time I click it, it updates only a single photo"). A one-off probe from GitHub's
+  servers (photo-probe.yml, removed after) replayed the run against the Worker: **Pexels and Unsplash have no key on
+  the Worker** (`notConfigured`), and **Pixabay answers a search or two, then 429 "too many searches in the last
+  minute; try again in about 1–8 s"**; Wikimedia found nothing for "Tester 2 Spaghetti Carbonara". The run read the
+  429 as "no picture". Now: `photoSearchOnce` marks its empty answer with `rateLimited`/`retryAfter`/`notConfigured`;
+  the run waits `photoPauseSecs` (asked + 1 s, 2–30 s) and asks again (≤ 3 times), skips a no-key source for the rest
+  of the run, and says "(Pixabay was still busy)" where it ran out. `photoAttemptPlan`'s broader attempts (last word,
+  category) go to every source, not only the first (Pexels, keyless on the server). The manual 🔍 Find a photo waits a
+  short pause (≤ 10 s) once before moving on. Self-test `photo_autofetch_waits_for_busy_source` (that server as a
+  stand-in). Pexels/Unsplash keys would add two more libraries: offered to Tony, his choice.
 - **Move step 9 finished (20 Oct 2026, 18:05 Israel time; Tony: "OK to delete the 4 + 135 old family documents").**
   clear-source `all` + `shared` (run 39445140837): 139 deleted (households 4, shared 135), the household cut to its
   moved mark; clear-check after it (run 39445361414): recipes-f379d holds 1 document of the moved household (its own,
