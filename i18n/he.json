@@ -1,7 +1,7 @@
 {
  "lang": "he",
- "updatedAt": 1792613162445,
- "count": 2898,
+ "updatedAt": 1792706493467,
+ "count": 2899,
  "strings": {
   "\"Add to Home Screen\"": "הוספה למסך הבית",
   "\"One item away\" filter ({1}f.{2})": "פילטר \"פריט אחד חסר\" ({1}f.{2})",
@@ -2254,6 +2254,7 @@
   "⏳ Signing in automatically in {1} seconds…": "⏳ מתחברים אוטומטית בעוד {1} שניות…",
   "⏳ Unzipping the extension…": "⏳ מחלץ את התוסף…",
   "⏳ waiting for them": "⏳ ממתין להם",
+  "⏳ {1}/{2}: {3} asks for a pause — {4} s": "⏳ {1}/{2}: {3} מבקש הפסקה — {4} s",
   "⏸ Paused at {1}/{2} — the browser holds back a tab that is not in front. It carries on when this tab is in front again.": "⏸ מושהה ב-{1}/{2} — הדפדפן מאט כרטיסייה שאינה בחזית. הפעולה תימשך כשהכרטיסייה תחזור להיות בחזית.",
   "▦ Grid": "▦ רשת",
   "▶ Execute Selected": "▶ הפעל נבחרים",

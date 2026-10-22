@@ -1,7 +1,7 @@
 {
  "lang": "ja",
- "updatedAt": 1792613162445,
- "count": 2698,
+ "updatedAt": 1792706493467,
+ "count": 2699,
  "strings": {
   "\"Add to Home Screen\"": "ホーム画面に追加",
   "\"One item away\" filter ({1}f.{2})": "「あと1品」フィルター（{1}f.{2}）",
@@ -2061,6 +2061,7 @@
   "⏳ Signing in automatically in {1} seconds…": "⏳ {1}秒後に自動でサインインします…",
   "⏳ Unzipping the extension…": "⏳ 拡張機能を展開中…",
   "⏳ waiting for them": "⏳ 相手の応答待ち",
+  "⏳ {1}/{2}: {3} asks for a pause — {4} s": "⏳ {1}/{2}：{3}が一時停止を求めています — {4}秒",
   "⏸ Paused at {1}/{2} — the browser holds back a tab that is not in front. It carries on when this tab is in front again.": "⏸ {1}/{2} で一時停止中 — タブが前面にないと、ブラウザが処理を止めてしまいます。このタブを前面に戻すと再開します。",
   "▦ Grid": "▦ グリッド",
   "▶ Execute Selected": "▶ 選択項目を実行",

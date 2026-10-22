@@ -1,7 +1,7 @@
 {
  "lang": "it",
- "updatedAt": 1792613162445,
- "count": 2237,
+ "updatedAt": 1792706493467,
+ "count": 2238,
  "strings": {
   "\"Add to Home Screen\"": "Aggiungi a Home",
   "\"Open Bring!\"": "Apri Bring!",
@@ -1644,6 +1644,7 @@
   "⏳ Signing in automatically in {1} seconds…": "⏳ Accesso automatico tra {1} secondi…",
   "⏳ Unzipping the extension…": "⏳ Estrazione dell'estensione…",
   "⏳ waiting for them": "⏳ in attesa",
+  "⏳ {1}/{2}: {3} asks for a pause — {4} s": "⏳ {1}/{2}: {3} chiede una pausa — {4} s",
   "⏸ Paused at {1}/{2} — the browser holds back a tab that is not in front. It carries on when this tab is in front again.": "⏸ In pausa a {1}/{2} — il browser rallenta le schede non in primo piano. Riprende quando questa scheda torna in primo piano.",
   "▦ Grid": "▦ Griglia",
   "▶ Execute Selected": "▶ Esegui selezionati",

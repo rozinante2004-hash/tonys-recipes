@@ -1,7 +1,7 @@
 {
  "lang": "ru",
- "updatedAt": 1792613162445,
- "count": 2688,
+ "updatedAt": 1792706493467,
+ "count": 2689,
  "strings": {
   "\"Add to Home Screen\"": "Добавить на главный экран",
   "\"One item away\" filter ({1}f.{2})": "Фильтр «Не хватает одного» ({1}ф.{2})",
@@ -2055,6 +2055,7 @@
   "⏳ Signing in automatically in {1} seconds…": "⏳ Автовход через {1} сек…",
   "⏳ Unzipping the extension…": "⏳ Распаковка расширения…",
   "⏳ waiting for them": "⏳ ждём ответа",
+  "⏳ {1}/{2}: {3} asks for a pause — {4} s": "⏳ {1}/{2}: {3} просит паузу — {4} с",
   "⏸ Paused at {1}/{2} — the browser holds back a tab that is not in front. It carries on when this tab is in front again.": "⏸ Приостановлено на {1}/{2} — браузер замедляет работу вкладки, если она не активна. Процесс продолжится, когда вкладка снова станет активной.",
   "▦ Grid": "▦ Плитка",
   "▶ Execute Selected": "▶ Выполнить выбранное",

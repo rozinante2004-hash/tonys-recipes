@@ -1,7 +1,7 @@
 {
  "lang": "zh",
- "updatedAt": 1792613162445,
- "count": 2384,
+ "updatedAt": 1792706493467,
+ "count": 2385,
  "strings": {
   "\"Add to Home Screen\"": "添加到主屏幕",
   "\"Open Bring!\"": "打开 Bring!",
@@ -1749,6 +1749,7 @@
   "⏳ Signing in automatically in {1} seconds…": "⏳ 将在 {1} 秒后自动登录…",
   "⏳ Unzipping the extension…": "⏳ 正在解压扩展程序…",
   "⏳ waiting for them": "⏳ 等待对方",
+  "⏳ {1}/{2}: {3} asks for a pause — {4} s": "⏳ {1}/{2}：{3} 需要暂停 — {4} 秒",
   "⏸ Paused at {1}/{2} — the browser holds back a tab that is not in front. It carries on when this tab is in front again.": "⏸ 已暂停，{1}/{2} — 浏览器会限制不在前台的标签页。切回此标签页后会继续。",
   "▦ Grid": "▦ 网格",
   "▶ Execute Selected": "▶ 执行所选",

@@ -1,7 +1,7 @@
 {
  "lang": "de",
- "updatedAt": 1792613162445,
- "count": 2354,
+ "updatedAt": 1792706493467,
+ "count": 2355,
  "strings": {
   "\"Add to Home Screen\"": "Zum Home-Bildschirm hinzufügen",
   "\"Open Bring!\"": "Bring! öffnen",
@@ -1734,6 +1734,7 @@
   "⏳ Signing in automatically in {1} seconds…": "⏳ Automatische Anmeldung in {1} Sekunden…",
   "⏳ Unzipping the extension…": "⏳ Erweiterung wird entpackt…",
   "⏳ waiting for them": "⏳ wartet auf sie",
+  "⏳ {1}/{2}: {3} asks for a pause — {4} s": "⏳ {1}/{2}: {3} bittet um eine Pause — {4} s",
   "⏸ Paused at {1}/{2} — the browser holds back a tab that is not in front. It carries on when this tab is in front again.": "⏸ Pausiert bei {1}/{2} — der Browser bremst Tabs, die nicht im Vordergrund sind. Es geht weiter, sobald dieser Tab wieder aktiv ist.",
   "▦ Grid": "▦ Raster",
   "▶ Execute Selected": "▶ Auswahl ausführen",

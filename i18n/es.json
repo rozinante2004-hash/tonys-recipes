@@ -1,7 +1,7 @@
 {
  "lang": "es",
- "updatedAt": 1792613162445,
- "count": 2352,
+ "updatedAt": 1792706493467,
+ "count": 2353,
  "strings": {
   "\"Add to Home Screen\"": "Añadir a pantalla de inicio",
   "\"Open Bring!\"": "Abrir Bring!",
@@ -1733,6 +1733,7 @@
   "⏳ Signing in automatically in {1} seconds…": "⏳ Iniciando sesión automáticamente en {1} segundos…",
   "⏳ Unzipping the extension…": "⏳ Descomprimiendo la extensión…",
   "⏳ waiting for them": "⏳ esperando respuesta",
+  "⏳ {1}/{2}: {3} asks for a pause — {4} s": "⏳ {1}/{2}: {3} pide una pausa — {4} s",
   "⏸ Paused at {1}/{2} — the browser holds back a tab that is not in front. It carries on when this tab is in front again.": "⏸ Pausado en {1}/{2} — el navegador frena las pestañas que no están en primer plano. Sigue en cuanto esta pestaña vuelva a estar activa.",
   "▦ Grid": "▦ Cuadrícula",
   "▶ Execute Selected": "▶ Ejecutar selección",

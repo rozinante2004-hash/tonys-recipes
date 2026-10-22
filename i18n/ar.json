@@ -1,7 +1,7 @@
 {
  "lang": "ar",
- "updatedAt": 1792613162445,
- "count": 2357,
+ "updatedAt": 1792706493467,
+ "count": 2358,
  "strings": {
   "\"Add to Home Screen\"": "إضافة إلى الشاشة الرئيسية",
   "\"Open Bring!\"": "فتح Bring!",
@@ -1735,6 +1735,7 @@
   "⏳ Signing in automatically in {1} seconds…": "⏳ تسجيل الدخول تلقائيًا خلال {1} ثانية…",
   "⏳ Unzipping the extension…": "⏳ جارٍ فك ضغط الإضافة…",
   "⏳ waiting for them": "⏳ في انتظارهم",
+  "⏳ {1}/{2}: {3} asks for a pause — {4} s": "⏳ {1}/{2}: {3} يطلب توقفًا — {4} ث",
   "⏸ Paused at {1}/{2} — the browser holds back a tab that is not in front. It carries on when this tab is in front again.": "⏸ متوقف مؤقتًا عند {1}/{2} — يقلّل المتصفح من نشاط التبويب غير الظاهر. سيكمل العمل عند العودة لهذا التبويب.",
   "▦ Grid": "▦ شبكة",
   "▶ Execute Selected": "▶ تنفيذ المحدد",
