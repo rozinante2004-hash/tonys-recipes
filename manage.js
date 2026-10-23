@@ -376,6 +376,7 @@
     'print': 'Printed', 'word': 'Exported to Word', 'share': 'Shared a recipe', 'bring': 'Sent to Bring!', 'help': 'Asked the help assistant',
     'photo-search': 'Searched for a photo', 'farm': 'Tapped a farm visitor', 'farm-off': 'Turned the farm off', 'share-app': 'Shared the app',
     'cvd-on': 'Turned on the red–green colours', 'cvd-off': 'Turned off the red–green colours',   // v38.83
+    'toast-go': 'Clicked a notice to go where it points',   // v38.86
     'link-request': 'Asked to link with a household',
     'added.typed': 'typed in', 'added.link': 'from a link', 'added.extension': 'from the browser extension', 'added.shared': 'shared to the app (phone)',
     'added.photo': 'from a photo', 'added.screenshots': 'from screenshots', 'added.text': 'from pasted text', 'added.video-file': 'from a video file',

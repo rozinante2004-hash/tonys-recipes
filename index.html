@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v38.85 -->
+<!-- Tony's Recipes Collection v38.86 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -2091,7 +2091,8 @@ function handleShareTarget() {
     // v37.17 — the same for Facebook: its text only exists on the signed-in page.
     if (directUrl && isFacebookUrl(directUrl) && hasRecipeText && typeof openFreehandModal === 'function') {
       openFreehandModal(textBlob, directUrl);
-      toast('\u{1F4D8} The text from Facebook is in \u2014 press \u{1F916} Parse & Import Recipe', 8000);
+      toast('\u{1F4D8} The text from Facebook is in \u2014 press \u{1F916} Parse & Import Recipe', 8000,
+        function(){ toastLand(document.querySelector('#freehandOverlay [onclick="runFreehandImport()"]')); });
       return;
     }
     if (directUrl) { openUrlImportModal(directUrl); runUrlImport(); return; }   // v37.23 — shared on purpose: go
@@ -2760,7 +2761,7 @@ function _selfTestUnpark(p) {
   // data. Taken down, and its button with it.
   try {
     var tt = document.getElementById('toast');
-    if (tt) { clearTimeout(tt._tid); tt.classList.remove('show'); tt.style.pointerEvents = ''; tt.textContent = ''; }
+    if (tt) { toastHide(tt); tt.textContent = ''; }     // v38.86 — and where it led
   } catch(e) {}
   // A cloud save that came due during the run was held (timedCloudSave); it
   // runs now, against the real connection.
@@ -5235,7 +5236,7 @@ async function openConnectHousehold() {
         message: 'Once they agree, each of you sees the other’s recipes — read-only. Nothing is copied or changed.\n\n'
           + 'Type their household’s identifier (MKN-…), or the e-mail address of anyone in it.',
         input: t, placeholder: 'MKN-XXXX-XXXX  /  name@example.com', okLabel: 'Next ›' });
-      if (typeof a1 !== 'string' || !a1.trim()) { if (sent) toast('The request you sent stays — ⚙️ → \u{1F3E0} My household → \u{1F4EC} Link requests to withdraw it.', 7000); return sent ? sent.r : null; }
+      if (typeof a1 !== 'string' || !a1.trim()) { if (sent) toast('The request you sent stays — ⚙️ → \u{1F3E0} My household → \u{1F4EC} Link requests to withdraw it.', 7000, openLinkRequests); return sent ? sent.r : null; }
       t = a1.trim(); step = 2; continue;
     }
     if (step === 2) {
@@ -5244,14 +5245,14 @@ async function openConnectHousehold() {
         message: 'A few words for them — who you are, why you’d like to link. They see it with your request, signed with your household’s name.',
         input: note, placeholder: 'e.g. Hi, it’s Dana from the cooking class!', okLabel: /@/.test(t) ? 'Next \u203A' : 'Send the request' });
       if (a2 === ASK_BACK) { step = 1; continue; }
-      if (typeof a2 !== 'string') { if (sent) toast('The request you sent stays — ⚙️ → \u{1F3E0} My household → \u{1F4EC} Link requests to withdraw it.', 7000); return sent ? sent.r : null; }
+      if (typeof a2 !== 'string') { if (sent) toast('The request you sent stays — ⚙️ → \u{1F3E0} My household → \u{1F4EC} Link requests to withdraw it.', 7000, openLinkRequests); return sent ? sent.r : null; }
       note = a2;
       if (!await talkPrivacyOk(note)) continue;
       var tg = hhLinkTarget(t);
       if (!tg) { await askConfirm({ icon: '\u{1F91D}', title: 'Not sent', message: 'That is neither an identifier (MKN-…) nor an e-mail address.', okLabel: 'OK' }); step = 1; continue; }
       if (tg.code) {                                              // by identifier: through the app, nothing to choose
         if (!await connectSend()) { step = 1; continue; }
-        toast(sent.r.again ? '⏳ Already asked — waiting for them.' : '\u{1F91D} Sent. It pops up in their app right away if it is open, or the next time they open it.', 7000);
+        toast(sent.r.again ? '⏳ Already asked — waiting for them.' : '\u{1F91D} Sent. It pops up in their app right away if it is open, or the next time they open it.', 7000, openLinkRequests);
         return sent.r;
       }
       step = 3; continue;
@@ -5288,10 +5289,10 @@ async function openConnectHousehold() {
       if (!how) { if (!sent) toast('Not sent.', 4000); return sent ? sent.r : null; }
     }
     if (!await connectSend()) { step = 1; continue; }
-    if (how === 'app') { toast(sent.r.again ? '⏳ Already asked — waiting for them.' : '\u{1F4E8} Sent through My Kitchen Notes.', 7000); return sent.r; }
+    if (how === 'app') { toast(sent.r.again ? '⏳ Already asked — waiting for them.' : '\u{1F4E8} Sent through My Kitchen Notes.', 7000, openLinkRequests); return sent.r; }
     var did = await shareDo(how, msg);
     if (did === ASK_BACK) continue;                               // no mail program: back to these choices (sent once only)
-    toast('\u{1F4E8} Sent through My Kitchen Notes — and you are telling them too.', 7000);
+    toast('\u{1F4E8} Sent through My Kitchen Notes — and you are telling them too.', 7000, openLinkRequests);
     return sent.r;
   }
   return sent ? sent.r : null;
@@ -5509,7 +5510,7 @@ async function hhAcceptLink(r) {
   await hhLoadLinks(); await hhSetHome();
   if (typeof renderFilters === 'function') renderFilters();
   householdRenderBar();
-  toast('\u{1F91D} Linked with ' + name + ' — their recipes are under \u{1F91D} ' + name + ' among the filters.', 9000);
+  toast('\u{1F91D} Linked with ' + name + ' — their recipes are under \u{1F91D} ' + name + ' among the filters.', 9000, function(){ goKitchen(from); });
   return 'accepted';
 }
 // Block (or unblock) a household from the page's history.
@@ -5536,7 +5537,7 @@ async function linkReqFromUrl() {
   for (var w = 0; w < 300 && document.getElementById('askOverlay'); w++) await wait(200);   // the request's own question first
   var u = window._fbUser;
   var linked = hhLinks().filter(function(l){ return l.hid === from; })[0];
-  if (linked) { toast('\u{1F91D} You are linked with ' + hhLinkName(linked) + ' — their recipes are in your list.', 7000); return 'linked'; }
+  if (linked) { toast('\u{1F91D} You are linked with ' + hhLinkName(linked) + ' — their recipes are in your list.', 7000, function(){ goKitchen(linked.hid); }); return 'linked'; }
   if (from === _household.hid) return false;
   if (u.emailVerified === false) {
     var go = await askConfirm({ icon: '\u{1F4EC}', title: 'Confirm your e-mail address first',
@@ -6027,7 +6028,7 @@ function famArrived(fresh) {
   if (win && _fam.with === room) return;                                       // on the screen already
   var text = String(m.text || '');
   toastAction('\u{1F46A} ' + (m.name || famPersonName(m.by)) + (m.to === 'all' ? ' (to everyone)' : '') + ': “'
-    + (text.length > 70 ? text.slice(0, 70) + '…' : text) + '”', 'Open', function(){ openFamilyChat(room); }, 9000);
+    + (text.length > 70 ? text.slice(0, 70) + '…' : text) + '”', 'Open', function(){ openFamilyChat(room); }, 9000, function(){ openFamilyChat(room); });
 }
 async function openFamilyChat(room) {
   if (!_household || !window._fbUser) { toast('Sign in first.', 5000); return null; }
@@ -6625,7 +6626,7 @@ function linkLiveTalkArrived(other, fresh) {
   if (chat || page || !theirs.length) return;
   var m = theirs[theirs.length - 1], text = String(m.text || '');
   toastAction('\u{1F4AC} ' + (m.name || 'A linked household') + ': “' + (text.length > 70 ? text.slice(0, 70) + '…' : text) + '”',
-    'Open', function(){ openKitchenChats(other); }, 9000);
+    'Open', function(){ openKitchenChats(other); }, 9000, function(){ openKitchenChats(other); });
 }
 async function linkLiveRequests() {
   await hhCheckLinkRequests();
@@ -6641,7 +6642,7 @@ async function linkLiveLinks() {
   linkLiveTalk();
   linkLiveRecipes();                                              // v38.52 — a new link's recipes listened to; a removed one's no longer
   if (document.getElementById('lrBody')) renderLinkRequestsPage();
-  if (added.length) { chimePlay('message'); toast('\u{1F91D} ' + hhLinkName(added[0]) + ' accepted — their recipes are now in your list.', 8000); }
+  if (added.length) { chimePlay('message'); toast('\u{1F91D} ' + hhLinkName(added[0]) + ' accepted — their recipes are now in your list.', 8000, function(){ goKitchen(added[0].hid); }); }
 }
 // v38.54 — not while nobody is there. 18–19 Oct 2026: four windows left open on a
 // desk asked the server every two minutes, all night (~270 requests an hour), and
@@ -6670,7 +6671,7 @@ async function livePoll(force) {
       var n = await feedbackCountNew();
       if (_liveOwnerN >= 0 && n > _liveOwnerN) {
         chimePlay('message');                                     // v38.82
-        toast('\u{1F4AC} A new note from a tester — ⚙️ → 👑 App owner → \u{1F4CA} Households → \u{1F4AC} Feedback', 9000);
+        toast('\u{1F4AC} A new note from a tester — ⚙️ → 👑 App owner → \u{1F4CA} Households → \u{1F4AC} Feedback', 9000, goFeedback);
       }
       _liveOwnerN = n; feedbackKnown(n);
     }
@@ -6953,7 +6954,7 @@ function saveLinkedCopy() {
   saveData(); renderGrid();
   closeM('linkedViewOverlay');
   syncLog('save', 'Saved a copy of a linked household’s recipe', { name: made.name, id: made.id });
-  toast('\u{1F4E5} Saved to your recipes: “' + made.name + '”', 6000);
+  toast('\u{1F4E5} Saved to your recipes: “' + made.name + '”', 6000, function(){ goRecipe(made.id); });
   return made.id;
 }
 window.hhLoadLinks = hhLoadLinks; window.hhSendLinkRequest = hhSendLinkRequest; window.openConnectHousehold = openConnectHousehold;
@@ -6982,7 +6983,7 @@ async function householdEnter(user) {
       try {
         var joined = await householdJoinByInvite(user, code);
         try { localStorage.setItem(HOUSEHOLD_KEY, joined); } catch(e) {}
-        toast('✅ You have joined the household', 6000);
+        toast('✅ You have joined the household', 6000, goFamilyAccess);
       } catch(e) {
         await askConfirm({ icon: '⚠️', title: 'Could not join', message: e.message, okLabel: 'OK' });
       }
@@ -7152,7 +7153,7 @@ function householdToldOfAsks(list) {
   if (!who.length || _hhAsksTold[_cloudHid] || _selfTestRunning) return;
   _hhAsksTold[_cloudHid] = true;
   toast('\u270b ' + (who.length === 1 ? (who[0].name || who[0].email) + ' asks' : who.length + ' people ask')
-    + ' to add and change recipes \u2014 see \u{1F465} Family Access.', 9000);
+    + ' to add and change recipes \u2014 see \u{1F465} Family Access.', 9000, goFamilyAccess);
 }
 async function householdAskToWrite() {
   if (!_household || _household.role !== 'viewer' || !window._fbUser) return false;
@@ -7262,7 +7263,7 @@ async function householdJoinPasted() {
   catch(e) { await askConfirm({ icon: '\u26a0\ufe0f', title: 'Could not join', message: e.message, okLabel: 'OK' }); return null; }
   if (hid === _cloudHid) { toast('You are already in this household'); return hid; }
   try { localStorage.setItem(HOUSEHOLD_KEY, hid); } catch(e) {}
-  toast('\u2705 You have joined the household', 6000);
+  toast('\u2705 You have joined the household', 6000, goFamilyAccess);
   householdReopen();
   return hid;
 }
@@ -8026,7 +8027,7 @@ async function householdWelcome(user) {
         continue;
       }
       try { var hid = await householdJoinByInvite(user, code); try { localStorage.setItem(HOUSEHOLD_KEY, hid); } catch(e) {}
-            toast('✅ You\u2019re in \u2014 welcome to the kitchen!', 6000); return hid; }
+            toast('✅ You\u2019re in \u2014 welcome to the kitchen!', 6000, goFamilyAccess); return hid; }
       catch(e) { await askConfirm({ icon: '⚠️', title: 'Could not join', message: e.message, okLabel: 'OK' }); continue; }
     }
     // Not now (Cancel, Escape) — signed out, as the button says. Closed to newcomers: My Kitchen Notes is opened first.
@@ -8289,7 +8290,8 @@ function toggleFeedbackButton() {
   var hide = feedbackButtonOn();
   try { localStorage.setItem(FB_HIDDEN_KEY, hide ? '1' : '0'); } catch(e) {}
   renderFeedbackButton();
-  toast(hide ? 'The \u{1F4AC} button is hidden — ⚙️ → 💬 Help and feedback → ✉️ Send feedback still works' : 'The \u{1F4AC} button is back', 5000);
+  toast(hide ? 'The \u{1F4AC} button is hidden — ⚙️ → 💬 Help and feedback → ✉️ Send feedback still works' : 'The \u{1F4AC} button is back', 5000,
+    hide ? function(){ goSettings('help', '[onclick*="sendFeedback()"]'); } : null);
 }
 var _fbShot = '';
 async function fbShotPicked(input) {
@@ -8392,7 +8394,7 @@ async function feedbackTellOwner() {
   if (!feedbackInboxHere()) { feedbackDot(null); return 0; }
   feedbackKnown(null);                       // v37.94 — the last count straight away, while the inbox is asked
   var n = await feedbackCountNew();
-  if (n) toast('\u{1F4AC} ' + n + ' new note' + (n === 1 ? '' : 's') + ' from testers — ⚙️ → 👑 App owner → \u{1F4CA} Households → \u{1F4AC} Feedback', 10000);
+  if (n) toast('\u{1F4AC} ' + n + ' new note' + (n === 1 ? '' : 's') + ' from testers — ⚙️ → 👑 App owner → \u{1F4CA} Households → \u{1F4AC} Feedback', 10000, goFeedback);
   feedbackKnown(n);
   return n || 0;
 }
@@ -9339,7 +9341,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v38.85';
+var APP_VERSION = 'v38.86';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -9977,7 +9979,7 @@ window.addEventListener('error', function(e) {
   console.error('[Global error]', msg, e.filename, e.lineno, e.error && e.error.stack);
   recordError('error', msg, (e.filename || '') + (e.lineno ? ':' + e.lineno : ''));
   if (fsBroken(msg)) return;   // v38.34 — one Reload offer, not a toast per repeat
-  if (typeof toast === 'function') toast('⚠️ Error: ' + msg);
+  if (typeof toast === 'function') toast('⚠️ Error: ' + msg, showLoggingPanel);   // v38.86 — it is in the log
 });
 // A rejected promise never reaches the handler above, and most of this app's
 // failure paths are async — so without this the report would miss exactly the
@@ -11346,6 +11348,16 @@ li.line-sub-indent { padding-inline-start: 22px; }
 .empty-state { text-align: center; padding: 3rem 2rem; color: var(--muted); grid-column: 1/-1; }
 .toast { position: fixed; bottom: 2rem; left: 50%; transform: translateX(-50%) translateY(120px); background: var(--card-bg); color: var(--ink); padding: 10px 16px 10px 10px; border-radius: 14px; font-size: 13px; font-weight: 500; z-index: 999; transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1); pointer-events: none; white-space: nowrap; border: 1px solid var(--border); box-shadow: 0 4px 20px rgba(0,0,0,0.12); display: flex; align-items: center; gap: 10px; }
 .toast.show { transform: translateX(-50%) translateY(0); }
+/* v38.86 — a toast that leads to what it is about: the whole toast is the button, a › at its end says so */
+.toast.toast-go { cursor: pointer; }
+.toast.toast-go:hover { border-color: var(--terracotta); }
+.toast.toast-go:focus-visible { outline: 2px solid var(--terracotta); outline-offset: 2px; }
+.toast.toast-arrow::after { content: '\203A'; font-size: 20px; font-weight: 700; line-height: 1; color: var(--terracotta); flex-shrink: 0; }
+[dir="rtl"] .toast.toast-arrow::after { content: '\2039'; }
+/* …and where it led: a moment's ring round the place */
+.toast-landed { animation: toastLanded 1.8s ease-out; }
+@keyframes toastLanded { 0%, 45% { box-shadow: 0 0 0 3px var(--dot-ring); } 100% { box-shadow: 0 0 0 3px transparent; } }
+@media (prefers-reduced-motion: reduce) { .toast-landed { animation: none; box-shadow: 0 0 0 3px var(--dot-ring); } }
 .toast-icon-wrap { width: 28px; height: 28px; border-radius: 50%; background: #FFF0E8; display: flex; align-items: center; justify-content: center; font-size: 15px; flex-shrink: 0; }
 
 /* ── 3D BUTTON EFFECT ── */
@@ -12464,7 +12476,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.85</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.86</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -12552,7 +12564,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.85</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.86</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -15517,7 +15529,9 @@ async function i18nHarvestPass(drawn, onScreen) {
 // list is right on the day it is written and quietly wrong after the next edit
 // — and quietly wrong is the exact failure this release exists to end.
 var I18N_SCRAPE = [
-  /\btoast\(\s*(['"])((?:\\.|(?!\1).)*)\1\s*(?:,\s*\d+\s*)?\)/g,
+  // v38.86 — a toast may be told where it leads (toast('…', go), toast('…', 7000, go)), and toastAction's message is
+  // read the same way: the literal is the whole message when a comma or the bracket follows it.
+  /\btoast(?:Action)?\(\s*(['"])((?:\\.|(?!\1).)*)\1\s*[,)]/g,
   /\baskPrompt\(\s*(['"])((?:\\.|(?!\1).)*)\1\s*(?:,[^)]*)?\)/g,
   /\bshowServiceError\(\s*(['"])((?:\\.|(?!\1).)*)\1\s*\)/g,
   /\b(?:title|message|okLabel|cancelLabel|placeholder|label|hint|detail|fix|note)\s*:\s*(['"])((?:\\.|(?!\1).)*)\1\s*[,}]/g,
@@ -15837,7 +15851,7 @@ function i18nPatternRegex(pat) {
 // hat, and so are askConfirm's title and message. Each opener is followed by a
 // chain that ends at a top-level `)`, `,` or `}`.
 var I18N_PATTERN_OPENERS = new RegExp([
-  '\\btoast\\(',
+  '\\btoast(?:Action)?\\(',                              // v38.86 — toastAction's message too
   '\\bshowServiceError\\(',
   '\\b(?:title|message|step|okLabel|cancelLabel|detail|fix|note)\\s*:\\s*',
   '\\bsetDriveStatus\\(\\s*[\'"][^\'"]*[\'"]\\s*,\\s*',
@@ -15915,6 +15929,8 @@ var I18N_EXTRA = [
   // v38.82 — the sound's line in ⚙️ → ♿ Accessibility, for each sound; v38.81 — a photo library's pause, in 🔍 Find a photo
   '🎵 The sound: Spoon on a wine glass', '🎵 The sound: The kitchen’s service bell', '🎵 The sound: Wooden spoon on a pot',
   '⏳ {1} asks for a pause — {2} s…',
+  // v38.86 — the button on a toast about a message (toastAction's label is never a literal the scrape reads)
+  'Open',
   // v38.83 — ♿ Accessibility's colours, said as they switch
   '🎨 Blue for all right, orange for a problem — on this device', '🎨 The usual colours again',
   // v38.71 — Send to Bring!: where to get it
@@ -17761,7 +17777,7 @@ async function i18nUpdateAll() {
   if (!i18nCanEdit()) { toast(isAppOwner() && !i18nCentralIsOwn() ? i18nEditElsewhereNote() : 'Updating the shared translations needs full access.', 7000); return null; }
   try { await i18nIndexFetch(); } catch(e) {}
   var langs = i18nSupportedLangs();
-  if (!langs.length) { toast('No language has been translated yet — 🌐 → pick one to start.'); return null; }
+  if (!langs.length) { toast('No language has been translated yet — 🌐 → pick one to start.', toggleLangMenu); return null; }
 
   progressOpen({ icon: '🔍', title: 'Checking every screen for new text',
                  total: I18N_HARVEST.length + langs.length, step: 'Opening each panel in turn…' });
@@ -19962,7 +19978,7 @@ async function collectSelectedInto(targetId) {
   cancelSelectMode();
   activeCat = 'All'; renderFilters(); renderGrid(); saveData();
   toastAction('📚 ' + incoming.length + ' recipe' + (incoming.length === 1 ? '' : 's')
-    + ' now in “' + coll.name + '”', '↩︎ Undo', undoBulk, 12000);
+    + ' now in “' + coll.name + '”', '↩︎ Undo', undoBulk, 12000, function(){ goRecipe(coll.id); });
   syncLog('save', 'Collected ' + incoming.length + ' recipe(s) into “' + coll.name + '”',
     { id: coll.id, from: goneIds.length });
 
@@ -20192,7 +20208,7 @@ async function promotePartToRecipe(collId, partUid) {
   toast('⤴ “' + made.name + '” is its own recipe now'
     + (how === 'collapsed' ? ' — “' + coll.name + '” had one left, so it is an ordinary recipe again'
       : coll.parts.length ? ' — ' + coll.parts.length + ' left in the collection' : ''),
-    how === 'collapsed' ? 6000 : 5000);
+    how === 'collapsed' ? 6000 : 5000, function(){ goRecipe(made.id); });
   coll.updatedAt = Date.now();
   saveData(); renderGrid();
   if (viewId === coll.id) drawView();
@@ -21641,7 +21657,7 @@ async function importFromFile(event){
       applyParsedRecipe(built.recipe, 'freehandResult', 'freehandOverlay');
       document.getElementById('freehandOverlay').classList.add('open');
     } else {
-      toast('⚠️ No recipes found in this file. Try Free-hand text import.');
+      toast('⚠️ No recipes found in this file. Try Free-hand text import.', function(){ openFreehandModal(text); });
     }
 
   } catch(err) {
@@ -21994,12 +22010,15 @@ async function saveRecipe(){
         originalPhoto: existing.originalPhoto || '',  // preserve original photo
       };
     }
-    toast('\u2705 Recipe updated!');
+    // v38.86 — to the recipe, unless it is open behind the editor already
+    var vo = document.getElementById('viewOverlay'), shown = viewId === editingId && vo && vo.classList.contains('open'), savedId = editingId;
+    toast('\u2705 Recipe updated!', shown ? null : function(){ goRecipe(savedId); });
     if (typeof insightCount === 'function') insightCount('edit');   // v38.30
   } else {
     recipes.unshift({id: nextId++, uid: newUid(),bg:rndBg(),...data});
     if (typeof insightAdded === 'function') insightAdded(recipes[0]);   // v38.15 — how recipes arrive
-    toast('\u2705 Recipe saved!');
+    var newId = recipes[0].id;
+    toast('\u2705 Recipe saved!', function(){ goRecipe(newId); });
   }
   _editFormSnapshot = null; // saved — nothing left to warn about
   _editBaseAt = null;
@@ -22187,7 +22206,8 @@ function addSuggestion(idx, containerId) {
   if (btn) { btn.textContent = '✓ Added!'; btn.classList.add('added'); btn.disabled = true; }
   renderGrid();
   saveData();
-  toast(`✅ "${s.name}" added to your collection!`);
+  var addedId = recipes[0].id;
+  toast(`✅ "${s.name}" added to your collection!`, function(){ goRecipe(addedId); });
 }
 
 // ═══════════════════════════════════
@@ -22384,7 +22404,7 @@ function aiMeterNote(m) {
   if (_aiMeter.cap && _aiMeter.usd >= 0.8 * _aiMeter.cap && _aiMeter.usd < _aiMeter.cap && !_selfTestRunning) {
     var k = 'mkn_ai_warned_' + aiSpendMonth() + '_' + (_cloudHid || '');
     try { if (!localStorage.getItem(k)) { localStorage.setItem(k, '1');
-      toast('\u{1F916} Your household has used $' + _aiMeter.usd.toFixed(2) + ' of this month\u2019s $' + _aiMeter.cap.toFixed(2) + ' AI allowance.', 8000); } } catch(e) {}
+      toast('\u{1F916} Your household has used $' + _aiMeter.usd.toFixed(2) + ' of this month\u2019s $' + _aiMeter.cap.toFixed(2) + ' AI allowance.', 8000, openSyncHealth); } } catch(e) {}
   }
 }
 function aiMeterLine(m) {
@@ -23181,8 +23201,40 @@ function openExploreModal(){
   document.getElementById('dietPills').innerHTML='';
   document.getElementById('exploreOverlay').classList.add('open');
 }
+// ─── A TOAST THAT TAKES YOU THERE (v38.86) ───────────────────────────────────
+// Tony, 23 Oct 2026: "When a toast jumps, informing me of something, can we make this toast clickable, so clicking
+// it will bring me to the relevant location the toast is writing about?" A toast about something that lives
+// elsewhere — a message, a request, a recipe just saved or imported, a kitchen just linked, a backup, a failed sync —
+// is told where that is: toast(msg, go) or toast(msg, ms, go). The whole toast is then a button (a › at its end says
+// so), it stays up at least TOAST_GO_MIN_MS, and a click, Enter or Space goes there; the place itself is marked with
+// a moment's ring (toastLand). A toast that only confirms what is already on the screen leads nowhere, as before.
+// toastAction(msg, label, onAction, ms, go): the body leads where the message points, the button still does its own
+// thing — an "Open" button and the body do the same, and an "↩︎ Undo" toast's body never undoes.
+var TOAST_GO_MIN_MS = 6000;
+function toastHide(t) {
+  clearTimeout(t._tid);
+  t.classList.remove('show', 'toast-go', 'toast-arrow');
+  t.style.pointerEvents = '';
+  t.removeAttribute('tabindex');
+  t.onkeydown = null;
+  t._go = null;
+}
+function toastGoSet(t, go, arrow) {
+  t._go = go || null;
+  t.classList.toggle('toast-go', !!go);
+  t.classList.toggle('toast-arrow', !!go && arrow !== false);
+  if (go) { t.tabIndex = 0; t.style.pointerEvents = 'auto'; } else t.removeAttribute('tabindex');
+  t.onclick = function(){ var to = t._go; toastHide(t); if (to) toastGo(to); };
+  // its own Enter only: Enter on its button is that button's
+  t.onkeydown = go ? function(e){ if (e.target === t && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); t.onclick(); } } : null;
+}
+function toastGo(go) {
+  if (typeof insightCount === 'function') try { insightCount('toast-go'); } catch(e) {}
+  try { var r = go(); if (r && typeof r.catch === 'function') r.catch(function(e){ console.warn('toast: could not go there', e); }); }
+  catch(e) { console.warn('toast: could not go there', e); }
+}
 // Toast with an action button (used by Undo). Stays up longer and is tappable.
-function toastAction(msg, actionLabel, onAction, duration){
+function toastAction(msg, actionLabel, onAction, duration, go){
   duration = duration || 9000;
   var t = document.getElementById('toast');
   if (!t) { toast(msg); return; }
@@ -23196,35 +23248,87 @@ function toastAction(msg, actionLabel, onAction, duration){
   btn.style.cssText = 'margin-left:4px;padding:5px 12px;border-radius:8px;border:none;background:var(--terracotta-fill);color:#fff;font-family:"DM Sans",sans-serif;font-size:13px;font-weight:700;cursor:pointer;flex-shrink:0;';
   btn.onclick = function(e){
     e.stopPropagation();
-    clearTimeout(t._tid);
-    t.classList.remove('show');
+    toastHide(t);
     try { onAction(); } catch(err) { console.warn('toast action failed:', err); }
   };
   t.appendChild(span); t.appendChild(btn);
+  toastGoSet(t, go, false);          // v38.86 — no ›: its button is there
   t.style.pointerEvents = 'auto';
   t.classList.add('show');
-  t._tid = setTimeout(function(){
-    t.classList.remove('show');
-    t.style.pointerEvents = '';
-  }, duration);
+  t._shownFor = duration;
+  t._tid = setTimeout(function(){ toastHide(t); }, duration);
 }
 window.toastAction = toastAction;
 
-function toast(msg, duration){
-  var _t = document.getElementById('toast');
-  if (_t) _t.style.pointerEvents = ''; // clear any lingering action-toast state
-  duration = duration || (msg.includes('❌') || msg.includes('⚠️') ? 8000 : 2800);
+function toast(msg, duration, go){
+  if (typeof duration === 'function') { go = duration; duration = 0; }     // v38.86 — toast(msg, go)
   const t=document.getElementById('toast');
-  // Allow tapping toast to dismiss early
-  t.onclick = function(){ clearTimeout(t._tid); t.classList.remove('show'); };
+  t.style.pointerEvents = ''; // clear any lingering action-toast state
+  duration = duration || (msg.includes('❌') || msg.includes('⚠️') ? 8000 : 2800);
+  if (go) duration = Math.max(duration, TOAST_GO_MIN_MS);                  // time to reach it
   // For errors, make toast larger and tappable
   t.style.cursor = duration > 3000 ? 'pointer' : '';
   t.style.maxWidth = duration > 3000 ? '90vw' : '';
   t.style.whiteSpace = duration > 3000 ? 'normal' : 'nowrap';
   t.textContent = msg;
+  toastGoSet(t, go);                 // a tap dismisses it early; with somewhere to go, goes there
   t.classList.add('show');
   clearTimeout(t._tid);
-  t._tid = setTimeout(()=>t.classList.remove('show'), duration);
+  t._shownFor = duration;
+  t._tid = setTimeout(function(){ toastHide(t); }, duration);
+}
+// ── Where a toast leads (v38.86). Each opens the place; toastLand marks the very spot for a moment.
+function toastLand(el) {
+  if (!el) return false;
+  try { el.scrollIntoView({ block: 'nearest' }); } catch(e) {}
+  el.classList.remove('toast-landed'); void el.offsetWidth; el.classList.add('toast-landed');
+  setTimeout(function(){ el.classList.remove('toast-landed'); }, 1900);
+  return true;
+}
+function goRecipe(id) {
+  if (!recipes.some(function(r){ return r.id === id; })) { toast('That recipe is no longer here'); return false; }
+  openView(id);
+  return true;
+}
+// ⚙️, its section open, the item marked — after toggleDrop has placed the menu (it does so a frame later)
+function goSettings(group, sel) {
+  var menu = document.getElementById('settingsDrop');
+  if (!menu) return false;
+  if (!menu.classList.contains('open')) toggleDrop('settingsDrop');
+  requestAnimationFrame(function(){ requestAnimationFrame(function(){
+    var g = group ? menu.querySelector('.set-group[data-group="' + group + '"]') : null;
+    if (g && !g.classList.contains('open')) settingsGroup(group);
+    toastLand(sel ? menu.querySelector(sel) : g && g.querySelector('.set-head'));
+  }); });
+  return true;
+}
+// Only that kitchen's recipes in the list (🏠 Kitchens), the Link requests page out of the way
+function goKitchen(hid) {
+  if (!_household || !kitchenList().some(function(k){ return k.hid === hid; })) return false;
+  hiddenHouseholds.clear();
+  kitchenList().forEach(function(k){ if (k.hid !== hid) hiddenHouseholds.add(k.hid); });
+  var lr = document.getElementById('linkReqOverlay'); if (lr) lr.remove();
+  renderFilters(); renderGrid();
+  try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch(e) {}
+  toastLand(document.getElementById('sectionLabel'));
+  return true;
+}
+function goFamilyAccess() {
+  openAccessControl();
+  setTimeout(function(){ toastLand(document.querySelector('#accessMembersList .access-asks')); }, 400);   // someone asking, once drawn
+  return true;
+}
+async function goFeedback() {
+  if (await openManagement() === false) return false;
+  if (window.mknManage && typeof mknManage.tabTo === 'function') mknManage.tabTo('feedback');
+  return true;
+}
+window.toastHide = toastHide; window.toastLand = toastLand; window.goRecipe = goRecipe; window.goSettings = goSettings;
+window.goKitchen = goKitchen; window.goFamilyAccess = goFamilyAccess; window.goFeedback = goFeedback;
+// An import's toast leads to the recipe — not while a WhatsApp batch opens the next one
+function toastGoUnlessBatch(id) {
+  if (typeof _waQueue === 'object' && _waQueue && _waQueue.active) return null;
+  return function(){ goRecipe(id); };
 }
 // Escape for HTML *text* content. Null-safe (callers pass optional recipe fields).
 // Newlines become <br> because notes/steps rely on that when displayed.
@@ -23389,7 +23493,8 @@ function saveTranslation(parsed) {
   closeM('translateOverlay');
   activeCat = 'All'; renderFilters(); renderGrid();
   saveData();
-  toast('✅ Translated recipe saved!');
+  var madeId = recipes[0].id;
+  toast('✅ Translated recipe saved!', function(){ goRecipe(madeId); });
 }
 
 // ═══════════════════════════════════
@@ -24466,7 +24571,7 @@ async function confirmImportChecked(parsed, overlayId, dup) {
     closeM(overlayId);
     activeCat = 'All'; renderFilters(); renderGrid(); saveData();
     toastAction('✅ Updated “' + r.name + '” — its photo and history were kept',
-      '↩︎ Undo', undoBulk, 12000);
+      '↩︎ Undo', undoBulk, 12000, toastGoUnlessBatch(r.id));
     return;
   }
   importParsedNow(parsed, overlayId);
@@ -24801,7 +24906,7 @@ function importParsedNow(parsed, overlayId) {
   if (typeof insightAdded === 'function') insightAdded(made, '', 'import');
   var n = recipeParts(made).length;
   toast(n ? ('📚 Collection imported — ' + n + ' recipes in “' + made.name + '”') : 'Recipe imported!',
-        n ? 5000 : 3000);
+        n ? 5000 : 3000, toastGoUnlessBatch(made.id));
 }
 window.importParsedNow = importParsedNow;
 window.confirmImportParsed = confirmImportParsed;
@@ -26286,7 +26391,7 @@ function recipeRankCelebrate(rank, n, el) {
   el.classList.remove('rb-celebrate'); void el.offsetWidth; el.classList.add('rb-celebrate');
   setTimeout(function(){ el.classList.remove('rb-celebrate'); }, 1800);
   var _p = function(t){ return typeof i18nPhrase === 'function' ? i18nPhrase(t) : t; };
-  toast('\u{1F389} ' + n + ' ' + _p('recipes') + ' \u2014 ' + rank.icon + ' ' + _p(rank.name) + '!', 6000);
+  toast('\u{1F389} ' + n + ' ' + _p('recipes') + ' \u2014 ' + rank.icon + ' ' + _p(rank.name) + '!', 6000, openRecipeBadge);
   if (typeof insightCount === 'function') try { insightCount('rank.' + rank.key); } catch(e) {}
   return true;
 }
@@ -26982,7 +27087,7 @@ function handleFirestoreSaveError(err) {
     return;
   }
   // Unknown error — be honest about what actually happened, then retry once
-  toast('❌ Cloud sync failed: ' + (code || msg.slice(0, 60)) + ' — will retry shortly');
+  toast('❌ Cloud sync failed: ' + (code || msg.slice(0, 60)) + ' — will retry shortly', openSyncHealth);
   setTimeout(function() {
     if (_offlineQueue && window._driveMode && window._fbUser && navigator.onLine) timedCloudSave();
   }, 30000);
@@ -27819,7 +27924,8 @@ function confirmationRetryLater(user, n) {
     } catch(e) {
       syncLog('error', 'Could not send the address confirmation (try ' + (n + 2) + ')', ((e && e.code) || '') + ' ' + ((e && e.message) || ''));
       if (!(e && e.code === 'auth/too-many-requests' && confirmationRetryLater(user, n + 1)))
-        toast('\u274c The confirmation e-mail could not be sent. Try later from \u2699\ufe0f \u2192 \u2709\ufe0f Confirm my e-mail address.', 9000);
+        toast('\u274c The confirmation e-mail could not be sent. Try later from \u2699\ufe0f \u2192 \u2709\ufe0f Confirm my e-mail address.', 9000,
+          function(){ goSettings(null, '#confirmEmailItem'); });
     }
   }, CONFIRM_RETRY_WAITS[n]);
   return true;
@@ -29469,6 +29575,7 @@ function appFeatureSections(all) {
       'On a phone, a tablet or a computer: it installs like an app and works offline.',
       'In many languages, in light or dark.',
       'Colours for red–green colour blindness, and a ring that makes new messages easy to spot — ⚙️ → ♿ Accessibility.',   // v38.83
+      'A notice about something elsewhere takes you there with one tap — a new message, a recipe just saved, a kitchen just linked.',   // v38.86
       'Back up all your recipes to your device at any time.',
       'And now and then, a visitor from the farm drops by. \u{1F404}' ] }
   ];
@@ -31094,6 +31201,7 @@ var HELP_SYSTEM_PROMPT = [
   "- 👪 CHAT WITH FAMILY MEMBERS (the people in YOUR household only): ⋯ More → 👪 Chat with family members — or 💬 Chat beside a person in 👥 Family Access (someone added by address who has not signed in yet says ⏳ hasn’t signed in yet: their 💬 Chat comes once they do). 📣 Everyone in <your kitchen> is the room for announcements: everyone in the household reads it. Or choose one person: only the two of you read that conversation. Everyone in the household can write, readers too. Messages arrive live: a short notice with Open, and a red dot on ⋯ More until you have read them. Nothing is changed or deleted afterwards; deleting the household deletes them.",
   "- 💬 CHATS WITH LINKED KITCHENS: ⋯ More → 💬 Chats with linked kitchens — or 💬 Chat beside a linked kitchen's name in your recipe list, or in 👥 Family Access. Every conversation, newest first, with what is new; open one to read it all and write (Enter sends, Shift+Enter starts a new line). The same conversations are also on 📬 Link requests. A red dot on ⋯ More and on ⚙️ says something new arrived.",
   "- ♿ ACCESSIBILITY: ⚙️ → ♿ Accessibility, on this device: 🎨 Colours for red–green colour blindness (the most common colour blindness, where reds and greens look alike, brownish): wherever a colour says something, green becomes blue and red becomes a deep orange — all right / a problem, the sync dot, Easy and Hard, the Self Test's results, delete buttons — and a notification dot turns blue inside its ring; and the recipe photos are colour-corrected, so a red tomato and a green pepper no longer look alike (they look a little different to everyone else). For the whole phone, an iPhone has its own: Settings → Accessibility → Display & Text Size → Color Filters → Red/Green Filter; Android: Settings → Accessibility → Color correction. 🟡 A yellow ring round the notification dots (on unless turned off) so a new message or request catches the eye, on ⋯ More and in ⚙️. 🌗 Theme: light, dark, or as the device. 🔔 the sound when something arrives, and 🎵 which sound.",
+  "- 👉 NOTICES THAT TAKE YOU THERE: a notice at the bottom of the screen with a › at its end is a button — tap or click it (or Enter) to go where it points: a new message opens its chat; a kitchen linked or accepted shows only that kitchen's recipes; a recipe saved, imported, copied, translated or added opens it; a note from a tester opens 👑 → 📊 Households → 💬 Feedback; someone asking to add recipes, or joining, opens 👥 Family Access; a link request sent opens 📬 Link requests; a backup opens 💾 Backups; a failed sync or the AI allowance opens Sync Health; an error opens the log. The place it leads to is marked with a yellow ring for a moment. Such a notice stays up at least 6 seconds; a notice about what is already on the screen has no › and goes nowhere. On a notice with a button (Open, ↩︎ Undo, Back up now) the button does its own thing — tapping the words of an Undo notice never undoes.",
   "- 🔔 A SOUND WHEN SOMETHING ARRIVES: a message (from a linked kitchen, from your family, an answer to your note) taps twice; a request to link kitchens taps three times. Choose the sound — 🥂 Spoon on a wine glass, 🛎️ The kitchen’s service bell, 🥄 Wooden spoon on a pot, each with ▶ to hear it — in ⚙️ → ♿ Accessibility → 🎵 The sound; untick 🔔 Sound for messages and requests to mute it. On this device only. Browsers keep a page silent until it has been touched once since opening, so a message that arrives before that is not heard. On a phone it plays at the media volume; an iPhone on silent (the switch on its side) plays no sound.",
   "- A household's identifier works only within the same copy of the app: the family's copy and My Kitchen Notes keep their households apart.",
   "",
@@ -33953,12 +34061,12 @@ async function autoBackupIfDue() {
     var name = await writeBackupToFolder(rec.handle, JSON.stringify(await backupPayloadWithLanguages(), null, 2));
     markAutoBackup(); markBackupTaken();
     familyBackupNote(true);
-    toast('\u{1F4BE} Backed up to "' + rec.name + '/' + name + '"', 6000);
+    toast('\u{1F4BE} Backed up to "' + rec.name + '/' + name + '"', 6000, showBackupPanel);
     return 'written';
   } catch(e) {
     // A failed automatic backup must be audible. Silence here is the exact
     // failure this whole item exists to remove.
-    toast('⚠️ Automatic backup failed: ' + (e && e.message ? e.message : String(e)), 9000);
+    toast('⚠️ Automatic backup failed: ' + (e && e.message ? e.message : String(e)), 9000, showBackupPanel);
     return 'failed';
   }
 }
@@ -34335,7 +34443,7 @@ async function checkBackupOverdue() {
     else markBackupNagged();          // asked and answered; do not ask again today
     return;
   }
-  toastAction(msg, 'Back up now', function(){ backupSave(); }, level === 'sticky' ? 0 : 12000);
+  toastAction(msg, 'Back up now', function(){ backupSave(); }, level === 'sticky' ? 0 : 12000, showBackupPanel);
 }
 // The modal asks once a day at most. Without this, "Not now" on a 200-day-old
 // backup means a dialog on every single reload, which trains the reader to
@@ -35816,7 +35924,7 @@ function saveAsVideoBookmark(btn) {
   saveData();
   renderGrid();
   closeM('urlImportOverlay');
-  toast('🎥 Saved as video bookmark! Open it to add recipe details.');
+  toast('🎥 Saved as video bookmark! Open it to add recipe details.', function(){ goRecipe(r.id); });
 }
 
 function clearUrlImportResult(){ var el=document.getElementById('urlImportResult'); if(el) el.innerHTML=''; }

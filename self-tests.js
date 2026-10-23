@@ -7904,6 +7904,103 @@ window.SELF_TESTS = [
         if(themeWas) root.setAttribute('data-theme', themeWas); else applyTheme();
       }
     } },
+  { id:'toast_leads_there', group:'UI', name:'A toast about something elsewhere takes you there (v38.86): the whole toast is a button with a ›, stays up longer, a click or Enter goes there and marks the place; a plain toast and the words of an Undo toast go nowhere; the arrivals, links, saves, imports and backups are wired',
+    test: async()=>{
+      // Tony, 23 Oct 2026: "When a toast jumps, informing me of something, can we make this toast clickable, so clicking
+      // it will bring me to the relevant location the toast is writing about?"
+      var t=document.getElementById('toast'), went=[], did=[];
+      var real={ open:window.openView, hidden:Array.from(hiddenHouseholds), hh:window._household, rf:window.renderFilters, rg:window.renderGrid };
+      try{
+        // a plain toast: not a button, no ›, taps pass through it
+        toast('Just saying');
+        if(t.classList.contains('toast-go') || t.classList.contains('toast-arrow') || getComputedStyle(t).pointerEvents!=='none' || t.hasAttribute('tabindex'))
+          throw new Error('a plain toast became a button');
+        // toast(msg, go)
+        toast('Over there', function(){ went.push('a'); });
+        if(!t.classList.contains('toast-go') || !t.classList.contains('toast-arrow') || getComputedStyle(t).pointerEvents!=='auto' || t.tabIndex!==0)
+          throw new Error('a toast with somewhere to go is not a button');
+        if(!(t._shownFor>=TOAST_GO_MIN_MS)) throw new Error('it does not stay up long enough to reach: '+t._shownFor+' ms');
+        if(!/›/.test(getComputedStyle(t,'::after').content)) throw new Error('no › at its end: '+getComputedStyle(t,'::after').content);
+        if(t.textContent!=='Over there') throw new Error('the › is in its words (they are translated whole): '+t.textContent);
+        t.click();
+        if(went.join()!=='a' || t.classList.contains('show') || t.classList.contains('toast-go') || getComputedStyle(t).pointerEvents!=='none')
+          throw new Error('a click did not go there and put the toast away: '+went.join());
+        t.click(); if(went.length!==1) throw new Error('it went twice');
+        // toast(msg, ms, go) keeps its time; Enter goes there
+        toast('Over there too', 9000, function(){ went.push('b'); });
+        if(t._shownFor!==9000) throw new Error('its own time was not kept: '+t._shownFor);
+        t.dispatchEvent(new KeyboardEvent('keydown', { key:'Enter', bubbles:true }));
+        if(went.join()!=='a,b') throw new Error('Enter did not go there: '+went.join());
+        // the next toast is plain again
+        toast('Plain again');
+        if(t.classList.contains('toast-go') || t.hasAttribute('tabindex')) throw new Error('the next toast kept the last one’s way');
+        t.click(); if(went.length!==2) throw new Error('a plain toast went somewhere');
+        // toastAction: its words go where the message points, its button does its own thing — no › beside the button
+        toastAction('A message', 'Open', function(){ did.push('btn'); }, 9000, function(){ did.push('words'); });
+        if(t.classList.contains('toast-arrow') || !t.classList.contains('toast-go')) throw new Error('an Open toast: a › beside the button, or its words lead nowhere');
+        t.querySelector('button').click();
+        if(did.join()!=='btn') throw new Error('its button did more than its own thing: '+did.join());
+        toastAction('A message', 'Open', function(){ did.push('btn'); }, 9000, function(){ did.push('words'); });
+        t.querySelector('span').click();
+        if(did.join()!=='btn,words') throw new Error('its words did not go there: '+did.join());
+        toastAction('A message', 'Open', function(){ did.push('btn3'); }, 9000, function(){ did.push('words3'); });
+        t.querySelector('button').dispatchEvent(new KeyboardEvent('keydown', { key:'Enter', bubbles:true }));
+        if(did.indexOf('words3')!==-1) throw new Error('Enter on its button went where the words point');
+        // an Undo toast: its words put it away and never undo
+        var undone=0; toastAction('Deleted', '↩︎ Undo', function(){ undone++; }, 9000);
+        t.querySelector('span').click();
+        if(undone || t.classList.contains('show')) throw new Error('tapping the words of an Undo toast undid, or did not put it away');
+        // where they lead — a recipe (one that is gone: nothing opens)
+        if(recipes.length){
+          var op=[]; window.openView=function(id){ op.push(id); };
+          try{ goRecipe(recipes[0].id); goRecipe(-987654); } finally{ window.openView=real.open; }
+          if(op.join()!==String(recipes[0].id)) throw new Error('goRecipe opened: '+op.join());
+        }
+        // ⚙️ at its section, the item marked
+        goSettings('data', '[onclick*="showBackupPanel()"]');
+        await wait(150);
+        var g=document.querySelector('#settingsDrop .set-group[data-group="data"]'), item=document.querySelector('#settingsDrop [onclick*="showBackupPanel()"]');
+        var openNow=document.getElementById('settingsDrop').classList.contains('open') && g.classList.contains('open'), marked=item.classList.contains('toast-landed');
+        closeDrop('settingsDrop'); settingsGroupsRefresh(true);
+        if(!openNow) throw new Error('goSettings did not open ⚙️ at its section');
+        if(!marked) throw new Error('the item it leads to is not marked');
+        // a kitchen: only its recipes, the Link requests page out of the way, never a kitchen that is not linked
+        window._household={ hid:'hMe', role:'owner', name:'Mine', code:'', links:[{ hid:'hL1', name:'Theirs', code:'', at:1 }, { hid:'hL2', name:'Others', code:'', at:1 }], asking:[] };
+        window.renderFilters=function(){}; window.renderGrid=function(){};
+        var lr=document.createElement('div'); lr.id='linkReqOverlay'; document.body.appendChild(lr);
+        if(!goKitchen('hL1')) throw new Error('goKitchen refused a linked kitchen');
+        if(!hhShown('hL1') || hhShown('hMe') || hhShown('hL2')) throw new Error('goKitchen did not show that kitchen alone: hidden '+Array.from(hiddenHouseholds).join());
+        if(document.getElementById('linkReqOverlay')) throw new Error('the Link requests page stayed over the list');
+        if(goKitchen('hNope')) throw new Error('it led to a kitchen that is not linked');
+        window.renderFilters=real.rf; window.renderGrid=real.rg;
+        // wired: each of these toasts is told where it leads
+        [['famArrived','openFamilyChat(room); });'], ['linkLiveTalkArrived','openKitchenChats(other); });'], ['linkLiveLinks','goKitchen(added[0].hid)'],
+         ['hhAcceptLink','goKitchen(from)'], ['linkReqFromUrl','goKitchen(linked.hid)'], ['feedbackTellOwner','goFeedback'], ['householdToldOfAsks','goFamilyAccess'],
+         ['saveLinkedCopy','goRecipe(made.id)'], ['saveRecipe','goRecipe(newId)'], ['importParsedNow','toastGoUnlessBatch(made.id)'],
+         ['collectSelectedInto','goRecipe(coll.id)'], ['openConnectHousehold','openLinkRequests)'], ['autoBackupIfDue','showBackupPanel)'],
+         ['checkBackupOverdue','showBackupPanel)'], ['handleFirestoreSaveError','openSyncHealth)'], ['saveAsVideoBookmark','goRecipe(r.id)']
+        ].forEach(function(w){
+          if(typeof window[w[0]]!=='function') throw new Error(w[0]+' is not there to check');
+          if(String(window[w[0]]).indexOf(w[1])===-1) throw new Error(w[0]+'’s toast does not lead where it points ('+w[1]+')');
+        });
+        // the translation still reads a toast that leads somewhere, and toastAction's message
+        var re=new RegExp(I18N_SCRAPE[0].source, 'g');
+        ["toast('Linked with all of them', 7000, go)", "toast('Linked with all of them', go)", "toast('Linked with all of them')", "toast('Linked with all of them', 7000)",
+         "toastAction('Linked with all of them', 'Open', f, 9000, f)"].forEach(function(src){
+          re.lastIndex=0; var m=re.exec(src);
+          if(!m || m[2]!=='Linked with all of them') throw new Error('the translation does not read '+src);
+        });
+        re.lastIndex=0; if(re.exec("toast('Linked with ' + name, go)")) throw new Error('half a message read as a whole one');
+        if(!new RegExp(I18N_PATTERN_OPENERS.source).test('toastAction(')) throw new Error('a built toastAction message is not read as a shape');
+        if(I18N_EXTRA.indexOf('Open')===-1) throw new Error('the Open button’s word is not translated');
+      } finally {
+        toastHide(t); t.textContent='';
+        window.openView=real.open; window.renderFilters=real.rf; window.renderGrid=real.rg; window._household=real.hh;
+        hiddenHouseholds.clear(); real.hidden.forEach(function(h){ hiddenHouseholds.add(h); });
+        var lr2=document.getElementById('linkReqOverlay'); if(lr2 && !lr2.querySelector('#lrBody')) lr2.remove();
+        try{ renderFilters(); renderGrid(); }catch(e){}
+      }
+    } },
   { id:'arrival_sound', group:'Sharing', name:'🔔 A kitchen sound when something arrives (v38.82): a message taps twice, a request to link kitchens three times; three sounds to choose from, each heard with ▶; a mute in ⚙️ → ♿ Accessibility; nothing for one’s own messages, nothing for what was already waiting on opening, one sound for a burst',
     test:async function(){
       // Tony, 23 Oct 2026: "accompany any join request and message arrival with an audio indicator … a spoon tapping a
