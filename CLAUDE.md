@@ -112,7 +112,8 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
   **v38.85 — Family Access says "⏳ hasn’t signed in yet" on a place kept for an address** (23 Oct; see its note).
   **v38.86 — a notice about something elsewhere takes you there with one click** (24 Oct, 01:09; see its note).
   **v38.87 — Bold (B, Ctrl+B) in ingredients and the Method; Update Recipe floats at the bottom of the editor** (24 Oct, 01:33).
-  **Worker v87.** The test copy (https://tonys-recipes-test.pages.dev, its own database) follows `test`.
+  **v38.88 + Worker v88 — select several reports in 💬 Feedback and ⚠️ Errors, and 🗑 Delete selected** (24 Oct, 02:34).
+  **Worker v88.** The test copy (https://tonys-recipes-test.pages.dev, its own database) follows `test`.
 - **The testers go live on Sunday 25 Oct 2026** (Tony: "The plan is to start sending invitations to the testers
   this Sunday"). The community app is **by invitation only** (Tony switched it, 20 Oct): only addresses invited with
   ⚙️ → 👑 → ✉️ Invite testers may found a kitchen (rules `invitedTester()`, `testerInvites/<sha256 of the address>`);
@@ -1063,6 +1064,23 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
   the button sticky and in sight at the top and the end of a 40-ingredient editor).
 - **Released: v38.87 (24 Oct 2026, 01:33 Israel time, on a44ebc2)** — every job success (Deploy to GitHub Pages,
   Publish languages, Translate new phrases, Self Tests on main and test, Cloudflare Pages for both copies).
+- **v38.88 + Worker v88 — Delete selected** (Tony, 24 Oct: "In the Feedback and Errors tabs, please allow to select
+  multiple reports (already exists in "Feedback"). After selecting, there should appear a "Delete selected" button, to
+  remove all the selected items."). **manage.js:** ⚠️ Errors got the Feedback tab's tick box on each card (`S.errPicked`,
+  `errPick`, `errPickAll`, ☑ Select all shown / ☐ Clear); both tabs show `🗑 Delete selected (n)` once anything is ticked
+  (`delPicked`, `errDelPicked`): one confirm, then `deleteBatch(op, oneOp, ids)` — batches of 100 through Worker v88;
+  an older Worker's "which note?/which error?" → one by one; a refusal keeps what was not deleted (e.gone) and says
+  how many went. Notes still in a copy's own database: one Firestore batch. **Why a Worker change:** every
+  note-delete/error-delete is an OWNER_DESTRUCTIVE op — a fresh-sign-in check and an owner-action alert e-mail (and
+  WhatsApp once set up) EACH; 30 reports one by one would have been 30 alerts. **Worker v88:** meter-admin
+  `notes-delete` / `errors-delete` with `ids` (idBatch: whole numbers > 0, each once, at most 100 — D1 binds at most
+  100 values a query), one DELETE … IN (…), in OWNER_DESTRUCTIVE (fresh sign-in once), the alert says "(n of them)".
+  Tests: worker-cors.mjs (owner only, nonsense ids left out, 0 or 101 refused, the rest stay, ONE alert with the count)
+  and Self Test `manage_delete_selected` (button appears only when ticked, Cancel, one request with both ids, the older
+  server's one-by-one, Errors' tick boxes and Select all, a refusal keeps them) — checked to fail when the op is broken.
+- **Released: v38.88 + Worker v88 (24 Oct 2026, 02:34 Israel time, on 8fed6f8)** — every job success (Deploy the Worker,
+  its "live Worker answers with this version" step included; Deploy to GitHub Pages, Publish languages, Translate new
+  phrases, Self Tests on main and test, Cloudflare Pages for both copies).
 - **Photo keys, 23 Oct:** Pexels: "New API key issuance is currently paused and cannot be requested" (Tony); Unsplash:
   "We can forego unsplash for now" (Tony). Photos stay Pixabay + Wikimedia Commons; the workflow is ready if a key
   ever comes (secrets PEXELS_API_KEY / UNSPLASH_ACCESS_KEY, then dispatch Deploy the Worker).

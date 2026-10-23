@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v38.87` — app. **Worker: v87**, deployed separately and versioned separately
+**Current version:** `v38.88` — app. **Worker: v88**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -758,6 +758,10 @@ ingredient) or Ctrl+B/⌘B toggles it on the selection or the word at the cursor
 `escB` shows it bold wherever a recipe is drawn (view, linked view, print, Word runs, e-mail, shared page, previews);
 `noBold` for search, pantry, Bring!, AI; WhatsApp text gets `*bold*`. **Save / Update Recipe** floats in a sticky bar
 at the bottom of the editor.
+
+**Delete selected (v38.88, Worker v88):** 👑 → 📊 Households → 💬 Feedback and ⚠️ Errors: a Select box on each report,
+Select all shown / Clear, and 🗑 Delete selected (n) once anything is ticked — sent in batches of up to 100
+(meter-admin `notes-delete` / `errors-delete` with `ids`): one fresh sign-in and one owner alert per batch, not per report.
 
 **State on 23 Oct 2026 (v38.84, Worker v87):** testers are invited from Sunday 25 Oct; from then on every
 release waits for the owner's yes. The community app is by invitation only; "Share this App with family" goes back
