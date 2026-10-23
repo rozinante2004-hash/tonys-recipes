@@ -12,7 +12,8 @@
             tab: 'households', notes: null, notesError: '', noteFilter: 'open', founding: null,
             replies: {}, replying: null, replyDraft: '', replySending: false,
             errors: null, errorsError: '', errFilter: 'open', useCopy: '',   // v38.15
-            picked: {},   // v38.16 — the notes ticked for 📋 Copy reports
+            picked: {},   // v38.16 — the notes ticked for 📋 Copy reports (v38.88: and 🗑 Delete selected)
+            errPicked: {},   // v38.88 — the error reports ticked for 🗑 Delete selected
             survey: null, surveyError: '' };   // v38.18 — 📝 the end-of-beta question
   function esc(v) { return escH(String(v == null ? '' : v)); }
   function money(v) { return '$' + (Number(v) || 0).toFixed(2); }
@@ -255,7 +256,9 @@
         + '<button type="button" class="mg-btn" id="mgPickAll" onclick="mknManage.pickAll(true)">☑ Select all shown</button>'
         + (nPicked ? '<button type="button" class="mg-btn" id="mgPickNone" onclick="mknManage.pickAll(false)">☐ Clear</button>' : '')
         + '<button type="button" class="mg-btn mg-primary" id="mgCopyReports"' + (nPicked ? '' : ' disabled title="Tick the notes to copy first"')
-        + ' onclick="mknManage.copyReports()">📋 Copy reports' + (nPicked ? ' (' + nPicked + ')' : '') + '</button>' : '')
+        + ' onclick="mknManage.copyReports()">📋 Copy reports' + (nPicked ? ' (' + nPicked + ')' : '') + '</button>'
+        // v38.88 — Tony: "After selecting, there should appear a "Delete selected" button, to remove all the selected items."
+        + (nPicked ? '<button type="button" class="mg-btn mg-danger" id="mgDelPicked"' + (S.deleting ? ' disabled' : '') + ' onclick="mknManage.delPicked()">🗑 Delete selected (' + nPicked + ')</button>' : '') : '')
       + '</div>';
     if (!list.length) return filt + '<div class="mg-empty">' + (S.notes.length ? 'Every note is done. 🎉' : 'No notes yet.') + '</div>';
     var tag = { new: '🆕 new', seen: '👀 seen', done: '✅ done' };
@@ -267,7 +270,7 @@
       var k = escA(n.key), kj = jsA(n.key);
       return '<div class="mg-card' + (n.status === 'new' ? ' mg-new' : '') + (S.picked[n.key] ? ' mg-picked' : '') + '" id="mgNote-' + k + '">'
         + '<label class="mg-pick"><input type="checkbox"' + (S.picked[n.key] ? ' checked' : '') + ' onchange="mknManage.pick(' + kj + ', this.checked)"'
-        + ' aria-label="Select this note for 📋 Copy reports"> Select</label>'
+        + ' aria-label="Select this note (📋 Copy reports, 🗑 Delete selected)"> Select</label>'
         + '<div class="mg-ptop"><div><b class="mg-email">' + esc(n.email || n.uid) + '</b> <span class="mg-muted">' + esc(n.household || '') + '</span>'
         + (n.copy ? ' <span class="mg-copy">' + esc(n.copy) + '</span>' : '')
         + '<div class="mg-muted">' + new Date(n.at || 0).toLocaleString() + ' · ' + esc(n.version || '') + ' · ' + esc(n.env || '') + ' · ' + esc(n.lang || '') + '</div></div>'
@@ -329,6 +332,25 @@
     return true;
   }
   function errNew() { return (S.errors || []).filter(function (x) { return x.status === 'new'; }).length; }
+  function pickedErrors() { return (S.errors || []).filter(function (x) { return S.errPicked[x.id]; }); }   // v38.88
+  // v38.88 — several deleted at once: Worker v88 takes up to 100 ids a request (one fresh sign-in, ONE owner alert for
+  // the lot — one by one, each was an alert e-mail of its own). An older Worker does not know the op ("which note?"):
+  // then one by one, as before.
+  async function deleteBatch(op, oneOp, ids) {
+    var gone = [];
+    for (var i = 0; i < ids.length; i += 100) {
+      var part = ids.slice(i, i + 100);
+      try { await meterSet(op, '', { ids: part }); gone = gone.concat(part); }
+      catch (e) {
+        if (!/which (note|error)\?/.test(String(e && e.message))) throw Object.assign(e, { gone: gone });
+        for (var k = 0; k < part.length; k++) {
+          try { await meterSet(oneOp, '', { id: part[k] }); gone.push(part[k]); }
+          catch (e2) { throw Object.assign(e2, { gone: gone }); }
+        }
+      }
+    }
+    return gone;
+  }
   function errBy(id) { return (S.errors || []).filter(function (x) { return String(x.id) === String(id); })[0]; }
   function householdName(project, hid) {
     var r = S.rows.filter(function (x) { return x.hid === hid && (x.project || thisProject()) === project; })[0];
@@ -343,16 +365,24 @@
     if (S.errorsError) return '<div class="mg-note">The error reports could not be read: ' + esc(S.errorsError) + '</div>';
     if (!S.errors) return '<div class="mg-empty">⏳ Reading the error reports…</div>';
     var list = S.errors.filter(function (x) { return S.errFilter === 'all' || x.status !== 'done'; });
+    var nErrPicked = pickedErrors().length;      // v38.88 — ticked, as in 💬 Feedback, to delete several at once
     var tools = '<div class="mg-muted" style="margin-bottom:8px;">Sent by the testers’ apps by themselves (the beta and the test copy): the error’s wording, where, the screen, the version and the device — never a recipe’s contents. The same error is one line with a count.</div>'
       + '<div class="mg-tools" style="margin-bottom:10px;">'
       + '<button type="button" class="mg-btn' + (S.errFilter === 'open' ? ' mg-primary' : '') + '" onclick="mknManage.errFilter(\'open\')">Not done yet</button>'
       + '<button type="button" class="mg-btn' + (S.errFilter === 'all' ? ' mg-primary' : '') + '" onclick="mknManage.errFilter(\'all\')">All (' + S.errors.length + ')</button>'
       + (list.length ? '<button type="button" class="mg-btn" onclick="mknManage.errCopyAll()" title="Copies these reports as text, to paste where they will be fixed">📋 Copy these</button>' : '')
-      + '<button type="button" class="mg-btn" onclick="mknManage.errReload()">↻</button></div>';
+      + '<button type="button" class="mg-btn" onclick="mknManage.errReload()">↻</button>'
+      + (list.length ? '<span class="mg-sep"></span>'
+        + '<button type="button" class="mg-btn" id="mgErrPickAll" onclick="mknManage.errPickAll(true)">☑ Select all shown</button>'
+        + (nErrPicked ? '<button type="button" class="mg-btn" id="mgErrPickNone" onclick="mknManage.errPickAll(false)">☐ Clear</button>'
+          + '<button type="button" class="mg-btn mg-danger" id="mgErrDelPicked"' + (S.deleting ? ' disabled' : '') + ' onclick="mknManage.errDelPicked()">🗑 Delete selected (' + nErrPicked + ')</button>' : '') : '')
+      + '</div>';
     if (!list.length) return tools + '<div class="mg-empty">' + (S.errors.length ? 'Every error is done. 🎉' : 'No errors reported. 🎉') + '</div>';
     return tools + list.map(function (x) {
-      var id = jsA(String(x.id));
-      return '<div class="mg-card' + (x.status === 'new' ? ' mg-new' : '') + '">'
+      var id = jsA(String(x.id)), on = !!S.errPicked[x.id];
+      return '<div class="mg-card' + (x.status === 'new' ? ' mg-new' : '') + (on ? ' mg-picked' : '') + '" id="mgErr-' + escA(String(x.id)) + '">'
+        + '<label class="mg-pick"><input type="checkbox"' + (on ? ' checked' : '') + ' onchange="mknManage.errPick(' + id + ', this.checked)"'
+        + ' aria-label="Select this error report (🗑 Delete selected)"> Select</label>'
         + '<div class="mg-ptop"><div><b class="mg-email">' + esc(x.email || x.uid || '') + '</b> <span class="mg-muted">' + esc(householdName(x.project, x.hid)) + '</span>'
         + ' <span class="mg-copy">' + esc(x.copy) + '</span>'
         + '<div class="mg-muted">' + esc(x.version) + ' · ' + esc(x.kind) + ' · ' + esc(x.lang || '') + ' · last ' + new Date(x.last_at || 0).toLocaleString()
@@ -1058,6 +1088,30 @@
       S.errors = (S.errors || []).filter(function (y) { return y !== x; }); render(); return true;
     },
     errCopy: function (id) { var x = errBy(id); if (x && typeof fbProbeCopy === 'function') fbProbeCopy(errText(x), 'The error report'); },
+    // v38.88 — tick error reports, then 🗑 Delete selected
+    errPick: function (id, on) { if (on) S.errPicked[id] = true; else delete S.errPicked[id]; render(); return pickedErrors().length; },
+    errPickAll: function (on) {
+      S.errPicked = {};
+      if (on) (S.errors || []).filter(function (x) { return S.errFilter === 'all' || x.status !== 'done'; }).forEach(function (x) { S.errPicked[x.id] = true; });
+      render(); return pickedErrors().length;
+    },
+    errDelPicked: async function () {
+      var list = pickedErrors(), n = list.length;
+      if (!n || S.deleting) return false;
+      if (await askConfirm({ icon: '🗑', title: 'Delete ' + n + ' error report' + (n === 1 ? '' : 's') + '?', message: 'If one of them happens again, it comes back.',
+        okLabel: 'Delete ' + n, danger: true }) !== true) return false;
+      S.deleting = true; render();
+      var gone = [], err = null;
+      try { gone = await deleteBatch('errors-delete', 'error-delete', list.map(function (x) { return x.id; })); }
+      catch (e) { err = e; gone = e.gone || []; }
+      S.deleting = false;
+      var g = {}; gone.forEach(function (id) { g[id] = true; delete S.errPicked[id]; });
+      S.errors = (S.errors || []).filter(function (x) { return !g[x.id]; });
+      render();
+      if (err) { showServiceError((gone.length ? gone.length + ' of ' + n + ' were deleted; the rest could not be: ' : 'Could not delete them: ') + err.message); return gone.length; }
+      toast('🗑 ' + n + ' error report' + (n === 1 ? '' : 's') + ' deleted', 5000);
+      return gone.length;
+    },
     errCopyAll: function () {
       var list = (S.errors || []).filter(function (x) { return S.errFilter === 'all' || x.status !== 'done'; });
       if (list.length && typeof fbProbeCopy === 'function') fbProbeCopy(list.map(errText).join('\n\n'), list.length + ' error report' + (list.length === 1 ? '' : 's'));
@@ -1097,6 +1151,36 @@
       S.notes = (S.notes || []).filter(function (x) { return x.key !== key; }); render(); syncDot(); return true;
     },
     copyLog: function (key) { var n = noteBy(key); if (n && typeof fbProbeCopy === 'function') fbProbeCopy(n.log, 'The log'); },
+    // v38.88 — 🗑 Delete selected: the inbox's notes in batches (Worker v88), any left in this copy's database one batch
+    delPicked: async function () {
+      var list = pickedNotes(), n = list.length;
+      if (!n || S.deleting) return false;
+      if (await askConfirm({ icon: '🗑', title: 'Delete ' + n + ' note' + (n === 1 ? '' : 's') + '?', message: 'They are gone for good.',
+        okLabel: 'Delete ' + n, danger: true }) !== true) return false;
+      S.deleting = true; render();
+      var gone = [], err = null;
+      try {
+        var server = list.filter(function (x) { return x.src === 'server'; }), local = list.filter(function (x) { return x.src !== 'server'; });
+        var ids = await deleteBatch('notes-delete', 'note-delete', server.map(function (x) { return x.id; }));
+        gone = server.filter(function (x) { return ids.indexOf(x.id) !== -1; });
+        if (local.length) {
+          var db = window._fbDb, b = db.batch();
+          local.forEach(function (x) { b.delete(db.collection('feedback').doc(x.id)); });
+          await b.commit();
+          gone = gone.concat(local);
+        }
+      } catch (e) {
+        err = e;
+        if (e.gone) gone = list.filter(function (x) { return x.src === 'server' && e.gone.indexOf(x.id) !== -1; });
+      }
+      S.deleting = false;
+      var g = {}; gone.forEach(function (x) { g[x.key] = true; delete S.picked[x.key]; });
+      S.notes = (S.notes || []).filter(function (x) { return !g[x.key]; });
+      render(); syncDot();
+      if (err) { showServiceError((gone.length ? gone.length + ' of ' + n + ' were deleted; the rest could not be: ' : 'Could not delete them: ') + err.message); return gone.length; }
+      toast('🗑 ' + n + ' note' + (n === 1 ? '' : 's') + ' deleted', 5000);
+      return gone.length;
+    },
     // v38.00 — 📲 Reply in app: the answer box under the note, then to their app (Worker v68).
     replyOpen: function (key) {
       var n = noteBy(key); if (!n || !canReplyInApp(n)) return false;

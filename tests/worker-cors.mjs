@@ -1132,6 +1132,19 @@ console.log('\nAI per household (v60):');
     expect('…marks one done', f.status === 200 && db.raw.prepare('SELECT status FROM feedback WHERE id = ?').get(id).status === 'done', JSON.stringify(f));
     f = await fb({ action: 'meter-admin', op: 'note-delete', id, idToken: tOwner });
     expect('…and removes it', f.status === 200 && !db.raw.prepare('SELECT id FROM feedback WHERE id = ?').get(id), JSON.stringify(f));
+    // v88 — several at once (Tony: select reports, then "Delete selected")
+    for (const t of ['Batch one', 'Batch two', 'Batch three']) await fb({ action: 'feedback-send', idToken: tA, note: { text: t } });
+    const batchLeft = () => db.raw.prepare("SELECT id FROM feedback WHERE text LIKE 'Batch %' ORDER BY id").all().map(x => x.id);
+    const bIds = batchLeft();
+    f = await fb({ action: 'meter-admin', op: 'notes-delete', ids: bIds.slice(0, 2), idToken: tA });
+    expect('v88: only the owner deletes several notes', f.status === 403 && batchLeft().length === 3, JSON.stringify(f));
+    f = await fb({ action: 'meter-admin', op: 'notes-delete', ids: [bIds[0], String(bIds[1]), bIds[0], 'x', -4], idToken: tOwner });
+    expect('v88: the owner deletes several notes in one go (each once, nonsense left out); the others stay', f.status === 200 && f.d.deleted === 2
+      && batchLeft().join() === String(bIds[2]), JSON.stringify([f, batchLeft()]));
+    f = await fb({ action: 'meter-admin', op: 'notes-delete', ids: [], idToken: tOwner });
+    expect('v88: …none named: refused', f.status === 400, JSON.stringify(f));
+    f = await fb({ action: 'meter-admin', op: 'notes-delete', ids: Array.from({ length: 101 }, (_, i) => i + 1), idToken: tOwner });
+    expect('v88: …more than 100 at once: refused, nothing deleted', f.status === 400 && batchLeft().length === 1, JSON.stringify(f));
     // v64 — notes left in a copy's own database move to the inbox, as they were.
     const old = { uid: 'uOld', email: 'old@example.com', text: 'Left in the beta', at: 1759500000000, status: 'new', env: 'beta', shot: 'data:image/png;base64,AAAA' };
     f = await fb({ action: 'meter-admin', op: 'notes-import', project: 'my-kitchen-notes-beta', note: old, idToken: tA });
@@ -1305,6 +1318,14 @@ console.log('\nAI per household (v60):');
     expect('v69: …and the count of new ones goes down', f.d.new === nNew - 1, JSON.stringify(f));
     f = await fb({ action: 'meter-admin', op: 'error-delete', id: mine[0].id, idToken: famOwner }, ORIGIN);
     expect('v69: …and removes one', f.status === 200 && !db.raw.prepare('SELECT 1 FROM app_errors WHERE id = ?').get(mine[0].id), JSON.stringify(f));
+    // v88 — several error reports at once
+    const ein = db.raw.prepare("INSERT INTO app_errors (project, uid, version, kind, message, place, first_at, last_at, n, status) VALUES ('tonys-recipes-test', 'uQ', 'v1', 'error', ?, '', ?, ?, 1, 'new')");
+    const eIds = ['batch e1', 'batch e2', 'batch e3'].map(m => Number(ein.run(m, Date.now(), Date.now()).lastInsertRowid));
+    const errLeft = () => db.raw.prepare("SELECT id FROM app_errors WHERE message LIKE 'batch e%' ORDER BY id").all().map(x => x.id);
+    f = await fb({ action: 'meter-admin', op: 'errors-delete', ids: eIds.slice(0, 2), idToken: tA });
+    expect('v88: only the owner deletes several error reports', f.status === 403 && errLeft().length === 3, JSON.stringify(f));
+    f = await fb({ action: 'meter-admin', op: 'errors-delete', ids: eIds.slice(0, 2), idToken: famOwner }, ORIGIN);
+    expect('v88: the owner deletes several error reports in one go; the others stay', f.status === 200 && f.d.deleted === 2 && errLeft().join() === String(eIds[2]), JSON.stringify([f, errLeft()]));
     f = await fb({ action: 'meter-admin', op: 'list', all: true, idToken: famOwner }, ORIGIN);
     const hAu = ((f.d.households || []).filter(x => x.project === 'tonys-recipes-test' && x.hid === 'hA')[0] || {}).usage;
     expect('v69: the Households list carries each household\'s feature counts by month', hAu && hAu[nowMonth] && hAu[nowMonth]['added.link'] === 5 && hAu[nowMonth].scale === 1, JSON.stringify(hAu));
@@ -1405,6 +1426,9 @@ console.log('\nAI per household (v60):');
     expect('v73: …and every action that cannot be undone is told', f.status === 200 && mails.length === 2 && /owner action "set-cap"/.test(mails[1].raw) && /household hA/.test(mails[1].raw), JSON.stringify(mails.map(m => m.raw.slice(0, 200))));
     f = await fa({ action: 'meter-admin', op: 'list', idToken: tA, device: 'dev-BBBB2222' });
     expect('v73: …someone who is not the owner: refused, and no e-mail', f.status === 403 && mails.length === 2, String(mails.length));
+    f = await fa({ action: 'meter-admin', op: 'errors-delete', ids: [999991, 999992, 999993], idToken: comOwner, device: 'dev-AAAA1111' });
+    expect('v88: deleting several at once is told ONCE, with how many', f.status === 200 && mails.length === 3 && /owner action "errors-delete"/.test(mails[2].raw)
+      && /\(3 of them\)/.test(mails[2].raw), JSON.stringify(mails.map(m => m.raw.slice(0, 240))));
     // v75 — a spare owner key: two owner addresses; the alerts go to every alert address, and one refused
     // address does not stop the others.
     const spare = await token({ sub: 'uSpare', email: 'spare@worker-test.example' });

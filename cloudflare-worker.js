@@ -1,4 +1,8 @@
-// Tony's Recipes — Cloudflare Worker v87
+// Tony's Recipes — Cloudflare Worker v88
+// v88: SEVERAL NOTES OR ERROR REPORTS DELETED AT ONCE (Tony, 24 Oct 2026: "In the Feedback and Errors tabs, please allow
+// to select multiple reports … there should appear a "Delete selected" button"): meter-admin `notes-delete` and
+// `errors-delete` take `ids` (up to 100 — D1 binds at most 100 values a query) and delete them in one statement: one
+// fresh-sign-in check and ONE owner-action alert for the lot (it says how many), not one e-mail per report.
 // v87: SIGN-IN-LINK E-MAILS, COUNTED (Tony, 20 Oct 2026: "Stay on the free plan unless we realize, from the stats we
 // are collecting, that 5 is insufficient. We are collecting stats about it, right?"): action `link-sent` (no sign-in —
 // it comes before one; a ceiling of 50 a day instead) counts each link the apps ask Firebase for, per copy and
@@ -392,7 +396,7 @@
 //   AI_MAX_TOKENS   – the longest answer one call may ask for (32000; the
 //                     app's largest, reading several recipes at once, asks 8000).
 
-const WORKER_VERSION = 'v87';
+const WORKER_VERSION = 'v88';
 const VIDEO_MAX_MB_DEFAULT = 50;
 const GEMINI_API = 'https://generativelanguage.googleapis.com';
 const GEMINI_MODEL_DEFAULT = 'gemini-2.5-flash';
@@ -1875,7 +1879,14 @@ function fsValue(f) {
   return null;
 }
 // v73 — the owner's protections (see the top of the file).
-const OWNER_DESTRUCTIVE = new Set(['forget', 'mark-deleted', 'set-cap', 'survey-open', 'survey-close', 'note-delete', 'error-delete', 'copy-from']);
+const OWNER_DESTRUCTIVE = new Set(['forget', 'mark-deleted', 'set-cap', 'survey-open', 'survey-close', 'note-delete', 'error-delete', 'copy-from',
+  'notes-delete', 'errors-delete']);   // v88 — several at once
+// v88 — the ids of a batch: whole numbers above 0, each once, at most 100 (D1 binds at most 100 values a query)
+function idBatch(v) {
+  const out = [];
+  (Array.isArray(v) ? v : []).forEach(x => { const n = parseInt(x, 10); if (n > 0 && out.indexOf(n) === -1) out.push(n); });
+  return out.length <= 100 ? out : null;
+}
 const _ownerSec = new Map();
 async function ownerTwoStepOn(project, token, env) {
   const c = env.__firestoreBase ? null : _ownerSec.get(project);   // (the tests change it between calls)
@@ -1909,7 +1920,8 @@ async function ownerWatch(env, db, claims, body, request) {
       ['', 'If this was you, there is nothing to do. If not: change your Google password, sign out of all devices at',
        'https://myaccount.google.com/device-activity and switch on the authenticator step in the app.']).join('\n'), { kind: 'new-device' });
   if (OWNER_DESTRUCTIVE.has(op)) await ownerAlert(env, 'My Kitchen Notes: owner action "' + op + '"',
-    ['The app\'s owner did "' + op + '"' + (body.hid ? ' on household ' + String(body.hid).slice(0, 64) : '') + (body.project ? ' in ' + String(body.project).slice(0, 40) : '') + '.']
+    ['The app\'s owner did "' + op + '"' + (Array.isArray(body.ids) ? ' (' + body.ids.length + ' of them)' : '')   // v88 — a batch says how many
+      + (body.hid ? ' on household ' + String(body.hid).slice(0, 64) : '') + (body.project ? ' in ' + String(body.project).slice(0, 40) : '') + '.']
       .concat(lines).join('\n'), { kind: 'owner-action' });
 }
 // v85 — which alerts also come on WhatsApp (Tony, 20 Oct 2026: "add to the Admin's Setting an option to separately
@@ -2439,6 +2451,13 @@ async function feedbackAdmin(env, db, body, claims) {
             str(n.log, 200000), str(n.version, 20), str(n.env, 20), str(n.device, 300), str(n.lang, 10), at, st).run();
     return jsonResp({ ok: true, id: (r && r.meta && r.meta.last_row_id) || null });
   }
+  // v88 — several at once: one statement, one alert
+  if (body.op === 'notes-delete') {
+    const ids = idBatch(body.ids);
+    if (!ids || !ids.length) return jsonResp({ error: 'FEEDBACK: which notes? (1 to 100 at a time)' }, 400);
+    const r = await db.prepare('DELETE FROM feedback WHERE id IN (' + ids.map((_, i) => '?' + (i + 1)).join(', ') + ')').bind(...ids).run();
+    return jsonResp({ ok: true, deleted: (r && r.meta && r.meta.changes) != null ? r.meta.changes : ids.length });
+  }
   if (body.op === 'notes-new') {
     const r = await db.prepare("SELECT COUNT(*) AS n FROM feedback WHERE status = 'new'").first();
     return jsonResp({ new: (r && r.n) || 0, server: await serverNotices(env, { owner: true }) });   // v78/v79 — every allowance notice
@@ -2613,6 +2632,12 @@ async function signalsAdmin(env, db, body) {
   if (body.op === 'errors-new') {
     const r = await db.prepare("SELECT COUNT(*) AS n FROM app_errors WHERE status = 'new'").first();
     return jsonResp({ new: (r && r.n) || 0 });
+  }
+  if (body.op === 'errors-delete') {      // v88 — several at once: one statement, one alert
+    const ids = idBatch(body.ids);
+    if (!ids || !ids.length) return jsonResp({ error: 'SIGNALS: which errors? (1 to 100 at a time)' }, 400);
+    const r = await db.prepare('DELETE FROM app_errors WHERE id IN (' + ids.map((_, i) => '?' + (i + 1)).join(', ') + ')').bind(...ids).run();
+    return jsonResp({ ok: true, deleted: (r && r.meta && r.meta.changes) != null ? r.meta.changes : ids.length });
   }
   const id = parseInt(body.id, 10);
   if (!(id > 0)) return jsonResp({ error: 'SIGNALS: which error?' }, 400);
@@ -3282,4 +3307,4 @@ export default {
   }
 };
 
-// ── END OF WORKER v87 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
+// ── END OF WORKER v88 ── If this is the last line in the Cloudflare editor, the whole file was pasted.

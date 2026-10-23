@@ -2261,6 +2261,77 @@ window.SELF_TESTS = [
         feedbackKnown(null);
       }
     } },
+  { id:'manage_delete_selected', group:'Sharing', name:'🗑 Delete selected in 💬 Feedback and ⚠️ Errors (v38.88): tick several (Errors has tick boxes now too), the button appears, one request deletes them all (one owner alert, not one each), an older server one by one, a refusal keeps them',
+    test: async()=>{
+      // Tony, 24 Oct 2026: "In the Feedback and Errors tabs, please allow to select multiple reports (already exists in
+      // "Feedback"). After selecting, there should appear a "Delete selected" button, to remove all the selected items."
+      if(!feedbackInboxHere()) return;          // read in the family app only
+      var real={ db:window._fbDb, user:window._fbUser, toast:window.toast, err:window.showServiceError, owner:window.isAppOwner, fetch:window.fetch, h:_workerHealth, ask:window.askConfirm, last:_fbLastNew };
+      var keptNew=null; try{ keptNew=localStorage.getItem(FB_NEW_KEY); }catch(e){}
+      var sent=[], toasts=[], errs=[], answer=true, mode='new', at=Date.now()-3600e3;
+      var notes=function(){ return [5,6,7].map(function(i){ return { id:i, project:'my-kitchen-notes-beta', uid:'u'+i, email:'t'+i+'@example.com', text:'Note '+i, at:at-i, status:'new', env:'beta' }; }); };
+      var errors=function(){ return [17,18,19].map(function(i){ return { id:i, project:'my-kitchen-notes-beta', uid:'u'+i, kind:'error', message:'Error '+i, version:'v38.87', env:'beta',
+        first_at:at, last_at:at-i, n:1, status:'new' }; }); };
+      try{
+        window.toast=function(m){ toasts.push(String(m)); }; window.showServiceError=function(m){ errs.push(String(m)); };
+        window.isAppOwner=function(){ return true; }; _workerHealth=null;
+        window.askConfirm=async function(){ return answer; };
+        window._fbUser={ uid:'uOwner', email:'owner@example.com', getIdToken:async function(){ return 'tok'; } };
+        window._fbDb={ collection:function(c){
+            if(c==='feedback') return { orderBy:function(){ return { limit:function(){ return { get:async function(){ return { forEach:function(){} }; } }; } }; } };
+            return { get:async function(){ return { size:0, forEach:function(){} }; } }; },
+          collectionGroup:function(){ return { get:async function(){ return { size:0, forEach:function(){} }; } }; } };
+        window.fetch=async function(u, init){
+          var b={}; try{ b=JSON.parse(init.body); }catch(e){}
+          sent.push(b);
+          if(b.op==='notes') return new Response(JSON.stringify({ notes:notes(), replies:[] }), { status:200 });
+          if(b.op==='errors') return new Response(JSON.stringify({ errors:errors() }), { status:200 });
+          if(b.op==='notes-delete' || b.op==='errors-delete') {
+            if(mode==='old') return new Response(JSON.stringify({ error: b.op==='notes-delete' ? 'FEEDBACK: which note?' : 'SIGNALS: which error?' }), { status:400 });
+            if(mode==='down') return new Response('{"error":"METER: the database is busy"}', { status:503 });
+            return new Response(JSON.stringify({ ok:true, deleted:b.ids.length }), { status:200 });
+          }
+          if(b.op==='note-delete' || b.op==='error-delete') return new Response('{"ok":true}', { status:200 });
+          return new Response('{"error":"METER: not set up"}', { status:503 });
+        };
+        var ops=function(){ return sent.map(function(b){ return b.op; }).filter(function(o){ return /delete/.test(o); }); };
+        var shown=function(cls){ return Array.from(document.querySelectorAll('#manageOverlay .mg-card')).map(function(c){ return (c.querySelector('.mg-text, .mg-err') || {}).textContent; }).join('|'); };
+        // 💬 Feedback: nothing ticked → no Delete selected; two ticked → "(2)"; one request with both ids
+        await openManagement(); await mknManage._notes(); mknManage.tabTo('feedback'); mknManage.noteFilter('open'); mknManage.pickAll(false);
+        if(document.getElementById('mgDelPicked')) throw new Error('Delete selected shows with nothing ticked');
+        var boxes=document.querySelectorAll('#manageOverlay .mg-pick input'); boxes[0].click(); document.querySelectorAll('#manageOverlay .mg-pick input')[1].click();
+        var del=document.getElementById('mgDelPicked');
+        if(!del || !/Delete selected \(2\)/.test(del.textContent)) throw new Error('no Delete selected (2): '+(del && del.textContent));
+        answer=false; await mknManage.delPicked();
+        if(ops().length || !document.getElementById('mgDelPicked')) throw new Error('deleted although Cancel was pressed');
+        answer=true; sent=[]; await mknManage.delPicked();
+        var nd=sent.filter(function(b){ return b.op==='notes-delete'; });
+        if(ops().join()!=='notes-delete' || nd[0].ids.join()!=='5,6') throw new Error('not one request with both: '+JSON.stringify(sent.map(function(b){ return [b.op, b.ids || b.id]; })));
+        if(shown()!=='Note 7' || document.getElementById('mgDelPicked') || !toasts.some(function(t){ return /2 notes deleted/.test(t); })) throw new Error('after deleting: '+shown());
+        // an older server: one by one
+        mode='old'; sent=[]; mknManage.pickAll(true); await mknManage.delPicked();
+        if(ops().join()!=='notes-delete,note-delete' || shown()!=='') throw new Error('with an older server: '+ops().join()+' / '+shown());
+        // ⚠️ Errors: tick boxes now; Select all shown; one request; a refusal keeps them
+        mode='new'; await mknManage._errors(); mknManage.tabTo('errors'); mknManage.errFilter('open');
+        if(document.querySelectorAll('#manageOverlay .mg-card .mg-pick input').length!==3) throw new Error('the error reports have no tick boxes');
+        if(document.getElementById('mgErrDelPicked')) throw new Error('Delete selected shows with nothing ticked (Errors)');
+        document.querySelector('#manageOverlay .mg-card .mg-pick input').click();
+        if(!/Delete selected \(1\)/.test((document.getElementById('mgErrDelPicked') || {}).textContent || '')) throw new Error('ticking one error: no Delete selected (1)');
+        mknManage.errPickAll(true);
+        if(!/Delete selected \(3\)/.test(document.getElementById('mgErrDelPicked').textContent)) throw new Error('Select all shown (Errors)');
+        mode='down'; sent=[]; errs=[]; await mknManage.errDelPicked();
+        if(shown().split('|').length!==3 || !errs.length || !document.getElementById('mgErrDelPicked')) throw new Error('a refusal lost them, or said nothing: '+shown());
+        mode='new'; sent=[]; await mknManage.errDelPicked();
+        var ed=sent.filter(function(b){ return b.op==='errors-delete'; });
+        if(ops().join()!=='errors-delete' || ed[0].ids.slice().sort().join()!=='17,18,19' || shown()!=='') throw new Error('Errors deleted: '+JSON.stringify(sent.map(function(b){ return [b.op, b.ids]; }))+' / '+shown());
+      } finally {
+        window._fbDb=real.db; window._fbUser=real.user; window.toast=real.toast; window.showServiceError=real.err; window.isAppOwner=real.owner; window.fetch=real.fetch; _workerHealth=real.h;
+        window.askConfirm=real.ask;
+        if(window.mknManage) { mknManage.pickAll(false); mknManage.errPickAll(false); mknManage.close(); }
+        _fbLastNew=real.last; try{ if(keptNew===null) localStorage.removeItem(FB_NEW_KEY); else localStorage.setItem(FB_NEW_KEY, keptNew); }catch(e){}
+        feedbackKnown(null);
+      }
+    } },
   { id:'feedback_reply_in_app', group:'Sharing', name:'📲 Reply in app: Tony answers a note from the Feedback tab, the answer goes to the writer’s own app; the tab’s buttons press like the app’s own (v38.00)',
     test: async()=>{
       if(!feedbackInboxHere()) return;          // the notes are read in the family app only
