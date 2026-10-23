@@ -8001,6 +8001,95 @@ window.SELF_TESTS = [
         try{ renderFilters(); renderGrid(); }catch(e){}
       }
     } },
+  { id:'recipe_bold', group:'UI', name:'Bold words in a recipe (v38.87): B and Ctrl+B put **…** round the selected words or the word at the cursor and take it off again; the recipe shows them bold (view, scaled amounts and steps, print, e-mail, page), WhatsApp text gets *bold*, search, the pantry and Bring! ignore the marks; Save / Update Recipe floats at the bottom of the editor',
+    test: async()=>{
+      // Tony, 24 Oct 2026: "Please create a "Bold" control, so I could mark words (either in the ingredients or Methods
+      // areas) a BOLD. We should also be able to use the "CTRL+B" keyboard shortcut" — and "make the "Update Recipe" a
+      // floating button, like the "X" button at the top … at the bottom of the screen".
+      var host=document.createElement('div'); host.style.cssText='position:fixed;left:-9999px;top:0;'; document.body.appendChild(host);
+      var inp=document.createElement('input'); host.appendChild(inp);
+      var ta=document.createElement('textarea'); host.appendChild(ta);
+      var real={ mult:viewMult, unit:viewUnit, ings:readIngsTable(), boldField:_boldField };
+      var ov=document.getElementById('editOverlay'), wasOpen=ov.classList.contains('open');
+      var loginEl=document.getElementById('loginScreen'), loginWas=loginEl ? loginEl.style.display : null;
+      function sel(el, v, a, b){ el.value=v; el.focus(); el.setSelectionRange(a, b==null?a:b); }
+      try{
+        // the toggle
+        sel(inp, 'salt and pepper', 9, 15); boldToggle(inp);
+        if(inp.value!=='salt and **pepper**' || inp.value.slice(inp.selectionStart, inp.selectionEnd)!=='pepper') throw new Error('a selection: '+inp.value);
+        boldToggle(inp); if(inp.value!=='salt and pepper') throw new Error('B again did not take the bold off: '+inp.value);
+        sel(inp, 'salt and pepper', 2); boldToggle(inp); if(inp.value!=='**salt** and pepper') throw new Error('the word at the cursor: '+inp.value);
+        sel(inp, '**salt** and pepper', 4); boldToggle(inp); if(inp.value!=='salt and pepper') throw new Error('the cursor in a bold word: '+inp.value);
+        sel(inp, '**salt** and pepper', 0, 8); boldToggle(inp); if(inp.value!=='salt and pepper') throw new Error('a bold word selected with its marks: '+inp.value);
+        sel(inp, 'salt and pepper', 0, 5); boldToggle(inp); if(inp.value!=='**salt** and pepper') throw new Error('a selection’s space stays outside: '+inp.value);
+        sel(inp, '', 0); boldToggle(inp); if(inp.value!=='****' || inp.selectionStart!==2) throw new Error('nothing there: '+inp.value+' @'+inp.selectionStart);
+        boldToggle(inp); if(inp.value!=='') throw new Error('the empty pair did not go: '+inp.value);
+        sel(inp, 'מלח גס', 1); boldToggle(inp); if(inp.value!=='**מלח** גס') throw new Error('a Hebrew word: '+inp.value);
+        var lines3='Boil the pasta\n# Sauce\n    Mix well';
+        sel(ta, lines3, 0, lines3.length); boldToggle(ta);
+        if(ta.value!=='**Boil the pasta**\n# **Sauce**\n    **Mix well**') throw new Error('several Method lines: '+JSON.stringify(ta.value));
+        boldToggle(ta); if(ta.value!==lines3) throw new Error('several lines, all bold → none: '+JSON.stringify(ta.value));
+        // Ctrl+B (and the key under B on a Hebrew keyboard) in an ingredient field — not elsewhere (the editor open: a
+        // closed one's fields cannot take the focus the B button relies on)
+        ov.classList.add('open');
+        loadIngsTable([{ a:'1 tsp', n:'salt and pepper' }]);
+        var nameIn=document.querySelectorAll('#ingsRows .ing-row input')[1];
+        sel(nameIn, 'salt and pepper', 0, 4);
+        var ev=new KeyboardEvent('keydown', { key:'b', code:'KeyB', ctrlKey:true, bubbles:true, cancelable:true }); nameIn.dispatchEvent(ev);
+        if(nameIn.value!=='**salt** and pepper' || !ev.defaultPrevented) throw new Error('Ctrl+B in an ingredient: '+nameIn.value);
+        sel(nameIn, '**salt** and pepper', 13, 19);
+        nameIn.dispatchEvent(new KeyboardEvent('keydown', { key:'נ', code:'KeyB', ctrlKey:true, bubbles:true, cancelable:true }));
+        if(nameIn.value!=='**salt** and **pepper**') throw new Error('Ctrl+B on a Hebrew keyboard: '+nameIn.value);
+        var ev2=new KeyboardEvent('keydown', { key:'b', ctrlKey:true, bubbles:true, cancelable:true }); inp.value='x'; inp.dispatchEvent(ev2);
+        if(ev2.defaultPrevented || inp.value!=='x') throw new Error('Ctrl+B taken outside the recipe’s lines');
+        // the B button: the ingredient last in
+        nameIn.focus(); nameIn.setSelectionRange(9, 9); var nv=nameIn.value;
+        boldTool('ings'); if(nameIn.value===nv) throw new Error('B beside + Add ingredient did nothing');
+        if(!document.querySelector('#editOverlay [onclick="boldTool(\'steps\')"]') || !document.querySelector('#editOverlay [onclick="boldTool(\'ings\')"]')) throw new Error('a B button is missing');
+        // shown bold — escaped first
+        if(escB('**<img src=x onerror=alert(1)>**')!=='<strong>&lt;img src=x onerror=alert(1)&gt;</strong>') throw new Error('escB: '+escB('**<img src=x onerror=alert(1)>**'));
+        if(escB('a ** b ** c')!=='a ** b ** c' || noBold('a **b** c **d**')!=='a b c d' || boldAs('a **b**', '*')!=='a *b*') throw new Error('the marks: '+escB('a ** b ** c'));
+        viewUnit='metric'; viewMult=2;
+        var ih=ingredientLinesHtml([{ sub:'For the **sauce**' }, { a:'**2** eggs', n:'fresh **basil**' }], 'ing');
+        if(!/<strong>sauce<\/strong>/.test(ih) || !/fresh <strong>basil<\/strong>/.test(ih) || !/<strong>4 eggs<\/strong>/.test(ih) || /\*\*/.test(ih)) throw new Error('the ingredients: '+ih);
+        if(/aria-label="Mark [^"]*\*/.test(ih)) throw new Error('the marks are read out');
+        var sh=stepLinesHtml(['Add **2 cups** of flour', { sub:'**Bake**' }], 'step', 's', [{ a:'2 cups', n:'flour' }]);
+        if(!/<strong><span class="step-scaled"[^>]*>4<\/span> cups<\/strong>/.test(sh) || !/<strong>Bake<\/strong>/.test(sh) || /\*\*/.test(sh)) throw new Error('the steps, scaled: '+sh);
+        viewMult=1;
+        // shared as text: WhatsApp's *bold*; search, pantry: the words
+        var r=normalizeRecipe({ id:-424242, name:'Bold test', ingredients:[{ a:'1', n:'fresh **basil** leaves' }], steps:['Tear the **basil** leaves'] });
+        var tx=rText(r); if(!/\*basil\*/.test(tx) || /\*\*/.test(tx)) throw new Error('shared as text: '+tx);
+        if(!recipeMatchesQuery(r, 'basil leaves') || !recipeMatchesQuery(r, 'tear the basil')) throw new Error('search does not see past the marks');
+        if(missingFor(r, ['fresh basil leaves']).length) throw new Error('the pantry does not see past the marks: '+missingFor(r, ['fresh basil leaves']).join());
+        ['makeDocxBlob:wRuns(st', 'makeDocxBlob:wRuns(i.n', 'rHtml:escB(s)', 'buildRecipePage:escB(st)', 'openBringModal:noBold(ing.n)', 'buildPrintHtml:escB(stepText(s))'].forEach(function(c){
+          var f=c.split(':'), fn=window[f[0]];
+          if(typeof fn!=='function') throw new Error(f[0]+' is not there to check');
+          if(String(fn).indexOf(f[1])===-1) throw new Error(f[0]+' does not carry the bold through ('+f[1]+')');
+        });
+        // Save / Update Recipe floats at the bottom of the editor
+        loadIngsTable(Array.from({ length:40 }, function(_, k){ return { a:String(k+1), n:'ingredient '+(k+1) }; }));
+        ov.classList.add('open');
+        if(loginEl) loginEl.style.display='none';             // signed out in the test: the sign-in screen is over everything
+        var modal=ov.querySelector('.modal'); modal.scrollTop=0; await wait(60);
+        var btn=document.getElementById('editSubmitBtn'), br=btn.getBoundingClientRect(), mr=modal.getBoundingClientRect();
+        var bar=btn.parentElement, pos=getComputedStyle(bar).position;
+        if(pos!=='sticky') throw new Error('the bar is not sticky: '+pos);
+        if(!(modal.scrollHeight > modal.clientHeight + 200)) throw new Error('the editor did not scroll in the test (nothing proved)');
+        if(!(br.bottom <= mr.bottom + 1 && br.top >= mr.top && br.height > 20)) throw new Error('Update Recipe is not in sight at the top of the editor: button '+Math.round(br.top)+'–'+Math.round(br.bottom)+', window '+Math.round(mr.top)+'–'+Math.round(mr.bottom));
+        // the topmost thing OF THE EDITOR there is the button (the Self Test's own window is above everything during a run)
+        var hit=document.elementsFromPoint(br.left + br.width/2, br.top + br.height/2).filter(function(x){ return modal.contains(x); })[0];
+        if(hit!==btn && !btn.contains(hit)) throw new Error('something in the editor covers Update Recipe: '+(hit && (hit.id || hit.className)));
+        modal.scrollTop=modal.scrollHeight; await wait(60);
+        br=btn.getBoundingClientRect(); mr=modal.getBoundingClientRect();
+        if(!(br.bottom <= mr.bottom + 1)) throw new Error('at the end of the editor it is out of sight');
+      } finally {
+        host.remove();
+        if(loginEl) loginEl.style.display=loginWas;
+        viewMult=real.mult; viewUnit=real.unit; _boldField=real.boldField;
+        if(!wasOpen) ov.classList.remove('open');
+        loadIngsTable(real.ings);
+      }
+    } },
   { id:'arrival_sound', group:'Sharing', name:'🔔 A kitchen sound when something arrives (v38.82): a message taps twice, a request to link kitchens three times; three sounds to choose from, each heard with ▶; a mute in ⚙️ → ♿ Accessibility; nothing for one’s own messages, nothing for what was already waiting on opening, one sound for a burst',
     test:async function(){
       // Tony, 23 Oct 2026: "accompany any join request and message arrival with an audio indicator … a spoon tapping a

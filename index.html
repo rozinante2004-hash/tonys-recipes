@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v38.86 -->
+<!-- Tony's Recipes Collection v38.87 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1837,7 +1837,7 @@ async function calcNutrition(id) {
   var r = recipes.find(function(x) { return x.id===id; });
   if (!r) return;
   toast('⏳ Calculating nutrition...');
-  var ings = allIngredients(r).map(function(i) { return (i.a?i.a+' ':'')+i.n; }).join(', ');
+  var ings = allIngredients(r).map(function(i) { return noBold((i.a?i.a+' ':'')+i.n); }).join(', ');
   var prompt = 'Estimate nutrition per serving for a recipe with these ingredients: ' + ings
     + '. Servings: ' + (r.servings||'4') + '. '
     + 'Return ONLY JSON: {"calories":0,"protein":0,"carbs":0,"fat":0} (numbers only, per serving).';
@@ -6887,13 +6887,13 @@ function linkedLinesHtml(r) {
   return parts.map(function(p) {
     var num = 0;
     var ings = (p.ingredients || []).map(function(i) {
-      if (isSubLine(i)) return '<li class="line-sub" dir="auto">' + escH(i.sub) + '</li>';
-      return '<li dir="auto"><span class="line-text">' + escH(i.n) + '</span><span class="ing-amount">' + escH(i.a || '') + '</span></li>';
+      if (isSubLine(i)) return '<li class="line-sub" dir="auto">' + escB(i.sub) + '</li>';
+      return '<li dir="auto"><span class="line-text">' + escB(i.n) + '</span><span class="ing-amount">' + escB(i.a || '') + '</span></li>';
     }).join('');
     var steps = (p.steps || []).map(function(s) {
-      if (isSubLine(s)) return '<li class="line-sub" dir="auto">' + escH(s.sub) + '</li>';
+      if (isSubLine(s)) return '<li class="line-sub" dir="auto">' + escB(s.sub) + '</li>';
       num++;
-      return '<li dir="auto"><span class="step-num">' + num + '</span><span class="step-text">' + escH(stepText(s)) + '</span></li>';
+      return '<li dir="auto"><span class="step-num">' + num + '</span><span class="step-text">' + escB(stepText(s)) + '</span></li>';
     }).join('');
     return (parts.length > 1 ? '<div dir="auto" data-no-i18n style="font-family:Georgia,serif;font-size:18px;font-weight:700;color:var(--heading);margin:14px 0 6px;">' + escH(p.name) + '</div>' : '')
       + ((ings || steps) ? '<div class="recipe-columns"' + (recipeIsRTL(r) ? ' dir="rtl"' : '') + '>'
@@ -9341,7 +9341,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v38.86';
+var APP_VERSION = 'v38.87';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -9505,8 +9505,8 @@ function rHtml(r) {
     : '';
 
   var ingredients = allIngredients(r).map(function(i){
-    return '<tr><td dir="auto" style="padding:6px 12px 6px 0;color:#5C3D2E;font-weight:600;font-size:14px;white-space:nowrap;vertical-align:top;unicode-bidi:plaintext;">' + escH(i.a||'') + '</td>' +
-           '<td dir="auto"' + langAttr(i.n||'') + ' style="padding:6px 0;color:#1C1A18;font-size:14px;vertical-align:top;unicode-bidi:plaintext;">' + escH(i.n||'') + '</td></tr>';
+    return '<tr><td dir="auto" style="padding:6px 12px 6px 0;color:#5C3D2E;font-weight:600;font-size:14px;white-space:nowrap;vertical-align:top;unicode-bidi:plaintext;">' + escB(i.a||'') + '</td>' +
+           '<td dir="auto"' + langAttr(i.n||'') + ' style="padding:6px 0;color:#1C1A18;font-size:14px;vertical-align:top;unicode-bidi:plaintext;">' + escB(i.n||'') + '</td></tr>';
   }).join('');
 
   var steps = allSteps(r).map(function(s, i){
@@ -9514,7 +9514,7 @@ function rHtml(r) {
     var numCell = '<td style="padding:0 ' + (isHeb?'0':'12px') + ' 0 ' + (isHeb?'12px':'0') + ';vertical-align:top;">' +
       '<div style="width:28px;height:28px;border-radius:50%;background:#C1440E;color:white;font-size:12px;font-weight:700;text-align:center;line-height:28px;min-width:28px;">' + (i+1) + '</div>' +
       '</td>';
-    var txtCell = '<td dir="' + (isHeb?'rtl':'ltr') + '" style="padding:0 0 14px 0;color:#1C1A18;font-size:14px;line-height:1.7;text-align:' + (isHeb?'right':'left') + ';width:100%;">' + escH(s) + '</td>';
+    var txtCell = '<td dir="' + (isHeb?'rtl':'ltr') + '" style="padding:0 0 14px 0;color:#1C1A18;font-size:14px;line-height:1.7;text-align:' + (isHeb?'right':'left') + ';width:100%;">' + escB(s) + '</td>';
     // For Hebrew: text cell first (left col), number cell second (right col) — table reads LTR so right col = right side
     return '<tr>' + (isHeb ? txtCell + numCell : numCell + txtCell) + '</tr>';
   }).join('');
@@ -11381,6 +11381,13 @@ li.line-sub-indent { padding-inline-start: 22px; }
 }
 .btn-submit:hover  { box-shadow: 0 4px 0 #7a2b08, 0 5px 8px rgba(0,0,0,0.24); transform: translateY(-1px); }
 .btn-submit:active { box-shadow: 0 1px 0 #7a2b08; transform: translateY(3px); }
+/* v38.87 — Save / Update Recipe floats at the bottom of the editor, as ✕ does at its top: always in reach, never
+   over a field (the editor scrolls a focused field clear of it) */
+.edit-save-bar { position: sticky; bottom: 0; z-index: 15; margin: 0 -1.4rem -1.4rem; padding: 14px 1.4rem calc(14px + env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(to bottom, transparent, var(--cream) 12px); }
+.edit-save-bar .btn-submit { margin-top: 0; box-shadow: 0 4px 0 #7a2b08, 0 6px 16px rgba(0,0,0,0.28); }
+#editOverlay .modal { scroll-padding-bottom: 84px; }
+.bold-tool-btn b { font-family: Georgia, serif; font-weight: 800; }
 
 /* Save translation (sage green) */
 .save-translation-btn {
@@ -12476,7 +12483,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.86</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.87</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -12564,7 +12571,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.86</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.87</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -12989,6 +12996,7 @@ body.banner-shown .header {
         </div>
         <div style="display:flex;gap:8px;">
           <button type="button" onclick="addIngRow()" style="flex:2;font-size:13px;color:var(--terracotta);background:none;border:1.5px dashed var(--terracotta);border-radius:8px;padding:6px 14px;cursor:pointer;font-family:'DM Sans','Heebo',sans-serif;">+ Add ingredient</button>
+          <button type="button" class="step-tool-btn bold-tool-btn" onmousedown="event.preventDefault()" onclick="boldTool('ings')" aria-label="Bold" title="Bold — the selected words of the ingredient you are in, or its word under the cursor (Ctrl+B)" style="flex:none;padding:6px 14px;font-size:14px;"><b>B</b></button>
           <button type="button" onclick="addIngSubRow('')" title="A heading that groups the lines below it, e.g. Brine option #1" style="flex:1;font-size:13px;color:var(--muted);background:none;border:1.5px dashed var(--border);border-radius:8px;padding:6px 10px;cursor:pointer;font-family:'DM Sans','Heebo',sans-serif;">&#9656; Sub-title</button>
         </div>
         <!-- Hidden textarea for backward compatibility with saveRecipe parser -->
@@ -12996,10 +13004,11 @@ body.banner-shown .header {
       <div class="form-group">
         <label class="form-label">Steps — one per line</label>
         <div style="display:flex;gap:6px;margin-bottom:6px;align-items:center;flex-wrap:wrap;">
+          <button type="button" class="step-tool-btn bold-tool-btn" onmousedown="event.preventDefault()" onclick="boldTool('steps')" aria-label="Bold" title="Bold — the selected words, or the word the cursor is in (Ctrl+B)"><b>B</b></button>
           <button type="button" class="step-tool-btn" onmousedown="event.preventDefault()" onclick="stepToolSub()" title="Make this line — or every selected line — a sub-title (no step number)">&#9656; Sub-title</button>
           <button type="button" class="step-tool-btn" onmousedown="event.preventDefault()" onclick="stepToolIndent(1)" aria-label="Indent this line, or the selected lines" title="Indent this line, or the selected lines">&#8677;</button>
           <button type="button" class="step-tool-btn" onmousedown="event.preventDefault()" onclick="stepToolIndent(-1)" aria-label="Outdent this line, or the selected lines" title="Outdent this line, or the selected lines">&#8676;</button>
-          <span style="font-size:11px;color:var(--muted);">acts on the line your cursor is in, or on every line you select</span>
+          <span style="font-size:11px;color:var(--muted);">acts on the line your cursor is in, or on every line you select · <b>B</b> or Ctrl+B: **bold** here is bold in the recipe</span>
         </div>
         <textarea class="form-textarea" id="f-steps" dir="auto" onkeyup="rememberStepCaret()" onclick="rememberStepCaret()" onselect="rememberStepCaret()" onfocus="rememberStepCaret()" placeholder="Boil the pasta&#10;Mix eggs and cheese&#10;Serve hot"></textarea>
       </div>
@@ -13017,7 +13026,9 @@ body.banner-shown .header {
           🎥 This is a video clip (no written recipe)
         </label>
       </div>
-      <button class="btn-submit" id="editSubmitBtn" onclick="saveRecipe()">Save Recipe</button>
+      <!-- v38.87 — floats at the bottom of the editor, as ✕ does at its top (Tony: "will save me the need to scroll
+           down all the way to the end of the page to find it") -->
+      <div class="edit-save-bar"><button class="btn-submit" id="editSubmitBtn" onclick="saveRecipe()">Save Recipe</button></div>
     </div>
   </div>
 </div>
@@ -13884,7 +13895,7 @@ function parseSearchQuery(raw) {
 }
 function recipeIngredientNames(r) {
   return allIngredients(r)
-    .map(function(i){ return String((i && i.n) == null ? '' : i.n).toLowerCase(); });
+    .map(function(i){ return noBold((i && i.n) == null ? '' : i.n).toLowerCase(); });   // v38.87 — without bold marks
 }
 function recipeMatchesQuery(r, raw) {
   var parsed = parseSearchQuery(raw);
@@ -13909,7 +13920,7 @@ function recipeMatchesQuery(r, raw) {
     // unsearchable. It also maps {t,ind} step objects back to their text —
     // String({t:'…'}) is "[object Object]", so indented steps never matched
     // either (v36.12).
-    || allSteps(r).some(function(st){ return lc(st).includes(q); });
+    || allSteps(r).some(function(st){ return lc(noBold(st)).includes(q); });
 }
 // Every short field a search may legitimately hit, the collection's parts
 // included. A recipe inside a collection has its own name, meal type and
@@ -14394,9 +14405,9 @@ function buildRecipePage(r) {
   var esc = function(v){ return escH(v).replace(/<br>/g, '<br>'); };
   var img = r.photo ? '<img\u0020class="hero" src="' + escA(r.photo) + '" alt="">' : '';
   var ings = allIngredients(r).map(function(i){
-    return '<li><span>' + escH(i.n) + '</span><b>' + escH(i.a) + '</b></li>';
+    return '<li><span>' + escB(i.n) + '</span><b>' + escB(i.a) + '</b></li>';
   }).join('');
-  var steps = allSteps(r).map(function(st){ return '<li>' + escH(st) + '</li>'; }).join('');
+  var steps = allSteps(r).map(function(st){ return '<li>' + escB(st) + '</li>'; }).join('');
   return '<!doctype html><html><head><meta charset="utf-8">'
     + '<meta name="viewport" content="width=device-width,initial-scale=1">'
     + '<title>' + escH(r.name) + '</title><style>'
@@ -14537,7 +14548,7 @@ function haveIngredient(name, pantry) {
 }
 function missingFor(r, pantry) {
   return allIngredients(r)
-    .map(function(i){ return i && i.n; })
+    .map(function(i){ return i && noBold(i.n); })
     .filter(function(n){ return n && !haveIngredient(n, pantry); });
 }
 window.getPantry = getPantry; window.setPantry = setPantry;
@@ -19107,8 +19118,8 @@ function matchReason(r, q) {
       + (inside.length > 2 ? ' <span style="opacity:.7;">+' + (inside.length - 2) + ' more</span>' : '') + '</div>';
   }
   var ings = allIngredients(r)
-    .filter(function(i){ return lc(i && i.n).includes(q); })
-    .map(function(i){ return i.n; });
+    .filter(function(i){ return lc(i && noBold(i.n)).includes(q); })
+    .map(function(i){ return noBold(i.n); });
   if (ings.length) {
     return '<div class="match-why" dir="auto">🧂 ' + hlMatch(ings.slice(0,2).join(', '), q)
       + (ings.length > 2 ? ' <span style="opacity:.7;">+' + (ings.length - 2) + ' more</span>' : '') + '</div>';
@@ -19641,15 +19652,17 @@ window.conflictBannerHtml = conflictBannerHtml;
 function ingredientLinesHtml(lines, pfx, awkOut) {
   return (lines || []).map(function(i, ii) {
     if (isSubLine(i)) return '<li class="line-sub' + (lineIndented(i) ? ' line-sub-indent' : '')
-      + '" dir="auto">' + escH(i.sub) + '</li>';
-    var cv = cvtIng(i.a, viewUnit), sc = scaleAmt(cv, viewMult);
-    if (awkOut && awkwardCount(i.n, sc)) awkOut.push(i.n);
+      + '" dir="auto">' + escB(i.sub) + '</li>';
+    // v38.87 — a bold amount is converted and scaled without its marks, then shown bold whole
+    var am = noBold(i.a), amBold = am !== String(i.a == null ? '' : i.a);
+    var cv = cvtIng(am, viewUnit), sc = scaleAmt(cv, viewMult);
+    if (awkOut && awkwardCount(noBold(i.n), sc)) awkOut.push(noBold(i.n));
     var key = pfx + '-' + ii;
     return '<li dir="auto"' + (lineIndented(i) ? ' class="line-indent"' : '')
       + ' data-line="' + key + '" onclick="markLine(\'' + pfx + '\',' + ii + ')">'
-      + '<button class="tick-box" role="checkbox" aria-checked="false" aria-label="Mark ' + escA(i.n) + ' as added" '
+      + '<button class="tick-box" role="checkbox" aria-checked="false" aria-label="Mark ' + escA(noBold(i.n)) + ' as added" '
       + 'onclick="toggleTick(\'' + key + '\',event)"></button>'
-      + '<span class="line-text">' + escH(i.n) + '</span><span class="ing-amount">' + escH(sc) + '</span></li>';
+      + '<span class="line-text">' + escB(i.n) + '</span><span class="ing-amount">' + (amBold ? '<strong>' + escH(sc) + '</strong>' : escH(sc)) + '</span></li>';
   }).join('');
 }
 // The step number counts REAL steps only — a heading takes no number, so
@@ -19658,7 +19671,7 @@ function stepLinesHtml(lines, pfx, timerPfx, ings) {
   var num = 0, ingSet = viewMult !== 1 ? stepIngWords(ings) : null;    // v38.08 — the method scales too
   return (lines || []).map(function(s, si) {
     if (isSubLine(s)) return '<li class="line-sub' + (lineIndented(s) ? ' line-sub-indent' : '')
-      + '" dir="auto">' + escH(s.sub) + '</li>';
+      + '" dir="auto">' + escB(s.sub) + '</li>';
     num++;
     var txt = stepText(s);
     var isHeb = /[֐-׿]/.test(txt);
@@ -19677,7 +19690,7 @@ function stepLinesHtml(lines, pfx, timerPfx, ings) {
       + '<button class="tick-box" role="checkbox" aria-checked="false" aria-label="Mark step ' + num + ' as done" '
       + 'onclick="toggleTick(\'' + key + '\',event)"></button>'
       + '<span class="step-num">' + num + '</span>'
-      + '<span class="step-text">' + (ingSet ? scaleStepHtml(txt, viewMult, ingSet) : escH(txt)) + (timers ? '<br>' + timers : '') + '</span></li>';
+      + '<span class="step-text">' + boldHtml(ingSet ? scaleStepHtml(txt, viewMult, ingSet) : escH(txt)) + (timers ? '<br>' + timers : '') + '</span></li>';
   }).join('');
 }
 window.ingredientLinesHtml = ingredientLinesHtml; window.stepLinesHtml = stepLinesHtml;
@@ -20931,7 +20944,7 @@ function scaleStepHtml(txt, mult, ingSet) {
   STEP_AMT_RE.lastIndex = 0;
   while ((m = STEP_AMT_RE.exec(txt))) {
     var start = m.index, end = start + m[0].length, before = txt.charAt(start - 1);
-    if (before && /[A-Za-z֐-׿\d.,\/°×x*#]/.test(before)) continue;   // "9x13", "v2", "step#2" …
+    if (before && /[A-Za-z֐-׿\d.,\/°×x*#]/.test(before) && !(before === '*' && txt.charAt(start - 2) === '*')) continue;   // "9x13", "v2", "step#2" … (v38.87: not "**2 cups**")
     var after = txt.slice(end), ok = STEP_UNIT_AFTER.test(after);
     if (!ok) { var c = after.match(STEP_CONT_AFTER); ok = !!(c && (/^\s*\S+\s+(?:of|של)\s/i.test(after) || stepIngHit(ingSet, c[1]))); }
     if (!ok && ingSet) {
@@ -20989,12 +21002,14 @@ function rText(r){
   // answer "what can I cook with", which is a different question.
   // A sub-sub-header is indented like the lines under it, so the two levels
   // stay distinguishable in plain text where nothing else can carry them.
-  var _h = function(x){ return (lineIndented(x) ? '\n  ' : '\n') + x.sub; };
+  // v38.87 — a **bold** word goes out as WhatsApp's *bold*
+  var _b = function(x){ return boldAs(x, '*'); };
+  var _h = function(x){ return (lineIndented(x) ? '\n  ' : '\n') + _b(x.sub); };
   t+=`INGREDIENTS:\n${ingredientLines(r).map(i =>
-      isSubLine(i) ? _h(i) : `${lineIndented(i)?'  ':''}• ${i.a} ${i.n}`).join('\n')}\n\n`;
+      isSubLine(i) ? _h(i) : `${lineIndented(i)?'  ':''}• ${_b(i.a)} ${_b(i.n)}`).join('\n')}\n\n`;
   var _sn = 0;
   t+=`METHOD:\n${stepLines(r).map(s =>
-      isSubLine(s) ? _h(s) : `${lineIndented(s)?'  ':''}${++_sn}. ${stepText(s)}`).join('\n')}`;
+      isSubLine(s) ? _h(s) : `${lineIndented(s)?'  ':''}${++_sn}. ${_b(stepText(s))}`).join('\n')}`;
   if(r.notes&&r.notes.trim()) t+=`\n\nNOTES:\n${r.notes.trim()}`;
   if(r.source&&r.source.trim()) t+=`\n\nSource: ${r.source.trim()}`;
   return t;
@@ -21132,6 +21147,11 @@ function makeDocxBlob(recipeList){
   // a suggestion.
   const pBidi = t => isRtl(t) ? '<w:bidi/>' : '';
   const rRtl  = t => isRtl(t) ? '<w:rtl/>' : '';
+  // v38.87 — a line's **bold** words as bold runs; `pr` is what every run of it carries (direction, colour)
+  const wRuns = (t, pr) => String(t == null ? '' : t).split(/(\*\*(?=\S)[\s\S]*?\S\*\*)/).filter(x => x !== '').map(x => {
+    const b = /^\*\*(?=\S)[\s\S]*?\S\*\*$/.test(x);
+    return `<w:r><w:rPr>${b ? '<w:b/>' : ''}${pr || ''}</w:rPr><w:t xml:space="preserve">${esc(b ? x.slice(2, -2) : x)}</w:t></w:r>`;
+  }).join('');
 
   let bodyXml='';
   var srcUrls = []; // Collect hyperlink URLs for relationships
@@ -21228,12 +21248,12 @@ function makeDocxBlob(recipeList){
       (part.ingredients||[]).forEach(i=>{
         if (isSubLine(i)) {
           bodyXml+=`<w:p><w:pPr>${pBidi(i.sub)}${lineIndented(i)?IND:''}</w:pPr><w:r><w:rPr><w:b/><w:color w:val="C1440E"/>${rRtl(i.sub)}</w:rPr>`
-            + `<w:t>${esc(i.sub)}</w:t></w:r></w:p>`;
+            + `<w:t>${esc(noBold(i.sub))}</w:t></w:r></w:p>`;
           return;
         }
         bodyXml+=`<w:p><w:pPr>${pBidi(i.n)}${lineIndented(i)?IND:''}</w:pPr>`
-          + `<w:r><w:rPr><w:b/>${rRtl(i.n)}</w:rPr><w:t xml:space="preserve">${esc(i.a)}  </w:t></w:r>`
-          + `<w:r><w:rPr>${rRtl(i.n)}</w:rPr><w:t>${esc(i.n)}</w:t></w:r></w:p>`;
+          + `<w:r><w:rPr><w:b/>${rRtl(i.n)}</w:rPr><w:t xml:space="preserve">${esc(noBold(i.a))}  </w:t></w:r>`
+          + wRuns(i.n, rRtl(i.n)) + `</w:p>`;
       });
       bodyXml+=`<w:p></w:p>`;
 
@@ -21242,14 +21262,14 @@ function makeDocxBlob(recipeList){
       (part.steps||[]).forEach(s=>{
         if (isSubLine(s)) {
           bodyXml+=`<w:p><w:pPr>${pBidi(s.sub)}${lineIndented(s)?IND:''}</w:pPr><w:r><w:rPr><w:b/><w:color w:val="C1440E"/>${rRtl(s.sub)}</w:rPr>`
-            + `<w:t>${esc(s.sub)}</w:t></w:r></w:p>`;
+            + `<w:t>${esc(noBold(s.sub))}</w:t></w:r></w:p>`;
           return;
         }
         wn++;
         var st = stepText(s);
         bodyXml+=`<w:p><w:pPr>${pBidi(st)}${lineIndented(s)?IND:''}</w:pPr>`
           + `<w:r><w:rPr><w:b/>${rRtl(st)}</w:rPr><w:t xml:space="preserve">${wn}. </w:t></w:r>`
-          + `<w:r><w:rPr>${rRtl(st)}</w:rPr><w:t>${esc(st)}</w:t></w:r></w:p>`;
+          + wRuns(st, rRtl(st)) + `</w:p>`;
       });
     });
 
@@ -23337,6 +23357,20 @@ function escH(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,
 // and never emits <br>, so a crafted value can't break out of the attribute.
 function escA(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
 window.escA = escA;
+// ─── BOLD WORDS IN A RECIPE (v38.87) ─────────────────────────────────────────
+// Tony, 24 Oct 2026: "Please create a "Bold" control, so I could mark words (either in the ingredients or Methods
+// areas) a BOLD. We should also be able to use the "CTRL+B" keyboard shortcut". A recipe line is plain text (an input,
+// a textarea), so a bold word is written **like this** — what WhatsApp and most notes apps understand — and the
+// recipe shows it bold: the view, a linked kitchen's, print, Word, e-mail, the shared page, the previews. Wherever a
+// line is matched or sent on as plain words (search, the pantry, Bring!, the AI) the marks are taken off (noBold);
+// shared as text, it becomes WhatsApp's *bold* (boldAs). escB = escH, then the marks into <strong> — escaped first,
+// so nothing in a recipe can become markup. A mark needs a word at each end: "a ** b" stays as typed.
+var BOLD_RE = /\*\*(?=\S)([\s\S]*?\S)\*\*/g;
+function boldHtml(html) { return String(html).replace(BOLD_RE, '<strong>$1</strong>'); }   // on text already escaped
+function escB(s) { return boldHtml(escH(s)); }
+function noBold(s) { return String(s == null ? '' : s).replace(BOLD_RE, '$1'); }
+function boldAs(s, mark) { return String(s == null ? '' : s).replace(BOLD_RE, mark + '$1' + mark); }
+window.escB = escB; window.noBold = noBold; window.boldAs = boldAs; window.boldHtml = boldHtml;
 // v37.95 — a value as a JavaScript STRING inside an on…="…" attribute. escA
 // alone is not enough there: the browser decodes &#39; back into ' before the
 // handler runs, so a value with a quote in it (a household identifier chosen
@@ -23581,7 +23615,7 @@ function applyParsedToFormPreview(parsed, resultDivId) {
   parsed.ingredients = _n.ingredients; parsed.steps = _n.steps;
   var enc = JSON.stringify(parsed).replace(/"/g, '&quot;');
   var ings = parsed.ingredients.map(function(i){
-    return '<div class="translate-ing-row"><span style="font-weight:500;color:var(--terracotta)">' + escH(i.a) + '</span><span>' + escH(i.n) + '</span></div>';
+    return '<div class="translate-ing-row"><span style="font-weight:500;color:var(--terracotta)">' + escB(i.a) + '</span><span>' + escB(i.n) + '</span></div>';
   }).join('');
   var steps = previewStepsHtml(parsed.steps);
   document.getElementById(resultDivId).innerHTML =
@@ -24251,7 +24285,7 @@ function applyParsedRecipe(parsed, resultDivId, overlayId, originalPhoto) {
   parsed.ingredients = _n.ingredients;
   parsed.steps = _n.steps;
   var ingsHtml = (parsed.ingredients||[]).map(function(i) {
-    return '<div class="translate-ing-row"><span style="font-weight:500;color:var(--terracotta)">' + escH(i.a) + '</span><span>' + escH(i.n) + '</span></div>';
+    return '<div class="translate-ing-row"><span style="font-weight:500;color:var(--terracotta)">' + escB(i.a) + '</span><span>' + escB(i.n) + '</span></div>';
   }).join('');
   var stepsHtml = previewStepsHtml(parsed.steps);
   if (originalPhoto) parsed._originalPhoto = originalPhoto;
@@ -30351,20 +30385,20 @@ function buildPrintHtml(list) {
     var ings = ingredientLines(r).map(function(i){
       if (isSubLine(i))
         return '<tr><td class="sub' + (lineIndented(i) ? ' ind' : '')
-          + '" dir="auto" colspan="2">' + escH(i.sub) + '</td></tr>';
+          + '" dir="auto" colspan="2">' + escB(i.sub) + '</td></tr>';
       return '<tr><td dir="auto" style="padding:4px 12px 4px 0;color:#C1440E;font-weight:600;white-space:nowrap;">'
-        + escH(i.a) + '</td><td dir="auto"' + (lineIndented(i) ? ' class="ind"' : '')
-        + ' style="padding:4px 0;">' + escH(i.n) + '</td></tr>';
+        + escB(i.a) + '</td><td dir="auto"' + (lineIndented(i) ? ' class="ind"' : '')
+        + ' style="padding:4px 0;">' + escB(i.n) + '</td></tr>';
     }).join('');
     var _pn = 0;
     var steps = stepLines(r).map(function(s){
       if (isSubLine(s)) return '<div class="sub' + (lineIndented(s) ? ' ind' : '')
-        + '" dir="auto">' + escH(s.sub) + '</div>';
+        + '" dir="auto">' + escB(s.sub) + '</div>';
       _pn++;
       return '<div style="display:flex;gap:12px;margin-bottom:10px;"'
         + (lineIndented(s) ? ' class="ind"' : '') + '>'
         + '<span style="min-width:26px;height:26px;background:#C1440E;color:white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;flex-shrink:0;">' + _pn + '</span>'
-        + '<span dir="auto">' + escH(stepText(s)) + '</span></div>';
+        + '<span dir="auto">' + escB(stepText(s)) + '</span></div>';
     }).join('');
     return '<div class="recipe">'
       + '<h1 dir="auto">' + escH(r.emoji) + ' ' + escH(r.name) + '</h1>'
@@ -30630,20 +30664,20 @@ function previewStepsHtml(steps) {
   return (steps || []).map(function(s) {
     if (isSubLine(s))
       return '<div class="translate-step" style="font-weight:700;color:var(--terracotta);'
-        + (lineIndented(s) ? 'padding-inline-start:18px;' : '') + '">' + escH(s.sub) + '</div>';
+        + (lineIndented(s) ? 'padding-inline-start:18px;' : '') + '">' + escB(s.sub) + '</div>';
     n++;
     return '<div class="translate-step"' + (lineIndented(s) ? ' style="padding-inline-start:18px;"' : '') + '>'
-      + '<span class="translate-step-num">' + n + '</span><span>' + escH(stepText(s)) + '</span></div>';
+      + '<span class="translate-step-num">' + n + '</span><span>' + escB(stepText(s)) + '</span></div>';
   }).join('');
 }
 function previewIngsHtml(ings) {
   return (ings || []).map(function(i) {
     if (isSubLine(i))
       return '<div class="translate-ing-row" style="font-weight:700;color:var(--terracotta);'
-        + (lineIndented(i) ? 'padding-inline-start:18px;' : '') + '">' + escH(i.sub) + '</div>';
+        + (lineIndented(i) ? 'padding-inline-start:18px;' : '') + '">' + escB(i.sub) + '</div>';
     return '<div class="translate-ing-row"' + (lineIndented(i) ? ' style="padding-inline-start:18px;"' : '') + '>'
-      + '<span style="font-weight:500;color:var(--terracotta)">' + escH(i.a) + '</span>'
-      + '<span>' + escH(i.n) + '</span></div>';
+      + '<span style="font-weight:500;color:var(--terracotta)">' + escB(i.a) + '</span>'
+      + '<span>' + escB(i.n) + '</span></div>';
   }).join('');
 }
 window.previewStepsHtml = previewStepsHtml; window.previewIngsHtml = previewIngsHtml;
@@ -30763,6 +30797,96 @@ function stepToolIndent(dir) {
 }
 window.stepToolSub = stepToolSub; window.stepToolIndent = stepToolIndent;
 window.stepLineRange = stepLineRange;
+
+// ─── B / Ctrl+B — BOLD IN THE EDITOR (v38.87) ────────────────────────────────
+// The field holds plain text, so bold is written as **…** (see BOLD_RE): B puts the marks round the selected words —
+// or round the word the cursor is in — and takes them off again when they are already bold, so the button undoes
+// itself. Several lines of the Method selected: each line on its own (a step is a line; a mark never spans two),
+// all bold already → none. Nothing selected and no word there: **** with the cursor between, to type in bold.
+// Done through insertText where the browser allows, so Ctrl+Z still undoes it.
+var _boldField = null;              // the last ingredient field or the Method — B acts there
+function boldFieldOk(el) { return !!(el && el.isConnected && el.matches && el.matches('#ingsRows input, #f-steps')); }
+document.addEventListener('focusin', function(e){ if (boldFieldOk(e.target)) _boldField = e.target; });
+function boldPut(el, a, b, text, selA, selB) {
+  var done = false;
+  try {
+    if (document.activeElement !== el) el.focus();
+    el.setSelectionRange(a, b);
+    done = document.execCommand && document.execCommand('insertText', false, text);
+  } catch (e) {}
+  if (!done || el.value.slice(a, a + text.length) !== text) {
+    el.value = el.value.slice(0, a) + text + el.value.slice(b);
+    try { el.dispatchEvent(new Event('input', { bubbles: true })); } catch (e) {}
+  }
+  try { el.setSelectionRange(selA, selB); } catch (e) {}
+  if (el.id === 'f-steps') { _stepCaret = selA; _stepCaretEnd = selB; }
+  return true;
+}
+// The bold span (**…**) of `line` that holds [s, e], or null
+function boldSpanAt(line, s, e) {
+  var re = new RegExp(BOLD_RE.source, 'g'), m;
+  while ((m = re.exec(line))) if (m.index <= s && e <= m.index + m[0].length) return { a: m.index, b: m.index + m[0].length, inner: m[1] };
+  return null;
+}
+function boldToggle(el, s, e) {
+  if (!el) return false;
+  var v = el.value;
+  if (s == null) { s = el.selectionStart; e = el.selectionEnd; }
+  if (s == null) return false;
+  if (e == null || e < s) e = s;
+  var ls = v.lastIndexOf('\n', s - 1) + 1, le = v.indexOf('\n', e > s && v.charAt(e - 1) === '\n' ? e - 1 : e);
+  if (le === -1) le = v.length;
+  // several lines: each line's words, bold or plain together
+  if (v.slice(s, e).replace(/\n$/, '').indexOf('\n') !== -1) {
+    var lines = v.slice(ls, le).split('\n');
+    var body = function(l){ var m = l.match(/^(\s*#\s*|\s*)([\s\S]*?)(\s*)$/); return { pre: m[1], w: m[2], post: m[3] }; };
+    var filled = lines.map(body).filter(function(x){ return x.w; });
+    var allBold = filled.length && filled.every(function(x){ return /^\*\*(?=\S)[\s\S]*?\S\*\*$/.test(x.w) && noBold(x.w) === x.w.slice(2, -2); });
+    var out = lines.map(function(l){
+      var x = body(l); if (!x.w) return l;
+      return x.pre + (allBold ? x.w.slice(2, -2) : '**' + noBold(x.w) + '**') + x.post;
+    }).join('\n');
+    return boldPut(el, ls, le, out, ls, ls + out.length);
+  }
+  var line = v.slice(ls, le), a = s - ls, b = e - ls;
+  // nothing selected: the word the cursor is in
+  if (a === b) {
+    var W = /[\p{L}\p{N}\p{M}'’\-]/u;
+    while (a > 0 && W.test(line.charAt(a - 1))) a--;
+    while (b < line.length && W.test(line.charAt(b))) b++;
+    if (a === b) {
+      if (line.slice(a - 2, a + 2) === '****') return boldPut(el, ls + a - 2, ls + a + 2, '', ls + a - 2, ls + a - 2);   // the empty pair back off
+      return boldPut(el, s, s, '****', s + 2, s + 2);                                                                  // type in bold
+    }
+  }
+  // a selection's spaces stay outside the marks
+  while (a < b && /\s/.test(line.charAt(a))) a++;
+  while (b > a && /\s/.test(line.charAt(b - 1))) b--;
+  // already bold: off (the selection in it, or exactly it with its marks)
+  var span = boldSpanAt(line, a, b) || (line.slice(a - 2, a) === '**' && line.slice(b, b + 2) === '**' ? { a: a - 2, b: b + 2, inner: line.slice(a, b) } : null);
+  if (span) return boldPut(el, ls + span.a, ls + span.b, span.inner, ls + span.a, ls + span.a + span.inner.length);
+  var words = noBold(line.slice(a, b));
+  return boldPut(el, ls + a, ls + b, '**' + words + '**', ls + a + 2, ls + a + 2 + words.length);
+}
+// The B buttons. They keep the field's focus (mousedown), but on a phone the field may have lost it: its last
+// selection is still on it (the Method's is remembered by rememberStepCaret).
+function boldTool(where) {
+  var el = where === 'steps' ? document.getElementById('f-steps') : (boldFieldOk(_boldField) && _boldField.id !== 'f-steps' ? _boldField : null);
+  if (!el) { toast(where === 'steps' ? 'Tap the words in the Method first, then B' : 'Tap the ingredient first, then B', 4000); return false; }
+  if (el.id === 'f-steps' && document.activeElement !== el) {
+    if (_stepCaret == null) return noStepLine();
+    return boldToggle(el, _stepCaret, _stepCaretEnd);
+  }
+  return boldToggle(el);
+}
+// Ctrl+B (⌘B on a Mac) in an ingredient or the Method — not the browser's own (Firefox: bookmarks)
+document.addEventListener('keydown', function (e) {
+  if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey || (String(e.key).toLowerCase() !== 'b' && e.code !== 'KeyB')) return;   // a Hebrew keyboard's key is נ
+  if (!boldFieldOk(e.target)) return;
+  e.preventDefault();
+  boldToggle(e.target);
+}, true);
+window.boldToggle = boldToggle; window.boldTool = boldTool;
 
 // ─── PHOTO SEARCH ─────────────────────────────────────────────────────────────
 var _photoSearchSelected = null;
@@ -31096,6 +31220,8 @@ var HELP_SYSTEM_PROMPT = [
   "- Notes field: personal tips, variations — shown as amber panel in view mode if not empty",
   "- Ingredients are a drag-and-drop table; use Tab to move between amount/name fields",
   "- Steps — one per line. The buttons above the Steps box: ▸ Sub-title (a heading line, no step number), ⇥ indent, ⇤ outdent. They act on the line your cursor is in — or on every line you select (select several lines first, then press). The lines stay selected, so you can press another button straight away. Sub-titles are never indented; ▸ Sub-title on lines that are all sub-titles turns them back into steps",
+  "- BOLD (v38.87): B — beside ▸ Sub-title above the Steps box, and beside + Add ingredient — or Ctrl+B (⌘B on a Mac) makes the selected words bold, or the word the cursor is in; pressed again on bold words, it takes the bold off. Several Method lines selected: each line bold (or, if all are, none). The editor shows bold words between two stars, **like this**; the recipe shows them bold — on the screen, printed, in Word, in an e-mail and on a shared page; shared as text (WhatsApp) they come out as *bold*. Search, the pantry and Bring! ignore the stars. A bold amount is still scaled and converted.",
+  "- SAVE / UPDATE RECIPE (v38.87): the button floats at the bottom of the editor, as ✕ does at its top — no need to scroll to the end to save.",
   "",
   "=== IMPORTING RECIPES ===",
   "Via ⇅ Imp/Exp → Import section:",
@@ -34884,12 +35010,12 @@ function openBringModal(recipeId) {
   var mult = (recipeId === viewId) ? viewMult : 1;
   var unit = (recipeId === viewId) ? viewUnit : 'metric';
   _bringScaledAmounts = allIngredients(r).map(function(ing) {
-    return scaleAmt(cvtIng(ing.a || '', unit), mult);
+    return scaleAmt(cvtIng(noBold(ing.a || ''), unit), mult);      // v38.87 — Bring! gets words, not bold marks
   });
   // Render ingredients as checkboxes — one per recipe line at first; the
   // same thing to buy is then combined into one line (v36.95).
   _bringLines = allIngredients(r).map(function(ing, i) {
-    return { name: ing.n, spec: _bringScaledAmounts[i] || ing.a || '', from: [i] };
+    return { name: noBold(ing.n), spec: _bringScaledAmounts[i] || noBold(ing.a || ''), from: [i] };
   });
   _bringCombined = null; _bringShowCombined = true;
   bringRenderList(true);                         // a new recipe: everything ticked
