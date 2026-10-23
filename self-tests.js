@@ -8101,6 +8101,14 @@ window.SELF_TESTS = [
         var list=document.getElementById('accessMembersList');
         if(!list || !list.querySelector('[onclick*=\'openFamilyChat("uB")\']')) throw new Error('no 💬 Chat beside Ben in Family Access');
         if(list.querySelectorAll('[onclick*="openFamilyChat"]').length!==1) throw new Error('a 💬 Chat beside a place kept for an address');
+        // v38.85 — and that place says why it has none (Tony: "why does Gal not have a Chat button?"), as a reader sees it and as the owner does
+        [false, true].forEach(function(owner){
+          _household.role=owner ? 'owner' : 'viewer'; renderAccessMembers();
+          var rows=Array.from(document.querySelectorAll('#accessMembersList .access-row'));
+          var waits=rows.filter(function(r){ return /hasn\u2019t signed in yet/.test(r.textContent); });
+          if(rows.length!==2 || waits.length!==1 || !/kept@/.test(waits[0].textContent)) throw new Error((owner ? 'the owner' : 'a reader')+': the place kept for an address does not say nobody has signed in with it — '+rows.map(function(r){ return r.textContent.trim(); }).join(' | '));
+        });
+        _household.role='viewer'; renderAccessMembers();
         householdRenderBar();
         var oc=document.getElementById('ownerChatBtn');
         if(!oc || oc.style.display==='none') throw new Error('no 💬 Chat beside the owner');
@@ -14594,7 +14602,10 @@ window.SELF_TESTS = [
        [/Terms of use and disclaimer/, 'About'],
        [/Get me out of here/, 'the kitchen rules page'],
        [/Ask a household to link/, 'the Link requests page'],
-       [/Will ask for Gmail permission/, 'the e-mail window']
+       [/Will ask for Gmail permission/, 'the e-mail window'],
+       // v38.85 — 👥 Family Access's lines for someone asking and for a place nobody has signed into yet
+       [/asks to add and change recipes/, 'Family Access: someone asking to add recipes'],
+       [/hasn\u2019t signed in yet/, 'Family Access: a place nobody has signed into yet']
        // The self-test screen was on this list until v36.53, when Tony decided
        // it stays English. The opposite is asserted further down.
       ].forEach(function(pair){
