@@ -934,6 +934,10 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
   as they were: the runner's annotations (escaping; test names and stand-in data only), v38.80's guards, v38.81's
   waits (Worker's own 429 = 60 s → capped 30 s; the manual search waits only ≤ 10 s), first snapshots silent, own
   messages silent, the stripped build (acorn) and the suite on it.
+- **Released: v38.82 (23 Oct 2026, 05:39 Israel time, on d0a11b7)** — every job success: Deploy the Worker (it ran
+  because its workflow changed: the same Worker v87, the photo keys not yet set — left as they were), Deploy to
+  GitHub Pages, Publish languages, Translate new phrases (the sound's words), Self Tests on main and test, Cloudflare
+  Pages (community and test copies).
 - **Photo libraries' keys (23 Oct, Tony: "Yes, set it up for the Pexels and Unsplash keys"):** deploy-worker.yml now
   sets the Worker's `PEXELS_API_KEY` and `UNSPLASH_ACCESS_KEY` from GitHub secrets of the same names (unset → left as
   it is). After Tony adds them: dispatch **Deploy the Worker** on `main` (workflow_dispatch) and check health
