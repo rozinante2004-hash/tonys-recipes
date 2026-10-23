@@ -1,7 +1,7 @@
 {
  "lang": "ar",
- "updatedAt": 1792778591252,
- "count": 2388,
+ "updatedAt": 1792780592973,
+ "count": 2389,
  "strings": {
   "\"Add to Home Screen\"": "إضافة إلى الشاشة الرئيسية",
   "\"Open Bring!\"": "فتح Bring!",
@@ -144,6 +144,7 @@
   "Between {1} and {2} minutes apart, picked at random, counted while the app is open.": "بين {1} و{2} دقيقة، تُختار عشوائيًا، وتُحسب أثناء فتح التطبيق فقط.",
   "Block": "حظر",
   "Blue instead of green and orange instead of red wherever a colour says something (all right / a problem / something new) — the colours a red–green colour-blind eye tells apart. On this device.": "أزرق بدل الأخضر وبرتقالي بدل الأحمر أينما يعبّر لون عن شيء (كل شيء تمام / مشكلة / جديد) — ألوان يميّزها من يعاني من عمى الألوان الأحمر–الأخضر. على هذا الجهاز.",
+  "Blue instead of green and orange instead of red wherever a colour says something (all right / a problem / something new), and recipe photos colour-corrected so red and green food can be told apart. On this device.": "أزرق بدلاً من أخضر وبرتقالي بدلاً من أحمر في كل مكان يعبّر فيه اللون عن شيء (كل شيء تمام / مشكلة / شيء جديد)، وصور الوصفات معدّلة الألوان حتى يمكن تمييز الطعام الأحمر عن الأخضر. على هذا الجهاز.",
   "Bramble the sheepdog": "برامبل كلب الراعي",
   "Breakfast": "فطور",
   "Bring!": "Bring!",

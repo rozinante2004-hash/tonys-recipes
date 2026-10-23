@@ -1,7 +1,7 @@
 {
  "lang": "he",
- "updatedAt": 1792778591252,
- "count": 2929,
+ "updatedAt": 1792780592973,
+ "count": 2930,
  "strings": {
   "\"Add to Home Screen\"": "הוספה למסך הבית",
   "\"One item away\" filter ({1}f.{2})": "פילטר \"פריט אחד חסר\" ({1}f.{2})",
@@ -223,6 +223,7 @@
   "Between {1} and {2} minutes apart, picked at random, counted while the app is open.": "בין {1} ל-{2} דקות, נבחר אקראית, נספר כל עוד האפליקציה פתוחה.",
   "Block": "חסום",
   "Blue instead of green and orange instead of red wherever a colour says something (all right / a problem / something new) — the colours a red–green colour-blind eye tells apart. On this device.": "כחול במקום ירוק וכתום במקום אדום בכל מקום שצבע אומר משהו (הכול בסדר / יש בעיה / משהו חדש) — הצבעים שעין עם עיוורון צבעים אדום-ירוק מבדילה ביניהם. במכשיר הזה.",
+  "Blue instead of green and orange instead of red wherever a colour says something (all right / a problem / something new), and recipe photos colour-corrected so red and green food can be told apart. On this device.": "כחול במקום ירוק וכתום במקום אדום בכל מקום שבו צבע אומר משהו (הכול בסדר / יש בעיה / משהו חדש), ותמונות המתכונים מתוקנות בצבע כדי שאפשר יהיה להבחין בין אוכל אדום לירוק. במכשיר הזה.",
   "Bramble the sheepdog": "ברמבל, כלב הרועים",
   "Breakfast": "ארוחת בוקר",
   "Bring!": "Bring!",

@@ -1,7 +1,7 @@
 {
  "lang": "ru",
- "updatedAt": 1792778591252,
- "count": 2719,
+ "updatedAt": 1792780592973,
+ "count": 2720,
  "strings": {
   "\"Add to Home Screen\"": "Добавить на главный экран",
   "\"One item away\" filter ({1}f.{2})": "Фильтр «Не хватает одного» ({1}ф.{2})",
@@ -207,6 +207,7 @@
   "Between {1} and {2} minutes apart, picked at random, counted while the app is open.": "От {1} до {2} минут, выбирается случайно и отсчитывается, пока приложение открыто.",
   "Block": "Заблокировать",
   "Blue instead of green and orange instead of red wherever a colour says something (all right / a problem / something new) — the colours a red–green colour-blind eye tells apart. On this device.": "Синий вместо зелёного и оранжевый вместо красного везде, где цвет что-то означает (всё хорошо / проблема / что-то новое) — цвета, которые различает глаз при красно-зелёной цветовой слепоте. На этом устройстве.",
+  "Blue instead of green and orange instead of red wherever a colour says something (all right / a problem / something new), and recipe photos colour-corrected so red and green food can be told apart. On this device.": "Синий вместо зелёного и оранжевый вместо красного везде, где цвет что-то означает (всё в порядке / проблема / что-то новое), а фото рецептов скорректированы по цвету, чтобы можно было отличить красную еду от зелёной. На этом устройстве.",
   "Bramble the sheepdog": "Овчарка Брэмбл",
   "Breakfast": "Завтрак",
   "Bring!": "Bring!",

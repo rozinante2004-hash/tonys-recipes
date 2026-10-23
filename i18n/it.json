@@ -1,7 +1,7 @@
 {
  "lang": "it",
- "updatedAt": 1792778591252,
- "count": 2268,
+ "updatedAt": 1792780592973,
+ "count": 2269,
  "strings": {
   "\"Add to Home Screen\"": "Aggiungi a Home",
   "\"Open Bring!\"": "Apri Bring!",
@@ -137,6 +137,7 @@
   "Between {1} and {2} minutes apart, picked at random, counted while the app is open.": "Tra {1} e {2} minuti di distanza, scelti a caso, contati mentre l'app è aperta.",
   "Block": "Blocca",
   "Blue instead of green and orange instead of red wherever a colour says something (all right / a problem / something new) — the colours a red–green colour-blind eye tells apart. On this device.": "Blu al posto del verde e arancione al posto del rosso ovunque un colore comunichi qualcosa (tutto ok / un problema / qualcosa di nuovo) — i colori che un occhio daltonico rosso-verde riesce a distinguere. Su questo dispositivo.",
+  "Blue instead of green and orange instead of red wherever a colour says something (all right / a problem / something new), and recipe photos colour-corrected so red and green food can be told apart. On this device.": "Blu al posto del verde e arancione al posto del rosso ovunque un colore indichi qualcosa (tutto ok / un problema / qualcosa di nuovo), e foto delle ricette corrette nei colori per distinguere cibi rossi e verdi. Su questo dispositivo.",
   "Bramble the sheepdog": "Bramble il cane da pastore",
   "Breakfast": "Colazione",
   "Bring!": "Bring!",

@@ -1,7 +1,7 @@
 {
  "lang": "ja",
- "updatedAt": 1792778591252,
- "count": 2729,
+ "updatedAt": 1792780592973,
+ "count": 2730,
  "strings": {
   "\"Add to Home Screen\"": "ホーム画面に追加",
   "\"One item away\" filter ({1}f.{2})": "「あと1品」フィルター（{1}f.{2}）",
@@ -209,6 +209,7 @@
   "Between {1} and {2} minutes apart, picked at random, counted while the app is open.": "{1}分から{2}分の間でランダムに決まります。アプリを開いている間だけカウントされます。",
   "Block": "ブロック",
   "Blue instead of green and orange instead of red wherever a colour says something (all right / a problem / something new) — the colours a red–green colour-blind eye tells apart. On this device.": "色で意味を伝える場面すべてで、緑の代わりに青、赤の代わりにオレンジを使います（OK・問題あり・新着など）。赤緑色覚の人でも見分けやすい色です。この端末のみ。",
+  "Blue instead of green and orange instead of red wherever a colour says something (all right / a problem / something new), and recipe photos colour-corrected so red and green food can be told apart. On this device.": "色が何かを意味する場面(問題なし/問題あり/新着)では、緑の代わりに青、赤の代わりにオレンジを使用します。レシピ写真も赤と緑の食材を見分けやすいよう色調整されます。この端末のみ。",
   "Bramble the sheepdog": "牧羊犬のブランブル",
   "Breakfast": "朝食",
   "Bring!": "Bring!",

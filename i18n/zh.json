@@ -1,7 +1,7 @@
 {
  "lang": "zh",
- "updatedAt": 1792778591252,
- "count": 2415,
+ "updatedAt": 1792780592973,
+ "count": 2416,
  "strings": {
   "\"Add to Home Screen\"": "添加到主屏幕",
   "\"Open Bring!\"": "打开 Bring!",
@@ -144,6 +144,7 @@
   "Between {1} and {2} minutes apart, picked at random, counted while the app is open.": "间隔{1}到{2}分钟，随机选取，仅在应用打开时计时。",
   "Block": "屏蔽",
   "Blue instead of green and orange instead of red wherever a colour says something (all right / a problem / something new) — the colours a red–green colour-blind eye tells apart. On this device.": "但凡颜色表示状态（正常／有问题／有新内容），一律蓝色代替绿色、橙色代替红色——红绿色盲也能分辨的颜色。仅限本设备。",
+  "Blue instead of green and orange instead of red wherever a colour says something (all right / a problem / something new), and recipe photos colour-corrected so red and green food can be told apart. On this device.": "用蓝色代替绿色、橙色代替红色来表示状态（正常／有问题／新内容），并对菜谱照片进行颜色校正，以便区分红色和绿色的食物。仅限本设备。",
   "Bramble the sheepdog": "牧羊犬布兰博",
   "Breakfast": "早餐",
   "Bring!": "Bring!",
