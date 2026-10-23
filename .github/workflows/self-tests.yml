@@ -311,6 +311,12 @@ jobs:
       - name: Phone chrome budget (390x844)
         run: node tests/phone-chrome.js --port 8137
 
+      # v38.84 — Tony's iPhone: 👥 Family Access drew Chat over the names and put ✕ outside the cards, and the owner's
+      # 📊 Households took the whole page sideways. Both stand-in-staged at 390, 360 and 1280 px, dark and light:
+      # nothing outside its card, a name with room, no sideways scroll, in every tab.
+      - name: Windows fit a phone (Family Access, Households)
+        run: node tests/phone-fit.js --port 8137
+
       # v38.48 — Tony, as a new tester: a double-click on "Let's cook!" opened the
       # Free-hand window, its second click landing on "Paste the text" under the box.
       # The guard only holds back REAL clicks, which no self-test can make — so a

@@ -7883,12 +7883,20 @@ window.SELF_TESTS = [
           var left=signals().filter(function(x){ return redOrGreen(x[1]); });
           if(left.length) throw new Error('in '+th+', still red or green: '+left.map(function(x){ return x[0]+' '+JSON.stringify(x[1]); }).join('; '));
         });
+        // v38.84 — and the PHOTOS are corrected (Tony: "hardly any difference … nor almost any color-blind assistance"):
+        // the daltonising filter, on a recipe's photo and not on the app's own controls.
+        var f=document.querySelector('#mknCvdFilter feColorMatrix');
+        if(!f || !/^1 0 0 0 0\s+0\.16279/.test(f.getAttribute('values'))) throw new Error('the colour-correction filter is missing or not the daltonising one');
+        var pic=el('<div class="card-image"><img alt=""></div>').querySelector('img');
+        if(!/mknCvdFilter/.test(getComputedStyle(pic).filter)) throw new Error('a recipe photo is not corrected: '+getComputedStyle(pic).filter);
+        if(getComputedStyle(root).filter!=='none') throw new Error('the whole screen is filtered (it greyed the app’s own buttons): '+getComputedStyle(root).filter);
         // The dot turns blue inside its yellow ring.
         root.setAttribute('data-theme','light');
         var d=hue(rgb(getComputedStyle(dot).backgroundColor));
         if(!(d.h>195&&d.h<235)) throw new Error('the dot is not blue in the red–green colours: '+getComputedStyle(dot).backgroundColor);
         cvdSet(false);
         if(root.hasAttribute('data-cvd')||cvdOn()) throw new Error('the usual colours did not come back');
+        if(getComputedStyle(pic).filter!=='none') throw new Error('turned off, the photos are still corrected');
       } finally {
         made.forEach(function(d){ d.remove(); });
         [CVD_KEY, DOT_RING_KEY].forEach(function(k){ try{ if(keep[k]==null) localStorage.removeItem(k); else localStorage.setItem(k, keep[k]); }catch(e){} });

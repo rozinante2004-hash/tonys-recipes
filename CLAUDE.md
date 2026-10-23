@@ -107,7 +107,8 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
   (23:04) — all jobs green (one Self Tests job on main re-run); **v38.80 — the Self Test in the owner's own browser**
   (23 Oct 00:46) and **v38.81 — auto-fetch waits out a busy Pixabay** (01:00) — all jobs green (see their notes);
   **v38.82 — 🔔 a kitchen sound when a message or request arrives, with a mute** (23 Oct; see its note and the audit);
-  **v38.83 — ♿ Accessibility: red–green colours, a yellow ring round the dots** (23 Oct; see its note).
+  **v38.83 — ♿ Accessibility: red–green colours, a yellow ring round the dots** (23 Oct, 21:00; see its note);
+  **v38.84 — the photos colour-corrected for red–green; Family Access and Households fit a phone** (see its note).
   **Worker v87.** The test copy (https://tonys-recipes-test.pages.dev, its own database) follows `test`.
 - **The testers go live on Sunday 25 Oct 2026** (Tony: "The plan is to start sending invitations to the testers
   this Sunday"). The community app is **by invitation only** (Tony switched it, 20 Oct): only addresses invited with
@@ -963,6 +964,30 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
   `sound.muted|glass|bell|pot`, and `cvd-on/off` (labels in manage.js). Self-test `accessibility_section` measures the
   drawn colours: no signal left red or green in light or dark (and that the usual colours HAD some). Translation:
   harvested (the two switch toasts in I18N_EXTRA). Help: a ♿ ACCESSIBILITY line; Settings' sections list.
+- **Released: v38.83 (23 Oct 2026, 21:00 Israel time, on 3f37e0a)** — every job success (Deploy to GitHub Pages,
+  Publish languages, Translate new phrases, Self Tests on main and test, Cloudflare Pages for both copies).
+- **v38.84 — the red–green colours correct the photos; 👥 Family Access and 👑 📊 Households fit a phone** (Tony, 23 Oct,
+  with screenshots: colour-blind on and off "hardly any difference … nor almost any color-blind assistance"; Family
+  Access and Households on his iPhone "messy and do not fit the screen. Please adjust them to a mobile use as well as
+  the PC one. On the PC it looks very good"). **Colours:** the signal swap alone changed little on the main screen —
+  its colour is the food photos. The photos (`.card-image img`, `.recipe-list-thumb img`, `.modal-hero img`,
+  `#photoSearchGrid img`) now get `filter: url(#mknCvdFilter)`: an SVG feColorMatrix (in `<body>`, linear RGB) =
+  daltonisation (Fidaner et al. on the Machado 2009 deuteranopia model): C = I + M(I − S), M = [[0,0,0],[.7,1,0],[.7,0,1]].
+  ΔE as such an eye sees it: tomato/lettuce 11.8 → 50.2, red/green pepper 12.3 → 44.2, the old red/green signals
+  5.8 → 45.0. Tried on the whole screen first: it greyed the app's own buttons (+ Add Recipe lost its pull, seen in a
+  simulation), so photos only. Help names the phones' own filters (iPhone: Settings → Accessibility → Display & Text
+  Size → Color Filters → Red/Green; Android: Accessibility → Color correction). The self-test checks the filter's
+  numbers, that a photo gets it and the root does not, and that it goes when turned off. **Family Access:** at ≤ 600 px a
+  row wraps (name and address on the first line, buttons under; `white-space:nowrap` on its buttons; a person's ✕ in
+  the card's corner, `.access-x`); the row of someone asking to add recipes wraps on a computer too (`.access-asks`:
+  it did not fit there either); the modal is 640 px on a computer (was 520: a long name had 80 px); a linked kitchen's
+  💬 Chat is a plain button (`access-role-btn`; it looked like a delete button and was unreadable in dark); the "How it
+  works" boxes use --linked-bg/--linked-border/--info-text (they were pale literals, light in dark mode). **Households
+  (manage.js):** tabs wrap (they ran off the screen and took the page sideways — 479 px on a 390 px phone); at ≤ 700 px
+  the search box fits, the table `mg-hh` becomes one card per household (each cell with `data-label`, shown by
+  `::before`), with a "Sort by" menu (`mknManage.sortTo('key:dir')`) for the hidden headers; the details' Extras wrap.
+  The computer keeps the table. **CI:** tests/phone-fit.js stages both windows with stand-ins at 390, 360 and 1280 px,
+  dark and light, and fails on anything outside its card, a name under 120 px, or a sideways scroll in any tab.
 - **Photo keys, 23 Oct:** Pexels: "New API key issuance is currently paused and cannot be requested" (Tony); Unsplash:
   "We can forego unsplash for now" (Tony). Photos stay Pixabay + Wikimedia Commons; the workflow is ready if a key
   ever comes (secrets PEXELS_API_KEY / UNSPLASH_ACCESS_KEY, then dispatch Deploy the Worker).

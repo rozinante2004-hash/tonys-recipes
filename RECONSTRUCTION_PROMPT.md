@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v38.83` — app. **Worker: v87**, deployed separately and versioned separately
+**Current version:** `v38.84` — app. **Worker: v87**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -737,8 +737,15 @@ person's own: tests that empty or write it put it back exactly.
 🟡 A yellow ring round the notification dots (box-shadow in --dot-ring; on unless `mkn_dot_ring`='off'). 🌗 Theme and the
 arrival sound live here too. Colours that say something are tokens, never literals — the self-test measures that none
 is left red or green in the colour-blind set.
+The same setting colour-corrects the recipe PHOTOS (v38.84): `filter:url(#mknCvdFilter)`, an SVG feColorMatrix in
+<body> — daltonisation for deuteranopia (C = I + M(I − S), linear RGB); not the whole screen (it greyed the app's own
+buttons). Phones' own filters are named in Help for the whole phone.
 
-**State on 23 Oct 2026 (v38.83, Worker v87):** testers are invited from Sunday 25 Oct; from then on every
+**Phone layouts (v38.84):** 👥 Family Access rows wrap below 600 px (name first, buttons under, ✕ in the card's corner);
+the 👑 📊 Households table is cards below 700 px (cells with data-label) with a Sort-by menu; the tabs wrap. CI
+tests/phone-fit.js measures both at 390/360/1280 px.
+
+**State on 23 Oct 2026 (v38.84, Worker v87):** testers are invited from Sunday 25 Oct; from then on every
 release waits for the owner's yes. The community app is by invitation only; "Share this App with family" goes back
 to "Share this App" at the official launch. Open: WhatsApp (CallMeBot was full), the AI models after the launch, the testing
 tools' update (Playwright, Ubuntu 26.04) after launch week, a lighter first screen.

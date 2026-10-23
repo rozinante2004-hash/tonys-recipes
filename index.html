@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v38.83 -->
+<!-- Tony's Recipes Collection v38.84 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -4658,7 +4658,7 @@ function renderAccessMembers() {
       '<div class="access-info"><div class="access-name" data-no-i18n>' + escH(m.name||m.email.split('@')[0]) + '</div>' +
       '<div class="access-email" data-no-i18n>' + escH(m.email) + '</div></div>' + chatBtn +
       '<div class="access-badge">' + roleLabels[m.role] + '</div></div>';
-    return '<div class="access-row">' +
+    return '<div class="access-row' + (m.asks ? ' access-asks' : '') + '">' +
       '<div class="access-avatar">' + escH(m.email[0].toUpperCase()) + '</div>' +
       // Same reason as the owner row above: names and addresses are data.
       // Escaped (v36.60) — the only unescaped data the audit's scan found.
@@ -4673,7 +4673,7 @@ function renderAccessMembers() {
       '</select>' +
       // v37.09 — send the note again whenever it is needed (Tony: one try is not enough)
       '<button class="access-role-btn" title="Send this person a note about the app" onclick="notifyAccessMember(' + i + ')" style="margin-right:4px;">✉️ Notify</button>' +
-      '<button class="access-remove-btn" onclick="removeAccessMember(' + i + ')">✕</button>' +
+      '<button class="access-remove-btn access-x" data-i18n-skip-attrs="aria-label" aria-label="Remove ' + escA(m.name || m.email) + '" onclick="removeAccessMember(' + i + ')">✕</button>' +
       '</div>';
   }).join('');
   updateAccessRules();
@@ -6715,7 +6715,7 @@ function hhLinksHtml() {
         return '<div class="access-row" style="margin-top:6px;"><div class="access-avatar">\u{1F91D}</div>'
           + '<div class="access-info"><div class="access-name" data-no-i18n>' + escH(hhLinkName(l)) + '</div>'
           + '<div class="access-email" data-no-i18n dir="ltr">' + escH(l.code || '') + '</div></div>'
-          + '<button class="access-remove-btn" style="color:var(--heading);border-color:var(--border);margin-inline-end:6px;" onclick="openKitchenChats(' + jsA(l.hid) + ')">\u{1F4AC} Chat</button>'   // v38.50
+          + '<button class="access-role-btn" style="margin-inline-end:6px;" onclick="openKitchenChats(' + jsA(l.hid) + ')">\u{1F4AC} Chat</button>'   // v38.50 (v38.84: the plain button, not a delete-looking one)
           + (manage ? '<button class="access-remove-btn" onclick="hhRemoveLink(' + i + ')">Remove the link</button>' : '') + '</div>';
       }).join('')
     + asking.map(function(a, i) {
@@ -9336,7 +9336,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v38.83';
+var APP_VERSION = 'v38.84';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -10078,6 +10078,15 @@ window.addEventListener('unhandledrejection', function(e) {
   --dot-new:     #4D8FE8;
   --sig-ok:      #6FA8F0;  --sig-bad:     #F5A35C;
 }
+/* v38.84 — Tony, 23 Oct (a screenshot with it on and one with it off): "There is hardly any difference between them,
+   nor almost any color-blind assistance." Most of the colour on the main screen is the food photos, and the signal
+   colours alone left them as they were — where red against green matters most (a ripe tomato, a green pepper). So the
+   PHOTOS are corrected too, as a phone's own colour filter would (#mknCvdFilter): to such an eye tomato red against
+   lettuce green goes from a ΔE of about 12 (hard to tell) to about 50. Measured and seen in a simulation: on the whole
+   screen it also greyed the app's own buttons (+ Add Recipe lost its pull), so it is the photos only; the controls
+   have the blue/orange signal colours above, made for that eye. */
+:root[data-cvd="rg"] .card-image img, :root[data-cvd="rg"] .recipe-list-thumb img, :root[data-cvd="rg"] .modal-hero img,
+:root[data-cvd="rg"] #photoSearchGrid img { filter: url(#mknCvdFilter); }
 /* (written for dark too: the dark theme's own .easy and .hard come later in this sheet) */
 :root[data-cvd="rg"] .easy, :root[data-theme][data-cvd="rg"] .easy { background: var(--ok-bg); color: var(--ok-text); }
 :root[data-cvd="rg"] .hard, :root[data-theme][data-cvd="rg"] .hard { background: #F7CFA6; color: #6E2E00; }
@@ -12375,6 +12384,22 @@ body.banner-shown .header {
 
 /* ── ACCESS CONTROL ── */
 .access-row { display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;border:1px solid var(--border);margin-bottom:6px;background:var(--card-bg); }
+/* v38.84 — Tony's iPhone (390 px): six things in one line — the name shrank to nothing, 💬 Chat was drawn over it,
+   and ✕ and the role menu stood outside the card. On a phone the name and address have the first line, and the buttons
+   go under them (wrapping again if they must); a button's words never break into two lines. */
+.access-role-btn, .access-remove-btn { white-space: nowrap; }
+/* …and, on a computer too, the row of someone who asks to add and change recipes (✅ Allow and Decline as well): it
+   did not fit either — the name had no room left (v38.84). */
+.access-row.access-asks { flex-wrap: wrap; row-gap: 8px; }
+.access-row.access-asks > .access-info { flex: 1 1 calc(100% - 48px); }
+@media (max-width: 600px) {
+  .access-row { flex-wrap: wrap; row-gap: 8px; position: relative; }
+  .access-row > .access-info { flex: 1 1 calc(100% - 48px); }
+  .access-row > .access-remove-btn:last-child { margin-inline-start: auto; }
+  /* a person's ✕ in the card's corner, as on a phone's own lists, not alone on a line of its own */
+  .access-row > .access-x { position: absolute; top: 8px; inset-inline-end: 8px; }
+  .access-row:has(> .access-x) > .access-info { padding-inline-end: 30px; }
+}
 .access-avatar { width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;background:var(--bg); }
 .access-info { flex:1;min-width:0; }
 .access-name { font-size:13px;font-weight:600;color:var(--ink); }
@@ -12398,6 +12423,14 @@ body.banner-shown .header {
 
 </head>
 <body>
+<!-- v38.84 — the colour correction for red–green colour blindness: what such an eye cannot tell apart
+     (red from green) is moved into what it can (blue and yellow) — the daltonisation of Fidaner et al. on the Machado 2009
+     deuteranopia model, in linear RGB. Used on the recipe photos when ⚙️ → ♿ Accessibility → 🎨 red–green colours is on. -->
+<svg id="mknCvdSvg" width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute;width:0;height:0;overflow:hidden;" data-no-i18n>
+  <filter id="mknCvdFilter" color-interpolation-filters="linearRGB">
+    <feColorMatrix type="matrix" values="1 0 0 0 0  0.162790 0.725047 0.112165 0 0  0.454695 -0.645392 1.190697 0 0  0 0 0 1 0"/>
+  </filter>
+</svg>
 <!-- 5c.1c — it takes ~67 tab presses to walk the header, filters and view
      controls before reaching the first recipe. That is not a keyboard path,
      it is an endurance test. This jumps straight there and is invisible until
@@ -12427,7 +12460,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.83</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.84</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -12515,7 +12548,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.83</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.84</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -12564,7 +12597,7 @@ body.banner-shown .header {
           <div class="set-group" data-group="access">
             <button type="button" class="drop-item set-head" aria-expanded="false" title="Colours for red–green colour blindness, the ring round the notification dots, light or dark, and the sound when something arrives — on this device." onclick="settingsGroup('access')">♿ Accessibility</button>
             <div class="set-body">
-              <label class="drop-item" id="cvdToggleItem" title="Blue instead of green and orange instead of red wherever a colour says something (all right / a problem / something new) — the colours a red–green colour-blind eye tells apart. On this device." style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" id="cvdToggle" onchange="cvdSet(this.checked)" style="width:18px;height:18px;flex:none;accent-color:var(--terracotta);"> 🎨 Colours for red–green colour blindness</label>
+              <label class="drop-item" id="cvdToggleItem" title="Blue instead of green and orange instead of red wherever a colour says something (all right / a problem / something new), and recipe photos colour-corrected so red and green food can be told apart. On this device." style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" id="cvdToggle" onchange="cvdSet(this.checked)" style="width:18px;height:18px;flex:none;accent-color:var(--terracotta);"> 🎨 Colours for red–green colour blindness</label>
               <label class="drop-item" id="dotRingToggleItem" title="A yellow ring round each notification dot, so a new message or request catches the eye. On this device." style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" id="dotRingToggle" checked onchange="dotRingSet(this.checked)" style="width:18px;height:18px;flex:none;accent-color:var(--terracotta);"> 🟡 A yellow ring round the notification dots</label>
               <button class="drop-item" title="Light, dark, or following the device — on this device only." id="themeModeItem" onclick="cycleTheme()">🌗 Theme: Auto</button>
               <label class="drop-item" id="chimeToggleItem" title="A sound when a message or a request to link kitchens arrives. Untick to mute it. On this device." style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" id="chimeToggle" checked onchange="chimeSetOn(this.checked)" style="width:18px;height:18px;flex:none;accent-color:var(--terracotta);"> 🔔 Sound for messages and requests</label>
@@ -31048,7 +31081,7 @@ var HELP_SYSTEM_PROMPT = [
   "- 📬 LINK REQUESTS: ⚙️ → 🏠 My household → 📬 Link requests — the number in brackets beside it is how many wait for an answer. Every request in one place: Waiting (Accept / Reject / 🚫 Block), Sent by your household (Withdraw), Linked now (Revoke access), and earlier answers. A request may carry a note, and the two households can write to each other there — the latest message shows, highlighted, with ↩ Reply; earlier ones are under 💬 Conversation. Only the household's name is shown, never a person's. Reject is for now: if they ask again — by identifier or by e-mail — their request is back under Waiting. 🚫 Block is for good, until you Unblock it under the earlier answers; they are never told, and on their side it reads “waiting”. A new message or request arrives while the app is open: a red dot (and a short notice with Open) within seconds, no reload needed. A red dot on ⚙️ leads to anything new. The switch there decides whether other households may ask through the app at all.",
   "- 👪 CHAT WITH FAMILY MEMBERS (the people in YOUR household only): ⋯ More → 👪 Chat with family members — or 💬 Chat beside a person in 👥 Family Access. 📣 Everyone in <your kitchen> is the room for announcements: everyone in the household reads it. Or choose one person: only the two of you read that conversation. Everyone in the household can write, readers too. Messages arrive live: a short notice with Open, and a red dot on ⋯ More until you have read them. Nothing is changed or deleted afterwards; deleting the household deletes them.",
   "- 💬 CHATS WITH LINKED KITCHENS: ⋯ More → 💬 Chats with linked kitchens — or 💬 Chat beside a linked kitchen's name in your recipe list, or in 👥 Family Access. Every conversation, newest first, with what is new; open one to read it all and write (Enter sends, Shift+Enter starts a new line). The same conversations are also on 📬 Link requests. A red dot on ⋯ More and on ⚙️ says something new arrived.",
-  "- ♿ ACCESSIBILITY: ⚙️ → ♿ Accessibility, on this device: 🎨 Colours for red–green colour blindness (the most common colour blindness, where reds and greens look alike, brownish): wherever a colour says something, green becomes blue and red becomes a deep orange — all right / a problem, the sync dot, Easy and Hard, the Self Test's results, delete buttons — and a notification dot turns blue inside its ring; photos and the farm keep their colours. 🟡 A yellow ring round the notification dots (on unless turned off) so a new message or request catches the eye, on ⋯ More and in ⚙️. 🌗 Theme: light, dark, or as the device. 🔔 the sound when something arrives, and 🎵 which sound.",
+  "- ♿ ACCESSIBILITY: ⚙️ → ♿ Accessibility, on this device: 🎨 Colours for red–green colour blindness (the most common colour blindness, where reds and greens look alike, brownish): wherever a colour says something, green becomes blue and red becomes a deep orange — all right / a problem, the sync dot, Easy and Hard, the Self Test's results, delete buttons — and a notification dot turns blue inside its ring; and the recipe photos are colour-corrected, so a red tomato and a green pepper no longer look alike (they look a little different to everyone else). For the whole phone, an iPhone has its own: Settings → Accessibility → Display & Text Size → Color Filters → Red/Green Filter; Android: Settings → Accessibility → Color correction. 🟡 A yellow ring round the notification dots (on unless turned off) so a new message or request catches the eye, on ⋯ More and in ⚙️. 🌗 Theme: light, dark, or as the device. 🔔 the sound when something arrives, and 🎵 which sound.",
   "- 🔔 A SOUND WHEN SOMETHING ARRIVES: a message (from a linked kitchen, from your family, an answer to your note) taps twice; a request to link kitchens taps three times. Choose the sound — 🥂 Spoon on a wine glass, 🛎️ The kitchen’s service bell, 🥄 Wooden spoon on a pot, each with ▶ to hear it — in ⚙️ → ♿ Accessibility → 🎵 The sound; untick 🔔 Sound for messages and requests to mute it. On this device only. Browsers keep a page silent until it has been touched once since opening, so a message that arrives before that is not heard. On a phone it plays at the media volume; an iPhone on silent (the switch on its side) plays no sound.",
   "- A household's identifier works only within the same copy of the app: the family's copy and My Kitchen Notes keep their households apart.",
   "",
@@ -36591,7 +36624,8 @@ window.onHeaderScroll = onHeaderScroll;
 
 <!-- ACCESS CONTROL MODAL -->
 <div class="modal-overlay" id="accessOverlay" onclick="bgClose(event,'accessOverlay')">
-  <div class="modal" style="max-width:520px;">
+  <!-- v38.84 — 640 px on a computer (was 520): a long name had 80 px beside Chat, the role and Notify, and was cut off -->
+  <div class="modal" style="max-width:640px;">
     <div style="position:sticky;top:8px;display:flex;justify-content:flex-end;padding:0 8px;z-index:20;pointer-events:none;">
       <button onclick="closeM('accessOverlay')" style="pointer-events:auto;width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,0.95);border:none;cursor:pointer;font-size:16px;color:var(--warm-brown);display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,0.25);flex-shrink:0;">✕</button>
     </div>
@@ -36653,13 +36687,13 @@ window.onHeaderScroll = onHeaderScroll;
       </div>
 
       <!-- How it works note -->
-      <div data-layout-only="households" style="margin-top:12px;padding:10px 12px;background:#EEF6FF;border-radius:8px;border:1px solid #C0D8F0;">
-        <div style="font-size:12px;color:#2255AA;line-height:1.6;">
+      <div data-layout-only="households" style="margin-top:12px;padding:10px 12px;background:var(--linked-bg);border-radius:8px;border:1px solid var(--linked-border);">
+        <div style="font-size:12px;color:var(--info-text);line-height:1.6;">
           <strong>How it works:</strong> add someone's e-mail address and they join the moment they sign in — or send an <strong>invitation link</strong>. Everyone in the household sees the same recipes, and a change here takes effect at once: there is nothing to publish.
         </div>
       </div>
-      <div data-layout-only="shared" style="margin-top:12px;padding:10px 12px;background:#EEF6FF;border-radius:8px;border:1px solid #C0D8F0;">
-        <div style="font-size:12px;color:#2255AA;line-height:1.6;">
+      <div data-layout-only="shared" style="margin-top:12px;padding:10px 12px;background:var(--linked-bg);border-radius:8px;border:1px solid var(--linked-border);">
+        <div style="font-size:12px;color:var(--info-text);line-height:1.6;">
           <strong>How it works:</strong> Family members sign in with their own Google account at the same URL: <strong data-no-i18n data-cfg-text="{siteHost}"></strong><br><br>
         All accounts read and write to the <strong>same shared recipe collection</strong> — changes sync in real-time across everyone's devices, just like your PC↔iPhone sync today.<br><br>
         After adding members below, tap <strong>"🔧 Show Firestore security rules"</strong>, copy the rules, and paste them into Firebase Console to activate access. <strong>Nothing takes effect until you do</strong> — the member list here is only half of it.
@@ -36742,7 +36776,7 @@ window.onHeaderScroll = onHeaderScroll;
         <div style="font-size:12px;color:var(--muted);">Supports .doc, .docx, .xlsx, .pdf, .html, .txt</div>
       </div>
       <div id="dropZoneStatus" style="margin-top:12px;font-size:13px;color:var(--muted);text-align:center;min-height:20px;"></div>
-      <div style="margin-top:16px;padding:12px;background:#EEF6FF;border-radius:8px;font-size:12px;color:#2255AA;line-height:1.6;">
+      <div style="margin-top:16px;padding:12px;background:var(--linked-bg);border:1px solid var(--linked-border);border-radius:8px;font-size:12px;color:var(--info-text);line-height:1.6;">
         <strong>Tip for Linux users:</strong> If the regular file picker shows permission errors, drag the file directly from your file manager (Nautilus, Dolphin, etc.) into the box above.
       </div>
     </div>
