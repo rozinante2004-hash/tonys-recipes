@@ -7824,7 +7824,79 @@ window.SELF_TESTS = [
       }
     } },
 
-  { id:'arrival_sound', group:'Sharing', name:'🔔 A kitchen sound when something arrives (v38.82): a message taps twice, a request to link kitchens three times; three sounds to choose from, each heard with ▶; a mute in ⚙️ → 🎨 How it looks; nothing for one’s own messages, nothing for what was already waiting on opening, one sound for a burst',
+  { id:'accessibility_section', group:'UI', name:'♿ Accessibility (v38.83): its own section in ⚙️ — colours for red–green colour blindness (no signal left red or green, light or dark), a yellow ring round every notification dot (on unless turned off), and light or dark and the arrival sound moved here from 🎨 How it looks',
+    test: async()=>{
+      // Tony, 23 Oct 2026: a yellow circle round the dot on ⋯ More "so it could catch the eye better"; "an accessibility
+      // feature for color blindness … the red-green blindness, in which all the red and green spectrum look brown"; and
+      // "a new 'Accessibility' menu item under settings and place under it both the already existing features and this one".
+      var root=document.documentElement, keep={}, themeWas=root.getAttribute('data-theme'), made=[];
+      [CVD_KEY, DOT_RING_KEY].forEach(function(k){ try{ keep[k]=localStorage.getItem(k); }catch(e){} });
+      function rgb(c){ var m=String(c).match(/rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)/); return m ? [+m[1],+m[2],+m[3]] : null; }
+      function hex(v){ v=String(v).trim(); var m=v.match(/^#([0-9a-f]{6})$/i); if(!m) return rgb(v); return [0,2,4].map(function(i){ return parseInt(m[1].substr(i,2),16); }); }
+      function hue(c){ var r=c[0]/255,g=c[1]/255,b=c[2]/255,mx=Math.max(r,g,b),mn=Math.min(r,g,b),d=mx-mn,l=(mx+mn)/2;
+        var sat=d===0?0:d/(1-Math.abs(2*l-1)), h=0;
+        if(d){ if(mx===r) h=60*(((g-b)/d)%6); else if(mx===g) h=60*((b-r)/d+2); else h=60*((r-g)/d+4); }
+        return { h:(h+360)%360, s:sat, l:l }; }
+      function redOrGreen(c){ if(!c) return false; var x=hue(c); if(x.s<0.3||x.l<0.12||x.l>0.93) return false; return x.h>=340||x.h<=12||(x.h>=75&&x.h<=165); }
+      function el(html){ var d=document.createElement('div'); d.style.cssText='position:fixed;left:-9999px;top:0;'; d.innerHTML=html; document.body.appendChild(d); made.push(d); return d.firstChild; }
+      try{
+        // The section, where it belongs, holding what it should — and How it looks no longer holding those.
+        var acc=document.querySelector('#settingsDrop .set-group[data-group="access"]'), look=document.querySelector('#settingsDrop .set-group[data-group="look"]');
+        if(!acc) throw new Error('no ♿ Accessibility section in ⚙️');
+        if(look.nextElementSibling!==acc) throw new Error('♿ Accessibility is not right after 🎨 How it looks');
+        if(!/Accessibility/.test(acc.querySelector('.set-head').textContent)) throw new Error('the section is not called Accessibility');
+        ['cvdToggle','dotRingToggle','themeModeItem','chimeToggle','chimeChooseItem'].forEach(function(id){
+          var x=document.getElementById(id);
+          if(!x||!acc.contains(x)) throw new Error('#'+id+' is not under ♿ Accessibility');
+          if(look.contains(x)) throw new Error('#'+id+' is still under 🎨 How it looks');
+        });
+
+        // The ring: round every notification dot, on unless turned off.
+        try{ localStorage.removeItem(DOT_RING_KEY); localStorage.removeItem(CVD_KEY); }catch(e){}
+        accessApply(); root.setAttribute('data-theme','light');
+        var dot=el('<span class="path-dot"></span>');
+        var sh=getComputedStyle(dot).boxShadow;
+        if(!/rgb\(255,\s*210,\s*63\)/.test(sh)) throw new Error('no yellow ring round the dot: '+sh);
+        if(!document.getElementById('dotRingToggle').checked) throw new Error('the ring is on, its box is unticked');
+        dotRingSet(false);
+        if(getComputedStyle(dot).boxShadow!=='none') throw new Error('turned off, the ring is still there');
+        if(dotRingOn()) throw new Error('turning the ring off was not kept');
+        dotRingSet(true);
+        if(!/rgb\(255,\s*210,\s*63\)/.test(getComputedStyle(dot).boxShadow)) throw new Error('turned on again, no ring');
+
+        // Red–green: every colour that SAYS something is neither red nor green — light and dark.
+        var probes=[el('<button class="ask-btn danger">x</button>'), el('<button class="del-bar-delete">x</button>'),
+          el('<button class="access-remove-btn">x</button>'), el('<span class="easy">Easy</span>'), el('<span class="hard">Hard</span>'), dot];
+        var tokens=['--danger','--green','--bad-text','--ok-text','--dot-new','--sig-ok','--sig-bad','--sig-ok-hi','--sig-bad-hi','--btn-ok','--btn-bad'];
+        function signals(){
+          var out=[];
+          probes.forEach(function(p){ var cs=getComputedStyle(p); out.push([p.className+' background', rgb(cs.backgroundColor)], [p.className+' text', rgb(cs.color)]); });
+          tokens.forEach(function(t){ out.push([t, hex(getComputedStyle(root).getPropertyValue(t))]); });
+          return out;
+        }
+        var before=signals().filter(function(x){ return redOrGreen(x[1]); });
+        if(before.length<5) throw new Error('the usual colours were expected to have red and green signals ('+before.length+') — the probe sees nothing');
+        cvdSet(true);
+        if(root.getAttribute('data-cvd')!=='rg' || !cvdOn() || !document.getElementById('cvdToggle').checked) throw new Error('the red–green colours did not switch on');
+        ['light','dark'].forEach(function(th){
+          root.setAttribute('data-theme', th);
+          var left=signals().filter(function(x){ return redOrGreen(x[1]); });
+          if(left.length) throw new Error('in '+th+', still red or green: '+left.map(function(x){ return x[0]+' '+JSON.stringify(x[1]); }).join('; '));
+        });
+        // The dot turns blue inside its yellow ring.
+        root.setAttribute('data-theme','light');
+        var d=hue(rgb(getComputedStyle(dot).backgroundColor));
+        if(!(d.h>195&&d.h<235)) throw new Error('the dot is not blue in the red–green colours: '+getComputedStyle(dot).backgroundColor);
+        cvdSet(false);
+        if(root.hasAttribute('data-cvd')||cvdOn()) throw new Error('the usual colours did not come back');
+      } finally {
+        made.forEach(function(d){ d.remove(); });
+        [CVD_KEY, DOT_RING_KEY].forEach(function(k){ try{ if(keep[k]==null) localStorage.removeItem(k); else localStorage.setItem(k, keep[k]); }catch(e){} });
+        accessApply();
+        if(themeWas) root.setAttribute('data-theme', themeWas); else applyTheme();
+      }
+    } },
+  { id:'arrival_sound', group:'Sharing', name:'🔔 A kitchen sound when something arrives (v38.82): a message taps twice, a request to link kitchens three times; three sounds to choose from, each heard with ▶; a mute in ⚙️ → ♿ Accessibility; nothing for one’s own messages, nothing for what was already waiting on opening, one sound for a burst',
     test:async function(){
       // Tony, 23 Oct 2026: "accompany any join request and message arrival with an audio indicator … a spoon tapping a
       // wine glass 2-3 times … in settings, put an option to mute these notifications." The browser's synthesiser is a
@@ -7890,12 +7962,12 @@ window.SELF_TESTS = [
         if(chimeSetSound('bell')!=='bell'||chimeChoice()!=='bell') throw new Error('the service bell could not be chosen');
         if(chimeSetSound('trumpet')!==false||chimeChoice()!=='bell') throw new Error('an unknown sound was taken');
 
-        // ⚙️ → 🎨 How it looks shows it; the window offers all three, ▶ for each, and the mute.
+        // ⚙️ → ♿ Accessibility shows it; the window offers all three, ▶ for each, and the mute.
         chimeRefreshSettings();
         var box=document.getElementById('chimeToggle'), it=document.getElementById('chimeChooseItem');
         if(!box||!box.checked) throw new Error('🔔 Sound for messages and requests is missing, or unticked while on');
         if(!it||it.textContent.indexOf('service bell')<0) throw new Error('the menu does not name the chosen sound: '+(it&&it.textContent));
-        if(!box.closest('[data-group="look"]')) throw new Error('the sound is not under 🎨 How it looks');
+        if(!box.closest('[data-group="access"]')) throw new Error('the sound is not under ♿ Accessibility (v38.83)');
         var ov=openChimeSettings();
         try{
           var radios=ov.querySelectorAll('input[name="chimeSound"]');

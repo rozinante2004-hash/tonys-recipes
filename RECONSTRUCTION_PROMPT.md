@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v38.82` — app. **Worker: v87**, deployed separately and versioned separately
+**Current version:** `v38.83` — app. **Worker: v87**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -727,11 +727,18 @@ sound (`mkn_chime`: glass = a spoon on a wine glass, the default; bell = the kit
 on a pot), unless muted (`mkn_chime_mute`), during a Self Test, within 1.5 s of the last, or on a page never touched.
 Heard for a family-chat or linked-kitchen message from someone else, a link request that arrives while the app is open
 (`linkRequestsHeard`: what waits on opening is only noted), a link accepted, an answer to one's note, a tester's note
-(owner). ⚙️ → 🎨 How it looks: 🔔 Sound for messages and requests (the mute) and 🎵 The sound (the window, ▶ each).
+(owner). ⚙️ → ♿ Accessibility: 🔔 Sound for messages and requests (the mute) and 🎵 The sound (the window, ▶ each).
 The first touch wakes the audio; it rests a few seconds after each sound. The undo of the last auto-fetch is the
 person's own: tests that empty or write it put it back exactly.
 
-**State on 23 Oct 2026 (v38.82, Worker v87):** testers are invited from Sunday 25 Oct; from then on every
+**⚙️ → ♿ Accessibility (v38.83):** after 🎨 How it looks; per device. 🎨 Colours for red–green colour blindness
+(`mkn_cvd`='rg' → `<html data-cvd="rg">`): the signal tokens (--danger, --green, --bad-*, --ok-*, --dot-new, --sig-*,
+--btn-*) become orange for a problem and blue for all right, light and dark; Easy/Medium/Hard apart by lightness too.
+🟡 A yellow ring round the notification dots (box-shadow in --dot-ring; on unless `mkn_dot_ring`='off'). 🌗 Theme and the
+arrival sound live here too. Colours that say something are tokens, never literals — the self-test measures that none
+is left red or green in the colour-blind set.
+
+**State on 23 Oct 2026 (v38.83, Worker v87):** testers are invited from Sunday 25 Oct; from then on every
 release waits for the owner's yes. The community app is by invitation only; "Share this App with family" goes back
 to "Share this App" at the official launch. Open: WhatsApp (CallMeBot was full), the AI models after the launch, the testing
 tools' update (Playwright, Ubuntu 26.04) after launch week, a lighter first screen.

@@ -106,7 +106,8 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
   success); then **v38.78 — 👪 Chat with family members** (22:52; rules published) and **v38.79 — Scottish voices**
   (23:04) — all jobs green (one Self Tests job on main re-run); **v38.80 — the Self Test in the owner's own browser**
   (23 Oct 00:46) and **v38.81 — auto-fetch waits out a busy Pixabay** (01:00) — all jobs green (see their notes);
-  **v38.82 — 🔔 a kitchen sound when a message or request arrives, with a mute** (23 Oct; see its note and the audit).
+  **v38.82 — 🔔 a kitchen sound when a message or request arrives, with a mute** (23 Oct; see its note and the audit);
+  **v38.83 — ♿ Accessibility: red–green colours, a yellow ring round the dots** (23 Oct; see its note).
   **Worker v87.** The test copy (https://tonys-recipes-test.pages.dev, its own database) follows `test`.
 - **The testers go live on Sunday 25 Oct 2026** (Tony: "The plan is to start sending invitations to the testers
   this Sunday"). The community app is **by invitation only** (Tony switched it, 20 Oct): only addresses invited with
@@ -129,16 +130,16 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
 **What comes next**
 1. **Waiting on Tony:** 👪 Chat with family members in a household with at least two people (a message to everyone,
    a 1-to-1, the 💬 Chat buttons in 👥 Family Access), and the farm window's "On this device: …" line (Scottish voices);
-   v38.82's sounds (⚙️ → 🎨 How it looks → 🎵 The sound; a message between two testers should tap twice); the photo
-   keys: a Pexels key from https://www.pexels.com/api/ (and Unsplash's from https://unsplash.com/oauth/applications if
-   he accepts the caveat in the v38.82 note) as secrets PEXELS_API_KEY / UNSPLASH_ACCESS_KEY at
-   https://github.com/rozinante2004-hash/tonys-recipes/settings/secrets/actions/new — then dispatch Deploy the Worker.
+   v38.82's sounds (⚙️ → ♿ Accessibility → 🎵 The sound; a message between two testers should tap twice); v38.83's
+   ♿ Accessibility (the red–green colours, the ring on ⋯ More). Photo keys: none to come for now (Pexels paused new
+   keys; Unsplash forgone).
 2. **Releases:** until the testers go live (Sunday 25 Oct), release each version once the local suites and CI are
    green, without asking, and tell him after. **From Sunday 25 Oct: ask Tony before EVERY release.**
-3. **Reminder — Mon 26 Oct, 09:00 Israel time (winter time, UTC+2): try CallMeBot again** (WhatsApp alerts). Still
-   full on 20 Oct and again on 23 Oct (Tony, 23 Oct 13:09). Set in this session (send_later trig_01WCxjqehivyQrFXTaxrkiYk,
-   07:00 UTC); a new session must remind him itself. If full a third time, also mention Meta's own WhatsApp Cloud API
-   as the dependable route (more setup). Steps: AUDIT-2026-10-prelaunch.md
+3. **Reminder — Sat 24 Oct, 20:25 Israel time: send the CallMeBot message again** (WhatsApp alerts). Full on 20 and
+   23 Oct (morning); on 23 Oct evening Tony got a number and sent "I allow callmebot to send me messages" but no reply
+   came — CallMeBot says to try again after 24 h. Set in this session (send_later trig_015VqJaTx9ZgDJVZT6vRtHmo,
+   17:25 UTC; the Monday one was deleted); a new session must remind him itself. If it still does not answer, also
+   mention Meta's own WhatsApp Cloud API as the dependable route (more setup). Steps: AUDIT-2026-10-prelaunch.md
    "Needs Tony" item 1 (https://www.callmebot.com/blog/free-api-whatsapp-messages/ → contact → "I allow callmebot to
    send me messages" → secrets WHATSAPP_PHONE and WHATSAPP_KEY at
    https://github.com/rozinante2004-hash/tonys-recipes/settings/secrets/actions/new → redeploy the Worker → ⚙️ → 👑 →
@@ -940,6 +941,31 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
   because its workflow changed: the same Worker v87, the photo keys not yet set — left as they were), Deploy to
   GitHub Pages, Publish languages, Translate new phrases (the sound's words), Self Tests on main and test, Cloudflare
   Pages (community and test copies).
+- **v38.83 — a yellow ring round the notification dots, and ⚙️ → ♿ Accessibility with colours for red–green colour
+  blindness** (Tony, 23 Oct: the red dot on ⋯ More "is very hard to miss [easy to miss] … add a yellow circle around the
+  dot, so it could catch the eye better"; "an accessibility feature for color blindness … the red-green blindness, in
+  which all the red and green spectrum look brown"; "a new 'Accessibility' menu item under settings and place under it
+  both the already existing features and this one"; then, with a screenshot: "add some space between the word 'More'
+  and the dot"). **The ring:** `.path-dot`, ⚙️'s `#feedbackDot` and the 💬 button's dot get `box-shadow: 0 0 0 2.5px
+  var(--dot-ring)` (#FFD23F), 9 px dot; in a `.btn` (⋯ More) the dot is 8 px clear of the word. **Tokens** (:root):
+  `--dot-new`, `--dot-ring`, `--sig-ok/-bad` (small status dots), `--sig-ok-hi/-bad-hi` (on the dark header),
+  `--btn-ok/-bad` (white-text buttons) — and the literals that said red/green now use them (the sync dots, Bring!'s dot,
+  .ask-btn.danger, .del-bar-delete, .access-remove-btn, the service-error OK button, Gmail's ✅ Sent, the Self Test's
+  pass/fail rows and error box — those were pale literals, unreadable in dark mode too). **Red–green colours**
+  (`mkn_cvd`='rg' → `<html data-cvd="rg">`, stamped at load like the theme): every red signal a deep orange, every green
+  one blue (the Okabe–Ito pair such an eye tells apart), tokens for light and for dark; Easy blue, Medium light yellow,
+  Hard deep orange (apart by lightness too); the dot blue inside its yellow ring. Photos, the farm, diet chips and the
+  brand's terracotta stay. Checked with a deuteranopia simulation (Machado 2009 matrix as an SVG filter): in the usual
+  colours ✓ Saved / ✗ Could not save, Easy / Hard and synced / error all became the same olive; in the new colours each
+  pair is blue against tan. **⚙️ → ♿ Accessibility** (after 🎨 How it looks): 🎨 Colours for red–green colour blindness,
+  🟡 A yellow ring round the notification dots (on unless turned off: `mkn_dot_ring`='off' → data-dot-ring="off"),
+  🌗 Theme and 🔔 Sound / 🎵 The sound (moved from How it looks). Monthly counts `access.red-green|usual-colours` and
+  `sound.muted|glass|bell|pot`, and `cvd-on/off` (labels in manage.js). Self-test `accessibility_section` measures the
+  drawn colours: no signal left red or green in light or dark (and that the usual colours HAD some). Translation:
+  harvested (the two switch toasts in I18N_EXTRA). Help: a ♿ ACCESSIBILITY line; Settings' sections list.
+- **Photo keys, 23 Oct:** Pexels: "New API key issuance is currently paused and cannot be requested" (Tony); Unsplash:
+  "We can forego unsplash for now" (Tony). Photos stay Pixabay + Wikimedia Commons; the workflow is ready if a key
+  ever comes (secrets PEXELS_API_KEY / UNSPLASH_ACCESS_KEY, then dispatch Deploy the Worker).
 - **Photo libraries' keys (23 Oct, Tony: "Yes, set it up for the Pexels and Unsplash keys"):** deploy-worker.yml now
   sets the Worker's `PEXELS_API_KEY` and `UNSPLASH_ACCESS_KEY` from GitHub secrets of the same names (unset → left as
   it is). After Tony adds them: dispatch **Deploy the Worker** on `main` (workflow_dispatch) and check health

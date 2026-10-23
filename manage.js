@@ -375,6 +375,7 @@
     'voice': 'Voice control', 'pantry': 'Opened the pantry', 'suggest': 'Asked for suggestions', 'translate': 'Translated a recipe',
     'print': 'Printed', 'word': 'Exported to Word', 'share': 'Shared a recipe', 'bring': 'Sent to Bring!', 'help': 'Asked the help assistant',
     'photo-search': 'Searched for a photo', 'farm': 'Tapped a farm visitor', 'farm-off': 'Turned the farm off', 'share-app': 'Shared the app',
+    'cvd-on': 'Turned on the red–green colours', 'cvd-off': 'Turned off the red–green colours',   // v38.83
     'link-request': 'Asked to link with a household',
     'added.typed': 'typed in', 'added.link': 'from a link', 'added.extension': 'from the browser extension', 'added.shared': 'shared to the app (phone)',
     'added.photo': 'from a photo', 'added.screenshots': 'from screenshots', 'added.text': 'from pasted text', 'added.video-file': 'from a video file',
@@ -466,7 +467,8 @@
     { title: '📱 Devices and settings', note: 'Once a month per device.', parts: [
       { label: 'Device', test: /^device\./, share: true }, { label: 'Browser', test: /^browser\./, share: true },
       { label: 'Installed', test: /^installed\./, share: true }, { label: 'Language', test: /^lang\./, share: true },
-      { label: 'Light or dark', test: /^theme\./, share: true }, { label: 'Browser extension (computers)', test: /^extension\./, share: true } ] }
+      { label: 'Light or dark', test: /^theme\./, share: true }, { label: 'Browser extension (computers)', test: /^extension\./, share: true },
+      { label: 'Colours (♿ Accessibility)', test: /^access\./, share: true }, { label: 'Arrival sound', test: /^sound\./, share: true } ] }
   ];
   async function loadTrends() {
     try {

@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v38.82 -->
+<!-- Tony's Recipes Collection v38.83 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -378,17 +378,17 @@
   @media print { #feedbackFab { display: none; } }
   /* v38.00 — an answer to a note is waiting (inside the circle: the button clips its corners). */
   #feedbackFab .fab-dot { position: absolute; top: 6px; right: 6px; width: 12px; height: 12px; border-radius: 50%;
-    background: #E5484D; border: 2px solid #fff; box-sizing: border-box; pointer-events: none; z-index: 1; }
+    background: var(--dot-new); border: 2px solid #fff; box-sizing: border-box; pointer-events: none; z-index: 1; box-shadow: 0 0 0 2px var(--dot-ring); }
   .fr-card { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; margin-top: 10px; background: var(--card-bg); }
   .fr-card.fr-new { border-inline-start: 4px solid var(--terracotta-fill, #C1440E); }
   .fr-text { white-space: pre-wrap; font-size: 14px; line-height: 1.5; color: var(--ink); }
   .fr-wrote { white-space: pre-wrap; font-size: 13px; color: var(--muted); font-style: italic; }
   /* v37.68 — the owner's dot on ⚙️: red = notes from testers not yet read; green = all read. */
   #feedbackDot { position: absolute; top: -2px; right: -2px; width: 9px; height: 9px; border-radius: 50%;
-    border: 2px solid var(--warm-brown, #5C3D2E); box-sizing: content-box; pointer-events: none; }
+    border: 2px solid var(--warm-brown, #5C3D2E); box-sizing: content-box; pointer-events: none; box-shadow: 0 0 0 2px var(--dot-ring); }
   #feedbackDot[hidden] { display: none; }
-  #feedbackDot.fb-dot-new  { background: #E5484D; }
-  #feedbackDot.fb-dot-read { background: #30A46C; }
+  #feedbackDot.fb-dot-new  { background: var(--dot-new); }
+  #feedbackDot.fb-dot-read { background: var(--sig-ok); }
   /* …and out of the way while any window is open (its own form included). */
   body:has(.modal-overlay.open) #feedbackFab, body:has(#askOverlay) #feedbackFab,
   body:has(#manageOverlay) #feedbackFab { display: none; }
@@ -1489,6 +1489,40 @@ try {
   else if (_mq.addListener) _mq.addListener(_onScheme);
 } catch(e) {}
 window.setTheme = setTheme; window.getTheme = getTheme; window.cycleTheme = cycleTheme; window.applyTheme = applyTheme;
+
+// ─── ⚙️ → ♿ ACCESSIBILITY (v38.83) ───────────────────────────────────────────
+// Tony, 23 Oct 2026: a yellow ring round the notification dots, colours for red–green colour blindness, and an
+// Accessibility section holding them with what was already there (light or dark, the arrival sound). On this device,
+// stamped on <html> as the theme is, and as early: data-cvd="rg" (see the stylesheet's RED–GREEN block) and
+// data-dot-ring="off" when the ring is turned off (it is on unless turned off).
+var CVD_KEY = 'mkn_cvd', DOT_RING_KEY = 'mkn_dot_ring';
+function cvdOn() { try { return localStorage.getItem(CVD_KEY) === 'rg'; } catch(e) { return false; } }
+function dotRingOn() { try { return localStorage.getItem(DOT_RING_KEY) !== 'off'; } catch(e) { return true; } }
+function accessApply() {
+  var h = document.documentElement;
+  if (cvdOn()) h.setAttribute('data-cvd', 'rg'); else h.removeAttribute('data-cvd');
+  if (dotRingOn()) h.removeAttribute('data-dot-ring'); else h.setAttribute('data-dot-ring', 'off');
+  accessRefreshSettings();
+}
+function accessRefreshSettings() {
+  var a = document.getElementById('cvdToggle'); if (a) a.checked = cvdOn();
+  var b = document.getElementById('dotRingToggle'); if (b) b.checked = dotRingOn();
+}
+function cvdSet(on) {
+  try { if (on) localStorage.setItem(CVD_KEY, 'rg'); else localStorage.removeItem(CVD_KEY); } catch(e) {}
+  accessApply();
+  if (typeof insightCount === 'function') insightCount(on ? 'cvd-on' : 'cvd-off');
+  if (typeof toast === 'function') toast(on ? '🎨 Blue for all right, orange for a problem — on this device' : '🎨 The usual colours again', 5000);
+  return on;
+}
+function dotRingSet(on) {
+  try { if (on) localStorage.removeItem(DOT_RING_KEY); else localStorage.setItem(DOT_RING_KEY, 'off'); } catch(e) {}
+  accessApply();
+  return on;
+}
+accessApply();
+window.cvdOn = cvdOn; window.cvdSet = cvdSet; window.dotRingOn = dotRingOn; window.dotRingSet = dotRingSet;
+window.accessApply = accessApply; window.accessRefreshSettings = accessRefreshSettings;
 
 // ─── SELECT MODE ─────────────────────────────────────────────────────────────
 // Since v36.10 the ☑ Select button lives in the filter bar — the strip pinned
@@ -2874,7 +2908,7 @@ async function runSelfTests() {
       }
       _selfTestResults[t.id] = {pass:true, ms:Date.now()-_t0, group:t.group, name:t.name};
       if(statusEl) statusEl.textContent = '✅';
-      if(row) row.style.background = '#f0fdf0';
+      if(row) row.style.background = 'var(--ok-bg)';
       passed++;
     } catch(err) {
       try { _selfTestCloseDialogs(_selfTestOpenDialogs().filter(function(id){ return _openBefore.indexOf(id) === -1; })); } catch(e) {}
@@ -2882,7 +2916,7 @@ async function runSelfTests() {
                                 ms:Date.now()-_t0, group:t.group, name:t.name};
       if(statusEl) statusEl.textContent = '❌';
       if(detailBtn) detailBtn.style.display = 'inline-block';
-      if(row) row.style.background = '#fff5f5';
+      if(row) row.style.background = 'var(--bad-bg)';
       failed++;
     }
 
@@ -3202,8 +3236,8 @@ function showSelfTestDetail(testId) {
       <button onclick="document.getElementById('stDetailOverlay').remove()" style="width:28px;height:28px;border-radius:50%;background:var(--bg);border:none;cursor:pointer;font-size:14px;color:var(--muted);flex-shrink:0;">✕</button>
     </div>
 
-    <div style="background:#fff5f5;border-left:3px solid #f87171;border-radius:0 8px 8px 0;padding:10px 14px;margin-bottom:14px;">
-      <div style="font-size:11px;font-weight:700;color:#c62828;letter-spacing:0.5px;margin-bottom:4px;">ERROR</div>
+    <div style="background:var(--bad-bg);border-left:3px solid var(--bad-border);border-radius:0 8px 8px 0;padding:10px 14px;margin-bottom:14px;">
+      <div style="font-size:11px;font-weight:700;color:var(--bad-text);letter-spacing:0.5px;margin-bottom:4px;">ERROR</div>
       <div style="font-size:13px;color:var(--ink);font-family:monospace;">${result.error||'Unknown error'}</div>
     </div>
 
@@ -3236,10 +3270,10 @@ async function selfTestAutoFix(testId, btn) {
   try {
     await fix.autofix();
     btn.textContent = '✅ Applied! Re-run test to verify.';
-    btn.style.background = '#2E7D32';
+    btn.style.background = 'var(--btn-ok)';
   } catch(e) {
     btn.textContent = '❌ Fix failed: '+e.message;
-    btn.style.background = '#c62828';
+    btn.style.background = 'var(--btn-bad)';
     btn.disabled = false;
   }
 }
@@ -6172,7 +6206,7 @@ window.pathDots = pathDots;
 // Something that is related to cooking or food. I thought of the sound of a spoon tapping a wine glass 2-3 times, but
 // am happy to hear other ideas. Also, in settings, put an option to mute these notifications." The browser's own
 // synthesiser draws the sound (Web Audio) — no sound file to download. A message taps twice, a request three times.
-// Three sounds to choose from, and a mute: ⚙️ → 🎨 How it looks, on this device. Browsers keep a page silent until it
+// Three sounds to choose from, and a mute: ⚙️ → ♿ Accessibility (v38.83; first in 🎨 How it looks), on this device. Browsers keep a page silent until it
 // has been touched, so the first touch or key wakes the sound; one that cannot play is skipped, never played late.
 var CHIME_KEY = 'mkn_chime', CHIME_MUTE_KEY = 'mkn_chime_mute';
 var CHIME_SOUNDS = { glass: '🥂 Spoon on a wine glass', bell: '🛎️ The kitchen’s service bell', pot: '🥄 Wooden spoon on a pot' };
@@ -6268,7 +6302,7 @@ function chimePlay(kind, sound) {
   if (c.resume) c.resume().then(go, function(){});
   return true;
 }
-// ⚙️ → 🎨 How it looks: the mute, and the window with the three sounds.
+// ⚙️ → ♿ Accessibility: the mute, and the window with the three sounds.
 function chimeRefreshSettings() {
   var box = document.getElementById('chimeToggle'); if (box) box.checked = !chimeMuted();
   var it = document.getElementById('chimeChooseItem');
@@ -8749,6 +8783,8 @@ function insightMonthly() {
   insightCount('installed.' + (insInstalled() ? 'yes' : 'no'));
   insightCount('lang.' + String((typeof _i18nLang === 'string' && _i18nLang) || 'en').toLowerCase().replace(/[^a-z-]/g, '').slice(0, 10));
   insightCount('theme.' + (document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light'));
+  insightCount('access.' + (cvdOn() ? 'red-green' : 'usual-colours'));                                  // v38.83
+  if (typeof chimeMuted === 'function') insightCount('sound.' + (chimeMuted() ? 'muted' : chimeChoice()));   // v38.82
   if (/^(mac|windows|linux|chromebook)$/.test(kind) && typeof extInstalledVersion === 'function') insightCount('extension.' + (extInstalledVersion() ? 'yes' : 'no'));
   var acct = insAccountKind(); if (acct) insightCount('account.' + acct);
   if (typeof farmEnabled === 'function') insightCount('farm.' + (farmEnabled() ? 'look-' + (typeof farmStyle === 'function' ? farmStyle() : 'cartoon') : 'turned-off'));
@@ -9300,7 +9336,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v38.82';
+var APP_VERSION = 'v38.83';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -9645,7 +9681,7 @@ function showEmailModal(id) {
     try {
       await sendViaGmailApi(to, subject, htmlBody, plainText);
       gmailBtn.textContent = '✅ Sent!';
-      gmailBtn.style.background = '#2E7D32';
+      gmailBtn.style.background = 'var(--btn-ok)';
       toast('✅ Recipe emailed to ' + to + '!');
       setTimeout(function(){ overlay.remove(); }, 2000);
     } catch(err) {
@@ -9981,6 +10017,11 @@ window.addEventListener('unhandledrejection', function(e) {
   --warn-bg:     #FFF8E8;  --warn-border: #E8D9A8;  --warn-text:  #7A5C00;
   --ok-bg:       #EAF5E9;  --ok-border:   #B4D9B4;  --ok-text:    #1B5E20;
   --info-text:   #1565C0;
+  /* v38.83 — the signal colours, as tokens, so the red–green set below can replace them in one place */
+  --dot-new:     #E5484D;  --dot-ring:   #FFD23F;   /* a notification dot, and the yellow ring that makes it seen (Tony) */
+  --sig-ok:      #3A7D44;  --sig-bad:    #B03030;   /* small status dots */
+  --sig-ok-hi:   #4ADE80;  --sig-bad-hi: #F87171;   /* the same, on the dark header */
+  --btn-ok:      #2E7D32;  --btn-bad:    #C62828;   /* buttons with white text */
   color-scheme: light;
 }
 
@@ -10012,6 +10053,42 @@ window.addEventListener('unhandledrejection', function(e) {
   --info-text:   #8FB4F0;
   color-scheme: dark;
 }
+/* ── RED–GREEN COLOUR BLINDNESS (v38.83) ──────────────────────────────────────
+   Tony, 23 Oct 2026: "can we add an accessibility feature for color blindness? Let's address the most common color
+   blindness first - the red-green blindness, in which all the red and green spectrum look brown." ⚙️ → ♿ Accessibility,
+   on this device: <html data-cvd="rg">. The two colours such an eye still tells apart are blue and orange (the
+   Okabe–Ito pair), so every "all right" green becomes blue and every "problem" red a deep orange — the tokens above,
+   and the few signal colours written into the code. A notification dot turns blue inside its yellow ring (a red one
+   inside it would look as brown-yellow as the ring). Photos, the farm and the brand's own colours stay as they are. */
+:root[data-cvd="rg"] {
+  --danger:      #A84300;
+  --green:       #1F5FAD;
+  --bad-bg:      #FFF0E0;  --bad-border:  #F2C28C;  --bad-text:   #8F3D00;
+  --ok-bg:       #E8F0FB;  --ok-border:   #A9C4EA;  --ok-text:    #174A8B;
+  --dot-new:     #1E6FD9;
+  --sig-ok:      #2F6FBF;  --sig-bad:     #C25400;
+  --sig-ok-hi:   #8CC2FF;  --sig-bad-hi:  #FFB25C;
+  --btn-ok:      #1F5FAD;  --btn-bad:     #A84300;
+}
+:root[data-theme="dark"][data-cvd="rg"] {
+  --danger:      #F5A35C;
+  --green:       #8DB7F2;
+  --bad-bg:      #3A2814;  --bad-border:  #7A5226;  --bad-text:   #F7B97A;
+  --ok-bg:       #1A2A40;  --ok-border:   #3E5F8C;  --ok-text:    #A8C8F5;
+  --dot-new:     #4D8FE8;
+  --sig-ok:      #6FA8F0;  --sig-bad:     #F5A35C;
+}
+/* (written for dark too: the dark theme's own .easy and .hard come later in this sheet) */
+:root[data-cvd="rg"] .easy, :root[data-theme][data-cvd="rg"] .easy { background: var(--ok-bg); color: var(--ok-text); }
+:root[data-cvd="rg"] .hard, :root[data-theme][data-cvd="rg"] .hard { background: #F7CFA6; color: #6E2E00; }
+:root[data-cvd="rg"] .medium, :root[data-theme][data-cvd="rg"] .medium { background: #FFF6CC; color: #5E4B00; }
+/* (Medium and Hard apart by lightness too — light yellow, deep orange: the two read alike to such an eye otherwise) */
+:root[data-theme="dark"][data-cvd="rg"] .hard { background: #5A2E0E; color: #FFC68F; }
+:root[data-theme="dark"][data-cvd="rg"] .medium { background: #3A3414; color: #F0DE8A; }
+:root[data-cvd="rg"]:not([data-theme="dark"]) .del-bar-delete:hover { background: #C25400; }
+/* (the yellow ring, if the person turned it off) */
+:root[data-dot-ring="off"] .path-dot, :root[data-dot-ring="off"] #feedbackFab .fab-dot { box-shadow: none; }
+:root[data-dot-ring="off"] #feedbackDot { box-shadow: none; }
 /* Photos and emoji tiles sit on light pastel backgrounds baked into each recipe
    (r.bg); dim them slightly so cards don't glare in a dark kitchen. */
 :root[data-theme="dark"] .card-image,
@@ -10553,8 +10630,11 @@ body.i18n-harvesting #serviceErrorOverlay, body.i18n-harvesting #emailModalOverl
 @media (max-width: 520px) { #termsGate .tg-page { padding: 30px 14px 18px 44px; background-image: linear-gradient(90deg, transparent 32px, rgba(193,68,14,.35) 32px, rgba(193,68,14,.35) 34px, transparent 34px), repeating-linear-gradient(#fdf8ec 0 27px, rgba(70,110,170,.18) 27px 28px); }
   #termsGate .tg-title { font-size: 30px; } #termsGate .tg-ring { width: 80px; height: 80px; } }
 /* v37.80 — the red dots along the path to something new (pathDots). */
-.path-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--danger); flex-shrink: 0; margin-inline-start: auto; margin-inline-end: 4px; }
-#settingsDrop .set-head > .path-dot { margin-inline-end: 8px; }
+/* v38.83 — Tony: the red dot on ⋯ More "is very hard to miss" (easy to miss: red on the brown header) — "add a yellow
+   circle around the dot, so it could catch the eye better". A ring drawn outside the dot (box-shadow: no layout). */
+.path-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--dot-new); box-shadow: 0 0 0 2.5px var(--dot-ring); flex-shrink: 0; margin-inline-start: auto; margin-inline-end: 6px; }
+#settingsDrop .set-head > .path-dot { margin-inline-end: 9px; }
+.btn > .path-dot { display: inline-block; vertical-align: middle; margin: -2px 0 0; margin-inline-start: 8px; }   /* ⋯ More: clear of the word */
 #settingsDrop .set-head::after { content: '›'; font-size: 16px; line-height: 1; color: var(--muted); transition: transform 0.15s; }
 [dir="rtl"] #settingsDrop .set-head::after { content: '‹'; }
 #settingsDrop .set-group.open > .set-head::after { transform: rotate(90deg); }
@@ -10789,7 +10869,7 @@ body.i18n-harvesting #serviceErrorOverlay, body.i18n-harvesting #emailModalOverl
 .af-list { margin: 0; padding-inline-start: 20px; font-size: 13px; line-height: 1.55; color: var(--ink); }
 .af-list li { margin: 0 0 4px; }
 .ask-btn { width: 100%; padding: 12px; border: none; border-radius: 10px; background: var(--terracotta-fill); color: #fff; font-family: 'DM Sans', 'Heebo', sans-serif; font-size: 15px; font-weight: 600; cursor: pointer; }
-.ask-btn.danger { background: #C62828; }
+.ask-btn.danger { background: var(--btn-bad); }
 .ask-check { display:flex; align-items:center; gap:9px; margin:2px 0 12px; cursor:pointer;
   font-size:13px; color:var(--muted); text-align:start; }
 /* v38.65 — a list of ticks in one window (the owner's WhatsApp alerts): each on its own line, read from the start */
@@ -11000,7 +11080,7 @@ li.line-sub-indent { padding-inline-start: 22px; }
 .cook-log-entry { border-left: 3px solid var(--border); padding: 6px 0 6px 10px; margin-bottom: 6px; }
 .cook-log-head { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--muted); }
 .cook-log-del { margin-inline-start: auto; background: none; border: none; color: var(--muted); cursor: pointer; font-size: 12px; padding: 0 4px; }
-.cook-log-del:hover { color: #c62828; }
+.cook-log-del:hover { color: var(--danger); }
 .cook-log-note { font-size: 13px; color: var(--ink); line-height: 1.55; margin-top: 3px; unicode-bidi: plaintext; text-align: start; white-space: pre-wrap; }
 
 /* 2.5 — AI failure and empty states that offer a way forward */
@@ -11493,9 +11573,9 @@ li.line-sub-indent { padding-inline-start: 22px; }
   display: flex; align-items: center; gap: 5px;
 }
 #driveStatus .ds-dot { width: 7px; height: 7px; border-radius: 50%; background: #ccc; flex-shrink: 0; }
-#driveStatus.synced .ds-dot { background: #3A7D44; }
+#driveStatus.synced .ds-dot { background: var(--sig-ok); }
 #driveStatus.syncing .ds-dot { background: var(--gold); animation: pulse 1s infinite; }
-#driveStatus.error .ds-dot { background: #B03030; }
+#driveStatus.error .ds-dot { background: var(--sig-bad); }
 @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
 
 /* Share modal */
@@ -11862,10 +11942,10 @@ body.banner-shown .header {
 /* ── BRING! TOKEN STATUS ── */
 .bring-token-dot {
   width: 8px; height: 8px; border-radius: 50%;
-  background: #4CAF50; flex-shrink: 0;
+  background: var(--sig-ok); flex-shrink: 0;
 }
 .bring-token-dot.warn  { background: #FF9800; }
-.bring-token-dot.error { background: #F44336; }
+.bring-token-dot.error { background: var(--sig-bad); }
 .bring-token-label { flex: 1; color: var(--ink); }
 .bring-token-btn {
   font-size: 12px; padding: 4px 10px;
@@ -12080,7 +12160,7 @@ body.banner-shown .header {
   height: 100%;
   width: 28px;
 }
-.ing-del:hover { color: #c62828; }
+.ing-del:hover { color: var(--danger); }
 
 
 /* ── INGREDIENT DRAG ── */
@@ -12284,7 +12364,7 @@ body.banner-shown .header {
 }
 .del-bar-action { background: rgba(255,255,255,0.15); color: white; border: 1px solid rgba(255,255,255,0.3); }
 .del-bar-action:hover { background: rgba(255,255,255,0.25); }
-.del-bar-delete { background: #c0392b; color: white; }
+.del-bar-delete { background: var(--btn-bad); color: white; }
 .del-bar-delete:hover { background: #e74c3c; }
 /* v37.45 — the bar: a header line, then an even grid of actions. */
 #selectBar .sel-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; max-width: 980px; margin: 0 auto; }
@@ -12302,7 +12382,7 @@ body.banner-shown .header {
 .access-badge { font-size:11px;font-weight:600;padding:3px 9px;border-radius:10px;flex-shrink:0; }
 .access-role-btn { padding:4px 10px;border-radius:6px;font-size:11px;font-weight:600;font-family:'DM Sans','Heebo',sans-serif;cursor:pointer;border:1px solid var(--border);background:var(--bg);color:var(--ink); }
 .access-role-btn:hover { border-color:var(--terracotta);color:var(--terracotta); }
-.access-remove-btn { padding:4px 8px;border-radius:6px;font-size:11px;font-weight:600;font-family:'DM Sans','Heebo',sans-serif;cursor:pointer;border:none;background:#FFE8E8;color:#c0392b; }
+.access-remove-btn { padding:4px 8px;border-radius:6px;font-size:11px;font-weight:600;font-family:'DM Sans','Heebo',sans-serif;cursor:pointer;border:none;background:var(--bad-bg);color:var(--bad-text); }
 .access-role-opt { display:flex;align-items:center;gap:5px;padding:6px 10px;border-radius:7px;border:1px solid var(--border);font-size:12px;cursor:pointer;background:var(--card-bg);font-family:'DM Sans','Heebo',sans-serif; }
 .access-role-opt:has(input:checked) { border-color:var(--terracotta);background:#FFF5F2;color:var(--terracotta); }
 
@@ -12347,7 +12427,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.82</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.83</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -12435,7 +12515,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.82</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.83</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -12469,16 +12549,26 @@ body.banner-shown .header {
           <!-- v37.09 — only while this address is not confirmed (refreshed when ⚙️ opens) -->
           <button class="drop-item" title="Sends the e-mail that confirms this address is yours again. Needed only for places kept for your address." id="confirmEmailItem" style="display:none;font-weight:700;color:var(--terracotta);background:rgba(212,168,67,0.2);" onclick="closeDrop('settingsDrop');resendConfirmation()">✉️ Confirm my e-mail address</button>
           <div class="set-group" data-group="look">
-            <button type="button" class="drop-item set-head" aria-expanded="false" title="Grid layout, light or dark, metric or imperial, and the sound when something arrives — on this device." onclick="settingsGroup('look')">🎨 How it looks</button>
+            <button type="button" class="drop-item set-head" aria-expanded="false" title="Grid layout, metric or imperial, and the farm visitors — on this device." onclick="settingsGroup('look')">🎨 How it looks</button>
             <div class="set-body">
               <button class="drop-item" title="How many recipe cards fit in a row, on this device. Only changes how recipes are shown — nothing is added or removed." onclick="closeDrop('settingsDrop');openGridSettings()">📱 Grid Layout</button>
-              <button class="drop-item" title="Light, dark, or following the device — on this device only." id="themeModeItem" onclick="cycleTheme()">🌗 Theme: Auto</button>
               <button class="drop-item" title="Show amounts in metric or imperial on this device. The recipes themselves are not changed." id="unitsMenuItem" onclick="toggleUnitPref()">📏 Units: metric</button>
               <!-- v37.88 — the farm visitors: on by default, on this device; Tony chooses what they say, who comes and how often. -->
               <label class="drop-item" id="farmToggleItem" title="Now and then a cartoon farm animal strolls across the screen. Tap it and it answers back. On this device." style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" id="farmToggle" checked onchange="farmSetEnabled(this.checked)" style="width:18px;height:18px;flex:none;accent-color:var(--terracotta);"> 🐑 Farm guests?</label>
+              <button class="drop-item" id="farmOwnerItem" style="display:none;" title="What the animals say, which of them may visit and how often — for everyone, in every copy." onclick="closeDrop('settingsDrop');openFarmSettings()">🐄 The farm visitors…</button>
+            </div>
+          </div>
+          <!-- v38.83 — Tony: "Add a new 'Accessibility' menu item under settings and place under it both the already existing
+               features and this one": red–green colours (new), the yellow ring round the dots (new), light or dark and the
+               arrival sound (moved here from 🎨 How it looks). All on this device. -->
+          <div class="set-group" data-group="access">
+            <button type="button" class="drop-item set-head" aria-expanded="false" title="Colours for red–green colour blindness, the ring round the notification dots, light or dark, and the sound when something arrives — on this device." onclick="settingsGroup('access')">♿ Accessibility</button>
+            <div class="set-body">
+              <label class="drop-item" id="cvdToggleItem" title="Blue instead of green and orange instead of red wherever a colour says something (all right / a problem / something new) — the colours a red–green colour-blind eye tells apart. On this device." style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" id="cvdToggle" onchange="cvdSet(this.checked)" style="width:18px;height:18px;flex:none;accent-color:var(--terracotta);"> 🎨 Colours for red–green colour blindness</label>
+              <label class="drop-item" id="dotRingToggleItem" title="A yellow ring round each notification dot, so a new message or request catches the eye. On this device." style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" id="dotRingToggle" checked onchange="dotRingSet(this.checked)" style="width:18px;height:18px;flex:none;accent-color:var(--terracotta);"> 🟡 A yellow ring round the notification dots</label>
+              <button class="drop-item" title="Light, dark, or following the device — on this device only." id="themeModeItem" onclick="cycleTheme()">🌗 Theme: Auto</button>
               <label class="drop-item" id="chimeToggleItem" title="A sound when a message or a request to link kitchens arrives. Untick to mute it. On this device." style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" id="chimeToggle" checked onchange="chimeSetOn(this.checked)" style="width:18px;height:18px;flex:none;accent-color:var(--terracotta);"> 🔔 Sound for messages and requests</label>
               <button class="drop-item" id="chimeChooseItem" title="Choose the sound, and hear each one." onclick="closeDrop('settingsDrop');openChimeSettings()">🎵 The sound: Spoon on a wine glass</button>
-              <button class="drop-item" id="farmOwnerItem" style="display:none;" title="What the animals say, which of them may visit and how often — for everyone, in every copy." onclick="closeDrop('settingsDrop');openFarmSettings()">🐄 The farm visitors…</button>
             </div>
           </div>
           <div class="set-group" data-group="household">
@@ -15777,9 +15867,11 @@ window.i18nBuildPatterns = i18nBuildPatterns; window.i18nMatchPattern = i18nMatc
 // translating a string nobody sees. A `{1}` makes it a shape, matched the same
 // way a built toast is.
 var I18N_EXTRA = [
-  // v38.82 — the sound's line in ⚙️ → 🎨 How it looks, for each sound; v38.81 — a photo library's pause, in 🔍 Find a photo
+  // v38.82 — the sound's line in ⚙️ → ♿ Accessibility, for each sound; v38.81 — a photo library's pause, in 🔍 Find a photo
   '🎵 The sound: Spoon on a wine glass', '🎵 The sound: The kitchen’s service bell', '🎵 The sound: Wooden spoon on a pot',
   '⏳ {1} asks for a pause — {2} s…',
+  // v38.83 — ♿ Accessibility's colours, said as they switch
+  '🎨 Blue for all right, orange for a problem — on this device', '🎨 The usual colours again',
   // v38.71 — Send to Bring!: where to get it
   'Get it from the App Store', 'Get it on Google Play', 'Get Bring! for your phone, or use it on the web',
   // v38.70 — the share labels while the copy is by invitation only
@@ -22684,7 +22776,7 @@ function showServiceError(message, actions) {
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(28,26,24,0.7);z-index:1000;display:flex;align-items:center;justify-content:center;';
   var closeBtn = document.createElement('button');
   closeBtn.textContent = 'OK';
-  closeBtn.style.cssText = 'width:100%;padding:12px;background:#c62828;color:white;border:none;border-radius:10px;font-family:DM Sans,Heebo,sans-serif;font-size:15px;font-weight:600;cursor:pointer;margin-top:16px;';
+  closeBtn.style.cssText = 'width:100%;padding:12px;background:var(--btn-bad);color:white;border:none;border-radius:10px;font-family:DM Sans,Heebo,sans-serif;font-size:15px;font-weight:600;cursor:pointer;margin-top:16px;';
   closeBtn.onclick = function() { overlay.remove(); };
   var inner = document.createElement('div');
   inner.style.cssText = 'background:var(--card-bg);border-radius:16px;width:90%;max-width:440px;padding:24px;box-shadow:0 8px 30px rgba(0,0,0,0.3);';
@@ -22820,6 +22912,7 @@ function settingsItemShown(el, stop) {
 function settingsGroupsRefresh(collapse) {
   try { farmRefreshSettings(); } catch(e) {}
   try { chimeRefreshSettings(); } catch(e) {}
+  try { accessRefreshSettings(); } catch(e) {}
   var groups = document.querySelectorAll('#settingsDrop .set-group');
   Array.prototype.forEach.call(groups, function(g) {
     var body = g.querySelector('.set-body');
@@ -29202,13 +29295,13 @@ function setDriveStatus(state, text) {
   if (!bar) return;
   if (state === 'synced') {
     bar.textContent = '\u2713 Synced — ' + (text.replace('\u2601\ufe0f ','') || 'saved to cloud');
-    if (dot) dot.style.background = '#4ade80';
+    if (dot) dot.style.background = 'var(--sig-ok-hi)';
   } else if (state === 'syncing') {
     bar.textContent = 'Saving to cloud…';
     if (dot) dot.style.background = '#fbbf24';
   } else if (state === 'error') {
     bar.textContent = 'Sync failed — changes saved locally';
-    if (dot) dot.style.background = '#f87171';
+    if (dot) dot.style.background = 'var(--sig-bad-hi)';
   } else if (state === 'offline') {
     bar.textContent = 'Offline — will sync when reconnected';
     if (dot) dot.style.background = 'rgba(255,255,255,0.25)';
@@ -29330,6 +29423,7 @@ function appFeatureSections(all) {
     { icon: '\u{1F30D}', title: 'Everywhere', items: [
       'On a phone, a tablet or a computer: it installs like an app and works offline.',
       'In many languages, in light or dark.',
+      'Colours for red–green colour blindness, and a ring that makes new messages easy to spot — ⚙️ → ♿ Accessibility.',   // v38.83
       'Back up all your recipes to your device at any time.',
       'And now and then, a visitor from the farm drops by. \u{1F404}' ] }
   ];
@@ -30954,7 +31048,8 @@ var HELP_SYSTEM_PROMPT = [
   "- 📬 LINK REQUESTS: ⚙️ → 🏠 My household → 📬 Link requests — the number in brackets beside it is how many wait for an answer. Every request in one place: Waiting (Accept / Reject / 🚫 Block), Sent by your household (Withdraw), Linked now (Revoke access), and earlier answers. A request may carry a note, and the two households can write to each other there — the latest message shows, highlighted, with ↩ Reply; earlier ones are under 💬 Conversation. Only the household's name is shown, never a person's. Reject is for now: if they ask again — by identifier or by e-mail — their request is back under Waiting. 🚫 Block is for good, until you Unblock it under the earlier answers; they are never told, and on their side it reads “waiting”. A new message or request arrives while the app is open: a red dot (and a short notice with Open) within seconds, no reload needed. A red dot on ⚙️ leads to anything new. The switch there decides whether other households may ask through the app at all.",
   "- 👪 CHAT WITH FAMILY MEMBERS (the people in YOUR household only): ⋯ More → 👪 Chat with family members — or 💬 Chat beside a person in 👥 Family Access. 📣 Everyone in <your kitchen> is the room for announcements: everyone in the household reads it. Or choose one person: only the two of you read that conversation. Everyone in the household can write, readers too. Messages arrive live: a short notice with Open, and a red dot on ⋯ More until you have read them. Nothing is changed or deleted afterwards; deleting the household deletes them.",
   "- 💬 CHATS WITH LINKED KITCHENS: ⋯ More → 💬 Chats with linked kitchens — or 💬 Chat beside a linked kitchen's name in your recipe list, or in 👥 Family Access. Every conversation, newest first, with what is new; open one to read it all and write (Enter sends, Shift+Enter starts a new line). The same conversations are also on 📬 Link requests. A red dot on ⋯ More and on ⚙️ says something new arrived.",
-  "- 🔔 A SOUND WHEN SOMETHING ARRIVES: a message (from a linked kitchen, from your family, an answer to your note) taps twice; a request to link kitchens taps three times. Choose the sound — 🥂 Spoon on a wine glass, 🛎️ The kitchen’s service bell, 🥄 Wooden spoon on a pot, each with ▶ to hear it — in ⚙️ → 🎨 How it looks → 🎵 The sound; untick 🔔 Sound for messages and requests to mute it. On this device only. Browsers keep a page silent until it has been touched once since opening, so a message that arrives before that is not heard. On a phone it plays at the media volume; an iPhone on silent (the switch on its side) plays no sound.",
+  "- ♿ ACCESSIBILITY: ⚙️ → ♿ Accessibility, on this device: 🎨 Colours for red–green colour blindness (the most common colour blindness, where reds and greens look alike, brownish): wherever a colour says something, green becomes blue and red becomes a deep orange — all right / a problem, the sync dot, Easy and Hard, the Self Test's results, delete buttons — and a notification dot turns blue inside its ring; photos and the farm keep their colours. 🟡 A yellow ring round the notification dots (on unless turned off) so a new message or request catches the eye, on ⋯ More and in ⚙️. 🌗 Theme: light, dark, or as the device. 🔔 the sound when something arrives, and 🎵 which sound.",
+  "- 🔔 A SOUND WHEN SOMETHING ARRIVES: a message (from a linked kitchen, from your family, an answer to your note) taps twice; a request to link kitchens taps three times. Choose the sound — 🥂 Spoon on a wine glass, 🛎️ The kitchen’s service bell, 🥄 Wooden spoon on a pot, each with ▶ to hear it — in ⚙️ → ♿ Accessibility → 🎵 The sound; untick 🔔 Sound for messages and requests to mute it. On this device only. Browsers keep a page silent until it has been touched once since opening, so a message that arrives before that is not heard. On a phone it plays at the media volume; an iPhone on silent (the switch on its side) plays no sound.",
   "- A household's identifier works only within the same copy of the app: the family's copy and My Kitchen Notes keep their households apart.",
   "",
   "=== SAVING RECIPES FROM OTHER APPS ===",
@@ -30983,7 +31078,7 @@ var HELP_SYSTEM_PROMPT = [
   "- An address used with a password must be CONFIRMED from the e-mail sent to it; until then, places kept for that address do not open (invitation links still work). ⚙️ → ✉️ Confirm my e-mail address sends it again.",
   "- ⚙️ → 💾 Backups and photos → 💾 Backups saves a file with everything (every recipe and photo). ⚙️ → 🗑 Delete my account… (the last item) deletes the account and the households you own alone.",
   "- ⚙️ → 🔧 Troubleshooting → 🧽 Reset this device… erases only this device's copy; nothing in the cloud is deleted.",
-  "- ⚙️ Settings is in sections — 🎨 How it looks, 🏠 My household, 📥 Saving recipes from other apps, 💾 Backups and photos, 💬 Help and feedback, 🔧 Troubleshooting (and 👑 App owner, for the app's owner). Tap a section to open it. 🗑 Delete my account… is the last item, on its own. 🔒 What leaves this device (who receives what) is at the bottom of the ? window.",
+  "- ⚙️ Settings is in sections — 🎨 How it looks, ♿ Accessibility, 🏠 My household, 📥 Saving recipes from other apps, 💾 Backups and photos, 💬 Help and feedback, 🔧 Troubleshooting (and 👑 App owner, for the app's owner). Tap a section to open it. 🗑 Delete my account… is the last item, on its own. 🔒 What leaves this device (who receives what) is at the bottom of the ? window.",
   "- Every item in ⚙️ explains itself when you point at it.",
   "",
   "=== FOR THE APP'S OWNER ===",
