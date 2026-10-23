@@ -109,6 +109,7 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
   **v38.82 — 🔔 a kitchen sound when a message or request arrives, with a mute** (23 Oct; see its note and the audit);
   **v38.83 — ♿ Accessibility: red–green colours, a yellow ring round the dots** (23 Oct, 21:00; see its note);
   **v38.84 — the photos colour-corrected for red–green; Family Access and Households fit a phone** (21:35; see its note).
+  **v38.85 — Family Access says "⏳ hasn’t signed in yet" on a place kept for an address** (23 Oct; see its note).
   **Worker v87.** The test copy (https://tonys-recipes-test.pages.dev, its own database) follows `test`.
 - **The testers go live on Sunday 25 Oct 2026** (Tony: "The plan is to start sending invitations to the testers
   this Sunday"). The community app is **by invitation only** (Tony switched it, 20 Oct): only addresses invited with
@@ -991,6 +992,20 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
 - **Released: v38.84 (23 Oct 2026, 21:35 Israel time, on 393e2f4)** — every job success (Deploy to GitHub Pages,
   Publish languages, Translate new phrases, Self Tests on main and test — the new phone-fit check included —
   Cloudflare Pages for both copies).
+- **v38.85 — "⏳ hasn’t signed in yet" in 👥 Family Access** (Tony, 23 Oct, an iPhone screenshot: why one
+  family member had no Chat button — "Is it because he did not install the app?"). It was a
+  place kept for the address (`pending/<hid>:<email>`, `pending: true` in the list): nobody had signed in with it, so
+  no uid and nothing to chat with — installing is not needed, signing in with that address is (householdClaimKept runs
+  BEFORE the invitation-only gate, so a kept place lets them in). It looked like a member; now the row says
+  "⏳ hasn’t signed in yet" under the address (`.access-wait`, both the owner's and a reader's view), and Help's family
+  chat line says Chat comes once they sign in. **Translation:** `renderAccessMembers(standIns)` — the harvest draws the
+  list with stand-ins (one asking, one kept place) as the owner sees it (`householdCanManage` swapped for the
+  synchronous draw), then the real list again; the "✋ asks to add and change recipes" line had never been catalogued
+  (English in Hebrew since v37.13). i18n_sees_unopened_screens names both lines; the family-chat test checks the line
+  as a reader and as the owner. Told Tony: that person opens https://mykitchennotes.community and signs in with Google
+  as that address (or confirms it first with a password); ✉️ Notify sends them the note.
+- **Released: v38.85 (23 Oct 2026, 23:19 Israel time, on 4545f82)** — every job success (Deploy to GitHub Pages,
+  Publish languages, Translate new phrases, Self Tests on main and test, Cloudflare Pages for both copies).
 - **Photo keys, 23 Oct:** Pexels: "New API key issuance is currently paused and cannot be requested" (Tony); Unsplash:
   "We can forego unsplash for now" (Tony). Photos stay Pixabay + Wikimedia Commons; the workflow is ready if a key
   ever comes (secrets PEXELS_API_KEY / UNSPLASH_ACCESS_KEY, then dispatch Deploy the Worker).
