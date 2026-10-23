@@ -105,7 +105,8 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
   https://mykitchennotes.community, Firebase my-kitchen-notes-beta) run **v38.77** (released 22:22, all jobs
   success); then **v38.78 — 👪 Chat with family members** (22:52; rules published) and **v38.79 — Scottish voices**
   (23:04) — all jobs green (one Self Tests job on main re-run); **v38.80 — the Self Test in the owner's own browser**
-  (23 Oct 00:46) and **v38.81 — auto-fetch waits out a busy Pixabay** (01:00) — all jobs green (see their notes).
+  (23 Oct 00:46) and **v38.81 — auto-fetch waits out a busy Pixabay** (01:00) — all jobs green (see their notes);
+  **v38.82 — 🔔 a kitchen sound when a message or request arrives, with a mute** (23 Oct; see its note and the audit).
   **Worker v87.** The test copy (https://tonys-recipes-test.pages.dev, its own database) follows `test`.
 - **The testers go live on Sunday 25 Oct 2026** (Tony: "The plan is to start sending invitations to the testers
   this Sunday"). The community app is **by invitation only** (Tony switched it, 20 Oct): only addresses invited with
@@ -127,7 +128,11 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
 
 **What comes next**
 1. **Waiting on Tony:** 👪 Chat with family members in a household with at least two people (a message to everyone,
-   a 1-to-1, the 💬 Chat buttons in 👥 Family Access), and the farm window's "On this device: …" line (Scottish voices).
+   a 1-to-1, the 💬 Chat buttons in 👥 Family Access), and the farm window's "On this device: …" line (Scottish voices);
+   v38.82's sounds (⚙️ → 🎨 How it looks → 🎵 The sound; a message between two testers should tap twice); the photo
+   keys: a Pexels key from https://www.pexels.com/api/ (and Unsplash's from https://unsplash.com/oauth/applications if
+   he accepts the caveat in the v38.82 note) as secrets PEXELS_API_KEY / UNSPLASH_ACCESS_KEY at
+   https://github.com/rozinante2004-hash/tonys-recipes/settings/secrets/actions/new — then dispatch Deploy the Worker.
 2. **Releases:** until the testers go live (Sunday 25 Oct), release each version once the local suites and CI are
    green, without asking, and tell him after. **From Sunday 25 Oct: ask Tony before EVERY release.**
 3. **Reminder — Fri 23 Oct, 09:00 Israel time: try CallMeBot again** (WhatsApp alerts; the bot was full on 20 Oct).
@@ -143,7 +148,12 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
    page size (budget 1,800 KB for what a device downloads; ~1,653 KB built).
 6. **Later:** audit C — Playwright 1.56 → a version with Ubuntu 26.04 browsers, then unpin (NOT the launch week;
    before GitHub retires 24.04); audit G — a lighter first screen; a look at the AI models after the launch.
-7. **Lessons of 21 Oct:** a notice can be read the opposite way — Tony read "…appear here once that address is
+7. **Lessons of 22–23 Oct:** a refusal is not an answer — a source that says "too many, wait N s" read as "no
+   pictures" made every run look like it worked once; when the sandbox cannot reach a server, replay the exact run from
+   GitHub's servers (a one-off workflow on `test`, removed after). A Self Test that drives a whole feature also writes
+   the person's own state (the auto-fetch's undo): set it aside and put it back exactly. Web Audio: a
+   DynamicsCompressor's defaults squash and add make-up gain — set it as a peak limiter; let the AudioContext rest.
+8. **Lessons of 21 Oct:** a notice can be read the opposite way — Tony read "…appear here once that address is
    confirmed" as "confirmed": say what IS, plainly. Before blaming data, check what the app on the person's screen
    believes (a screenshot settled it). Firestore raises local writes to listeners before the write's promise
    resolves — never also push the written document into the same list. A rule function erroring on a missing field
@@ -891,6 +901,45 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
   success on both: Deploy to GitHub Pages, Publish languages, Translate new phrases, Self Tests on main and test,
   Cloudflare Pages (community and test copies). No Worker or rules change in either. Tony closed Chrome's "Save
   password?" (22 Oct).
+- **v38.82 — 🔔 a kitchen sound when something arrives, and its mute** (Tony, 23 Oct: "accompany any join request and
+  message arrival with an audio indicator. Something that is related to cooking or food. I thought of the sound of a
+  spoon tapping a wine glass 2-3 times, but am happy to hear other ideas. Also, in settings, put an option to mute
+  these notifications"). Drawn by Web Audio (no sound files): `CHIME_VOICES` glass (1480 Hz, modes ×2.71 ×5.15, a twin
+  +0.35 % for the shimmer), bell (a service bell, 2093 Hz, ×2.32 ×4.08) and pot (392 Hz, uneven ×1.52 ×2.08 ×2.67, a
+  low thud); each tap a burst of noise (the touch) and decaying sines. **A message taps twice, a request three times.**
+  `chimePlay(kind[, sound])`: nothing during a Self Test (unless `_chimeUnderTest`), nothing when muted (the ▶ buttons
+  play anyway), one sound per 1.5 s, nothing on a page nobody has touched (`chimePageTouched`), and one the browser
+  holds back is skipped, never played late. A touch wakes the audio (`chimeUnlock`); it rests 3–4.5 s after each sound
+  (`chimeRest`, a phone's battery) and the next sound wakes it by itself (checked in Chromium: running → suspended →
+  running with 3 taps → suspended). Peaks 0.62–0.72 (rendered offline, no clipping); the compressor only holds peaks
+  (the browser's default squashed the ring and added make-up gain). **Heard for:** a family-chat message from someone
+  else (`famArrived`), a linked kitchen's message (`linkLiveTalkArrived`), a link request that ARRIVES
+  (`linkRequestsHeard`: the first look on opening, or after switching kitchen, only notes what waits; asked again after
+  a refusal is new — keyed id@at), a link accepted on the other side, an answer to my note, a tester's note (owner).
+  Never for one's own messages; with the chat open too. ⚙️ → 🎨 How it looks: `🔔 Sound for messages and requests`
+  (tick = on; `mkn_chime_mute`) and `🎵 The sound: …` → a window with the three sounds, ▶ Message / ▶ Request for each,
+  and the mute (`mkn_chime`). Translation: the window is drawn by the harvest; the three menu labels and the photo
+  pause are in I18N_EXTRA (all checked harvested). Self-test `arrival_sound`. Listening files were sent to Tony.
+- **The audit of 22–23 Oct** (Tony: "audit all the changes done today, and make any required changes or fixes"),
+  v38.80 → v38.82 and the workflow, line by line. Fixed in v38.82: (1) the sound's compressor and level (above);
+  (2) the audio left running after the first touch → rests between sounds; (3) Help carried "(v38.82)" → removed, and
+  says a phone plays it at the media volume and an iPhone on silent plays nothing; (4) the sound window and labels were
+  not in the translation harvest → added and verified; (5) the window on a phone squeezed each name into a column and
+  cut the description → wraps; its title now matches the menu; (6) **a Self Test threw away the owner's own "↩︎ Undo
+  last auto-fetch"** (older than today: photo_autofetch_undo empties it, photo_never_overwrites's two runs cleared it
+  and then left a stand-in recipe's) → each puts the person's own back exactly (`idbPut`, time included);
+  self-test `self_test_keeps_own_undo` plants one and runs all three; the iPhone-offer test restores its mark both
+  ways; (7) a photo's credit links its library (Pexels asks for a link) — the lookup takes only the table's own names
+  (a linked kitchen's recipe is someone else's data: "constructor" must not become a link), tested. Checked and right
+  as they were: the runner's annotations (escaping; test names and stand-in data only), v38.80's guards, v38.81's
+  waits (Worker's own 429 = 60 s → capped 30 s; the manual search waits only ≤ 10 s), first snapshots silent, own
+  messages silent, the stripped build (acorn) and the suite on it.
+- **Photo libraries' keys (23 Oct, Tony: "Yes, set it up for the Pexels and Unsplash keys"):** deploy-worker.yml now
+  sets the Worker's `PEXELS_API_KEY` and `UNSPLASH_ACCESS_KEY` from GitHub secrets of the same names (unset → left as
+  it is). After Tony adds them: dispatch **Deploy the Worker** on `main` (workflow_dispatch) and check health
+  `configured`. Caveat told to Tony: Unsplash's API rules want its photos shown from its own servers (hotlinked) and
+  each use reported (download_location); the app keeps its own copy in the recipe, so Pexels (free to use and keep,
+  a credit and a link asked for — done) fits; Unsplash only if he accepts that or asks for the reporting call.
 - **Move step 9 finished (20 Oct 2026, 18:05 Israel time; Tony: "OK to delete the 4 + 135 old family documents").**
   clear-source `all` + `shared` (run 39445140837): 139 deleted (households 4, shared 135), the household cut to its
   moved mark; clear-check after it (run 39445361414): recipes-f379d holds 1 document of the moved household (its own,

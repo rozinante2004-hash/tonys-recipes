@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v38.81` — app. **Worker: v87**, deployed separately and versioned separately
+**Current version:** `v38.82` — app. **Worker: v87**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -722,7 +722,16 @@ seconds). `photoSearchOnce` marks an empty answer `rateLimited`/`retryAfter`/`no
 `photoPauseSecs` (asked + 1 s, 2–30 s) and asks again up to 3 times, skips a no-key source for the rest of the run,
 sends the broader attempts to every source, and names a source that stayed busy. The manual search waits once (≤ 10 s).
 
-**State on 23 Oct 2026 (v38.81, Worker v87):** testers are invited from Sunday 25 Oct; from then on every
+**Arrival sounds (v38.82):** Web Audio, no files. `chimePlay('message'|'request')` — two taps or three — of the chosen
+sound (`mkn_chime`: glass = a spoon on a wine glass, the default; bell = the kitchen's service bell; pot = a wooden spoon
+on a pot), unless muted (`mkn_chime_mute`), during a Self Test, within 1.5 s of the last, or on a page never touched.
+Heard for a family-chat or linked-kitchen message from someone else, a link request that arrives while the app is open
+(`linkRequestsHeard`: what waits on opening is only noted), a link accepted, an answer to one's note, a tester's note
+(owner). ⚙️ → 🎨 How it looks: 🔔 Sound for messages and requests (the mute) and 🎵 The sound (the window, ▶ each).
+The first touch wakes the audio; it rests a few seconds after each sound. The undo of the last auto-fetch is the
+person's own: tests that empty or write it put it back exactly.
+
+**State on 23 Oct 2026 (v38.82, Worker v87):** testers are invited from Sunday 25 Oct; from then on every
 release waits for the owner's yes. The community app is by invitation only; "Share this App with family" goes back
 to "Share this App" at the official launch. Open: WhatsApp (CallMeBot was full), the AI models after the launch, the testing
 tools' update (Playwright, Ubuntu 26.04) after launch week, a lighter first screen.

@@ -2867,7 +2867,7 @@ window.SELF_TESTS = [
         delete window._iosShortcutOverride;
         try{ delete navigator.userAgent; delete navigator.maxTouchPoints; }catch(e){}
         try{ closeM('urlImportOverlay'); }catch(e){}
-        try{ if(usedWas!==null) localStorage.setItem(IOS_SHORTCUT_USED_KEY, usedWas); }catch(e){}
+        try{ if(usedWas===null) localStorage.removeItem(IOS_SHORTCUT_USED_KEY); else localStorage.setItem(IOS_SHORTCUT_USED_KEY, usedWas); }catch(e){}
         if(typeof _offersCloud!=='undefined' && _offersCloud){ if(cloudUsedWas===undefined) delete _offersCloud.iosUsed; else _offersCloud.iosUsed=cloudUsedWas; }
       }
     } },
@@ -7824,6 +7824,120 @@ window.SELF_TESTS = [
       }
     } },
 
+  { id:'arrival_sound', group:'Sharing', name:'🔔 A kitchen sound when something arrives (v38.82): a message taps twice, a request to link kitchens three times; three sounds to choose from, each heard with ▶; a mute in ⚙️ → 🎨 How it looks; nothing for one’s own messages, nothing for what was already waiting on opening, one sound for a burst',
+    test:async function(){
+      // Tony, 23 Oct 2026: "accompany any join request and message arrival with an audio indicator … a spoon tapping a
+      // wine glass 2-3 times … in settings, put an option to mute these notifications." The browser's synthesiser is a
+      // stand-in here that counts the tones struck — a Self Test in someone's own browser makes no sound.
+      var keep={}; [CHIME_KEY, CHIME_MUTE_KEY].forEach(function(k){ try{ keep[k]=localStorage.getItem(k); }catch(e){} });
+      var real={ ctx:window.chimeCtx, play:window.chimePlay, under:window._chimeUnderTest, at:_chimeAt, heard:_linkHeard,
+        touched:window.chimePageTouched, own:_chimeCtx,
+        user:window._fbUser, hh:window._household, toastA:window.toastAction, toast:window.toast,
+        famDots:window.famDotRefresh, linkDots:window.linkDotRefresh };
+      var struck=0;
+      function node(){ return { connect:function(){}, frequency:{ value:0 },
+        gain:{ value:1, setValueAtTime:function(){}, exponentialRampToValueAtTime:function(){} } }; }
+      var fake={ state:'running', currentTime:0, sampleRate:8000, destination:{},
+        createOscillator:function(){ var o=node(); o.start=function(){ struck++; }; o.stop=function(){}; return o; },
+        createGain:node, createBiquadFilter:node, createDynamicsCompressor:node,
+        createBuffer:function(ch, n){ return { getChannelData:function(){ return new Float32Array(n); } }; },
+        createBufferSource:function(){ var s=node(); s.start=function(){}; return s; } };
+      try{
+        window._chimeUnderTest=true; window.chimeCtx=function(){ return fake; };
+        try{ localStorage.removeItem(CHIME_KEY); localStorage.removeItem(CHIME_MUTE_KEY); }catch(e){}
+        // A page nobody has touched: nothing is even asked of the sound (an answer to a note can be read on opening).
+        window.chimePageTouched=function(){ return false; }; _chimeCtx=null; _chimeAt=0;
+        if(chimePlay('message')!==false||struck) throw new Error('a page nobody had touched tried to sound');
+        window.chimePageTouched=function(){ return true; };
+        if(chimeChoice()!=='glass') throw new Error('the first sound is not the spoon on a wine glass: '+chimeChoice());
+        if(chimeMuted()) throw new Error('muted before anyone chose to mute');
+        _chimeAt=0;
+        if(chimePlay('message')!==true) throw new Error('a message made no sound');
+        if(struck!==8) throw new Error('a message is not two taps of the glass (four tones a tap): '+struck+' tones');
+        struck=0; _chimeAt=0; chimePlay('request');
+        if(struck!==12) throw new Error('a request is not three taps: '+struck+' tones');
+        struck=0; _chimeAt=0; chimePlay('message'); chimePlay('message');
+        if(struck!==8) throw new Error('two messages a moment apart sounded twice');
+        // A browser that has not been touched yet: nothing now, and nothing later either.
+        var resumed=null; fake.state='suspended'; fake.resume=function(){ return new Promise(function(r){ resumed=r; }); };
+        struck=0; _chimeAt=0; chimePlay('message');
+        if(struck) throw new Error('a sound played while the browser kept the page silent');
+        fake.state='running'; var was=Date.now; Date.now=function(){ return was()+5000; };
+        try{ resumed(); await new Promise(function(r){ setTimeout(r, 20); }); } finally { Date.now=was; }
+        if(struck) throw new Error('a sound held back by the browser was played late, seconds after the message');
+        delete fake.resume;
+        // Between sounds the audio is let go (a phone's battery), and the next message takes it again.
+        var slept=0; fake.suspend=function(){ slept++; fake.state='suspended'; return Promise.resolve(); };
+        fake.resume=function(){ fake.state='running'; return Promise.resolve(); };
+        chimeRest(fake, 5); await new Promise(function(r){ setTimeout(r, 40); });
+        if(!slept||fake.state!=='suspended') throw new Error('the audio was not let go after a sound');
+        struck=0; _chimeAt=0; chimePlay('message'); await new Promise(function(r){ setTimeout(r, 20); });
+        if(struck!==8) throw new Error('after a rest, the next message was not heard ('+struck+' tones)');
+        clearTimeout(_chimeSleep); delete fake.suspend; delete fake.resume; fake.state='running';
+        // A Self Test never wakes the real sound (a touch during the run would otherwise do it).
+        var asked=0; window._chimeUnderTest=false; window.chimeCtx=function(){ asked++; return fake; };
+        try{ if(_selfTestRunning){ chimeUnlock(); if(asked) throw new Error('a touch during a Self Test woke the sound'); } }
+        finally{ window._chimeUnderTest=true; window.chimeCtx=function(){ return fake; }; }
+
+        // The mute; and ▶ in the window plays the chosen sound even so.
+        chimeSetOn(false);
+        if(!chimeMuted()) throw new Error('unticking the sound did not mute it');
+        struck=0; _chimeAt=0;
+        if(chimePlay('message')!==false||struck) throw new Error('muted, it still sounded');
+        if(!chimePlay('message','pot')||struck!==8) throw new Error('▶ did not play the wooden spoon on a pot');
+        chimeSetOn(true);
+        if(chimeMuted()) throw new Error('ticking it again did not bring the sound back');
+        if(chimeSetSound('bell')!=='bell'||chimeChoice()!=='bell') throw new Error('the service bell could not be chosen');
+        if(chimeSetSound('trumpet')!==false||chimeChoice()!=='bell') throw new Error('an unknown sound was taken');
+
+        // ⚙️ → 🎨 How it looks shows it; the window offers all three, ▶ for each, and the mute.
+        chimeRefreshSettings();
+        var box=document.getElementById('chimeToggle'), it=document.getElementById('chimeChooseItem');
+        if(!box||!box.checked) throw new Error('🔔 Sound for messages and requests is missing, or unticked while on');
+        if(!it||it.textContent.indexOf('service bell')<0) throw new Error('the menu does not name the chosen sound: '+(it&&it.textContent));
+        if(!box.closest('[data-group="look"]')) throw new Error('the sound is not under 🎨 How it looks');
+        var ov=openChimeSettings();
+        try{
+          var radios=ov.querySelectorAll('input[name="chimeSound"]');
+          if(radios.length!==3) throw new Error('the window does not offer the three sounds');
+          if(ov.querySelector('input[name="chimeSound"]:checked').value!=='bell') throw new Error('the window does not show the chosen sound');
+          if(ov.querySelectorAll('button[onclick*="chimePlay"]').length!==6) throw new Error('not every sound can be heard as a message and as a request');
+          if(!document.getElementById('chimeWinMute')) throw new Error('the window has no mute');
+        } finally { ov.remove(); }
+
+        // Who hears what. Their message: yes, even with the chat open; one's own: no.
+        var heard=[]; window.chimePlay=function(k){ heard.push(k); return true; };
+        window.toastAction=function(){}; window.toast=function(){};
+        window.famDotRefresh=function(){}; window.linkDotRefresh=function(){};
+        window._fbUser={ uid:'uMe', email:'me@example.com', displayName:'Me' };
+        window._household={ hid:'hS', role:'owner', name:'Sound Kitchen', code:'', links:[], asking:[] };
+        famArrived([{ id:'a1', by:'uOther', name:'Dana', to:'all', text:'Dinner at 8', at:1 }]);
+        famArrived([{ id:'a2', by:'uMe', name:'Me', to:'all', text:'OK', at:2 }]);
+        if(heard.join()!=='message') throw new Error('family chat: '+(heard.join()||'nothing')+' (wanted one sound, for theirs only)');
+        heard=[];
+        linkLiveTalkArrived('hOther', [{ id:'b1', from:'hOther', name:'Other Kitchen', text:'Hello', at:3 }]);
+        linkLiveTalkArrived('hOther', [{ id:'b2', from:'hS', name:'Sound Kitchen', text:'Hi', at:4 }]);
+        if(heard.join()!=='message') throw new Error('linked kitchens’ chat: '+(heard.join()||'nothing'));
+        // Requests: what was waiting on opening is not news; one that arrives after is; asked again after a refusal, too.
+        heard=[]; _linkHeard=null;
+        var r1={ id:'hA_hS', d:{ at:100 } }, r2={ id:'hB_hS', d:{ at:200 } };
+        if(linkRequestsHeard([r1])!==0||heard.length) throw new Error('a request already waiting on opening made a sound');
+        if(linkRequestsHeard([r1])!==0||heard.length) throw new Error('the same waiting request sounded again');
+        if(linkRequestsHeard([r1, r2])!==1||heard.join()!=='request') throw new Error('a new request did not tap three times: '+heard.join());
+        heard=[];
+        if(linkRequestsHeard([{ id:'hA_hS', d:{ at:300 } }, r2])!==1||heard.join()!=='request') throw new Error('asked again, the request was not heard');
+        heard=[]; window._household={ hid:'hT', role:'owner', name:'T', links:[], asking:[] };
+        if(linkRequestsHeard([r1])!==0||heard.length) throw new Error('switching kitchens made the other kitchen’s waiting requests sound');
+      } finally {
+        window.chimeCtx=real.ctx; window.chimePlay=real.play; window._chimeUnderTest=real.under; _chimeAt=real.at; _linkHeard=real.heard;
+        clearTimeout(_chimeSleep); window.chimePageTouched=real.touched; _chimeCtx=real.own;
+        window._fbUser=real.user; window._household=real.hh; window.toastAction=real.toastA; window.toast=real.toast;
+        window.famDotRefresh=real.famDots; window.linkDotRefresh=real.linkDots;
+        [CHIME_KEY, CHIME_MUTE_KEY].forEach(function(k){ try{ if(keep[k]==null) localStorage.removeItem(k); else localStorage.setItem(k, keep[k]); }catch(e){} });
+        try{ chimeRefreshSettings(); }catch(e){}
+      }
+    }
+  },
   { id:'family_chat', group:'Sharing', name:'👪 Chat with family members (v38.78): ⋯ More → 👪 above the linked kitchens’ chats; a room for everyone (announcements) and one per person (only the two read it); live — a notice, a red dot, read when opened; the message and its id in one batch; the box empty after sending; 💬 Chat beside each person (and the owner) in Family Access; deleting the household deletes the chat by its ids; nothing listened to while nobody else is there',
     test: async()=>{
       // Tony, 21 Oct 2026: "extend the ability to chat with Joined Kitchens to the family members in a household … 1-to-1
@@ -9967,6 +10081,10 @@ window.SELF_TESTS = [
 
   { id:'photo_autofetch_undo', group:'Features', name:'Auto-fetch verifies itself and can be undone (5g.6)',
     test: async()=>{
+      // v38.82 — the person's own "↩︎ Undo last auto-fetch" is set aside and put back as it was: this test empties it
+      // on purpose, and a Self Test run in someone's own browser used to throw their undo away with it.
+      var ownUndo=await autoFetchUndoLoad();
+      try{
       ['autoFetchVerifyTargets','autoFetchUndoSave','autoFetchUndoLoad','autoFetchUndoClear','undoAutoFetch']
         .forEach(function(f){ if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
       if(!document.getElementById('autoFetchUndoItem')) throw new Error('there is no menu entry to undo a run');
@@ -10080,6 +10198,10 @@ window.SELF_TESTS = [
         window.saveData=uSave; window.renderGrid=uGrid;
         await autoFetchUndoClear();
       }
+      } finally {
+        try{ if(ownUndo) await idbPut(ownUndo); else await autoFetchUndoClear(); }catch(e){}
+        try{ refreshAutoFetchUndoItem(); }catch(e){}
+      }
     } },
 
   { id:'photo_autofetch_waits_for_busy_source', group:'Features', name:'Auto-fetch waits out a busy photo source and gets every photo (v38.81)',
@@ -10138,7 +10260,8 @@ window.SELF_TESTS = [
         window.photoSearchTerms=kTerms; window.photoSearchOnce=kOnce; window.fetch=kFetch;
         window.compressPhotoToDataUrl=kUp; window.toast=kToast; window.showServiceError=kErr;
         window.saveData=kSave; window.renderGrid=kGrid; window.photoPauseSecs=kPause;
-        try { if(kUndo) await autoFetchUndoSave(kUndo.items); else await autoFetchUndoClear(); } catch(e){}
+        try { if(kUndo) await idbPut(kUndo); else await autoFetchUndoClear(); } catch(e){}
+        try { refreshAutoFetchUndoItem(); } catch(e){}
       }
       // The broader attempts go to every source, not only to the first (which may have no key).
       var plan=photoAttemptPlan('lava cake','Dessert');
@@ -10150,10 +10273,32 @@ window.SELF_TESTS = [
       if(photoPauseSecs({ rateLimited:true, retryAfter:600 })!==30) throw new Error('a long pause is not capped at 30 s');
     }
   },
+  { id:'self_test_keeps_own_undo', group:'Features', name:'A Self Test gives back the person’s own “↩︎ Undo last auto-fetch”, exactly as it was (v38.82)',
+    test: async()=>{
+      var own=await autoFetchUndoLoad();
+      var planted={ id:AUTOFETCH_UNDO_KEY, at:12345, items:[{ id:777, name:'mine', photo:'', originalPhoto:'', credit:null }] };
+      try{
+        await idbPut(planted);
+        // Every test that runs a whole auto-fetch (each run writes the undo) or empties it on purpose.
+        var ids=['photo_autofetch_undo', 'photo_autofetch_waits_for_busy_source', 'photo_never_overwrites'];
+        for(var i=0;i<ids.length;i++){
+          var t=window.SELF_TESTS.filter(function(x){ return x.id===ids[i]; })[0];
+          if(!t) throw new Error(ids[i]+' is missing');
+          await t.test();
+          var back=await autoFetchUndoLoad();
+          if(!back||back.at!==12345||!back.items.length||back.items[0].id!==777)
+            throw new Error(ids[i]+' threw away the person’s own undo: '+JSON.stringify(back));
+        }
+      } finally {
+        try{ if(own) await idbPut(own); else await autoFetchUndoClear(); }catch(e){}
+        try{ refreshAutoFetchUndoItem(); }catch(e){}
+      }
+    } },
   { id:'photo_never_overwrites', group:'Features', name:'Auto-fetch never touches a recipe that already has a photo (5g.2)',
     test: async()=>{
       if(typeof recipesWithNoPhoto!=='function') throw new Error('recipesWithNoPhoto not defined');
       var savedRecipes=recipes, realHyd=window.hydratePhotosFromIDB, realAll=window.idbGetAll;
+      var ownUndo=await autoFetchUndoLoad();   // (v38.82 — the runs below write the undo: the person's own goes back after)
       try{
         window.hydratePhotosFromIDB=function(){ return Promise.resolve(); };
 
@@ -10256,6 +10401,8 @@ window.SELF_TESTS = [
         }
       } finally {
         recipes=savedRecipes; window.hydratePhotosFromIDB=realHyd; window.idbGetAll=realAll;
+        try{ if(ownUndo) await idbPut(ownUndo); else await autoFetchUndoClear(); }catch(e){}
+        try{ refreshAutoFetchUndoItem(); }catch(e){}
       }
     } },
 
@@ -12562,6 +12709,15 @@ window.SELF_TESTS = [
       if(/<img src=x/.test(evil)) throw new Error('the credit name is injected as live HTML');
       if(photoCreditHtml({ photo:'data:x' })!=='') throw new Error('a photo with no credit produced a stray line');
       if(photoCreditHtml({ photoCredit:{ name:'X' } })!=='') throw new Error('credit shown for a recipe with no photo');
+      // v38.82 — the library linked (Pexels asks for a link to it); a name that is not a library's stays plain text,
+      // even one that is the name of something every object has (a linked kitchen's recipe is someone else's data).
+      if(photoCreditHtml({ photo:'data:x', photoCredit:{ name:'P', source:'Pexels' } }).indexOf('href="https://www.pexels.com"')===-1)
+        throw new Error('the credit does not link to Pexels');
+      ['constructor','__proto__','toString','Somewhere'].forEach(function(src){
+        var h=photoCreditHtml({ photo:'data:x', photoCredit:{ name:'P', source:src } });
+        if(/href=/.test(h)) throw new Error('a source called "'+src+'" was made into a link: '+h);
+        if(h.indexOf(src)===-1) throw new Error('the source "'+src+'" went missing from the credit');
+      });
     } },
   { id:'export_docx_build', group:'Import/Export', name:'Word (.docx) builds a valid ZIP',
     test: async()=>{

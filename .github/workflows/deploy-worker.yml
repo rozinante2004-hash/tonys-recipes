@@ -94,14 +94,18 @@ jobs:
       # v84 — the owner on WhatsApp (CallMeBot: his number and the key it gave him) and the hourly usage check on
       # Cloudflare's own clock (a token that may only read analytics). Each is set from the GitHub secret of the same
       # name when there is one; never printed. Without them: e-mail only, and the GitHub watch only.
-      - name: WhatsApp and the hourly check
+      # 23 Oct 2026 — and the photo libraries' keys (Tony: "Yes, set it up for the Pexels and Unsplash keys"): without
+      # them only Pixabay and Wikimedia Commons answer photo searches. An unset one leaves the Worker's value as it is.
+      - name: WhatsApp, the hourly check and the photo libraries
         if: steps.token.outputs.ok == 'true'
         env:
           WHATSAPP_PHONE: ${{ secrets.WHATSAPP_PHONE }}
           WHATSAPP_KEY: ${{ secrets.WHATSAPP_KEY }}
           CF_ANALYTICS_TOKEN: ${{ secrets.CF_ANALYTICS_TOKEN }}
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          UNSPLASH_ACCESS_KEY: ${{ secrets.UNSPLASH_ACCESS_KEY }}
         run: |
-          for name in WHATSAPP_PHONE WHATSAPP_KEY CF_ANALYTICS_TOKEN; do
+          for name in WHATSAPP_PHONE WHATSAPP_KEY CF_ANALYTICS_TOKEN PEXELS_API_KEY UNSPLASH_ACCESS_KEY; do
             value="${!name}"
             if [ -n "$value" ]; then printf '%s' "$value" | npx --yes wrangler@4 secret put "$name" --config worker/wrangler.jsonc >/dev/null; echo "$name is set"
             else echo "::notice::$name is not set (Settings → Secrets and variables → Actions) — left as it is"; fi
