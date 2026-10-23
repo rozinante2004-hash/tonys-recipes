@@ -110,6 +110,8 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
   **v38.83 — ♿ Accessibility: red–green colours, a yellow ring round the dots** (23 Oct, 21:00; see its note);
   **v38.84 — the photos colour-corrected for red–green; Family Access and Households fit a phone** (21:35; see its note).
   **v38.85 — Family Access says "⏳ hasn’t signed in yet" on a place kept for an address** (23 Oct; see its note).
+  **v38.86 — a notice about something elsewhere takes you there with one click** (24 Oct, 01:09; see its note).
+  **v38.87 — Bold (B, Ctrl+B) in ingredients and the Method; Update Recipe floats at the bottom of the editor** (24 Oct, 01:33).
   **Worker v87.** The test copy (https://tonys-recipes-test.pages.dev, its own database) follows `test`.
 - **The testers go live on Sunday 25 Oct 2026** (Tony: "The plan is to start sending invitations to the testers
   this Sunday"). The community app is **by invitation only** (Tony switched it, 20 Oct): only addresses invited with
@@ -1005,6 +1007,61 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
   as a reader and as the owner. Told Tony: that person opens https://mykitchennotes.community and signs in with Google
   as that address (or confirms it first with a password); ✉️ Notify sends them the note.
 - **Released: v38.85 (23 Oct 2026, 23:19 Israel time, on 4545f82)** — every job success (Deploy to GitHub Pages,
+  Publish languages, Translate new phrases, Self Tests on main and test, Cloudflare Pages for both copies).
+- **v38.86 — a toast that takes you there** (Tony, 23 Oct: "When a toast jumps, informing me of something, can we make
+  this toast clickable, so clicking it will bring me to the relevant location the toast is writing about?"). API:
+  `toast(msg, go)` / `toast(msg, ms, go)` and `toastAction(msg, label, onAction, ms, go)`. With `go`, the whole toast is a
+  button (`.toast-go`, pointer-events on, tabindex 0, Enter/Space — not Enter on its own button), a › after its words
+  (`.toast-arrow::after`, ‹ under `[dir="rtl"]`; CSS only, so the words stay one translation key), at least
+  `TOAST_GO_MIN_MS` = 6 s on screen; a click runs `go` (`toastGo`: insightCount('toast-go'), errors caught). `toastHide`
+  resets everything; a plain toast is unchanged (pointer-events none). toastAction: the words go where the message
+  points, the button keeps its own job; an Undo toast has no `go`, so its words only dismiss it. Where they lead:
+  `goRecipe(id)` (gone → "That recipe is no longer here"), `goSettings(group, sel)` (⚙️ opened, its section, the item
+  marked — after toggleDrop's own frame), `goKitchen(hid)` (🏠 Kitchens: that kitchen alone; the Link requests page
+  removed), `goFamilyAccess()` (marks someone asking), `goFeedback()` (👑 → 📊 → 💬 Feedback), and existing openers
+  (openLinkRequests, openSyncHealth, showLoggingPanel, showBackupPanel, openRecipeBadge, toggleLangMenu,
+  openFreehandModal(text)). `toastLand(el)`: a 1.8 s yellow ring (`--dot-ring`; static under reduced motion). **Wired
+  (≈ 30 toasts):** family and linked-kitchen messages (the chat, as their Open button); a kitchen linked here, accepted
+  there or already linked (goKitchen); a tester's note (goFeedback); someone asking, or joining (goFamilyAccess); link
+  requests sent / "stays" (openLinkRequests); recipe saved / updated (unless open behind the editor) / imported /
+  updated by an import (not during a WhatsApp batch: `toastGoUnlessBatch`) / copied from a linked kitchen /
+  translated / suggested / made from a collection's part / video bookmark (goRecipe); collected (the collection);
+  backups done, failed, and the reminder's words (showBackupPanel); sync failed and the AI allowance (Sync Health);
+  a page error (the log); a new medal; the hidden 💬 button (⚙️ → Help and feedback → Send feedback); the confirmation
+  e-mail (⚙️ → ✉️ Confirm…); no language yet (🌐); a file with no recipe (free-hand import with its text); Facebook's
+  text (the Parse button marked). Left alone: toasts about what is on the screen (copied, saved settings, validation,
+  progress). **Translation:** I18N_SCRAPE's toast regex reads `toast(`/`toastAction(` with a literal followed by `,` or
+  `)` (it required `)` or a number before — a `go` would have dropped every such toast from the dictionary), the
+  pattern openers read toastAction too (its built messages were never catalogued), and 'Open' is in I18N_EXTRA (it
+  was English in Hebrew). Help: "👉 NOTICES THAT TAKE YOU THERE"; the feature list; manage.js USE_WORDS 'toast-go'.
+  Self Test `toast_leads_there`.
+- **Released: v38.86 (24 Oct 2026, 01:09 Israel time, on 2b7ff42)** — CI green (its Playwright install took 10 min on
+  GitHub's side, so the run took ~21 min). Every job success (Deploy to GitHub Pages, Publish languages,
+  Translate new phrases, Self Tests on main and test, Cloudflare usage, Cloudflare Pages for both copies).
+- **v38.87 — Bold, and a floating Update Recipe** (Tony, 24 Oct: "Please create a "Bold" control, so I could mark words
+  (either in the ingredients or Methods areas) a BOLD. We should also be able to use the "CTRL+B" keyboard shortcut" and
+  "make the "Update Recipe" a floating button, like the "X" button at the top … at the bottom of the screen"). **Bold is
+  written `**…**`** in the line's plain text (inputs and the Method textarea cannot show bold; WhatsApp-like, and AI
+  imports that bring markdown bold now show it). `BOLD_RE = /\*\*(?=\S)([\s\S]*?\S)\*\*/g` (a word at each end: "a ** b"
+  stays), `escB` (escH then <strong> — escaped first), `noBold`, `boldAs(s, '*')`. **Shown bold:** ingredientLinesHtml
+  (subs, names; a bold amount is converted/scaled without the marks and shown bold whole), stepLinesHtml (boldHtml
+  over escH/scaleStepHtml; scaleStepHtml lets a number follow `**`), a linked kitchen's view, rHtml (e-mail),
+  buildRecipePage, buildPrintHtml, previewIngsHtml/previewStepsHtml, the translation previews, makeDocxBlob (`wRuns`:
+  bold runs; sub-titles and amounts without marks). **Plain:** rText (share/WhatsApp: `*bold*`), search
+  (recipeIngredientNames, steps, the match line), missingFor (pantry), Bring! (names and amounts), the nutrition prompt.
+  **Editor:** `boldToggle(el, s, e)` — the selection (spaces kept outside) or the word at the cursor (\p{L}\p{N}…);
+  inside/around a bold span → off; nothing there → `****` with the caret between (again → removed); several Method
+  lines → each line's words (after `# ` / indent), all bold → none. `boldPut` uses execCommand('insertText') so Ctrl+Z
+  works (falls back to setting the value). B buttons: above the Method (`boldTool('steps')`, uses the remembered caret
+  when the textarea lost focus) and beside + Add ingredient (`boldTool('ings')`, the last ingredient field focused —
+  `_boldField` via focusin). Ctrl+B / ⌘B in `#ingsRows input, #f-steps` (also `e.code === 'KeyB'`, for a Hebrew
+  keyboard), preventDefault (Firefox's bookmarks). Hint under the Method's tools. **Floating Update Recipe:**
+  `.edit-save-bar` (sticky bottom of the editor's scrolling `.modal`, a fade above it, safe-area padding) holding
+  `#editSubmitBtn`; `#editOverlay .modal { scroll-padding-bottom: 84px }` so a focused field scrolls clear of it.
+  Help: BOLD and SAVE / UPDATE RECIPE lines. Self Test `recipe_bold` (toggle cases, Ctrl+B incl. Hebrew key, B button,
+  rendering incl. scaled steps and XSS, WhatsApp text, search, pantry, source checks for Word/e-mail/page/print/Bring!,
+  the button sticky and in sight at the top and the end of a 40-ingredient editor).
+- **Released: v38.87 (24 Oct 2026, 01:33 Israel time, on a44ebc2)** — every job success (Deploy to GitHub Pages,
   Publish languages, Translate new phrases, Self Tests on main and test, Cloudflare Pages for both copies).
 - **Photo keys, 23 Oct:** Pexels: "New API key issuance is currently paused and cannot be requested" (Tony); Unsplash:
   "We can forego unsplash for now" (Tony). Photos stay Pixabay + Wikimedia Commons; the workflow is ready if a key

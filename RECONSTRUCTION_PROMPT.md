@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v38.85` — app. **Worker: v87**, deployed separately and versioned separately
+**Current version:** `v38.87` — app. **Worker: v87**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -746,6 +746,18 @@ the 👑 📊 Households table is cards below 700 px (cells with data-label) wit
 tests/phone-fit.js measures both at 390/360/1280 px.
 A place kept for an address that nobody has signed in with yet says "⏳ hasn’t signed in yet" under it (v38.85): it
 has no 💬 Chat, because there is nobody to chat with until they sign in with that address.
+
+**A toast that takes you there (v38.86):** `toast(msg, go)` / `toast(msg, ms, go)` / `toastAction(…, ms, go)` — with
+`go` the whole toast is a button with a › (CSS ::after, ‹ in RTL), up ≥ 6 s, click/Enter runs `go`; the place is
+marked by `toastLand` (a moment's yellow ring). Destinations: goRecipe, goSettings(group, selector), goKitchen,
+goFamilyAccess, goFeedback, and the existing window openers. Arrivals, links, saves, imports and backups are wired;
+toasts about what is already on the screen are not. The translation scan accepts a toast with a `go` argument.
+
+**Bold in a recipe (v38.87):** a bold word is `**…**` in the line's text; B (above the Method, beside + Add
+ingredient) or Ctrl+B/⌘B toggles it on the selection or the word at the cursor (several Method lines: line by line).
+`escB` shows it bold wherever a recipe is drawn (view, linked view, print, Word runs, e-mail, shared page, previews);
+`noBold` for search, pantry, Bring!, AI; WhatsApp text gets `*bold*`. **Save / Update Recipe** floats in a sticky bar
+at the bottom of the editor.
 
 **State on 23 Oct 2026 (v38.84, Worker v87):** testers are invited from Sunday 25 Oct; from then on every
 release waits for the owner's yes. The community app is by invitation only; "Share this App with family" goes back
