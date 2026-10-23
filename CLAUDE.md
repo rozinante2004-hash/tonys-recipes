@@ -108,7 +108,7 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
   (23 Oct 00:46) and **v38.81 — auto-fetch waits out a busy Pixabay** (01:00) — all jobs green (see their notes);
   **v38.82 — 🔔 a kitchen sound when a message or request arrives, with a mute** (23 Oct; see its note and the audit);
   **v38.83 — ♿ Accessibility: red–green colours, a yellow ring round the dots** (23 Oct, 21:00; see its note);
-  **v38.84 — the photos colour-corrected for red–green; Family Access and Households fit a phone** (see its note).
+  **v38.84 — the photos colour-corrected for red–green; Family Access and Households fit a phone** (21:35; see its note).
   **Worker v87.** The test copy (https://tonys-recipes-test.pages.dev, its own database) follows `test`.
 - **The testers go live on Sunday 25 Oct 2026** (Tony: "The plan is to start sending invitations to the testers
   this Sunday"). The community app is **by invitation only** (Tony switched it, 20 Oct): only addresses invited with
@@ -988,6 +988,9 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
   `::before`), with a "Sort by" menu (`mknManage.sortTo('key:dir')`) for the hidden headers; the details' Extras wrap.
   The computer keeps the table. **CI:** tests/phone-fit.js stages both windows with stand-ins at 390, 360 and 1280 px,
   dark and light, and fails on anything outside its card, a name under 120 px, or a sideways scroll in any tab.
+- **Released: v38.84 (23 Oct 2026, 21:35 Israel time, on 393e2f4)** — every job success (Deploy to GitHub Pages,
+  Publish languages, Translate new phrases, Self Tests on main and test — the new phone-fit check included —
+  Cloudflare Pages for both copies).
 - **Photo keys, 23 Oct:** Pexels: "New API key issuance is currently paused and cannot be requested" (Tony); Unsplash:
   "We can forego unsplash for now" (Tony). Photos stay Pixabay + Wikimedia Commons; the workflow is ready if a key
   ever comes (secrets PEXELS_API_KEY / UNSPLASH_ACCESS_KEY, then dispatch Deploy the Worker).
