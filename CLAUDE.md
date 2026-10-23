@@ -135,8 +135,10 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
    https://github.com/rozinante2004-hash/tonys-recipes/settings/secrets/actions/new — then dispatch Deploy the Worker.
 2. **Releases:** until the testers go live (Sunday 25 Oct), release each version once the local suites and CI are
    green, without asking, and tell him after. **From Sunday 25 Oct: ask Tony before EVERY release.**
-3. **Reminder — Fri 23 Oct, 09:00 Israel time: try CallMeBot again** (WhatsApp alerts; the bot was full on 20 Oct).
-   The reminder was set in the OLD session; a new session must remind him itself. Steps: AUDIT-2026-10-prelaunch.md
+3. **Reminder — Mon 26 Oct, 09:00 Israel time (winter time, UTC+2): try CallMeBot again** (WhatsApp alerts). Still
+   full on 20 Oct and again on 23 Oct (Tony, 23 Oct 13:09). Set in this session (send_later trig_01WCxjqehivyQrFXTaxrkiYk,
+   07:00 UTC); a new session must remind him itself. If full a third time, also mention Meta's own WhatsApp Cloud API
+   as the dependable route (more setup). Steps: AUDIT-2026-10-prelaunch.md
    "Needs Tony" item 1 (https://www.callmebot.com/blog/free-api-whatsapp-messages/ → contact → "I allow callmebot to
    send me messages" → secrets WHATSAPP_PHONE and WHATSAPP_KEY at
    https://github.com/rozinante2004-hash/tonys-recipes/settings/secrets/actions/new → redeploy the Worker → ⚙️ → 👑 →
