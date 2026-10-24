@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v38.88` — app. **Worker: v88**, deployed separately and versioned separately
+**Current version:** `v38.89` — app. **Worker: v89**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -762,6 +762,8 @@ at the bottom of the editor.
 **Delete selected (v38.88, Worker v88):** 👑 → 📊 Households → 💬 Feedback and ⚠️ Errors: a Select box on each report,
 Select all shown / Clear, and 🗑 Delete selected (n) once anything is ticked — sent in batches of up to 100
 (meter-admin `notes-delete` / `errors-delete` with `ids`): one fresh sign-in and one owner alert per batch, not per report.
+Beside it (v38.89, Worker v89): 👀 Seen / ✅ Done for the ticked notes and ✅ Done for the ticked error reports —
+`notes-status` / `errors-status` with `ids` (up to 99, plus the status) in one request; no alert (it can be undone).
 
 **State on 23 Oct 2026 (v38.84, Worker v87):** testers are invited from Sunday 25 Oct; from then on every
 release waits for the owner's yes. The community app is by invitation only; "Share this App with family" goes back

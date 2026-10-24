@@ -113,7 +113,8 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
   **v38.86 — a notice about something elsewhere takes you there with one click** (24 Oct, 01:09; see its note).
   **v38.87 — Bold (B, Ctrl+B) in ingredients and the Method; Update Recipe floats at the bottom of the editor** (24 Oct, 01:33).
   **v38.88 + Worker v88 — select several reports in 💬 Feedback and ⚠️ Errors, and 🗑 Delete selected** (24 Oct, 02:34).
-  **Worker v88.** The test copy (https://tonys-recipes-test.pages.dev, its own database) follows `test`.
+  **v38.89 + Worker v89 — 👀 Seen / ✅ Done for the ticked notes, ✅ Done for the ticked error reports** (24 Oct, 13:03).
+  **Worker v89.** The test copy (https://tonys-recipes-test.pages.dev, its own database) follows `test`.
 - **The testers go live on Sunday 25 Oct 2026** (Tony: "The plan is to start sending invitations to the testers
   this Sunday"). The community app is **by invitation only** (Tony switched it, 20 Oct): only addresses invited with
   ⚙️ → 👑 → ✉️ Invite testers may found a kitchen (rules `invitedTester()`, `testerInvites/<sha256 of the address>`);
@@ -1079,6 +1080,19 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
   and Self Test `manage_delete_selected` (button appears only when ticked, Cancel, one request with both ids, the older
   server's one-by-one, Errors' tick boxes and Select all, a refusal keeps them) — checked to fail when the op is broken.
 - **Released: v38.88 + Worker v88 (24 Oct 2026, 02:34 Israel time, on 8fed6f8)** — every job success (Deploy the Worker,
+  its "live Worker answers with this version" step included; Deploy to GitHub Pages, Publish languages, Translate new
+  phrases, Self Tests on main and test, Cloudflare Pages for both copies).
+- **v38.89 + Worker v89 — Seen / Done for the selected** (Tony, 24 Oct, typed in the Hebrew layout: "On the Feedback
+  tab, what is the difference between Seen and Done?" — answered: new counts for the ⚙️ red dot; 👀 Seen = read, off the
+  dot, still under "Not done yet"; ✅ Done = also off that list, still under All; Reply in app marks a new note seen —
+  then "Add a "Seen" and "Done" for selected notes too"). 💬 Feedback: `👀 Seen (n)` and `✅ Done (n)` beside
+  🗑 Delete selected once notes are ticked (`markPicked(status)`); ⚠️ Errors: `✅ Done (n)` (`errMarkPicked`). One request
+  for the lot, the ticks cleared, the list follows its filter, syncDot; a copy's own-database notes in one Firestore
+  batch; an older Worker one by one. `deleteBatch(op, oneOp, ids, extra)` now sends batches of 99 for everything.
+  **Worker v89:** meter-admin `notes-status` (new|seen|done) / `errors-status` (new|done) with `ids` — `idBatch(v, 99)`:
+  with the status, D1's 100 values — one UPDATE … IN (…); not OWNER_DESTRUCTIVE (no fresh sign-in, no alert). Tests:
+  worker-cors.mjs and Self Test `manage_mark_selected` (checked to fail when the op is broken).
+- **Released: v38.89 + Worker v89 (24 Oct 2026, 13:03 Israel time, on 106bb11)** — every job success (Deploy the Worker,
   its "live Worker answers with this version" step included; Deploy to GitHub Pages, Publish languages, Translate new
   phrases, Self Tests on main and test, Cloudflare Pages for both copies).
 - **Photo keys, 23 Oct:** Pexels: "New API key issuance is currently paused and cannot be requested" (Tony); Unsplash:
