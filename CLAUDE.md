@@ -115,8 +115,8 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
   **v38.87 — Bold (B, Ctrl+B) in ingredients and the Method; Update Recipe floats at the bottom of the editor** (24 Oct, 01:33).
   **v38.88 + Worker v88 — select several reports in 💬 Feedback and ⚠️ Errors, and 🗑 Delete selected** (24 Oct, 02:34).
   **v38.89 + Worker v89 — 👀 Seen / ✅ Done for the ticked notes, ✅ Done for the ticked error reports** (24 Oct, 13:03).
-  **v38.90 — the beta-eve audit: Hebrew reaches the first hour; a new kitchen's small things** (24 Oct; AUDIT-2026-10-24-beta-eve.md).
-  **v38.91 — the audit's last fixes, the Help and the recreation prompt** (24 Oct).
+  **v38.90 — the beta-eve audit: Hebrew reaches the first hour; a new kitchen's small things** (24 Oct, 13:55; AUDIT-2026-10-24-beta-eve.md).
+  **v38.91 — the audit's last fixes, the Help and the recreation prompt** (24 Oct, 14:07).
   **Worker v89.** The test copy (https://tonys-recipes-test.pages.dev, its own database) follows `test`.
 - **The testers go live on Sunday 25 Oct 2026** (Tony: "The plan is to start sending invitations to the testers
   this Sunday"). The community app is **by invitation only** (Tony switched it, 20 Oct): only addresses invited with
@@ -1125,8 +1125,16 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
     - "under $0.01", no longer "about under $0.01".
     - Help: the language offer at sign-in, and the owner's Seen / Done / Delete selected.
     - RECONSTRUCTION_PROMPT: the translation rules and a new kitchen's first hour.
-  - **Watch:** the 55 phrases arrive with "Translate new phrases" + "Publish languages" after the release; the
-    chat history is read whole on each open (a limit of the last 200 if a kitchen chats a lot).
+  - **Watch:** the chat history is read whole on each open (a limit of the last 200 if a kitchen chats a lot).
+  - **Released: v38.90 (24 Oct 2026, 13:55 Israel time, on 4ff8584)** — every job success (Deploy to GitHub Pages,
+    Translate new phrases, Publish languages, Self Tests on main and test, Cloudflare Pages for both copies). The 55
+    phrases were translated and published at 13:59 (f07dc25); the status-line name entries are gone from all nine
+    files. (Two old About-line keys holding the owner's name remain in he.json — the name is public as the
+    controller in the Privacy Statement.)
+  - **Released: v38.91 (24 Oct 2026, 14:07 Israel time, on 9277db1 — ee16b38 plus the languages bot's merge, which
+    adds only i18n files; ee16b38's CI was green)** — every job success (the same list). The first release attempt
+    stopped at "main is not an ancestor": the languages bot had published to main meanwhile; release the merged
+    test head instead.
 - **Photo keys, 23 Oct:** Pexels: "New API key issuance is currently paused and cannot be requested" (Tony); Unsplash:
   "We can forego unsplash for now" (Tony). Photos stay Pixabay + Wikimedia Commons; the workflow is ready if a key
   ever comes (secrets PEXELS_API_KEY / UNSPLASH_ACCESS_KEY, then dispatch Deploy the Worker).
