@@ -8200,6 +8200,12 @@ window.SELF_TESTS = [
       if(metaVal('-')!=='' || metaVal('—')!=='' || metaVal(' ')!=='' || metaVal(null)!=='' || metaVal('20 min')!=='20 min' || metaVal(4)!=='4') throw new Error('metaVal');
       if(emojiFor('Lemon pasta','Dinner')!=='🍝' || emojiFor('מרק עדשים','')!=='🍲' || emojiFor('Greek Salad','')!=='🥗') throw new Error('emojiFor: '+[emojiFor('Lemon pasta','Dinner'), emojiFor('מרק עדשים',''), emojiFor('Greek Salad','')].join(' '));
       if(!emojiFor('Zzz', '')) throw new Error('no emoji at all for an unknown name');
+      // v38.91 — the cost line: "under $0.01", never "about under $0.01"
+      if(aiSpendLine({ calls:1, usd:0.004 })!=='1 AI call, under $0.01' || aiSpendLine({ calls:2, usd:0.5 })!=='2 AI calls, about $0.50')
+        throw new Error('the cost line: '+aiSpendLine({ calls:1, usd:0.004 })+' / '+aiSpendLine({ calls:2, usd:0.5 }));
+      // v38.91 — a family-chat message is signed with the member list's name, not one typed into the message
+      if(/m\.name \|\| famPersonName/.test(String(window.renderFamilyChat || '')) || /m\.name \|\| famPersonName/.test(String(window.famArrived || '')))
+        throw new Error('a family-chat message is still signed with the name typed into it');
       var real=window.syncHealth, el=document.getElementById('syncHealthBody');
       try{
         window.syncHealth=function(){ var h=real(); h.signedIn=true; h.schema=0; h.cloudRecipes=0; return h; };

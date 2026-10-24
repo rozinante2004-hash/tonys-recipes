@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v38.90 -->
+<!-- Tony's Recipes Collection v38.91 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -6029,7 +6029,7 @@ function famArrived(fresh) {
   var m = theirs[theirs.length - 1], room = famRoomOf(m);
   if (win && _fam.with === room) return;                                       // on the screen already
   var text = String(m.text || '');
-  toastAction('\u{1F46A} ' + (m.name || famPersonName(m.by)) + (m.to === 'all' ? ' (to everyone)' : '') + ': “'
+  toastAction('\u{1F46A} ' + famPersonName(m.by) + (m.to === 'all' ? ' (to everyone)' : '') + ': “'
     + (text.length > 70 ? text.slice(0, 70) + '…' : text) + '”', 'Open', function(){ openFamilyChat(room); }, 9000, function(){ openFamilyChat(room); });
 }
 async function openFamilyChat(room) {
@@ -6096,7 +6096,7 @@ function renderFamilyChat(focus) {
       + '<div style="max-width:84%;padding:7px 10px;border-radius:12px;font-size:13.5px;line-height:1.45;white-space:pre-wrap;'
       + (mine ? 'background:var(--note-bg);' : 'background:var(--card-bg);border:1px solid var(--border);') + '">'
       + '<div dir="auto" data-no-i18n>' + escH(m.text || '') + '</div>'
-      + '<div style="font-size:10.5px;color:var(--muted);margin-top:3px;text-align:end;">' + (mine ? '<span>You</span>' : '<span data-no-i18n>' + escH(m.name || famPersonName(m.by)) + '</span>') + (m.at ? '<span data-no-i18n> · ' + escH(when(m.at)) + '</span>' : '')   /* v38.90 — the time is no phrase */ + '</div>'
+      + '<div style="font-size:10.5px;color:var(--muted);margin-top:3px;text-align:end;">' + (mine ? '<span>You</span>' : '<span data-no-i18n>' + escH(famPersonName(m.by)) + '</span>') + (m.at ? '<span data-no-i18n> · ' + escH(when(m.at)) + '</span>' : '')   /* v38.90 — the time is no phrase */ + '</div>'
       + '</div></div>';
   }).join('');
   body.innerHTML = '<button type="button" onclick="_fam.with=null;renderFamilyChat()" style="background:none;border:none;color:var(--terracotta);font-weight:600;font-size:13px;cursor:pointer;padding:6px 0;font-family:inherit;">‹ All chats</button>'
@@ -9355,7 +9355,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v38.90';
+var APP_VERSION = 'v38.91';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -12497,7 +12497,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.90</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.91</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -12585,7 +12585,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.90</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.91</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -16019,7 +16019,7 @@ window.i18nPatternsFromDict = i18nPatternsFromDict; window.i18nAsk = i18nAsk;
 var I18N_EXTRA = [
   // v38.90 — the beta-eve walk in Hebrew: put together from a choice (a ternary), so no reading of the source finds them
   'Recipe imported!', '📚 Collection imported — {1} recipes in “{2}”',
-  '\u2713 Synced — {1}', '(yours)', 'Reading the recipe…', '⏳ Reading the requests…', 'new — nothing saved to the cloud yet',
+  '\u2713 Synced — {1}', '(yours)', 'Reading the recipe…', 'Fetching page via server…', 'about ${1}', 'under ${1}', '{1} of {2}', '⏳ Reading the requests…', 'new — nothing saved to the cloud yet',
   // v38.82 — the sound's line in ⚙️ → ♿ Accessibility, for each sound; v38.81 — a photo library's pause, in 🔍 Find a photo
   '🎵 The sound: Spoon on a wine glass', '🎵 The sound: The kitchen’s service bell', '🎵 The sound: Wooden spoon on a pot',
   '⏳ {1} asks for a pause — {2} s…',
@@ -22505,8 +22505,9 @@ function aiSpendNote(model, usage) {
 }
 function aiSpendLine(o) {
   o = o || aiSpendRead();
-  var usd = o.usd < 0.01 && o.usd > 0 ? 'under $0.01' : '$' + o.usd.toFixed(2);
-  return o.calls + ' AI call' + (o.calls === 1 ? '' : 's') + ', about ' + usd
+  // v38.90 — "under $0.01", not "about under $0.01"
+  var usd = o.usd < 0.01 && o.usd > 0 ? 'under $0.01' : 'about $' + o.usd.toFixed(2);
+  return o.calls + ' AI call' + (o.calls === 1 ? '' : 's') + ', ' + usd
     + (o.unpriced ? ' (+' + o.unpriced + ' on a model with no price listed)' : '');
 }
 // v37.57 — the HOUSEHOLD's AI this month, as the Worker counts it (every
@@ -31526,6 +31527,7 @@ var HELP_SYSTEM_PROMPT = [
   "",
   "=== FOR THE APP'S OWNER ===",
   "- ⚙️ → 👑 App owner is shown only to the app's owner: 📊 Households, 🩺 Server allowances, 📲 WhatsApp alerts (which alerts also come on WhatsApp, each on or off, and a test), ✉️ Invite testers, 💳 Payments, 🚀 Deployments, 🔑 Check the app's key, 🔐 Two-step sign-in for the owner, 📧 Gmail Setup, 🛒 Bring!",
+  "- 📊 Households → 💬 Feedback and ⚠️ Errors (the owner's): tick several (or Select all shown), then 👀 Seen (n), ✅ Done (n) or 🗑 Delete selected (n) for all of them at once. 👀 Seen = read, off the ⚙️ red dot, still under 'Not done yet'; ✅ Done = also off that list (still under All). Deleting several asks once and sends one alert",
   "- ✉️ Invite testers: the tester invitation in English or עברית, with this copy's link; the wording can be changed (this device keeps it; 'The original words' brings it back). Paste the addresses; 📧 Send with Gmail sends each person their own e-mail, from the app's address when the owner's Gmail may send as it. Also ✉️ Mail app, 💬 WhatsApp and 📋 Copy. The first Gmail send needs the Gmail API switched on for the copy's Google Cloud project, and Google's permission",
   "- The beta is by invitation only when 📊 Households says so: every address in To (however the invitation goes) may then start a kitchen, signed in with that address; the window says how many are invited. Only a fingerprint of each address is kept, never the address. The invitation asks testers to sign in with that address, not to forward it, and to invite family from inside the app",
   "- 🩺 Server allowances: a table of every free allowance — Cloudflare's day (Worker requests, KV, D1, server errors), Pages builds this month per copy, what is running now, Firestore reads as the apps count them, and sign-in-link e-mails (today, the most in a day, days all 5 went, days someone was turned away). ⚠️ near the limit, ⛔ stopped",
@@ -31543,7 +31545,7 @@ var HELP_SYSTEM_PROMPT = [
   "- Method steps in Hebrew recipes are right-aligned with step numbers on the right",
   "- Diet tags on recipes help the diet filters work correctly — use Auto-tag to set them",
   "- The Self Test (⚙️ → 🔧 Troubleshooting → 🧪 Self Test) is useful for diagnosing if something stops working",
-  "- The interface language: tap 🌐 next to ? — the app's words change; recipes stay as written",
+  "- The interface language: tap 🌐 next to ? — the app's words change; recipes stay as written. On a new device whose language the app speaks (Hebrew, say), it asks once, on the sign-in screen — so the sign-in, the kitchen rules and the welcome come in that language too",
   "- The sort and filter settings reset when you tap 'All'"
 ].join("\n");
 

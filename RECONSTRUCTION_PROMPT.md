@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v38.89` — app. **Worker: v89**, deployed separately and versioned separately
+**Current version:** `v38.91` — app. **Worker: v89**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -416,7 +416,20 @@ under its plain path only (a `?url=` request goes network-first).
   phrases are translated by the job after each release. The owner edits them only in the copy that
   holds them. **No e-mail address is ever a phrase** (`I18N_ADDRESS` in `i18nTranslatable`; the translate
   and publish jobs strip any): the files are public, and a member's address once reached them through a
-  tooltip.
+  tooltip. **Nor a person's name (v38.90):** the status line takes the name apart (`setDriveStatus(state, text,
+  who)`: translated quietly with "☁️ Shared · {1}" / "✓ Synced — {1}", marked data-no-i18n), and the translate job
+  removes status-line entries whose tail the translation kept word for word and the app no longer shows.
+- **What a chosen language must reach (v38.90, the beta-eve walk in Hebrew):** (1) the SHAPES ("Welcome to {1}")
+  are built from the dictionary's own keys when a language is activated (`i18nPatternsFromDict` in `i18nActivate`),
+  not only by a harvest — a tester's phone never harvests; (2) an ask's message, its choices, hints and Cancel, and a
+  tour step sit in dir="auto" (which `i18nSkip` treats as a recipe) and are translated as they are drawn by
+  `i18nAsk` — whole, then paragraph by paragraph; never recorded as missing; (3) a TEXTAREA's placeholder is
+  translated, never its contents (multi-line examples carry `data-i18n-skip-attrs="placeholder"`); (4) the harvest
+  draws the empty kitchen's first screen and the chats with other kitchens, and lists the welcome's paragraphs
+  (`HH_WELCOME`), the tour (`TOUR_STEPS`), the badge's words and the example recipes' meal types; (5) the language
+  offer (`firstRunLanguageOffer`, z 10100) comes above the sign-in screen and the kitchen rules, so both are in that
+  language; (6) recipe words in import previews, chat times and avatar letters are `data-no-i18n`. Check a change
+  with a walk in the language, then `i18nMissingList()`: what it lists is what is still English.
 - **Privacy by default (v38.26–v38.28; AUDIT-2026-10-privacy.md):** no e-mail address is written in any public
   file or job log (§1b.5); the device log shortens every address (`logMaskAddresses`); deleting an account also
   deletes `homes/<uid>` and `users/<uid>/prefs/*`; test data is made up, never copied from real chats or
@@ -764,6 +777,13 @@ Select all shown / Clear, and 🗑 Delete selected (n) once anything is ticked �
 (meter-admin `notes-delete` / `errors-delete` with `ids`): one fresh sign-in and one owner alert per batch, not per report.
 Beside it (v38.89, Worker v89): 👀 Seen / ✅ Done for the ticked notes and ✅ Done for the ticked error reports —
 `notes-status` / `errors-status` with `ids` (up to 99, plus the status) in one request; no alert (it can be undone).
+
+**A new kitchen's first hour (v38.90):** 📡 Sync Health says "new — nothing saved to the cloud yet" for a kitchen
+with no index and no recipes in the cloud (an empty read counts as a sync; a save that wrote sets the schema);
+`boldTidy` drops an empty `****` before saving, only outside bold words and line by line; `metaVal` hides a "-"
+prep or servings; `emojiFor(name, category)` picks an imported recipe's emoji from its name (English and Hebrew
+words), then its meal type. A family-chat message is signed with the member list's name (`famPersonName`), not
+one typed into the message.
 
 **State on 23 Oct 2026 (v38.84, Worker v87):** testers are invited from Sunday 25 Oct; from then on every
 release waits for the owner's yes. The community app is by invitation only; "Share this App with family" goes back

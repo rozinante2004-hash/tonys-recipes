@@ -16,7 +16,8 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
    `/home/user/tonys-recipes`, then `git checkout test`. All work happens on `test`.
 2. Recreate `/root/.claude/settings.json`: bypassPermissions plus the allow-list (see *Decisions*:
    "Never ask Tony for permission").
-3. Tests, locally (last result, v38.76: **403 pass, 0 fail, 7 skipped** on the source AND on the built test copy):
+3. Tests, locally (last result, v38.91: **414 pass, 0 fail, 7 skipped** on the source in English, Hebrew and with
+   preferences, AND on the built test copy):
    - Builds: `node tools/build.js live && cmp dist/index.html index.html`, then
      `SKIP_AUTH_HELPERS=1 node tools/build.js test` (writes dist/; the test and community copies are built WITHOUT
      comments — tools/strip-comments.js, proved by `ACORN_PATH=/opt/node22/lib/node_modules/eslint/node_modules/acorn
@@ -114,6 +115,8 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
   **v38.87 — Bold (B, Ctrl+B) in ingredients and the Method; Update Recipe floats at the bottom of the editor** (24 Oct, 01:33).
   **v38.88 + Worker v88 — select several reports in 💬 Feedback and ⚠️ Errors, and 🗑 Delete selected** (24 Oct, 02:34).
   **v38.89 + Worker v89 — 👀 Seen / ✅ Done for the ticked notes, ✅ Done for the ticked error reports** (24 Oct, 13:03).
+  **v38.90 — the beta-eve audit: Hebrew reaches the first hour; a new kitchen's small things** (24 Oct; AUDIT-2026-10-24-beta-eve.md).
+  **v38.91 — the audit's last fixes, the Help and the recreation prompt** (24 Oct).
   **Worker v89.** The test copy (https://tonys-recipes-test.pages.dev, its own database) follows `test`.
 - **The testers go live on Sunday 25 Oct 2026** (Tony: "The plan is to start sending invitations to the testers
   this Sunday"). The community app is **by invitation only** (Tony switched it, 20 Oct): only addresses invited with
@@ -1095,6 +1098,35 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
 - **Released: v38.89 + Worker v89 (24 Oct 2026, 13:03 Israel time, on 106bb11)** — every job success (Deploy the Worker,
   its "live Worker answers with this version" step included; Deploy to GitHub Pages, Publish languages, Translate new
   phrases, Self Tests on main and test, Cloudflare Pages for both copies).
+- **The beta-eve audit (24 Oct; AUDIT-2026-10-24-beta-eve.md)** — Tony: "As tomorrow I will be sending out the Beta
+  invitations, let's run an audit of the application that covers all aspects … save the ones you need my feedback for
+  for last. Once this is done, please also update the recreation prompt and the Help."
+  - How: a new tester's first half hour walked on the beta build against the emulators, by invitation only, phone and
+    computer, English and Hebrew (scratch kit: walk-he3.mjs answers the language offer on the sign-in screen, serves
+    a marked he.json (AUG=), dumps `i18nMissingList()`); the app's own harvest compared with i18n/he.json in a hidden
+    browser (i18n-gaps.mjs — the list tomorrow's job translates); rules, reads, privacy, invitation text reviewed.
+  - **v38.90:**
+    - Shapes ("Welcome to {1}") from the dictionary on activation (`i18nPatternsFromDict`). They were built only
+      by a harvest, so on a tester's phone NO shaped phrase was translated.
+    - `i18nAsk` for ask messages, choices, hints and Cancel, and tour steps. dir="auto" made `i18nSkip` treat them
+      as recipe text since v36.9.
+    - TEXTAREA placeholders translated, never their contents.
+    - The language offer at z 10100, above the sign-in screen and the kitchen rules. The rules reload in the
+      language if already open.
+    - The harvest draws the first screen and the kitchen chats. It lists `HH_WELCOME`, `TOUR_STEPS`, the badge's
+      words and the example meal types: 55 new phrases.
+    - Kept out of phrases: the status-line name (`setDriveStatus(state, text, who)`, and the translate job removes
+      old "☁️ <name>" entries), preview recipe words, chat times, avatar letters.
+    - Sync Health "new — nothing saved to the cloud yet". `boldTidy` outside bold words only, line by line (the
+      first version merged "**a** **b**", caught by its test). `metaVal` hides "-". `emojiFor`.
+    - Self Tests `i18n_reaches_questions` and `new_kitchen_first_hour`, each checked to fail with the fix undone.
+  - **v38.91:**
+    - A family-chat message is signed with `famPersonName(m.by)`, not the name typed into it.
+    - "under $0.01", no longer "about under $0.01".
+    - Help: the language offer at sign-in, and the owner's Seen / Done / Delete selected.
+    - RECONSTRUCTION_PROMPT: the translation rules and a new kitchen's first hour.
+  - **Watch:** the 55 phrases arrive with "Translate new phrases" + "Publish languages" after the release; the
+    chat history is read whole on each open (a limit of the last 200 if a kitchen chats a lot).
 - **Photo keys, 23 Oct:** Pexels: "New API key issuance is currently paused and cannot be requested" (Tony); Unsplash:
   "We can forego unsplash for now" (Tony). Photos stay Pixabay + Wikimedia Commons; the workflow is ready if a key
   ever comes (secrets PEXELS_API_KEY / UNSPLASH_ACCESS_KEY, then dispatch Deploy the Worker).
