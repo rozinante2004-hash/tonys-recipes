@@ -1,7 +1,7 @@
 {
  "lang": "ru",
- "updatedAt": 1792839538992,
- "count": 2792,
+ "updatedAt": 1792840124924,
+ "count": 2794,
  "strings": {
   "\"Add to Home Screen\"": "Добавить на главный экран",
   "\"One item away\" filter ({1}f.{2})": "Фильтр «Не хватает одного» ({1}ф.{2})",
@@ -512,6 +512,7 @@
   "Fetch photos": "Загрузить фото",
   "Fetch photos for {1} recipe{2}?": "Загрузить фото для {1} рецепт{2}?",
   "Fetches video descriptions for recipe extraction from YouTube URLs. {1} units/day free.": "Получает описания видео для извлечения рецептов из ссылок YouTube. {1} запросов/день бесплатно.",
+  "Fetching page via server…": "Загрузка страницы через сервер…",
   "Fill them in": "Заполнить",
   "Filter bar renders": "Панель фильтров отображается",
   "Filter functions work": "Фильтры работают",
@@ -1910,6 +1911,7 @@
   "tomato": "помидор",
   "tsp — teaspoons": "tsp — чайные ложки",
   "under $0.01": "меньше $0.01",
+  "under ${1}": "до ${1}",
   "unknown": "неизвестно",
   "unknown — signed out": "неизвестно — не авторизован",
   "unreadable in the cloud — this device will replace them on the next save": "нечитаемо в облаке — это устройство заменит их при следующем сохранении",

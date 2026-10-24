@@ -1,7 +1,7 @@
 {
  "lang": "it",
- "updatedAt": 1792839538992,
- "count": 2344,
+ "updatedAt": 1792840124924,
+ "count": 2346,
  "strings": {
   "\"Add to Home Screen\"": "Aggiungi a Home",
   "\"Open Bring!\"": "Apri Bring!",
@@ -384,6 +384,7 @@
   "Fetch photos": "Recupera foto",
   "Fetch photos for {1} recipe{2}?": "Recuperare le foto per {1} ricetta{2}?",
   "Fetches video descriptions for recipe extraction from YouTube URLs. {1} units/day free.": "Recupera le descrizioni video per l'estrazione delle ricette dagli URL di YouTube. {1} unità/giorno gratis.",
+  "Fetching page via server…": "Recupero pagina tramite server…",
   "Fill them in": "Compilali",
   "Find a photo for a recipe in free photo libraries.": "Trova una foto per una ricetta nelle librerie di foto gratuite.",
   "Find a photo for a recipe.": "Trova una foto per una ricetta.",
@@ -1535,6 +1536,7 @@
   "tomato": "pomodoro",
   "tsp — teaspoons": "tsp — cucchiaini",
   "under $0.01": "meno di $0.01",
+  "under ${1}": "sotto ${1}",
   "unknown": "sconosciuto",
   "unknown — signed out": "sconosciuto — disconnesso",
   "up to date": "aggiornato",

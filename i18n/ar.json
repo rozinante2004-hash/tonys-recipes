@@ -1,7 +1,7 @@
 {
  "lang": "ar",
- "updatedAt": 1792839538992,
- "count": 2461,
+ "updatedAt": 1792840124924,
+ "count": 2463,
  "strings": {
   "\"Add to Home Screen\"": "إضافة إلى الشاشة الرئيسية",
   "\"Open Bring!\"": "فتح Bring!",
@@ -404,6 +404,7 @@
   "Fetch photos": "جلب الصور",
   "Fetch photos for {1} recipe{2}?": "جلب صور لـ {1} وصفة{2}؟",
   "Fetches video descriptions for recipe extraction from YouTube URLs. {1} units/day free.": "يجلب أوصاف الفيديوهات لاستخراج الوصفات من روابط YouTube. {1} وحدة/يوم مجانًا.",
+  "Fetching page via server…": "جارٍ جلب الصفحة عبر الخادم…",
   "Fill them in": "املأها",
   "Find a photo for a recipe in free photo libraries.": "ابحث عن صورة للوصفة في مكتبات الصور المجانية.",
   "Find a photo for a recipe.": "ابحث عن صورة للوصفة.",
@@ -1616,6 +1617,7 @@
   "tomato": "طماطم",
   "tsp — teaspoons": "ملعقة صغيرة",
   "under $0.01": "أقل من $0.01",
+  "under ${1}": "أقل من ${1}",
   "unknown": "غير معروف",
   "unknown — signed out": "غير معروف — تم تسجيل الخروج",
   "up to date": "محدّث",

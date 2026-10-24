@@ -1,7 +1,7 @@
 {
  "lang": "he",
- "updatedAt": 1792839538992,
- "count": 3002,
+ "updatedAt": 1792840124924,
+ "count": 3004,
  "strings": {
   "\"Add to Home Screen\"": "הוספה למסך הבית",
   "\"One item away\" filter ({1}f.{2})": "פילטר \"פריט אחד חסר\" ({1}f.{2})",
@@ -538,6 +538,7 @@
   "Fetch photos": "שליפת תמונות",
   "Fetch photos for {1} recipe{2}?": "לשלוף תמונות עבור {1} מתכון{2}?",
   "Fetches video descriptions for recipe extraction from YouTube URLs. {1} units/day free.": "מביא תיאורי סרטונים לחילוץ מתכונים מכתובות YouTube. {1} יחידות ביום בחינם.",
+  "Fetching page via server…": "טוען את הדף דרך השרת…",
   "Fill them in": "השלימו אותם",
   "Filter bar renders": "סרגל הסינון מוצג",
   "Filter functions work": "פונקציות הסינון עובדות",
@@ -2068,6 +2069,7 @@
   "tsp — teaspoons": "tsp — כפיות",
   "ultrakml": "ultrakml",
   "under $0.01": "פחות מ-$0.01",
+  "under ${1}": "מתחת ל-${1}",
   "unknown": "לא ידוע",
   "unknown — signed out": "לא ידוע — מנותק",
   "unreadable in the cloud — this device will replace them on the next save": "לא ניתנים לקריאה בענן — המכשיר הזה יחליף אותם בשמירה הבאה",

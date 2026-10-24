@@ -1,7 +1,7 @@
 {
  "lang": "zh",
- "updatedAt": 1792839538992,
- "count": 2488,
+ "updatedAt": 1792840124924,
+ "count": 2490,
  "strings": {
   "\"Add to Home Screen\"": "添加到主屏幕",
   "\"Open Bring!\"": "打开 Bring!",
@@ -406,6 +406,7 @@
   "Fetch photos": "获取图片",
   "Fetch photos for {1} recipe{2}?": "要为{1}个食谱{2}获取图片吗？",
   "Fetches video descriptions for recipe extraction from YouTube URLs. {1} units/day free.": "从YouTube网址获取视频描述以提取食谱。每天免费{1}个单位。",
+  "Fetching page via server…": "正在通过服务器获取页面…",
   "Fill them in": "填写它们",
   "Find a photo for a recipe in free photo libraries.": "在免费图库中为食谱寻找照片。",
   "Find a photo for a recipe.": "为食谱找一张照片。",
@@ -1625,6 +1626,7 @@
   "tomato": "番茄",
   "tsp — teaspoons": "tsp — teaspoons",
   "under $0.01": "不到 $0.01",
+  "under ${1}": "低于 ${1}",
   "unknown": "未知",
   "unknown — signed out": "未知 — 已退出登录",
   "up to date": "已是最新",

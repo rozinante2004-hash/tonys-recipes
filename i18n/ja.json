@@ -1,7 +1,7 @@
 {
  "lang": "ja",
- "updatedAt": 1792839538992,
- "count": 2801,
+ "updatedAt": 1792840124924,
+ "count": 2803,
  "strings": {
   "\"Add to Home Screen\"": "ホーム画面に追加",
   "\"One item away\" filter ({1}f.{2})": "「あと1品」フィルター（{1}f.{2}）",
@@ -513,6 +513,7 @@
   "Fetch photos": "写真を取得",
   "Fetch photos for {1} recipe{2}?": "{1}件のレシピ{2}の写真を取得しますか?",
   "Fetches video descriptions for recipe extraction from YouTube URLs. {1} units/day free.": "YouTube URLからのレシピ抽出のために動画の説明を取得します。{1}件/日まで無料。",
+  "Fetching page via server…": "サーバー経由でページを取得中…",
   "Fill them in": "入力してください",
   "Filter bar renders": "フィルターバーが表示される",
   "Filter functions work": "フィルター機能が動作する",
@@ -1914,6 +1915,7 @@
   "tomato": "トマト",
   "tsp — teaspoons": "tsp — 小さじ",
   "under $0.01": "$0.01未満",
+  "under ${1}": "${1}未満",
   "unknown": "不明",
   "unknown — signed out": "不明 — サインアウト中",
   "unreadable in the cloud — this device will replace them on the next save": "クラウドで読み取れません — 次回保存時にこの端末のデータで置き換えます",

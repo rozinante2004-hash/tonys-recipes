@@ -1,7 +1,7 @@
 {
  "lang": "fr",
- "updatedAt": 1792839538992,
- "count": 2459,
+ "updatedAt": 1792840124924,
+ "count": 2461,
  "strings": {
   "\"Add to Home Screen\"": "Ajouter à l'écran d'accueil",
   "\"Open Bring!\"": "Ouvrir Bring!",
@@ -404,6 +404,7 @@
   "Fetch photos": "Récupérer les photos",
   "Fetch photos for {1} recipe{2}?": "Récupérer les photos pour {1} recette{2} ?",
   "Fetches video descriptions for recipe extraction from YouTube URLs. {1} units/day free.": "Récupère les descriptions des vidéos pour extraire les recettes depuis des URL YouTube. {1} unités/jour gratuites.",
+  "Fetching page via server…": "Récupération de la page via le serveur…",
   "Fill them in": "Remplissez-les",
   "Find a photo for a recipe in free photo libraries.": "Trouve une photo pour une recette dans des banques d'images gratuites.",
   "Find a photo for a recipe.": "Trouvez une photo pour une recette.",
@@ -1615,6 +1616,7 @@
   "tomato": "tomate",
   "tsp — teaspoons": "c. à c. — cuillères à café",
   "under $0.01": "moins de 0,01 $",
+  "under ${1}": "moins de {1} $",
   "unknown": "inconnu",
   "unknown — signed out": "inconnu — déconnecté",
   "up to date": "à jour",
