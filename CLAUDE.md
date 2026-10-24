@@ -1186,6 +1186,20 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
     5. Test it: a note from the test copy → an issue → a wake → a push notification to his phone.
   - **How Tony answers from his phone:** the Claude app (same account) → Code sessions → "📥 Beta reports" →
     type "Yes, release it". A comment on GitHub is never an approval.
+  - **Set up 24 Oct, 20:11–20:17 Israel time:**
+    - Tony made the repo, the access and the token. Worker v90 released at 20:11 on a71aa90; the deploy log says
+      "REPORTS_GITHUB_TOKEN is set", and the live Worker is v90.
+    - The inbox is https://github.com/rozinante2004-hash/kitchen-reports/pull/1, with kitchen-reports/CLAUDE.md
+      as the watcher's job description.
+    - **Tony chose "option 1 + option 2":**
+      - The watcher sorts every report but fixes only URGENT ones at once (it then notifies). Other bugs wait for
+        "fix #n" in the session. A daily summary at 19:30 Israel time.
+      - It is LIGHT: it starts in kitchen-reports only, with a one-page digest of rules and known things in its
+        CLAUDE.md, and loads tonys-recipes only to fix. Keep that digest in step when a rule changes here.
+    - Estimates given to Tony, at API prices; on his plan it is weekly allowance, which showed a warning on
+      24 Oct: about $0.50–1.50 a sorted report, $5–20 a fix.
+    - Watcher: session_01Fu8gBmrPNVa7aQ7dJa8fPL ("📥 Beta reports", subscribed to PR #1; setup $0.43). The first,
+      heavy one (session_01Qz8RpSM69y7NwfNyPr5EVE, $2.56 for setup) was archived.
 - **Photo keys, 23 Oct:** Pexels: "New API key issuance is currently paused and cannot be requested" (Tony); Unsplash:
   "We can forego unsplash for now" (Tony). Photos stay Pixabay + Wikimedia Commons; the workflow is ready if a key
   ever comes (secrets PEXELS_API_KEY / UNSPLASH_ACCESS_KEY, then dispatch Deploy the Worker).
