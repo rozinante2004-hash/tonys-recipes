@@ -1198,6 +1198,11 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
         CLAUDE.md, and loads tonys-recipes only to fix. Keep that digest in step when a rule changes here.
     - Estimates given to Tony, at API prices; on his plan it is weekly allowance, which showed a warning on
       24 Oct: about $0.50–1.50 a sorted report, $5–20 a fix.
+    - **Released: Worker v90 + Privacy Statement 1.8 (24 Oct 2026, 20:11 Israel time, on a71aa90)** — every job
+      success (Deploy the Worker, Deploy to GitHub Pages, Self Tests on main and test, Cloudflare Pages for both).
+    - **It works end to end:** the 20:17 hourly run filed the six open notes as issues #2–#7 and commented on PR #1.
+      The watcher woke and sorted them (e.g. #2 needs-info). Watcher comments appear under Tony's GitHub account (the
+      Claude app acts for him).
     - Watcher: session_01Fu8gBmrPNVa7aQ7dJa8fPL ("📥 Beta reports", subscribed to PR #1; setup $0.43). The first,
       heavy one (session_01Qz8RpSM69y7NwfNyPr5EVE, $2.56 for setup) was archived.
 - **Photo keys, 23 Oct:** Pexels: "New API key issuance is currently paused and cannot be requested" (Tony); Unsplash:
