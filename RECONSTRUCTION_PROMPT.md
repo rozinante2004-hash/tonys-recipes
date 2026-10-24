@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v38.91` — app. **Worker: v89**, deployed separately and versioned separately
+**Current version:** `v38.91` — app. **Worker: v90**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -777,6 +777,15 @@ Select all shown / Clear, and 🗑 Delete selected (n) once anything is ticked �
 (meter-admin `notes-delete` / `errors-delete` with `ids`): one fresh sign-in and one owner alert per batch, not per report.
 Beside it (v38.89, Worker v89): 👀 Seen / ✅ Done for the ticked notes and ✅ Done for the ticked error reports —
 `notes-status` / `errors-status` with `ids` (up to 99, plus the status) in one request; no alert (it can be undone).
+
+**Testers' reports reach Claude (Worker v90):** with the secret REPORTS_GITHUB_TOKEN (a fine-grained token for
+the PRIVATE repository REPORTS_REPO, rozinante2004-hash/kitchen-reports: Contents, Issues, Pull requests), each new
+note (not done) and each new kind of error report (project, kind, version, place, wording) becomes an issue there.
+Screenshot and log go in as files beside it. Sent after each note or error report (waitUntil) and hourly, at most 6 a
+run, each claimed first in `report_links`. Nothing personal goes: a fingerprint instead of the sender, the tester's
+words in a fence, @ never live. A comment on the open "📥" pull request wakes the Claude session subscribed to it. That
+session prepares fixes on `test` and releases only on the owner's yes typed in that session. Privacy Statement 1.8
+says so.
 
 **A new kitchen's first hour (v38.90):** 📡 Sync Health says "new — nothing saved to the cloud yet" for a kitchen
 with no index and no recipes in the cloud (an empty read counts as a sync; a save that wrote sets the schema);

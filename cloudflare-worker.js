@@ -1,4 +1,10 @@
-// Tony's Recipes — Cloudflare Worker v89
+// Tony's Recipes — Cloudflare Worker v90
+// v90: REPORTS TO A PRIVATE REPOSITORY (Tony, 24 Oct 2026: "Please find a way in which reports, sent by the beta users,
+// could be read by you, without me having to copy/paste them"): each new note and each new kind of error report
+// becomes an issue in the private repository REPORTS_REPO (rozinante2004-hash/kitchen-reports), with its screenshot
+// and log as files, written with REPORTS_GITHUB_TOKEN (a token for that repository only); a comment on the open "📥"
+// pull request there wakes the Claude session that watches it. No address, name or account id goes. After each note
+// or error report (waitUntil), and hourly. Without the token: nothing. A token GitHub refuses is said in 🩺.
 // v89: SEVERAL MARKED SEEN OR DONE AT ONCE (Tony, 24 Oct 2026: "Add a "Seen" and "Done" for selected notes too"):
 // meter-admin `notes-status` (new | seen | done) and `errors-status` (new | done) take `ids` — up to 99, with the
 // status that makes 100 values, D1's most a query — in one statement. Not an owner action that cannot be undone, so no
@@ -400,7 +406,7 @@
 //   AI_MAX_TOKENS   – the longest answer one call may ask for (32000; the
 //                     app's largest, reading several recipes at once, asks 8000).
 
-const WORKER_VERSION = 'v89';
+const WORKER_VERSION = 'v90';
 const VIDEO_MAX_MB_DEFAULT = 50;
 const GEMINI_API = 'https://generativelanguage.googleapis.com';
 const GEMINI_MODEL_DEFAULT = 'gemini-2.5-flash';
@@ -1097,7 +1103,7 @@ function extractYouTubeId(url) {
 // responses and the app saw a thrown fetch — "could not be reached from this
 // device" on every feature. A rule that 51 call sites have to remember is a rule
 // that will be broken; the wrapper below makes forgetting impossible.
-async function handleRequest(request, env) {
+async function handleRequest(request, env, ctx) {
     const corsHeaders = corsFor(request, env);
     const origin = originAllowed(request, env);
 
@@ -1196,6 +1202,7 @@ async function handleRequest(request, env) {
         // Anthropic refuses unknown fields — the v37 lesson).
         metering: { version: 1, db: !!env.METER_DB },
         feedback: !!env.METER_DB,     // v61 — notes from every copy, one inbox
+        reports: !!(env.REPORTS_GITHUB_TOKEN && env.METER_DB),   // v90 — and on to the private reports repository
         alerts: !!(env.ALERTS && env.ALERT_TO),   // v73 — the owner hears about a new device and destructive actions
         owner: ownerEmails(env).length > 0,       // v74 — the owner's address is set (it is no longer in the code)
         retention: { days: KEEP_DAYS, db: !!env.METER_DB },   // v75 — the daily sweep (logs and names after six months)
@@ -1693,10 +1700,18 @@ async function handleRequest(request, env) {
     if (body.action === 'link-sent') return await linkSent(request, env, body);         // v87
     if (body.action === 'usage-report') return await usageReport(env, body);            // v79
     if (body.action === 'meter-me' || body.action === 'meter-admin') return await meterAction(request, env, body);
-    if (body.action === 'feedback-send') return await feedbackSend(request, env, body);   // v61
+    if (body.action === 'feedback-send') {   // v61; v90 — and on to the reports repository
+      const fr = await feedbackSend(request, env, body);
+      if (fr.status === 200) reportsLater(env, ctx);
+      return fr;
+    }
     if (body.action === 'feedback-replies') return await feedbackReplies(request, env, body);   // v68
     if (body.action === 'household-report') return await householdReport(request, env, body);   // v62
-    if (body.action === 'app-signals') return await appSignals(request, env, body);   // v69
+    if (body.action === 'app-signals') {   // v69; v90 — a new error report on to the reports repository
+      const sr = await appSignals(request, env, body);
+      if (sr.status === 200 && Array.isArray(body.errors) && body.errors.length) reportsLater(env, ctx);
+      return sr;
+    }
     if (body.action === 'survey-status' || body.action === 'survey-answer') return await surveyAction(request, env, body);   // v71
 
     // ── Anthropic proxy ───────────────────────────────────────────────────────
@@ -3272,12 +3287,188 @@ async function retentionSweep(env, now) {
   return done;
 }
 
+// ─── REPORTS TO A PRIVATE REPOSITORY (v90) ───────────────────────────────────
+// Tony, 24 Oct 2026: "Please find a way in which reports, sent by the beta users, could be read by you, without me
+// having to copy/paste them … there may be urgent issues which will wait for hours or even days for a resolution,
+// instead of an immediate response." Each new note, and each new kind of error report, becomes an issue in a PRIVATE
+// GitHub repository (REPORTS_REPO, rozinante2004-hash/kitchen-reports), written with a token that may touch only that
+// repository (the secret REPORTS_GITHUB_TOKEN, set by the deploy job from the GitHub secret of the same name). A
+// screenshot and the app's log go in as files beside it. No e-mail address, no name, no account id: the sender is a
+// short fingerprint, so two notes from one person can be told apart; answers still go through the app. A comment on
+// the open "📥" pull request there wakes the Claude session that watches it. Run after each note or error report
+// (waitUntil) and with the hourly cron; without the token nothing happens at all.
+const REPORTS_REPO_DEFAULT = 'rozinante2004-hash/kitchen-reports';
+const REPORTS_PER_RUN = 6;                 // issues a run may open (each is up to three calls to GitHub)
+const REPORTS_ERRORS_SINCE_DAYS = 7;       // error reports older than this are not sent on the first run
+const REPORT_COPIES = { 'my-kitchen-notes-beta': 'beta', 'tonys-recipes-test': 'test', 'recipes-f379d': 'family' };
+function reportsRepo(env) {
+  const r = String(env.REPORTS_REPO || REPORTS_REPO_DEFAULT);
+  return /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(r) ? r : REPORTS_REPO_DEFAULT;
+}
+async function reportsGh(env, method, path, body) {
+  const f = env.__fetch || fetch;
+  const r = await f('https://api.github.com' + path, { method, headers: {
+    'Authorization': 'Bearer ' + env.REPORTS_GITHUB_TOKEN, 'Accept': 'application/vnd.github+json',
+    'X-GitHub-Api-Version': '2022-11-28', 'User-Agent': 'my-kitchen-notes-worker', 'Content-Type': 'application/json' },
+    body: body ? JSON.stringify(body) : undefined });
+  let data = null; try { data = await r.json(); } catch (e) {}
+  if (!r.ok) throw new Error('GitHub ' + r.status + ' on ' + method + ' ' + path.split('?')[0].replace(/\/repos\/[^/]+\/[^/]+/, '')
+    + (data && data.message ? ': ' + String(data.message).slice(0, 140) : ''));
+  return data;
+}
+async function reportsHash(s) {
+  const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(String(s)));
+  return Array.from(new Uint8Array(b)).map(x => x.toString(16).padStart(2, '0')).join('');
+}
+function reportsB64(s) {                   // UTF-8 text → base64, in pieces (a log can be 200 KB)
+  const bytes = new TextEncoder().encode(String(s));
+  let bin = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  return btoa(bin);
+}
+// The tester's words, shown as they are and never as markdown: in a fence longer than any run of ~ in them, so no
+// @mention can notify anyone and nothing in a note can dress up as something else. A title has no fence: its @ goes.
+function reportsFence(text) {
+  const runs = String(text).match(/~{3,}/g) || [];
+  const n = Math.max(4, ...runs.map(x => x.length + 1));
+  const f = '~'.repeat(n);
+  return f + 'text\n' + String(text) + '\n' + f;
+}
+function reportsTitle(s) { return String(s).replace(/\s+/g, ' ').replace(/@/g, '＠').trim().slice(0, 90); }
+function reportsCode(s, max) { return '`' + (String(s == null || s === '' ? '?' : s).replace(/[`\r\n]/g, ' ').slice(0, max || 120) || '?') + '`'; }
+function reportsVersion(v) { return /^v?[0-9][0-9A-Za-z.\-]{0,18}$/.test(String(v || '')) ? String(v) : '?'; }
+async function reportLinksTable(db) {
+  await tableOnce(db, 'report_links', 'CREATE TABLE IF NOT EXISTS report_links (kind TEXT NOT NULL, ref TEXT NOT NULL, issue INTEGER, at INTEGER, '
+    + 'PRIMARY KEY (kind, ref))');
+}
+// A row here before the issue is made: two runs at once cannot both send the same report.
+async function reportsClaim(db, kind, ref) {
+  const r = await db.prepare('INSERT OR IGNORE INTO report_links (kind, ref, issue, at) VALUES (?1, ?2, NULL, ?3)').bind(kind, String(ref), Date.now()).run();
+  return !!(r && r.meta && r.meta.changes);
+}
+async function reportsFile(env, repo, path, b64, what) {
+  const d = await reportsGh(env, 'PUT', '/repos/' + repo + '/contents/' + path, { message: what, content: b64 });
+  return (d && d.content && d.content.html_url) || ('https://github.com/' + repo + '/blob/main/' + path);
+}
+async function reportsForward(env, opts) {
+  const out = { configured: !!(env.REPORTS_GITHUB_TOKEN && env.METER_DB), sent: [], errors: [] };
+  if (!out.configured) return out;
+  const max = Math.min(Math.max(1, (opts && opts.max) || REPORTS_PER_RUN), 20);
+  const repo = reportsRepo(env), db = await meterDb(env);
+  await reportLinksTable(db); await feedbackTable(db); await signalsTable(db);
+  const day = (t) => new Date(t).toISOString().slice(0, 10);
+  const todo = [];
+  // Notes not yet sent and not done, newest first.
+  const notes = (await db.prepare('SELECT f.id, f.project, f.uid, f.hid, f.text, f.shot, f.log, f.version, f.env, f.device, f.lang, f.at '
+    + 'FROM feedback f LEFT JOIN report_links l ON l.kind = \'note\' AND l.ref = CAST(f.id AS TEXT) '
+    + 'WHERE l.ref IS NULL AND f.status != \'done\' ORDER BY f.at DESC LIMIT ?1').bind(max).all()).results || [];
+  notes.forEach(n => todo.push({ kind: 'note', ref: String(n.id), row: n }));
+  // Error reports by kind: one issue for each wording, place and version — however many people it happened to.
+  if (todo.length < max) {
+    const groups = (await db.prepare('SELECT project, kind, message, place, version, MIN(first_at) AS first_at, MAX(last_at) AS last_at, '
+      + 'SUM(n) AS n, COUNT(DISTINCT uid) AS people, MAX(screen) AS screen, MAX(device) AS device, MAX(lang) AS lang, MAX(env) AS env '
+      + 'FROM app_errors WHERE status = \'new\' AND last_at > ?1 GROUP BY project, kind, message, place, version ORDER BY MAX(last_at) DESC LIMIT 200')
+      .bind(Date.now() - REPORTS_ERRORS_SINCE_DAYS * 864e5).all()).results || [];
+    const sent = new Set(((await db.prepare('SELECT ref FROM report_links WHERE kind = \'err\'').all()).results || []).map(x => x.ref));
+    for (const g of groups) {
+      if (todo.length >= max) break;
+      const sig = (await reportsHash([g.project, g.kind, g.version, g.place, g.message].join('\u0001'))).slice(0, 32);
+      if (!sent.has(sig)) todo.push({ kind: 'err', ref: sig, row: g });
+    }
+  }
+  for (const t of todo) {
+    if (!(await reportsClaim(db, t.kind, t.ref))) continue;
+    const r = t.row, copy = REPORT_COPIES[r.project] || r.project, when = ilTime(t.kind === 'note' ? r.at : r.last_at) + ' (Israel time)';
+    const ver = reportsVersion(r.version);
+    try {
+      let title, body, labels;
+      if (t.kind === 'note') {
+        const who = (await reportsHash(r.project + '|' + r.uid)).slice(0, 8);
+        const stem = day(r.at) + '-note-' + r.id;
+        const extra = [];
+        const shot = /^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+/=]+)$/.exec(String(r.shot || ''));
+        if (shot) {
+          const url = await reportsFile(env, repo, 'shots/' + stem + '.' + (shot[1] === 'jpeg' ? 'jpg' : shot[1]), shot[2], 'Screenshot of note ' + r.id);
+          extra.push('📷 The screenshot: ' + url + '\n\n![screenshot](' + url + '?raw=true)');
+        }
+        if (String(r.log || '').trim()) {
+          const url = await reportsFile(env, repo, 'logs/' + stem + '.txt', reportsB64(r.log), 'The app\'s log with note ' + r.id);
+          extra.push('📋 What the app was doing (its log): ' + url);
+        }
+        title = '💬 ' + copy + ' ' + ver + ' — ' + reportsTitle(String(r.text).split('\n')[0]);
+        labels = ['note', copy];
+        body = '**💬 A note** from the **' + copy + '** copy · ' + ver + ' · ' + when + '\n\n'
+          + '- Sender: `' + who + '` (a fingerprint: notes from the same person share it)\n'
+          + '- Household: ' + reportsCode(r.hid, 64) + ' · language: ' + reportsCode(r.lang, 10) + '\n'
+          + '- Device: ' + reportsCode(r.device, 300) + '\n\n'
+          + reportsFence(r.text) + '\n\n' + (extra.length ? extra.join('\n\n') + '\n\n' : '')
+          + 'Note #' + r.id + ' — answered in the app: ⚙️ → 👑 App owner → 📊 Households → 💬 Feedback.';
+      } else {
+        title = '⚠️ ' + copy + ' ' + ver + ' — ' + reportsTitle(r.message);
+        labels = ['error', copy];
+        body = '**⚠️ An error report** from the **' + copy + '** copy · ' + ver + ' · kind ' + reportsCode(r.kind, 30) + '\n\n'
+          + '- Where: ' + reportsCode(r.place, 200) + ' · screen: ' + reportsCode(r.screen, 80) + '\n'
+          + '- ' + (Number(r.n) || 1) + ' time(s), to ' + (Number(r.people) || 1) + ' person(s): first ' + ilTime(r.first_at) + ', last ' + when + '\n'
+          + '- Device: ' + reportsCode(r.device, 300) + ' · language: ' + reportsCode(r.lang, 10) + '\n\n'
+          + reportsFence(r.message) + '\n\n'
+          + 'In the app: ⚙️ → 👑 App owner → 📊 Households → ⚠️ Errors.';
+      }
+      const issue = await reportsGh(env, 'POST', '/repos/' + repo + '/issues', { title, body: body.slice(0, 60000), labels });
+      await db.prepare('UPDATE report_links SET issue = ?1 WHERE kind = ?2 AND ref = ?3').bind(issue.number, t.kind, t.ref).run();
+      out.sent.push({ issue: issue.number, title });
+    } catch (e) {
+      // Not sent: the claim goes, so the next run tries again; the rest wait for it.
+      await db.prepare('DELETE FROM report_links WHERE kind = ?1 AND ref = ?2').bind(t.kind, t.ref).run();
+      out.errors.push(String((e && e.message) || e).slice(0, 300));
+      if (/GitHub (401|403|404)/.test(out.errors[0])) {
+        try {
+          await raiseNotice(env, { what: 'reports:github', kind: 'warning', scope: 'owner', until: nextUtcMidnight(Date.now()), self: true,
+            title: 'Reports cannot reach the private repository on GitHub', affects: 'notes and error reports reaching Claude (the app keeps them as before)',
+            detail: out.errors[0] + ' — the token REPORTS_GITHUB_TOKEN may have expired, or lost its access to ' + repo + '.' });
+        } catch (e2) {}
+      }
+      break;
+    }
+  }
+  if (out.sent.length) {
+    try {
+      let inbox = await db.prepare('SELECT issue FROM report_links WHERE kind = \'inbox\' AND ref = \'pr\'').first();
+      let pr = inbox && inbox.issue;
+      if (!pr) {
+        const pulls = await reportsGh(env, 'GET', '/repos/' + repo + '/pulls?state=open&per_page=30');
+        const p = (Array.isArray(pulls) ? pulls : []).filter(x => /^📥/.test(String(x.title || '')))[0];
+        if (p) { pr = p.number; await db.prepare('INSERT OR REPLACE INTO report_links (kind, ref, issue, at) VALUES (\'inbox\', \'pr\', ?1, ?2)').bind(pr, Date.now()).run(); }
+      }
+      if (pr) {
+        try {
+          await reportsGh(env, 'POST', '/repos/' + repo + '/issues/' + pr + '/comments',
+            { body: '📥 New: ' + out.sent.map(s => '#' + s.issue + ' ' + s.title).join('\n📥 New: ') });
+          out.inbox = pr;
+        } catch (e) {
+          await db.prepare('DELETE FROM report_links WHERE kind = \'inbox\' AND ref = \'pr\'').run();   // found again next time
+          throw e;
+        }
+      }
+    } catch (e) { out.errors.push('inbox: ' + String((e && e.message) || e).slice(0, 200)); }
+  }
+  return out;
+}
+function reportsLater(env, ctx) {
+  if (!env.REPORTS_GITHUB_TOKEN || !env.METER_DB) return;
+  const p = reportsForward(env).catch(() => null);
+  if (ctx && ctx.waitUntil) ctx.waitUntil(p);
+}
+
 export default {
   // v75 — the daily sweep (cron in worker/wrangler.jsonc).
   async scheduled(event, env, ctx) {
     const at = (event && Number(event.scheduledTime)) || Date.now();
     // v84 — the hourly usage check (its own cron); the daily sweep is the other
-    if (event && event.cron === HOURLY_CRON) { const h = hourlyUsage(env); if (ctx && ctx.waitUntil) ctx.waitUntil(h); else await h; return; }
+    if (event && event.cron === HOURLY_CRON) {
+      // v90 — and any report a run after it was sent could not pass on
+      const h = Promise.all([hourlyUsage(env), env.REPORTS_GITHUB_TOKEN && env.METER_DB ? reportsForward(env).catch(() => null) : null]);
+      if (ctx && ctx.waitUntil) ctx.waitUntil(h); else await h; return;
+    }
     const p = retentionSweep(env, at).then(async function (done) {
       // v78 — the AI ceiling counters and the allowance notices that have run their time.
       if (env.METER_DB) {
@@ -3288,11 +3479,11 @@ export default {
     });
     if (ctx && ctx.waitUntil) ctx.waitUntil(p); else await p;
   },
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const cors = corsFor(request, env);
     let resp;
     try {
-      resp = await handleRequest(request, env);
+      resp = await handleRequest(request, env, ctx);
     } catch (err) {
       const msg = err && err.message ? err.message : String(err);
       // v78 — D1's daily allowance used up: remembered (in KV) and said, with when it comes back.
@@ -3326,4 +3517,4 @@ export default {
   }
 };
 
-// ── END OF WORKER v89 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
+// ── END OF WORKER v90 ── If this is the last line in the Cloudflare editor, the whole file was pasted.

@@ -1925,6 +1925,82 @@ console.log('\nEvery allowance, told to the owner (v79):');
   }
 }
 
+// v90 — the testers' reports, on to a private repository (GitHub faked; SQLite for D1)
+console.log('\nReports to the private repository (v90):');
+{
+  const { DatabaseSync } = await import('node:sqlite');
+  const d1 = () => {
+    const raw = new DatabaseSync(':memory:');
+    const stmt = (sql, args) => ({
+      bind: (...a) => stmt(sql, a),
+      first: async () => raw.prepare(sql).get(...(args || [])) || null,
+      all: async () => ({ results: raw.prepare(sql).all(...(args || [])) }),
+      run: async () => { const x = raw.prepare(sql).run(...(args || [])); return { success: true, meta: { last_row_id: Number(x.lastInsertRowid), changes: Number(x.changes) } }; },
+      _run() { raw.prepare(sql).run(...(args || [])); }
+    });
+    return { raw, prepare: (sql) => stmt(sql, []), batch: async (list) => { raw.exec('BEGIN'); try { list.forEach(s => s._run()); raw.exec('COMMIT'); } catch (e) { raw.exec('ROLLBACK'); throw e; } return []; } };
+  };
+  const db = d1(), now = Date.now();
+  db.raw.exec('CREATE TABLE feedback (id INTEGER PRIMARY KEY AUTOINCREMENT, project TEXT, uid TEXT, email TEXT, name TEXT, hid TEXT, household TEXT, text TEXT, shot TEXT, log TEXT, version TEXT, env TEXT, device TEXT, lang TEXT, at INTEGER, status TEXT)');
+  db.raw.exec('CREATE TABLE app_errors (id INTEGER PRIMARY KEY AUTOINCREMENT, project TEXT, uid TEXT, email TEXT, hid TEXT, kind TEXT, message TEXT, place TEXT, screen TEXT, version TEXT, env TEXT, device TEXT, lang TEXT, first_at INTEGER, last_at INTEGER, n INTEGER, status TEXT)');
+  const note = db.raw.prepare('INSERT INTO feedback (project, uid, email, name, hid, household, text, shot, log, version, env, device, lang, at, status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)');
+  note.run('my-kitchen-notes-beta', 'uSecret1', 'dana@tester.example', 'Dana Tester', 'hDana', 'Dana\'s Kitchen', 'The import froze @octocat\n~~~~\nfake end', 'data:image/jpeg;base64,QUJD', 'log line ✓', 'v38.91', 'beta', 'iPhone `Safari`', 'he', now - 60000, 'new');
+  note.run('my-kitchen-notes-beta', 'uSecret1', 'dana@tester.example', 'Dana Tester', 'hDana', 'Dana\'s Kitchen', 'Already handled', '', '', 'v38.80', 'beta', 'x', 'en', now - 9e6, 'done');
+  const err = db.raw.prepare('INSERT INTO app_errors (project, uid, email, hid, kind, message, place, screen, version, env, device, lang, first_at, last_at, n, status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)');
+  err.run('my-kitchen-notes-beta', 'uSecret1', 'dana@tester.example', 'hDana', 'error', 'Cannot read x of undefined', 'saveRecipe', 'editor', 'v38.91', 'beta', 'iPhone', 'he', now - 5000, now - 4000, 2, 'new');
+  err.run('my-kitchen-notes-beta', 'uSecret2', 'eli@tester.example', 'hEli', 'error', 'Cannot read x of undefined', 'saveRecipe', 'editor', 'v38.91', 'beta', 'Android', 'en', now - 3000, now - 2000, 1, 'new');
+  err.run('my-kitchen-notes-beta', 'uSecret3', 'old@tester.example', 'hOld', 'error', 'Long ago', 'x', 'y', 'v38.50', 'beta', 'z', 'en', now - 30 * 864e5, now - 20 * 864e5, 1, 'new');
+  const calls = []; let issueN = 1, refuse = 0;
+  const ghFetch = async (url, init) => {
+    const u = String(url), b = init && init.body ? JSON.parse(init.body) : null;
+    calls.push({ u, m: init.method, b, auth: init.headers && init.headers.Authorization });
+    if (refuse) { refuse--; return new Response(JSON.stringify({ message: 'Bad credentials' }), { status: 401 }); }
+    if (/\/contents\//.test(u)) return new Response(JSON.stringify({ content: { html_url: 'https://github.com/rozinante2004-hash/kitchen-reports/blob/main/' + u.split('/contents/')[1] } }), { status: 201 });
+    if (/\/pulls\?/.test(u)) return new Response(JSON.stringify([{ number: 7, title: 'Not this one' }, { number: 1, title: '📥 Reports inbox' }]), { status: 200 });
+    if (/\/issues\/1\/comments$/.test(u)) return new Response('{"id":1}', { status: 201 });
+    if (/\/issues$/.test(u)) { issueN++; return new Response(JSON.stringify({ number: issueN }), { status: 201 }); }
+    return new Response('{"message":"Not Found"}', { status: 404 });
+  };
+  const env = { METER_DB: db, REPORTS_GITHUB_TOKEN: 'gh-test-token', __fetch: ghFetch };
+  const hourly = async (e) => { const w = []; await worker.scheduled({ cron: '17 * * * *', scheduledTime: Date.now() }, e, { waitUntil: p => w.push(p) }); await Promise.all(w); };
+  await hourly(env);
+  const issues = calls.filter(c => c.m === 'POST' && /\/issues$/.test(c.u));
+  expect('v90: the hourly run sends the open note and ONE issue for an error two people had (not the done note, not the old error)',
+    issues.length === 2 && /^💬 beta v38\.91 — The import froze ＠octocat$/.test(issues[0].b.title) && /^⚠️ beta v38\.91 — Cannot read x of undefined$/.test(issues[1].b.title),
+    JSON.stringify(issues.map(i => i.b.title)));
+  expect('v90: …every call to the private repository with its token', calls.every(c => c.u.startsWith('https://api.github.com/repos/rozinante2004-hash/kitchen-reports/') && c.auth === 'Bearer gh-test-token'), JSON.stringify(calls.map(c => c.u)));
+  const all = JSON.stringify(calls.map(c => c.b));
+  expect('v90: …no address, no name, no account id leaves', !/@tester\.example|Dana Tester|Dana\\u0027s|Dana's Kitchen|uSecret/.test(all), all.slice(0, 400));
+  const nb = issues[0].b.body;
+  expect('v90: …the tester\'s words fenced (no @mention, no fake end), the device in a code span',
+    /~~~~~text\nThe import froze @octocat\n~~~~\nfake end\n~~~~~/.test(nb) && /Device: `iPhone  Safari `/.test(nb) && /Sender: `[0-9a-f]{8}`/.test(nb) && /3 time\(s\), to 2 person\(s\)/.test(issues[1].b.body), nb);
+  const files = calls.filter(c => c.m === 'PUT');
+  expect('v90: …the screenshot and the log as files beside it, linked from the issue',
+    files.length === 2 && /\/contents\/shots\/\d{4}-\d\d-\d\d-note-1\.jpg$/.test(files[0].u) && files[0].b.content === 'QUJD'
+    && /\/contents\/logs\/\d{4}-\d\d-\d\d-note-1\.txt$/.test(files[1].u) && Buffer.from(files[1].b.content, 'base64').toString('utf8') === 'log line ✓'
+    && /shots\/.*note-1\.jpg\?raw=true/.test(nb) && /logs\/.*note-1\.txt/.test(nb), JSON.stringify(files.map(f => f.u)));
+  const comment = calls.filter(c => /\/issues\/1\/comments$/.test(c.u));
+  expect('v90: …and one comment on the open 📥 pull request wakes the watcher', comment.length === 1 && /#2 💬/.test(comment[0].b.body) && /#3 ⚠️/.test(comment[0].b.body), JSON.stringify(comment));
+  const n1 = calls.length;
+  await hourly(env);
+  expect('v90: the next run sends nothing twice', calls.length === n1, String(calls.length - n1));
+  // GitHub refuses: kept, said to the owner, and sent on a later run
+  note.run('my-kitchen-notes-beta', 'uSecret2', 'eli@tester.example', 'Eli', 'hEli', 'Eli\'s', 'Second note', '', '', 'v38.91', 'beta', 'Android', 'en', Date.now(), 'new');
+  refuse = 1; await hourly(env);
+  const notice = db.raw.prepare("SELECT * FROM allowance_notices WHERE what = 'reports:github'").get();
+  expect('v90: a token GitHub refuses: the note waits, and 🩺 tells the owner', notice && notice.scope === 'owner' && /REPORTS_GITHUB_TOKEN/.test(notice.detail)
+    && !db.raw.prepare("SELECT * FROM report_links WHERE kind = 'note' AND ref = '3'").get(), JSON.stringify(notice));
+  await hourly(env);
+  const l3 = db.raw.prepare("SELECT issue FROM report_links WHERE kind = 'note' AND ref = '3'").get();
+  expect('v90: …and goes on the next run', l3 && l3.issue > 0, JSON.stringify(l3));
+  // without the token: nothing at all
+  const db2 = d1(); const e2 = { METER_DB: db2, __fetch: async () => { throw new Error('no token, no call'); } };
+  await hourly(e2);
+  expect('v90: without the token nothing is sent and no table is made', !db2.raw.prepare("SELECT name FROM sqlite_master WHERE name = 'report_links'").get(), 'made a table');
+  const h = await (await worker.fetch(post({ action: 'health' }), env)).json();
+  expect('v90: health says the reports go on', h.metering && h.metering.reports === true || h.reports === true || JSON.stringify(h).indexOf('"reports":true') !== -1, JSON.stringify(h).slice(0, 300));
+}
+
 if (failures.length) {
   console.log(`\n${failures.length} failure(s):`);
   failures.forEach(f => console.log('  - ' + f));

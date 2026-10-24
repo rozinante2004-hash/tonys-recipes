@@ -96,7 +96,9 @@ jobs:
       # name when there is one; never printed. Without them: e-mail only, and the GitHub watch only.
       # 23 Oct 2026 — and the photo libraries' keys (Tony: "Yes, set it up for the Pexels and Unsplash keys"): without
       # them only Pixabay and Wikimedia Commons answer photo searches. An unset one leaves the Worker's value as it is.
-      - name: WhatsApp, the hourly check and the photo libraries
+      # 24 Oct 2026 — and the token that writes the testers' reports into the private repository kitchen-reports
+      # (Worker v90; a fine-grained token for that repository only: Contents, Issues, Pull requests).
+      - name: WhatsApp, the hourly check, the photo libraries and the reports repository
         if: steps.token.outputs.ok == 'true'
         env:
           WHATSAPP_PHONE: ${{ secrets.WHATSAPP_PHONE }}
@@ -104,8 +106,9 @@ jobs:
           CF_ANALYTICS_TOKEN: ${{ secrets.CF_ANALYTICS_TOKEN }}
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
           UNSPLASH_ACCESS_KEY: ${{ secrets.UNSPLASH_ACCESS_KEY }}
+          REPORTS_GITHUB_TOKEN: ${{ secrets.REPORTS_GITHUB_TOKEN }}
         run: |
-          for name in WHATSAPP_PHONE WHATSAPP_KEY CF_ANALYTICS_TOKEN PEXELS_API_KEY UNSPLASH_ACCESS_KEY; do
+          for name in WHATSAPP_PHONE WHATSAPP_KEY CF_ANALYTICS_TOKEN PEXELS_API_KEY UNSPLASH_ACCESS_KEY REPORTS_GITHUB_TOKEN; do
             value="${!name}"
             if [ -n "$value" ]; then printf '%s' "$value" | npx --yes wrangler@4 secret put "$name" --config worker/wrangler.jsonc >/dev/null; echo "$name is set"
             else echo "::notice::$name is not set (Settings → Secrets and variables → Actions) — left as it is"; fi
