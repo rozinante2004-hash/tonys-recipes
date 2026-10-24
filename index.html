@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v38.89 -->
+<!-- Tony's Recipes Collection v38.90 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -709,7 +709,7 @@
             }
             _autoLoginTimer = null;
             if (typeof setDriveStatus === 'function')
-              setDriveStatus('synced', '☁️ Shared · ' + (user.displayName || user.email));
+              setDriveStatus('synced', '☁️ Shared · ', user.displayName || user.email);   // v38.90 — the name apart
           }, delay);
         } else {
           // User signed out or auth cleared — unsubscribe Firestore listener immediately
@@ -2690,7 +2690,7 @@ async function _selfTestPark() {
   _signInWas.outShow = _signInWas.outBtn ? _signInWas.outBtn.display : undefined;
   _signInWas.inShow = _signInWas.inBtn ? _signInWas.inBtn.display : undefined;
   var _ds = document.getElementById('driveStatus'), _dsT = document.getElementById('dsText');
-  _signInWas.status = (_ds && _dsT) ? { state: _ds.className, text: _dsT.textContent } : null;
+  _signInWas.status = (_ds && _dsT) ? { state: _ds.className, text: _dsT.hasAttribute('data-text') ? _dsT.getAttribute('data-text') : _dsT.textContent, who: _dsT.getAttribute('data-who') || '' } : null;
   _firestoreUnsubscribe = null;
   // …and the WhatsApp scan and its finds (v38.49). Tony's tester, with no chats at all, saw "⏹ Stopped after 500 of
   // 4,000 messages" and "Ask my WhatsApp groups (1)" after a run: a test's 4,000 made-up messages, and a menu label
@@ -2715,7 +2715,7 @@ function _selfTestSignInBack(s) {
   if (s.outBtn && s.outShow !== undefined) s.outBtn.display = s.outShow;
   if (s.inBtn && s.inShow !== undefined) s.inBtn.display = s.inShow;
   var ls = document.getElementById('loginScreen'); if (ls) ls.style.display = 'none';
-  if (s.status && typeof setDriveStatus === 'function') try { setDriveStatus(s.status.state, s.status.text); } catch(e) {}
+  if (s.status && typeof setDriveStatus === 'function') try { setDriveStatus(s.status.state, s.status.text, s.status.who); } catch(e) {}
   setTimeout(function(){ if (typeof linkLiveStart === 'function') try { linkLiveStart(); } catch(e) {} }, 1500);   // v38.49
 }
 function _selfTestUnpark(p) {
@@ -4071,7 +4071,7 @@ function healthRow(label, value, tone, note) {
   var colour = tone === 'bad' ? 'var(--bad-text)' : tone === 'warn' ? 'var(--warn-text)' : tone === 'good' ? 'var(--green)' : 'var(--ink)';
   return '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:9px 0;border-bottom:1px solid var(--border);">'
     + '<div style="font-size:13px;color:var(--muted);flex-shrink:0;">' + escH(label) + '</div>'
-    + '<div style="font-size:14px;font-weight:600;color:' + colour + ';text-align:end;">' + escH(value)
+    + '<div style="font-size:14px;font-weight:600;color:' + colour + ';text-align:end;"><span>' + escH(value) + '</span>'   // v38.90 — its own phrase, beside a note
     + (note ? '<div style="font-size:11px;font-weight:400;color:var(--muted);margin-top:2px;">' + escH(note) + '</div>' : '')
     + '</div></div>';
 }
@@ -4141,9 +4141,11 @@ function renderSyncHealth() {
   // left, so a schema below 2 is no longer "an older layout you will be upgraded
   // from". It means `shared/meta` is missing or malformed, which is worth saying
   // plainly rather than dressing up as a transitional state.
-  out += healthRow('Cloud storage layout', h.schema >= 2 ? 'per-recipe documents (v2)' : (h.signedIn ? 'unrecognised — shared/meta is missing or damaged' : 'unknown'),
-                   h.schema >= 2 ? 'good' : (h.signedIn ? 'bad' : ''),
-                   h.signedIn && h.schema < 2 ? 'recipes still load from their own documents; it is the meta document that needs attention' : '');
+  // v38.90 — a kitchen with nothing in the cloud yet has no index: new, not damaged
+  var hNew = h.signedIn && h.schema < 2 && !h.cloudRecipes;
+  out += healthRow('Cloud storage layout', h.schema >= 2 ? 'per-recipe documents (v2)' : (hNew ? 'new — nothing saved to the cloud yet' : (h.signedIn ? 'unrecognised — shared/meta is missing or damaged' : 'unknown')),
+                   h.schema >= 2 ? 'good' : (hNew ? '' : h.signedIn ? 'bad' : ''),
+                   h.signedIn && h.schema < 2 && !hNew ? 'recipes still load from their own documents; it is the meta document that needs attention' : '');
 
   out += '<div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:0.8px;text-transform:uppercase;margin:14px 0 2px;">Cost & safety</div>';
   var pct = Math.round((h.readsToday / h.readsBudget) * 100);
@@ -4658,12 +4660,12 @@ function renderAccessMembers(standIns) {
     // like a member: nobody has signed in with it yet, so there is nobody to chat with. Now the row says so.
     var waits = m.pending ? '<div class="access-email access-wait">\u23F3 hasn\u2019t signed in yet</div>' : '';
     if (viewOnly) return '<div class="access-row">' +
-      '<div class="access-avatar">' + escH(m.email[0].toUpperCase()) + '</div>' +
+      '<div class="access-avatar" data-no-i18n>' + escH(m.email[0].toUpperCase()) + '</div>' +
       '<div class="access-info"><div class="access-name" data-no-i18n>' + escH(m.name||m.email.split('@')[0]) + '</div>' +
       '<div class="access-email" data-no-i18n>' + escH(m.email) + '</div>' + waits + '</div>' + chatBtn +
       '<div class="access-badge">' + roleLabels[m.role] + '</div></div>';
     return '<div class="access-row' + (m.asks ? ' access-asks' : '') + '">' +
-      '<div class="access-avatar">' + escH(m.email[0].toUpperCase()) + '</div>' +
+      '<div class="access-avatar" data-no-i18n>' + escH(m.email[0].toUpperCase()) + '</div>' +
       // Same reason as the owner row above: names and addresses are data.
       // Escaped (v36.60) — the only unescaped data the audit's scan found.
       '<div class="access-info"><div class="access-name" data-no-i18n>' + escH(m.name||m.email.split('@')[0]) + '</div>' +
@@ -5756,7 +5758,7 @@ function talkHtml(other, note, noteFrom, noteName) {
     return '<div style="display:flex;justify-content:' + (mine ? 'flex-end' : 'flex-start') + ';margin:4px 0;">'
       + '<div class="' + (hl ? 'talk-last' : '') + '" style="max-width:' + (hl ? '92' : '82') + '%;padding:7px 10px;border-radius:10px;font-size:13px;line-height:1.45;white-space:pre-wrap;'
       + (mine ? 'background:var(--note-bg);' : 'background:var(--card-bg);border:1px solid var(--border);') + '">'
-      + '<div style="font-size:11px;color:var(--muted);margin-bottom:2px;">' + (mine ? 'You' : '<span data-no-i18n>' + escH(m.name || 'They') + '</span>') + (m.at ? ' · ' + escH(when(m.at)) : '')
+      + '<div style="font-size:11px;color:var(--muted);margin-bottom:2px;">' + (mine ? '<span>You</span>' : '<span data-no-i18n>' + escH(m.name || 'They') + '</span>') + (m.at ? '<span data-no-i18n> · ' + escH(when(m.at)) + '</span>' : '')   /* v38.90 — the time is no phrase */
       + (hl && lastNew ? ' <b style="color:var(--danger);">NEW</b>' : '') + '</div>'
       + '<div dir="auto" data-no-i18n' + (hl ? ' style="font-size:14px;color:var(--ink);"' : '') + '>' + escH(m.text || '') + '</div></div></div>';
   }
@@ -5899,7 +5901,7 @@ function renderKitchenChats(focus) {
       + '<div style="max-width:84%;padding:7px 10px;border-radius:12px;font-size:13.5px;line-height:1.45;white-space:pre-wrap;'
       + (mine ? 'background:var(--note-bg);' : 'background:var(--card-bg);border:1px solid var(--border);') + '">'
       + '<div dir="auto" data-no-i18n>' + escH(m.text || '') + '</div>'
-      + '<div style="font-size:10.5px;color:var(--muted);margin-top:3px;text-align:end;">' + (mine ? 'You' : '<span data-no-i18n>' + escH(m.name || talkOtherName(other)) + '</span>') + (m.at ? ' · ' + escH(when(m.at)) : '') + '</div>'
+      + '<div style="font-size:10.5px;color:var(--muted);margin-top:3px;text-align:end;">' + (mine ? '<span>You</span>' : '<span data-no-i18n>' + escH(m.name || talkOtherName(other)) + '</span>') + (m.at ? '<span data-no-i18n> · ' + escH(when(m.at)) + '</span>' : '')   /* v38.90 — the time is no phrase */ + '</div>'
       + '</div></div>';
   }).join('');
   body.innerHTML = (others.length > 1 ? '<button type="button" onclick="_chatWith=null;renderKitchenChats()" style="background:none;border:none;color:var(--terracotta);font-weight:600;font-size:13px;cursor:pointer;padding:6px 0;font-family:inherit;">‹ All chats</button>' : '')
@@ -6094,7 +6096,7 @@ function renderFamilyChat(focus) {
       + '<div style="max-width:84%;padding:7px 10px;border-radius:12px;font-size:13.5px;line-height:1.45;white-space:pre-wrap;'
       + (mine ? 'background:var(--note-bg);' : 'background:var(--card-bg);border:1px solid var(--border);') + '">'
       + '<div dir="auto" data-no-i18n>' + escH(m.text || '') + '</div>'
-      + '<div style="font-size:10.5px;color:var(--muted);margin-top:3px;text-align:end;">' + (mine ? 'You' : '<span data-no-i18n>' + escH(m.name || famPersonName(m.by)) + '</span>') + (m.at ? ' · ' + escH(when(m.at)) : '') + '</div>'
+      + '<div style="font-size:10.5px;color:var(--muted);margin-top:3px;text-align:end;">' + (mine ? '<span>You</span>' : '<span data-no-i18n>' + escH(m.name || famPersonName(m.by)) + '</span>') + (m.at ? '<span data-no-i18n> · ' + escH(when(m.at)) + '</span>' : '')   /* v38.90 — the time is no phrase */ + '</div>'
       + '</div></div>';
   }).join('');
   body.innerHTML = '<button type="button" onclick="_fam.with=null;renderFamilyChat()" style="background:none;border:none;color:var(--terracotta);font-weight:600;font-size:13px;cursor:pointer;padding:6px 0;font-family:inherit;">‹ All chats</button>'
@@ -6788,7 +6790,7 @@ function linkedCardsInto(g, list, c, hid, lazy, name) {
         + '<div class="recipe-list-thumb" style="background:' + escA(r.bg) + ';position:relative;overflow:hidden;">' + pic(r, 26)
         + listBadgesHtml(r, !!(c.photos[r.id] || r._ph || /^https?:/i.test(r.photo || ''))) + '</div>'
         + '<div class="recipe-list-info"><div class="recipe-list-name" dir="auto"><button type="button" class="card-open">' + escH(r.name) + '</button></div>'
-        + '<div class="recipe-list-meta"><span>' + escH(T(r.category)) + '</span><bdi>⏱ ' + escH(r.prep) + '</bdi>'
+        + '<div class="recipe-list-meta"><span>' + escH(T(r.category)) + '</span>' + (metaVal(r.prep) ? '<bdi>⏱ ' + escH(r.prep) + '</bdi>' : '')
         + '<span class="difficulty ' + escA(String(r.difficulty || '').toLowerCase()) + '" style="padding:1px 6px;">' + escH(T(r.difficulty)) + '</span></div></div>'
         + '<div class="recipe-list-right" title="' + escA(T('Read-only')) + '">\u{1F441}</div></div>';
     }).join('');
@@ -6799,7 +6801,7 @@ function linkedCardsInto(g, list, c, hid, lazy, name) {
         + '<div class="card-image" style="background:' + escA(r.bg) + '">' + pic(r, 52)
         + '<div class="card-category-badge">' + escH(T(r.category)) + '</div>' + gridBadgesHtml(r) + '</div>'
         + '<div class="card-body"><div class="card-title" dir="auto"><button type="button" class="card-open">' + escH(r.name) + '</button></div>'
-        + '<div class="card-meta"><bdi>⏱ ' + escH(r.prep) + '</bdi></div></div>'
+        + '<div class="card-meta">' + (metaVal(r.prep) ? '<bdi>⏱ ' + escH(r.prep) + '</bdi>' : '') + '</div></div>'
         + '<div class="card-footer"><span class="difficulty ' + escA(String(r.difficulty || '').toLowerCase()) + '">' + escH(T(r.difficulty)) + '</span>'
         + '<span title="' + escA(T('Read-only')) + '">\u{1F441}</span></div></div>';
     }).join('');
@@ -6919,7 +6921,7 @@ function openLinkedRecipe(i, hid) {
     +   '<div class="modal-category">' + escH(r.category) + '</div>'
     +   '<div class="modal-title" dir="auto" data-no-i18n>' + escH(r.name) + '</div>'
     +   '<div class="modal-meta">' + (isCollection(r) ? '<span>\u{1F4DA} <span data-no-i18n>' + recipeParts(r).length + '</span> recipes</span>'
-          : '<bdi data-no-i18n>⏱ ' + escH(r.prep) + '</bdi><bdi>\u{1F37D} <span dir="auto" data-no-i18n>' + escH(r.servings) + '</span></bdi>'
+          : (metaVal(r.prep) ? '<bdi data-no-i18n>⏱ ' + escH(r.prep) + '</bdi>' : '') + (metaVal(r.servings) ? '<bdi>\u{1F37D} <span dir="auto" data-no-i18n>' + escH(r.servings) + '</span></bdi>' : '')
           + '<span class="difficulty ' + escA(String(r.difficulty || '').toLowerCase()) + '">' + escH(r.difficulty) + '</span>') + '</div>'
     +   (r.source ? '<div class="source-link" style="margin-bottom:8px;font-size:12px;"><bdi style="color:var(--muted);">Source:</bdi> '
           + '<span dir="auto" data-no-i18n>' + sourceHtml(r.source) + '</span></div>' : '')
@@ -7228,7 +7230,7 @@ function householdRenderBar() {
     // v37.12 — Tony: nothing said WHO is signed in (a second account in a
     // private window looks just like the first).
     + (window._fbUser ? '<div id="householdYouRow" class="access-row" style="margin-top:8px;">'
-    +   '<div class="access-avatar">' + escH(String(_fbUser.displayName || _fbUser.email || '?').charAt(0).toUpperCase()) + '</div>'
+    +   '<div class="access-avatar" data-no-i18n>' + escH(String(_fbUser.displayName || _fbUser.email || '?').charAt(0).toUpperCase()) + '</div>'
     +   '<div class="access-info"><div class="access-email" style="font-size:11px;">Signed in as</div>'
     +   '<div class="access-name" data-no-i18n>' + escH(_fbUser.displayName || String(_fbUser.email || '').split('@')[0]) + '</div>'
     +   '<div class="access-email" data-no-i18n>' + escH(_fbUser.email || '') + '</div></div>'
@@ -7977,6 +7979,15 @@ function householdElsewhereUrl() {
 }
 window.hhFoundingOpen = hhFoundingOpen; window.hhSetFoundingOpen = hhSetFoundingOpen; window.householdMayFound = householdMayFound;
 
+// v38.90 — the welcome's paragraphs, kept here so the translations can list them (I18N_EXTRA): the message is put
+// together from a choice of these, which no reading of the source can find. {1} is the address.
+var HH_WELCOME = {
+  open: 'Pull up a chair! \u{1F373} This is where your favourite recipes come to live \u2014 ready to cook from, and to share with the people you cook with.',
+  elsewhere: 'This kitchen is invitation-only \u2014 a bit like grandma\u2019s. \u{1F642} Got an invitation link? Come right in. If not, My Kitchen Notes gives you a kitchen of your own: free, and the very same app.',
+  closed: 'New kitchens open by invitation for now. \u{1F511} Got an invitation link? Come right in \u2014 if not, ask whoever told you about the app to send you one.',
+  tester: 'Invited to test the app? Sign in with the address the invitation came to \u2014 you are signed in as {1}.',
+  confirm: 'Joining someone\u2019s collection by your e-mail? Confirm it first \u2014 we sent a link to {1} (peek in spam if it\u2019s shy).'
+};
 async function householdWelcome(user) {
   // One question at a time: an open dialog (the language offer) is answered first.
   for (var w = 0; w < 600 && document.getElementById('askOverlay'); w++) await wait(200);
@@ -8001,13 +8012,11 @@ async function householdWelcome(user) {
       { value: 'join', label: '\u{1F517} I have an invitation link' }
     ].concat(elsewhere ? [{ value: 'elsewhere', label: '\u{1F373} Take me to My Kitchen Notes (my own recipes)' }] : []);
     if (unconfirmed) choices.push({ value: 'confirm', label: '\u{1F4EC} Someone added my e-mail \u2014 let me confirm it' });
-    var v = await askChoice((mayFound ? 'Pull up a chair! \u{1F373} This is where your favourite recipes come to live \u2014 ready to cook from, and to share with the people you cook with.'
-        : elsewhere ? 'This kitchen is invitation-only \u2014 a bit like grandma\u2019s. \u{1F642} Got an invitation link? Come right in. If not, My Kitchen Notes gives you a kitchen of your own: free, and the very same app.'
-        : 'New kitchens open by invitation for now. \u{1F511} Got an invitation link? Come right in \u2014 if not, ask whoever told you about the app to send you one.'
+    var v = await askChoice((mayFound ? HH_WELCOME.open : elsewhere ? HH_WELCOME.elsewhere
+        : HH_WELCOME.closed
           // v38.69 — a tester invited at another address
-          + (user && user.email ? '\n\nInvited to test the app? Sign in with the address the invitation came to \u2014 you are signed in as ' + user.email + '.' : ''))
-      + (unconfirmed ? '\n\nJoining someone\u2019s collection by your e-mail? Confirm it first \u2014 we sent a link to ' + user.email
-          + ' (peek in spam if it\u2019s shy).' : ''),
+          + (user && user.email ? '\n\n' + HH_WELCOME.tester.replace('{1}', function(){ return user.email; }) : ''))
+      + (unconfirmed ? '\n\n' + HH_WELCOME.confirm.replace('{1}', function(){ return user.email; }) : ''),
       choices, { icon: '\u{1F44B}', title: 'Welcome to ' + brand, cancelLabel: '\u{1F44B} Not now \u2014 sign me out', noBackdrop: true });
     if (v === 'confirm') {
       await resendConfirmation();
@@ -8188,7 +8197,7 @@ function startTour() {
         + 'px;border:3px solid var(--gold);border-radius:10px;box-shadow:0 0 0 9999px rgba(0,0,0,0.25);pointer-events:none;"></div>'
       + '<div id="tourCard" style="position:fixed;left:' + left + 'px;' + (below ? 'top:' + (r.bottom + 12) : 'bottom:' + (vh - r.top + 12)) + 'px;width:' + w
         + 'px;background:var(--card-bg);color:var(--ink);border-radius:12px;padding:14px 16px;box-shadow:0 8px 28px rgba(0,0,0,0.3);font-family:DM Sans,Heebo,sans-serif;">'
-      +   '<div dir="auto" style="font-size:14px;line-height:1.5;margin-bottom:10px;">' + escH(st.text) + '</div>'
+      +   '<div dir="auto" style="font-size:14px;line-height:1.5;margin-bottom:10px;">' + escH(i18nAsk(st.text)) + '</div>'   // v38.90
       +   '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">'
       +     '<span style="font-size:12px;color:var(--muted);">' + (i + 1) + ' / ' + steps.length + '</span>'
       +     '<span><button id="tourSkip" class="ask-btn ghost" style="margin-inline-end:6px;">Skip</button>'
@@ -8218,10 +8227,15 @@ async function firstRunLanguageOffer() {
   var code = i18nDeviceLangOffer(navigator.languages || [navigator.language], avail);
   if (!code || document.getElementById('askOverlay')) return null;
   try { localStorage.setItem(LANG_OFFERED_KEY, code); } catch(e) {}
-  var yes = await askConfirm({ icon: '\u{1F310}', title: I18N_LANGS[code].label + '?',
+  // v38.90 — z: above the sign-in screen (9999) and the kitchen rules (10050). Under them it waited unseen until after
+  // both — so a Hebrew phone read the sign-in and the rules in English, and was asked about Hebrew only afterwards.
+  var yes = await askConfirm({ icon: '\u{1F310}', title: I18N_LANGS[code].label + '?', z: 10100,
     message: 'Show the app in ' + I18N_LANGS[code].label + '? You can change it any time with 🌐.',
     okLabel: I18N_LANGS[code].label, cancelLabel: 'English' });
-  if (yes === true) await pickLanguage(code);
+  if (yes === true) {
+    await pickLanguage(code);
+    if (document.getElementById('tgTerms')) { try { legalLoadTerms(); } catch(e) {} }   // the rules already open: in that language
+  }
   return yes === true ? code : 'en';
 }
 function feedbackMailto() {
@@ -9341,7 +9355,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v38.89';
+var APP_VERSION = 'v38.90';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -12483,7 +12497,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.89</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.90</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -12571,7 +12585,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.89</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.90</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -13010,7 +13024,7 @@ body.banner-shown .header {
           <button type="button" class="step-tool-btn" onmousedown="event.preventDefault()" onclick="stepToolIndent(-1)" aria-label="Outdent this line, or the selected lines" title="Outdent this line, or the selected lines">&#8676;</button>
           <span style="font-size:11px;color:var(--muted);">acts on the line your cursor is in, or on every line you select · <b>B</b> or Ctrl+B: **bold** here is bold in the recipe</span>
         </div>
-        <textarea class="form-textarea" id="f-steps" dir="auto" onkeyup="rememberStepCaret()" onclick="rememberStepCaret()" onselect="rememberStepCaret()" onfocus="rememberStepCaret()" placeholder="Boil the pasta&#10;Mix eggs and cheese&#10;Serve hot"></textarea>
+        <textarea class="form-textarea" id="f-steps" dir="auto" data-i18n-skip-attrs="placeholder" onkeyup="rememberStepCaret()" onclick="rememberStepCaret()" onselect="rememberStepCaret()" onfocus="rememberStepCaret()" placeholder="Boil the pasta&#10;Mix eggs and cheese&#10;Serve hot"></textarea>
       </div>
       <div class="form-group">
         <label class="form-label">Source</label>
@@ -13643,7 +13657,7 @@ body.banner-shown .header {
       The things you always have in. One per line (or comma-separated). Matching is loose, so
       “olive oil” also covers “good olive oil”. Kept on this device only.
     </p>
-    <textarea id="pantryInput" dir="auto" rows="10" placeholder="olive oil&#10;flour&#10;eggs&#10;salt&#10;שמן זית"
+    <textarea id="pantryInput" dir="auto" data-i18n-skip-attrs="placeholder" rows="10" placeholder="olive oil&#10;flour&#10;eggs&#10;salt&#10;שמן זית"
       style="unicode-bidi:plaintext;text-align:start;width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;font-family:'DM Sans','Heebo',sans-serif;font-size:14px;color:var(--ink);background:var(--card-bg);resize:vertical;box-sizing:border-box;margin-bottom:12px;"></textarea>
     <button onclick="savePantry()" style="width:100%;padding:12px;background:var(--terracotta-fill);color:#fff;border:none;border-radius:10px;font-family:'DM Sans','Heebo',sans-serif;font-size:15px;font-weight:600;cursor:pointer;">Save pantry</button>
   </div>
@@ -13780,7 +13794,7 @@ body.banner-shown .header {
         <code class="inline-code" style="padding:1px 4px;border-radius:4px;font-size:11px;">copy(localStorage.accessToken)</code>,
         then paste it here.
       </p>
-      <textarea id="bringManualToken" placeholder="eyJhbGciOi…" style="width:100%;height:52px;font-size:10px;border:1px solid var(--border);border-radius:8px;padding:8px;font-family:monospace;resize:none;box-sizing:border-box;"></textarea>
+      <textarea id="bringManualToken" data-i18n-skip-attrs="placeholder" placeholder="eyJhbGciOi…" style="width:100%;height:52px;font-size:10px;border:1px solid var(--border);border-radius:8px;padding:8px;font-family:monospace;resize:none;box-sizing:border-box;"></textarea>
       <div id="bringManualStatus" style="font-size:12px;color:var(--muted);min-height:16px;margin:4px 0;"></div>
       <button onclick="submitManualBringToken()" style="width:100%;padding:10px;background:var(--gold);color:var(--warm-brown);border:none;border-radius:10px;font-family:'DM Sans','Heebo',sans-serif;font-size:13px;font-weight:600;cursor:pointer;">🔑 Save this token</button>
     </div>
@@ -15215,8 +15229,11 @@ function i18nUnits(root) {
   if (scope.nodeType === 1 && scope !== document.body) all.unshift(scope);
   for (var i = 0; i < all.length; i++) {
     var el = all[i];
-    if (I18N_SKIP_TAGS.test(el.tagName)) continue;
-    var hardSkip = i18nSkip(el, null);
+    // v38.90 — a text box holds what someone typed, never translated; but its HINT is the app's words ("Your note",
+    // "Write a message…"), and skipping the tag whole left every one of them English.
+    var isBox = el.tagName === 'TEXTAREA';
+    if (!isBox && I18N_SKIP_TAGS.test(el.tagName)) continue;
+    var hardSkip = isBox || i18nSkip(el, null);
     // …unless the only thing still worth reading here is a placeholder.
     if (hardSkip && i18nSkip(el, 'placeholder')) continue;
     // Attributes people actually read.
@@ -15336,8 +15353,9 @@ function i18nHarvestSignIn() {
 // while it waits the app is live, and the stand-in household below would be
 // the one it saw. Read-only: no reader or writer is called.
 function i18nHarvestDemand() {
-  var keep = { hh: window._household, user: window._fbUser, ls: _linkState, talk: _talk, open: _talkOpen, recipes: recipes };
+  var keep = { hh: window._household, user: window._fbUser, ls: _linkState, talk: _talk, open: _talkOpen, recipes: recipes, chat: _chatWith, newIn: window.talkNewIn };
   var gone = ['aboutOverlay', 'termsGate', 'linkReqOverlay', 'familyChatOverlay', 'feedbackOverlay', 'deviceOfferOverlay', 'extOfferOverlay',
+              'i18nFirstRun', 'kitchenChatOverlay',   // v38.90
               'logNudge', 'importErrorModal', 'serviceErrorOverlay', 'emailModalOverlay', 'farmOverlay', 'chimeOverlay'];
   var clear = function(){ gone.forEach(function(id){ var o = document.getElementById(id); if (o) o.remove(); }); };
   var fixtureId = 888701;
@@ -15376,6 +15394,24 @@ function i18nHarvestDemand() {
         _fam.with = 'uP'; renderFamilyChat(); i18nCollect();
         _fam.standIn = []; _fam.with = null; renderFamilyChat();
       },
+      function(){
+        // v38.90 — the chats with other kitchens: the list (a conversation, and "nobody yet"), and one conversation
+        window._household = { hid: 'hH', role: 'owner', name: '\u00b7', code: '', links: [{ hid: 'hL', name: '\u00b7', code: '', at: 1 }] };
+        window._fbUser = window._fbUser || { uid: 'i18n-harvest', email: 'someone@example.invalid' };
+        _linkState = { loadedFor: 'hH', pending: [], declined: [], log: {} };
+        _talk = { 'hH_hL': [{ from: 'hH', name: '\u00b7', text: '\u00b7', at: 1 }] }; _talkOpen = {};
+        window.talkNewIn = function(){ return 0; };                    // nothing is "new": a conversation drawn marks nothing seen
+        var ov = document.createElement('div'); ov.id = 'kitchenChatOverlay'; ov.className = 'modal-overlay open';
+        ov.innerHTML = '<div class="ask-card"><div id="kcBody2"></div></div>';
+        document.body.appendChild(ov);
+        _chatWith = null; renderKitchenChats(false); i18nCollect();
+        _chatWith = 'hL'; renderKitchenChats(false); i18nCollect();
+        _household.links = []; _talk = {}; _chatWith = null; renderKitchenChats(false);
+      },
+      function(){
+        // v38.90 — a new kitchen's first screen (no recipes yet): the ways to add the first one
+        var d = document.createElement('div'); d.id = 'i18nFirstRun'; d.innerHTML = firstRunEmptyHtml(); document.body.appendChild(d);
+      },
       function(){ openFeedbackForm(); },
       function(){ farmSettingsDraw(); },
       function(){ openChimeSettings(); },                // v38.82 — the sounds
@@ -15394,6 +15430,7 @@ function i18nHarvestDemand() {
     clear();
     recipes = keep.recipes;
     window._household = keep.hh; window._fbUser = keep.user; _linkState = keep.ls; _talk = keep.talk; _talkOpen = keep.open;
+    _chatWith = keep.chat; window.talkNewIn = keep.newIn;
     _fam.standIn = null; _fam.with = null;
     document.body.classList.remove('i18n-harvesting');
   }
@@ -15509,6 +15546,7 @@ async function i18nHarvest(onScreen) {
       if (n) drawn.push(n + ' messages from the source');
     } catch(e) { dlog('[i18n] scrape failed', e && e.message); }
     i18nRegisterExtra();
+    if (_i18nDict) i18nPatternsFromDict(_i18nDict);   // v38.90 — i18nBuildPatterns started the list afresh
   } finally { window.toast = realToast; window._fbUser = realUser; }
   return drawn;
 }
@@ -15544,6 +15582,8 @@ var I18N_SCRAPE = [
   // read the same way: the literal is the whole message when a comma or the bracket follows it.
   /\btoast(?:Action)?\(\s*(['"])((?:\\.|(?!\1).)*)\1\s*[,)]/g,
   /\baskPrompt\(\s*(['"])((?:\\.|(?!\1).)*)\1\s*(?:,[^)]*)?\)/g,
+  // v38.90 — askChoice's message is its first argument (i18nAsk translates it as it is drawn)
+  /\baskChoice\(\s*(['"])((?:\\.|(?!\1).)*)\1\s*,/g,
   /\bshowServiceError\(\s*(['"])((?:\\.|(?!\1).)*)\1\s*\)/g,
   /\b(?:title|message|okLabel|cancelLabel|placeholder|label|hint|detail|fix|note)\s*:\s*(['"])((?:\\.|(?!\1).)*)\1\s*[,}]/g,
   // The header's status line, whose second argument is the words.
@@ -15864,6 +15904,7 @@ function i18nPatternRegex(pat) {
 var I18N_PATTERN_OPENERS = new RegExp([
   '\\btoast(?:Action)?\\(',                              // v38.86 — toastAction's message too
   '\\bshowServiceError\\(',
+  '\\baskChoice\\(\\s*(?=[\'"])',                         // v38.90 — "Which version of {1}? Newest first." (a message, not a ternary)
   '\\b(?:title|message|step|okLabel|cancelLabel|detail|fix|note)\\s*:\\s*',
   '\\bsetDriveStatus\\(\\s*[\'"][^\'"]*[\'"]\\s*,\\s*',
   '\\.textContent\\s*=\\s*'
@@ -15925,6 +15966,45 @@ function i18nMatchPattern(text) {
   return null;
 }
 window.i18nBuildPatterns = i18nBuildPatterns; window.i18nMatchPattern = i18nMatchPattern;
+// v38.90 — the shapes come from the DICTIONARY too. They were built only by a harvest (i18nScrapeSource), which
+// runs where a language is made, never on a tester's phone: there the list stayed empty, and not one message with a
+// name or a number in it was translated ("Welcome to {1}", "Invite someone to {1}", "☁️ Shared · {1}"), though the
+// file had every one. Each key holding a {n} is a shape, kept to the scrape's own bar (i18nPartsToPattern).
+function i18nPatternsFromDict(dict) {
+  var have = Object.create(null), added = 0;
+  _i18nPatterns.forEach(function(p){ have[p.pat] = 1; });
+  Object.keys(dict || {}).forEach(function(k) {
+    if (have[k] || !/\{\d+\}/.test(k) || k.length > I18N_MAX_LEN) return;
+    var lit = k.replace(/\{\d+\}/g, '');
+    if (lit.length < 8 || !/[A-Za-z]{3}/.test(lit)) return;
+    var rx = i18nPatternRegex(k);
+    if (rx) { _i18nPatterns.push({ pat: k, re: rx }); have[k] = 1; added++; }
+  });
+  if (added) _i18nPatterns.sort(function(a, b) {
+    return b.pat.replace(/\{\d+\}/g, '').length - a.pat.replace(/\{\d+\}/g, '').length;
+  });
+  return added;
+}
+// v38.90 — a question's own words: the message and the choices of askConfirm / askChoice, and a tour step. They sit
+// in dir="auto" (a name or an address in them keeps its own direction), which i18nSkip reads as "a recipe's words" —
+// so since v36.9 no question was ever translated, the dictionary's answers notwithstanding. Looked up here as they are
+// drawn, the whole text first and then paragraph by paragraph; never noted as missing (a composed message can carry a
+// name or an address, and the missing list feeds the shared translations).
+function i18nAsk(s) {
+  s = String(s == null ? '' : s);
+  if (!s || _i18nLang === 'en' || !_i18nDict) return s;
+  function one(t) {
+    var k = t.trim();
+    if (!k || /^\S+@\S+$/.test(k)) return t;
+    var to = _i18nDict[k];
+    if (!to && k.length <= I18N_MAX_LEN) to = i18nMatchPattern(k);
+    return (to && String(to).trim()) ? String(to) : t;
+  }
+  var whole = one(s);
+  if (whole !== s || !/\n\s*\n/.test(s)) return whole;
+  return s.split(/(\n\s*\n)/).map(function(part, i){ return (i % 2) ? part : one(part); }).join('');
+}
+window.i18nPatternsFromDict = i18nPatternsFromDict; window.i18nAsk = i18nAsk;
 
 // ─── STRINGS THE CODE COMPOSES FOR ITSELF (v36.38) ───────────────────────────
 // Last resort, and deliberately short. Everything above finds strings by
@@ -15937,6 +16017,9 @@ window.i18nBuildPatterns = i18nBuildPatterns; window.i18nMatchPattern = i18nMatc
 // translating a string nobody sees. A `{1}` makes it a shape, matched the same
 // way a built toast is.
 var I18N_EXTRA = [
+  // v38.90 — the beta-eve walk in Hebrew: put together from a choice (a ternary), so no reading of the source finds them
+  'Recipe imported!', '📚 Collection imported — {1} recipes in “{2}”',
+  '\u2713 Synced — {1}', '(yours)', 'Reading the recipe…', '⏳ Reading the requests…', 'new — nothing saved to the cloud yet',
   // v38.82 — the sound's line in ⚙️ → ♿ Accessibility, for each sound; v38.81 — a photo library's pause, in 🔍 Find a photo
   '🎵 The sound: Spoon on a wine glass', '🎵 The sound: The kitchen’s service bell', '🎵 The sound: Wooden spoon on a pot',
   '⏳ {1} asks for a pause — {2} s…',
@@ -16044,8 +16127,14 @@ var I18N_EXTRA = [
     + ' In this test copy it also sends, by itself, the app\u2019s own error messages and how the app is used \u2014 which features and how often, when, on what kind of device, how you signed in and how you first found the app: names and numbers, never your recipes.',
   ', and no outside analytics or trackers are used. While the app is being tested, this copy reports its own errors and counts how it is used (which features, how often, on what kind of device), to the app\u2019s own server. '
     + 'The sync log in ⚙️ → 🔧 Troubleshooting → Logging & debugging stays on this device, is never put into a backup, and leaves it only when you choose to send it to the app\u2019s admin.'
-].concat(appFeaturePhrases(), contactPhrases(), surveyPhrases());   // v38.18 — 📝 the end-of-beta question   // v38.17 — ✨ What can this app do, ✉️ Contact us
+].concat(appFeaturePhrases(), contactPhrases(), surveyPhrases(),
+  // v38.90 — the welcome's paragraphs and the tour's steps (each drawn inside dir="auto", translated by i18nAsk)
+  Object.keys(HH_WELCOME).map(function(k){ return HH_WELCOME[k]; }), TOUR_STEPS.map(function(st){ return st.text; }));   // v38.18 — 📝 the end-of-beta question   // v38.17 — ✨ What can this app do, ✉️ Contact us
 function i18nRegisterExtra() {
+  // v38.90 — the recipe badge says its words one by one (i18nPhrase), and RECIPE_RANKS comes after I18N_EXTRA
+  ['recipe', 'recipes', 'next', 'Recipes in this collection', '{1} more for {2}', 'The highest rank there is.', 'Close']
+    .concat((typeof RECIPE_RANKS !== 'undefined' ? RECIPE_RANKS : []).map(function(x){ return x.name; }))
+    .forEach(function(str){ _i18nHarvested[str] = 1; });
   I18N_EXTRA.forEach(function(str) {
     _i18nHarvested[str] = 1;
     if (str.indexOf('{') === -1) return;
@@ -16071,7 +16160,8 @@ window.i18nScanCall = i18nScanCall; window.i18nPartsToPattern = i18nPartsToPatte
 // its paid-for translation would be reported as an orphan.
 function i18nCardLabels() {
   var seen = Object.create(null);
-  (typeof recipes !== 'undefined' && recipes ? recipes : []).forEach(function(r) {
+  // v38.90 — and the example recipes': "Pasta" reached no card where a language is made, and stayed English for testers
+  (typeof recipes !== 'undefined' && recipes ? recipes : []).concat(typeof SAMPLE_RECIPES !== 'undefined' ? SAMPLE_RECIPES : []).forEach(function(r) {
     [r.category, r.difficulty].forEach(function(v) {
       if (v && i18nTranslatable(v)) seen[String(v).trim()] = 1;
     });
@@ -18066,6 +18156,9 @@ function i18nActivate(lang, dict, changed) {
   var was = _i18nDict;
   _i18nDict = dict || null;
   _i18nLang = dict ? lang : 'en';
+  if (dict && (was !== dict || changed)) i18nPatternsFromDict(dict);
+  var dsT = document.getElementById('dsText'), dsW = dsT && dsT.getAttribute('data-who');   // v38.90 — said again in it
+  if (dsW && typeof setDriveStatus === 'function') { try { setDriveStatus(document.getElementById('driveStatus').className, dsT.getAttribute('data-text'), dsW); } catch(e) {} }
   i18nRenderBadge();
   // Recipe cards are translated while they are BUILT (renderGrid), and the
   // observer leaves them alone, so a different language has to redraw them.
@@ -19336,8 +19429,8 @@ function renderGrid() {
           <div class="recipe-list-name" dir="auto"><button type="button" class="card-open">${escH(r.name)}</button>${r.cookCount>=3?` <span title="${escA(T('Cooked ' + r.cookCount + ' times'))}" style="font-size:12px;">🔥</span>`:''}</div>
           <div class="recipe-list-meta">
             <span>${escH(T(r.category))}</span>
-            <bdi>⏱ ${escH(r.prep)}</bdi>
-            ${servingsIsYield(r.servings) ? `<bdi>🍽 ${escH(r.servings)}</bdi>` : `<bdi>${srvHtml(r.servings)}</bdi>`}
+            ${metaVal(r.prep) ? `<bdi>⏱ ${escH(r.prep)}</bdi>` : ''}
+            ${!metaVal(r.servings) ? '' : servingsIsYield(r.servings) ? `<bdi>🍽 ${escH(r.servings)}</bdi>` : `<bdi>${srvHtml(r.servings)}</bdi>`}
             <span class="difficulty ${escA(String(r.difficulty||'').toLowerCase())}" style="padding:1px 6px;">${escH(T(r.difficulty))}</span>
           </div>
           ${matchReason(r, q)}
@@ -19358,7 +19451,9 @@ function renderGrid() {
         </div>
         <div class="card-body">
           <div class="card-title" dir="auto"><button type="button" class="card-open">${escH(r.name)}</button></div>
-          <div class="card-meta"><bdi>⏱ ${escH(r.prep)}</bdi><div class="card-meta-dot"></div>${servingsIsYield(r.servings) ? `<bdi>${escH(r.servings)}</bdi>` : `<bdi><span>${escH(r.servings)}</span> ${escH(T('srv'))}</bdi>`}</div>
+          <div class="card-meta">${[metaVal(r.prep) ? `<bdi>⏱ ${escH(r.prep)}</bdi>` : '',
+            !metaVal(r.servings) ? '' : servingsIsYield(r.servings) ? `<bdi>${escH(r.servings)}</bdi>` : `<bdi><span>${escH(r.servings)}</span> ${escH(T('srv'))}</bdi>`]
+            .filter(Boolean).join('<div class="card-meta-dot"></div>')}</div>
           ${matchReason(r, q)}
         </div>
         <div class="card-footer">
@@ -20019,7 +20114,7 @@ function chooseCollectionPhoto(coll, pool) {
     ov.innerHTML = '<div class="ask-card" style="max-width:460px;">'
       + '<div class="ask-icon">🖼️</div>'
       + '<div class="ask-title">A photo for “' + escH(coll.name) + '”</div>'
-      + '<div class="ask-body" dir="auto">'
+      + '<div class="ask-body">'   // v38.90 — not dir="auto": these are the app's words, and dir="auto" is never translated
       + (pool.length
           ? 'Keep one of the photos from the recipes you just collected, or add a new one.'
           : 'None of those recipes had a photo. You can add one now.')
@@ -20134,14 +20229,14 @@ function askChoice(message, options, opts) {
       + (opts.backLabel ? '<button type="button" class="ask-back" id="askBack">' + escH(opts.backLabel) + '</button>' : '')   // v38.53
       + (opts.icon ? '<div class="ask-icon">' + escH(opts.icon) + '</div>' : '')
       + (opts.title ? '<div class="ask-title">' + escH(opts.title) + '</div>' : '')
-      + '<div class="ask-body" dir="auto">' + escH(message || '') + '</div>'
+      + '<div class="ask-body" dir="auto">' + escH(i18nAsk(message || '')) + '</div>'   // v38.90 — i18nAsk: dir="auto" is never translated
       + '<div class="ask-actions" id="askChoices">'
       + options.map(function(o, i) {   // v38.53 — o.primary: highlighted (the recommended one); o.title: its tool tip
-          return '<button class="ask-btn' + (o.primary ? '' : ' ghost') + '" data-i="' + i + '" dir="auto"' + (o.title ? ' title="' + escA(o.title) + '"' : '') + '>' + escH(o.label) + '</button>'
-            + (o.hint ? '<div class="ask-opt-hint" dir="auto">' + escH(o.hint) + '</div>' : '');
+          return '<button class="ask-btn' + (o.primary ? '' : ' ghost') + '" data-i="' + i + '" dir="auto"' + (o.title ? ' title="' + escA(i18nAsk(o.title)) + '"' : '') + '>' + escH(i18nAsk(o.label)) + '</button>'
+            + (o.hint ? '<div class="ask-opt-hint" dir="auto">' + escH(i18nAsk(o.hint)) + '</div>' : '');
         }).join('')
       // v38.47 — opts.cancelLabel: say what Cancel does (Tony: on the welcome it signed people out unannounced).
-      + '<button class="ask-btn ghost" id="askCancel" dir="auto">' + escH(opts.cancelLabel || 'Cancel') + '</button>'
+      + '<button class="ask-btn ghost" id="askCancel" dir="auto">' + escH(i18nAsk(opts.cancelLabel || 'Cancel')) + '</button>'
       + '</div></div>';
     document.body.appendChild(ov);
     function done(v) { ov.remove(); document.removeEventListener('keydown', onKey, true); resolve(v); }
@@ -20172,7 +20267,7 @@ function recipeFromPart(coll, part) {
     id: nextId++,
     uid: part.uid,                    // the identity it has carried since import
     name: part.name,
-    emoji: rndEmoji(),
+    emoji: emojiFor(part.name, part.category || coll.category),
     category: part.category || coll.category,
     difficulty: part.difficulty || coll.difficulty,
     prep: part.prep || coll.prep || '—',
@@ -20345,7 +20440,7 @@ function drawView(){
       <div class="modal-title" id="viewTitle" dir="auto">${escH(r.name)}</div>
       <div class="modal-meta">
         ${isCollection(r) ? `<span>📚 ${recipeParts(r).length} recipes</span>` : `
-        <bdi data-no-i18n>⏱ ${escH(r.prep)}</bdi>${servingsIsYield(r.servings)
+        ${metaVal(r.prep) ? `<bdi data-no-i18n>⏱ ${escH(r.prep)}</bdi>` : ''}${!metaVal(r.servings) ? '' : servingsIsYield(r.servings)
           ? `<bdi>🍽 Yield: <span dir="auto" data-no-i18n>${escH(r.servings)}</span></bdi>`
           : `<bdi>🍽 <span dir="auto" data-no-i18n>${escH(r.servings)}</span> servings</bdi>`}
         <span class="difficulty ${escA(String(r.difficulty||'').toLowerCase())}">${escH(r.difficulty)}</span>`}
@@ -21839,8 +21934,8 @@ function openAddModal(id){
   if(r&&r.photo){img.src=r.photo;img.style.display='block';hint.style.display='none';removeBtn.style.display='flex';}
   else{img.src='';img.style.display='none';hint.style.display='block';removeBtn.style.display='none';}
   document.getElementById('f-name').value=r?r.name:'';
-  document.getElementById('f-prep').value=r?r.prep:'';
-  document.getElementById('f-srv').value=r?r.servings:'';
+  document.getElementById('f-prep').value=r?metaVal(r.prep):'';      // v38.90 — "-" was an empty field, shown as "-"
+  document.getElementById('f-srv').value=r?metaVal(r.servings):'';
   loadIngsTable(r ? r.ingredients : []);
   renderDietButtons(r ? (r.diets || []) : []);
   document.getElementById('f-steps').value = r ? stepsToText(r.steps) : '';
@@ -21919,7 +22014,7 @@ async function saveRecipe(){
   // v36.4 — the text carries the structure: "# " is a sub-title, leading
   // spaces indent. The buttons above the box write those, so nothing has to be
   // remembered, but a pasted recipe using them still works.
-  const rawSteps=textToSteps(document.getElementById('f-steps').value);
+  const rawSteps=textToSteps(boldTidy(document.getElementById('f-steps').value));
   // 2.2 — straight from the table, no flatten-and-reparse round trip.
   const ings=readIngsTable().map(function(i){
     return (!i.n && i.a) ? {a:'', n:i.a} : i;   // amount typed with no name reads as the name
@@ -22208,7 +22303,7 @@ function addSuggestion(idx, containerId) {
   recipes.unshift(normalizeRecipe({
     id: nextId++, uid: newUid(),
     name: s.name || 'Imported Recipe',
-    emoji: rndEmoji(),
+    emoji: emojiFor(s.name, s.category),
     photo: '',
     category: CATS.includes(s.category) ? s.category : 'Dinner',
     difficulty: ['Easy','Medium','Hard'].includes(s.difficulty) ? s.difficulty : 'Medium',
@@ -23103,7 +23198,7 @@ function askConfirm(opts) {
       // v38.03 — someone's own words (an answer to a note), framed, never translated.
       + (opts.quote && opts.quoteLabel ? '<div class="ask-quote-label">' + escH(opts.quoteLabel) + '</div>' : '')   // v38.49
       + (opts.quote ? '<div class="ask-quote" dir="auto" data-no-i18n>' + escH(opts.quote) + '</div>' : '')
-      + (opts.message || !opts.html ? '<div class="ask-body" dir="auto">' + escH(opts.message || '') + '</div>' : '')
+      + (opts.message || !opts.html ? '<div class="ask-body" dir="auto">' + escH(i18nAsk(opts.message || '')) + '</div>' : '')   // v38.90 — i18nAsk
       // v38.69 — the caller's own markup (built with escH), e.g. the owner's 🩺 table
       + (opts.html ? '<div class="ask-html">' + opts.html + '</div>' : '')
       + (opts.input !== undefined
@@ -23370,7 +23465,16 @@ function boldHtml(html) { return String(html).replace(BOLD_RE, '<strong>$1</stro
 function escB(s) { return boldHtml(escH(s)); }
 function noBold(s) { return String(s == null ? '' : s).replace(BOLD_RE, '$1'); }
 function boldAs(s, mark) { return String(s == null ? '' : s).replace(BOLD_RE, mark + '$1' + mark); }
-window.escB = escB; window.noBold = noBold; window.boldAs = boldAs; window.boldHtml = boldHtml;
+// v38.90 — the audit: B with nothing typed leaves "****" for the cursor; saved as it was, the recipe showed a step "****".
+// Only an empty pair OUTSIDE the bold words goes — "**salt** **pepper**" is two bold words — and line by line, as B marks.
+function boldTidy(s) {
+  return String(s == null ? '' : s).split('\n').map(function(line) {
+    var re = new RegExp(BOLD_RE.source, 'g'), out = '', last = 0, m;
+    while ((m = re.exec(line)) !== null) { out += line.slice(last, m.index).replace(/\*\*[ \t]*\*\*/g, '') + m[0]; last = re.lastIndex; }
+    return out + line.slice(last).replace(/\*\*[ \t]*\*\*/g, '');
+  }).join('\n');
+}
+window.escB = escB; window.noBold = noBold; window.boldAs = boldAs; window.boldHtml = boldHtml; window.boldTidy = boldTidy;
 // v37.95 — a value as a JavaScript STRING inside an on…="…" attribute. escA
 // alone is not enough there: the browser decodes &#39; back into ' before the
 // handler runs, so a value with a quote in it (a household identifier chosen
@@ -23410,6 +23514,49 @@ function sourceHtml(src, style) {
 }
 window.sourceUrlIn = sourceUrlIn; window.sourceHtml = sourceHtml;
 function rndEmoji(){return EMOJIS[Math.floor(Math.random()*EMOJIS.length)];}
+// v38.90 — the audit: an imported recipe got a random emoji, so a lemon pasta showed 🍣 until it had a photo. The
+// emoji now comes from the recipe's name (English or Hebrew), then its category; random only when neither says.
+var EMOJI_BY_WORD = [
+  [/\b(pasta|spaghetti|lasagn\w*|macaroni|penne|fettuccin\w*|linguin\w*|gnocchi)\b|פסטה|ספגטי|לזני|ניוקי/i, '🍝'],
+  [/\b(noodles?|ramen|pho|udon|pad thai)\b|נודלס|ראמן/i, '🍜'],
+  [/\bpizza\b|פיצה/i, '🍕'],
+  [/\b(sushi|maki)\b|סושי/i, '🍣'],
+  [/\b(salad|slaw)\b|סלט/i, '🥗'],
+  [/\b(soup|stew|broth|chowder|bisque|goulash)\b|מרק|נזיד|גולאש/i, '🍲'],
+  [/\b(curry|tikka|masala|korma|dal|dhal)\b|קארי|מסאלה/i, '🍛'],
+  [/\b(rice|risotto|pilaf|paella|biryani|majadra)\b|אורז|ריזוטו|פאייה|מג'דר/i, '🍚'],
+  [/\b(cheesecake|cake|brownies?)\b|עוגה|עוגת|בראוניז/i, '🍰'],
+  [/\b(cookies?|biscuits?)\b|עוגיות|עוגייה|עוגיה/i, '🍪'],
+  [/\b(muffins?|cupcakes?)\b|מאפינס|קאפקייק/i, '🧁'],
+  [/\b(pancakes?|crepes?|waffles?)\b|פנקייק|קרפ|וופל|לביבות/i, '🥞'],
+  [/\b(bread|loaf|challah|focaccia|baguette|bagels?|pita)\b|לחם|חלה|פוקאצ|בייגל|פיתות/i, '🍞'],
+  [/\b(pies?|tarts?|quiche)\b|פאי|טארט|קיש/i, '🥧'],
+  [/\b(ice cream|sorbet|gelato)\b|גלידה|סורבה/i, '🍨'],
+  [/\bchocolate\b|שוקולד/i, '🍫'],
+  [/\b(shakshuka|omelet\w*|frittata|eggs?)\b|שקשוקה|חביתה|ביצים|ביצה|פריטטה/i, '🍳'],
+  [/\b(burgers?)\b|המבורגר/i, '🍔'],
+  [/\b(sandwich\w*|toast)\b|כריך|טוסט/i, '🥪'],
+  [/\b(tacos?|burritos?|quesadillas?|enchiladas?)\b|טאקו|בוריטו/i, '🌮'],
+  [/\b(dumplings?|ravioli|kreplach|gyoza)\b|כופתאות|קרפלך|רביולי/i, '🥟'],
+  [/\b(falafel|hummus)\b|פלאפל|חומוס/i, '🧆'],
+  [/\b(shrimps?|prawns?)\b|שרימפס/i, '🍤'],
+  [/\b(fish|salmon|tuna|cod|trout|sea bass|tilapia)\b|דג|סלמון|טונה|לברק|דניס|אמנון/i, '🐟'],
+  [/\b(chicken|turkey|schnitzel|wings)\b|עוף|פרגית|הודו|שניצל|כנפיים/i, '🍗'],
+  [/\b(beef|steak|lamb|meatballs?|brisket|kebab)\b|בקר|סטייק|כבש|קציצות|בריסקט|קבב/i, '🥩'],
+  [/\b(smoothie|shake|lemonade)\b|שייק|סמוטי|לימונדה/i, '🥤'],
+  [/\b(avocado|guacamole)\b|אבוקדו|גוואקמולי/i, '🥑'],
+  [/\b(vegetables?|veggie\w*|broccoli|cauliflower)\b|ירקות|ברוקולי|כרובית/i, '🥦']
+];
+var EMOJI_BY_CATEGORY = { Breakfast: '🥞', Lunch: '🥗', Dinner: '🍲', Snack: '🥨', Dessert: '🍰', Soup: '🍲' };
+function emojiFor(name, category) {
+  var n = String(name || '');
+  for (var i = 0; i < EMOJI_BY_WORD.length; i++) if (EMOJI_BY_WORD[i][0].test(n)) return EMOJI_BY_WORD[i][1];
+  return EMOJI_BY_CATEGORY[category] || rndEmoji();
+}
+window.emojiFor = emojiFor;
+// v38.90 — a prep time or servings that says nothing ("", "-", "–") is not shown: cards said "⏱ -", the recipe "🍽 - servings"
+function metaVal(v) { var t = String(v == null ? '' : v).trim(); return /^[-–—]?$/.test(t) ? '' : t; }
+window.metaVal = metaVal;
 function rndBg(){return BGS[Math.floor(Math.random()*BGS.length)];}
 
 
@@ -23498,7 +23645,7 @@ ${stepsText}`;
 
     res.innerHTML = `
       <div class="translate-block" dir="${dir}">
-        <div class="translate-block-title">${escH(parsed.name)}</div>
+        <div class="translate-block-title" data-no-i18n>${escH(parsed.name)}</div>
         <div style="font-size:12px;color:var(--muted);margin-bottom:10px;">${escH(parsed.category)} · ${escH(parsed.difficulty)} · ⏱ ${escH(parsed.prep)} · 🍽 ${escH(parsed.servings)}</div>
         <div class="translate-section-label">${isToHebrew ? 'מצרכים' : 'Ingredients'}</div>
         ${ingsHtml}
@@ -23515,7 +23662,7 @@ ${stepsText}`;
 
 function saveTranslation(parsed) {
   recipes.unshift({
-    id: nextId++, uid: newUid(), name: parsed.name, emoji: rndEmoji(), photo: '',
+    id: nextId++, uid: newUid(), name: parsed.name, emoji: emojiFor(parsed.name, parsed.category), photo: '',
     category: CATS.includes(parsed.category) ? parsed.category : 'Dinner',
     difficulty: ['Easy','Medium','Hard'].includes(parsed.difficulty) ? parsed.difficulty : 'Medium',
     prep: parsed.prep || '—', servings: parsed.servings || '—',
@@ -23615,12 +23762,12 @@ function applyParsedToFormPreview(parsed, resultDivId) {
   parsed.ingredients = _n.ingredients; parsed.steps = _n.steps;
   var enc = JSON.stringify(parsed).replace(/"/g, '&quot;');
   var ings = parsed.ingredients.map(function(i){
-    return '<div class="translate-ing-row"><span style="font-weight:500;color:var(--terracotta)">' + escB(i.a) + '</span><span>' + escB(i.n) + '</span></div>';
+    return '<div class="translate-ing-row" data-no-i18n><span style="font-weight:500;color:var(--terracotta)">' + escB(i.a) + '</span><span>' + escB(i.n) + '</span></div>';   // v38.90 — the recipe's words
   }).join('');
   var steps = previewStepsHtml(parsed.steps);
   document.getElementById(resultDivId).innerHTML =
     '<div class="translate-block" style="margin-top:12px;">'
-    + '<div class="translate-block-title">' + escH(parsed.name || 'Untitled') + '</div>'
+    + '<div class="translate-block-title" data-no-i18n>' + escH(parsed.name || 'Untitled') + '</div>'
     + '<div class="translate-section-label">Ingredients</div>' + ings
     + '<div class="translate-section-label" style="margin-top:14px;">Method</div>' + steps
     + '</div>'
@@ -24285,7 +24432,7 @@ function applyParsedRecipe(parsed, resultDivId, overlayId, originalPhoto) {
   parsed.ingredients = _n.ingredients;
   parsed.steps = _n.steps;
   var ingsHtml = (parsed.ingredients||[]).map(function(i) {
-    return '<div class="translate-ing-row"><span style="font-weight:500;color:var(--terracotta)">' + escB(i.a) + '</span><span>' + escB(i.n) + '</span></div>';
+    return '<div class="translate-ing-row" data-no-i18n><span style="font-weight:500;color:var(--terracotta)">' + escB(i.a) + '</span><span>' + escB(i.n) + '</span></div>';   // v38.90 — the recipe's words
   }).join('');
   var stepsHtml = previewStepsHtml(parsed.steps);
   if (originalPhoto) parsed._originalPhoto = originalPhoto;
@@ -24298,9 +24445,9 @@ function applyParsedRecipe(parsed, resultDivId, overlayId, originalPhoto) {
     : '';
   document.getElementById(resultDivId).innerHTML =
     '<div class="translate-block" style="margin-top:12px;">'
-    + '<div class="translate-block-title">' + escH(parsed.name||'Untitled') + '</div>'
+    + '<div class="translate-block-title" data-no-i18n>' + escH(parsed.name||'Untitled') + '</div>'
     // v38.59 — the audit: an empty field left its dots behind ("Dinner · · · 2"); only what is there, servings with 🍽
-    + '<div style="font-size:12px;color:var(--muted);margin-bottom:10px;">' + [parsed.category, parsed.difficulty, parsed.prep,
+    + '<div style="font-size:12px;color:var(--muted);margin-bottom:10px;">' + [i18nPhrase(parsed.category || ''), i18nPhrase(parsed.difficulty || ''), parsed.prep,   // v38.90 — as the cards say them
         parsed.servings ? '\u{1F37D} ' + parsed.servings : '']
         .filter(function(x){ return x && String(x).trim(); }).map(function(x){ return escH(String(x)); }).join(' &middot; ') + '</div>'
     + '<div class="translate-section-label">Ingredients</div>' + ingsHtml
@@ -24917,10 +25064,11 @@ function importParsedNow(parsed, overlayId) {
   // come back as plain strings) and sets updatedAt — without it a freshly imported
   // recipe had updatedAt undefined and could lose to an older copy during cloud merge.
   recipes.unshift(normalizeRecipe({
-    id: nextId++, uid: newUid(), name: parsed.name || 'Imported Recipe', emoji: rndEmoji(), photo: '',
+    id: nextId++, uid: newUid(), name: parsed.name || 'Imported Recipe', emoji: emojiFor(parsed.name, parsed.category), photo: '',
     category: CATS.includes(parsed.category) ? parsed.category : 'Dinner',
     difficulty: ['Easy','Medium','Hard'].includes(parsed.difficulty) ? parsed.difficulty : 'Medium',
-    prep: parsed.prep || '-', servings: parsed.servings || '-',
+    // v38.90 — nothing given is nothing, not "-": the editor showed "-" in Prep time and the cards "⏱ -"
+    prep: parsed.prep || '', servings: parsed.servings || '',
     source: parsed.source || '',
     originalPhoto: parsed._originalPhoto || '',
     bg: rndBg(), fav: false,
@@ -27178,7 +27326,7 @@ async function saveToFirestore() {
       // detail: the health panel said "last successful save: never" while 25 of
       // 26 recipes had just been written, which sent me looking in the wrong
       // place. Report what actually happened.
-      if (dirty.length > conflicts.length) _lastSaveOkAt = Date.now();
+      if (dirty.length > conflicts.length) { _lastSaveOkAt = Date.now(); _cloudSchema = CLOUD_SCHEMA; }   // v38.90 — its index was written too
       setDriveStatus('error', 'Not saved — changed elsewhere');
       var saved = dirty.length - conflicts.length;
       showServiceError('EDITED_ELSEWHERE: ' + conflicts.length + ' recipe(s) were changed on another '
@@ -27232,7 +27380,10 @@ async function saveToFirestore() {
         + '\n\nYour recipes synced fine — only these photos were skipped. Re-add a smaller photo for them.');
     } else {
       _lastSaveOkAt = Date.now();
-      setDriveStatus('synced', '☁️ ' + (user.displayName || user.email));
+      // v38.90 — the save wrote the index (meta, with its schema): a new kitchen's first save made it. Sync Health
+      // read the schema only on the next load, so every new tester saw "unrecognised — shared/meta is missing or damaged".
+      _cloudSchema = CLOUD_SCHEMA;
+      setDriveStatus('synced', '☁️ ', user.displayName || user.email);   // v38.90 — the name apart
     }
   } catch(err) {
     window._justSaved = false;
@@ -27355,6 +27506,8 @@ async function _loadFromFirestoreInner(user) {
         var docs = await readCloudRecipeDocs(_fbDb, meta.ids);
         countCloudRead(docs.length);
         fsRecipes = parseCloudRecipeDocs(docs);
+        // v38.90 — an empty kitchen, read: that IS a successful sync (a new tester's Sync Health said "never")
+        if (!fsRecipes.length) _lastSyncOkAt = Date.now();
         cloudNextId = meta.nextId || 0;
         if (_cloudLayout === 'households' && _cloudHid) {
           // v38.71 — and which ids the index lists without a document (not asked for again by the next partial read)
@@ -29468,18 +29621,29 @@ function showLoginScreen() {
 }
 window.showLoginScreen = showLoginScreen;
 
-function setDriveStatus(state, text) {
+// v38.90 — `who`, a person's name, is never part of a phrase. The line read "☁️ Tony …", and the translator filed
+// that as a phrase of its own — into every language's public file. With a name the line is translated here, quietly
+// ("☁️ Shared · {1}", "✓ Synced — {1}"), and marked for the translator to leave alone.
+var SYNCED_LINE = '\u2713 Synced — {1}';   // in I18N_EXTRA
+function setDriveStatus(state, text, who) {
   const el = document.getElementById('driveStatus');
   const textEl = document.getElementById('dsText');
   if (!el || !textEl) return;
-  el.className = state; textEl.textContent = text;
+  text = String(text == null ? '' : text); who = who ? String(who) : '';
+  var shown = who ? i18nAsk(text + who) : text;
+  el.className = state;
+  if (who) textEl.setAttribute('data-no-i18n', ''); else textEl.removeAttribute('data-no-i18n');
+  textEl.setAttribute('data-text', text); textEl.setAttribute('data-who', who);
+  textEl.textContent = shown;
 
   // Update integrated status bar
   var bar = document.getElementById('saveStatusBar');
   var dot = document.getElementById('saveStatusDot');
   if (!bar) return;
+  if (who) bar.setAttribute('data-no-i18n', ''); else bar.removeAttribute('data-no-i18n');
   if (state === 'synced') {
-    bar.textContent = '\u2713 Synced — ' + (text.replace('\u2601\ufe0f ','') || 'saved to cloud');
+    var rest = shown.replace('\u2601\ufe0f ','') || 'saved to cloud', line = who ? i18nAsk(SYNCED_LINE) : SYNCED_LINE;
+    bar.textContent = line.replace('{1}', function(){ return rest; });
     if (dot) dot.style.background = 'var(--sig-ok-hi)';
   } else if (state === 'syncing') {
     bar.textContent = 'Saving to cloud…';
@@ -30555,13 +30719,13 @@ function readIngsTable() {
     // not a quantity of anything.
     if (row.classList.contains('ing-row-sub')) {
       var st = row.querySelector('input');
-      var v = st ? st.value.trim() : '';
+      var v = st ? boldTidy(st.value).trim() : '';
       if (v) out.push(row.classList.contains('ing-row-indent') ? { sub: v, ind: 1 } : { sub: v });
       return;
     }
     var inputs = row.querySelectorAll('input');
-    var a = inputs[0] ? inputs[0].value.trim() : '';
-    var n = inputs[1] ? inputs[1].value.trim() : '';
+    var a = inputs[0] ? boldTidy(inputs[0].value).trim() : '';
+    var n = inputs[1] ? boldTidy(inputs[1].value).trim() : '';
     if (a || n) {
       var item = { a: a, n: n };
       if (row.classList.contains('ing-row-indent')) item.ind = 1;
@@ -30663,19 +30827,19 @@ function previewStepsHtml(steps) {
   var n = 0;
   return (steps || []).map(function(s) {
     if (isSubLine(s))
-      return '<div class="translate-step" style="font-weight:700;color:var(--terracotta);'
+      return '<div class="translate-step" data-no-i18n style="font-weight:700;color:var(--terracotta);'   // v38.90 — the recipe's words
         + (lineIndented(s) ? 'padding-inline-start:18px;' : '') + '">' + escB(s.sub) + '</div>';
     n++;
-    return '<div class="translate-step"' + (lineIndented(s) ? ' style="padding-inline-start:18px;"' : '') + '>'
+    return '<div class="translate-step" data-no-i18n' + (lineIndented(s) ? ' style="padding-inline-start:18px;"' : '') + '>'
       + '<span class="translate-step-num">' + n + '</span><span>' + escB(stepText(s)) + '</span></div>';
   }).join('');
 }
 function previewIngsHtml(ings) {
   return (ings || []).map(function(i) {
     if (isSubLine(i))
-      return '<div class="translate-ing-row" style="font-weight:700;color:var(--terracotta);'
+      return '<div class="translate-ing-row" data-no-i18n style="font-weight:700;color:var(--terracotta);'   // v38.90 — the recipe's words
         + (lineIndented(i) ? 'padding-inline-start:18px;' : '') + '">' + escB(i.sub) + '</div>';
-    return '<div class="translate-ing-row"' + (lineIndented(i) ? ' style="padding-inline-start:18px;"' : '') + '>'
+    return '<div class="translate-ing-row" data-no-i18n' + (lineIndented(i) ? ' style="padding-inline-start:18px;"' : '') + '>'
       + '<span style="font-weight:500;color:var(--terracotta)">' + escB(i.a) + '</span>'
       + '<span>' + escB(i.n) + '</span></div>';
   }).join('');

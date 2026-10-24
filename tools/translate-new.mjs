@@ -166,20 +166,27 @@ try {
   // already there, in every language, the same way the new phrases go in: the whole
   // map written back only if nothing changed meanwhile. Counts only in the log.
   const ADDRESS = /[^\s@<>()"'`]+@[^\s@<>()"'`]+\.[A-Za-z]{2,}/;
+  // v38.90 — nor a person's name. The header's status line said "☁️ <the signed-in person's name>" and "✓ Synced —
+  // Shared · <name>", and the translator filed each as a phrase. The app keeps names out of phrases now; these go:
+  // a status-line shape whose tail the translation kept word for word (a name is not translated), and which the app
+  // no longer shows (not in the catalogue) — so "☁️ Syncing…" and "☁️ Google Cloud" stay.
+  const inApp = new Set(catalogue);
+  const STATUS_NAME = /^(?:\u2601\ufe0f |\u2713 Synced \u2014 )(?:Shared \u00b7 )?([^{}]+)$/;
+  const named = (k, v) => { const m = STATUS_NAME.exec(k); return !!m && !inApp.has(k) && String(v).includes(m[1].trim()); };
   const scrubbed = [];
   for (const lang of langs) {
     for (let attempt = 1; attempt <= 4; attempt++) {
       const d = await readDoc(prefix + lang);
       const strings = (d && d.data && d.data.strings) || null;
       if (!strings) break;
-      const bad = Object.keys(strings).filter(k => ADDRESS.test(k) || ADDRESS.test(String(strings[k])));
+      const bad = Object.keys(strings).filter(k => ADDRESS.test(k) || ADDRESS.test(String(strings[k])) || named(k, strings[k]));
       if (!bad.length) break;
       if (DRY) { scrubbed.push(lang + ' ' + bad.length + ' (dry run: kept)'); break; }
       const kept = Object.assign({}, strings);
       bad.forEach(k => { delete kept[k]; });
       const at = Date.now();
       const fields = { strings: { mapValue: { fields: Object.fromEntries(Object.entries(kept).map(([k, v]) => [k, fsString(v)])) } },
-        count: fsInt(Object.keys(kept).length), updatedAt: fsInt(at), by: fsString('GitHub, after ' + version + ' (addresses taken out)') };
+        count: fsInt(Object.keys(kept).length), updatedAt: fsInt(at), by: fsString('GitHub, after ' + version + ' (addresses and names taken out)') };
       const w = await patchDoc(prefix + lang, fields, d.updateTime);
       if (w === 'changed') { console.log(`  ${lang}: changed meanwhile — reading it again`); continue; }
       await patchDoc(indexPath, { langs: { mapValue: { fields: { [lang]: { mapValue: { fields: { at: fsInt(at), count: fsInt(Object.keys(kept).length) } } } } } } }, null, ['langs.' + lang]);
@@ -187,7 +194,7 @@ try {
       break;
     }
   }
-  if (scrubbed.length) console.log('::notice::Languages: entries holding an e-mail address taken out — ' + scrubbed.join(', '));
+  if (scrubbed.length) console.log('::notice::Languages: entries holding an e-mail address or a name taken out — ' + scrubbed.join(', '));
 
   const plan = [];
   for (const lang of langs) {

@@ -8133,6 +8133,92 @@ window.SELF_TESTS = [
         try{ renderFilters(); renderGrid(); }catch(e){}
       }
     } },
+  { id:'i18n_reaches_questions', group:'UI', name:'A chosen language reaches the questions, the shapes and the hints (v38.90): an ask’s message and choices (dir="auto") are translated as drawn, paragraph by paragraph; "Welcome to {1}" works from the dictionary alone; a text box’s hint is translated, never what is in it; the status line keeps the name out of the phrases; a recipe in an import preview is never a phrase',
+    test: async()=>{
+      // The beta-eve walk in Hebrew (24 Oct 2026): the welcome, the name-your-kitchen box, the invitation and the
+      // identifier stayed English although the file had them (dir="auto" is never translated), every shape with a
+      // name or a number did too (the shapes were built only where a language is made), text-box hints were skipped
+      // whole, and the status line filed "☁️ <name>" as a phrase.
+      var prevDict=_i18nDict, prevLang=_i18nLang, prevPats=_i18nPatterns.slice(), prevMiss=Object.assign(Object.create(null), _i18nMissing);
+      var ds=document.getElementById('driveStatus'), dsT=document.getElementById('dsText'), bar=document.getElementById('saveStatusBar');
+      var dsWas={ cls: ds ? ds.className : '', text: dsT ? (dsT.hasAttribute('data-text') ? dsT.getAttribute('data-text') : dsT.textContent) : '', who: dsT ? (dsT.getAttribute('data-who') || '') : '' };
+      var host=document.createElement('div'); host.style.cssText='position:fixed;left:-9999px;top:0;'; document.body.appendChild(host);
+      try{
+        if(i18nAsk('Pick one.')!=='Pick one.') throw new Error('English changed by i18nAsk');
+        var dict={ 'Welcome to {1}':'ברוכים הבאים ל{1}', 'Pick one.':'בחרו אחד.', 'Second paragraph here.':'פסקה שנייה כאן.',
+          '🏠 Start my own recipe collection':'🏠 להתחיל אוסף משלי', 'Not now':'לא עכשיו', 'OK':'אישור', 'Cancel':'ביטול',
+          '☁️ Shared · {1}':'☁️ משותף · {1}', '✓ Synced — {1}':'✓ סונכרן — {1}', 'Your note':'ההערה שלך' };
+        _i18nPatterns=[];
+        i18nActivate('he', dict);
+        // the shapes come from the dictionary itself
+        var w=i18nMatchPattern('Welcome to My Kitchen Notes');
+        if(w!=='ברוכים הבאים לMy Kitchen Notes') throw new Error('a shape from the dictionary: '+w);
+        // a question: the message paragraph by paragraph, the choices, Cancel
+        var p=askChoice('Pick one.\n\nSecond paragraph here.', [{ value:'own', label:'🏠 Start my own recipe collection' }], { cancelLabel:'Not now' });
+        var ov=document.getElementById('askOverlay');
+        var body=ov.querySelector('.ask-body').innerHTML, btn=ov.querySelector('#askChoices button[data-i="0"]').textContent, cancel=ov.querySelector('#askCancel').textContent;
+        ov.querySelector('#askCancel').click(); await p;
+        if(body!=='בחרו אחד.<br><br>פסקה שנייה כאן.') throw new Error('the message, paragraph by paragraph: '+JSON.stringify(body));
+        if(btn!=='🏠 להתחיל אוסף משלי' || cancel!=='לא עכשיו') throw new Error('the choices: '+btn+' / '+cancel);
+        var p2=askConfirm({ message:'Pick one.' });
+        var b2=document.querySelector('#askOverlay .ask-body').textContent; document.querySelector('#askOverlay #askCancel').click(); await p2;
+        if(b2!=='בחרו אחד.') throw new Error('askConfirm’s message: '+b2);
+        // a text box: its hint, never what is in it
+        host.innerHTML='<textarea placeholder="Your note">Your note</textarea>';
+        i18nApply(host);
+        var ta=host.querySelector('textarea');
+        if(ta.getAttribute('placeholder')!=='ההערה שלך') throw new Error('the hint: '+ta.getAttribute('placeholder'));
+        if(ta.value!=='Your note') throw new Error('what is in the box was translated: '+ta.value);
+        // the status line: the name apart, never a phrase
+        _i18nMissing=Object.create(null);
+        if(dsT){
+          setDriveStatus('synced', '☁️ Shared · ', 'Zed Tester');
+          if(dsT.textContent!=='☁️ משותף · Zed Tester' || !dsT.hasAttribute('data-no-i18n')) throw new Error('the status line: '+dsT.textContent);
+          if(bar && bar.textContent!=='✓ סונכרן — משותף · Zed Tester') throw new Error('the bar under it: '+bar.textContent);
+          setDriveStatus('synced', '☁️ ', 'Zed Tester'); i18nApply(ds);
+          if(bar) i18nApply(bar.parentNode || bar);
+          if(i18nMissingList().some(function(s){ return /Zed/.test(s); })) throw new Error('a name was filed as a phrase: '+JSON.stringify(i18nMissingList()));
+          setDriveStatus('syncing', '☁️ Saving...');
+          if(dsT.hasAttribute('data-no-i18n')) throw new Error('the line without a name is still kept from the translator');
+        }
+        // a recipe in an import preview is the recipe's own words
+        host.innerHTML=previewIngsHtml([{ a:'200 g', n:'spaghetti' }])+previewStepsHtml(['Boil it']);
+        i18nApply(host);
+        var filed=i18nMissingList().filter(function(s){ return /spaghetti|Boil it|\{1\} g/.test(s); });
+        if(filed.length) throw new Error('a preview filed recipe words: '+JSON.stringify(filed));
+      } finally {
+        host.remove(); var a=document.getElementById('askOverlay'); if(a) a.remove();
+        i18nActivate(prevLang, prevDict); _i18nPatterns=prevPats; _i18nMissing=prevMiss;
+        if(ds && dsT) setDriveStatus(dsWas.cls, dsWas.text, dsWas.who);
+      }
+    }},
+  { id:'new_kitchen_first_hour', group:'UI', name:'A new kitchen’s first hour (v38.90): Sync Health calls an empty kitchen new, not damaged; an empty **** never saves; a "-" prep or servings is not shown; an imported recipe gets a fitting emoji; the welcome, the tour, the first screen, the chats with kitchens and the badge are in the translations',
+    test: async()=>{
+      var tidy=[['****',''], ['a ** ** b','a  b'], ['**salt** and ****pepper','**salt** and pepper'], ['**salt** **pepper**','**salt** **pepper**'],
+        ['**a****b**','**a****b**'], ['Boil\n****\n**Mix** well','Boil\n\n**Mix** well'], ['**מלח** ****','**מלח** ']];
+      tidy.forEach(function(c){ if(boldTidy(c[0])!==c[1]) throw new Error('empty bold marks: '+JSON.stringify(c[0])+' → '+JSON.stringify(boldTidy(c[0]))); });
+      if(metaVal('-')!=='' || metaVal('—')!=='' || metaVal(' ')!=='' || metaVal(null)!=='' || metaVal('20 min')!=='20 min' || metaVal(4)!=='4') throw new Error('metaVal');
+      if(emojiFor('Lemon pasta','Dinner')!=='🍝' || emojiFor('מרק עדשים','')!=='🍲' || emojiFor('Greek Salad','')!=='🥗') throw new Error('emojiFor: '+[emojiFor('Lemon pasta','Dinner'), emojiFor('מרק עדשים',''), emojiFor('Greek Salad','')].join(' '));
+      if(!emojiFor('Zzz', '')) throw new Error('no emoji at all for an unknown name');
+      var real=window.syncHealth, el=document.getElementById('syncHealthBody');
+      try{
+        window.syncHealth=function(){ var h=real(); h.signedIn=true; h.schema=0; h.cloudRecipes=0; return h; };
+        renderSyncHealth(); var t=el.textContent;
+        if(!/new — nothing saved to the cloud yet/.test(t) || /unrecognised/.test(t)) throw new Error('an empty kitchen: '+t.slice(0,300));
+        window.syncHealth=function(){ var h=real(); h.signedIn=true; h.schema=0; h.cloudRecipes=3; return h; };
+        renderSyncHealth(); t=el.textContent;
+        if(!/unrecognised/.test(t)) throw new Error('recipes in the cloud and no index is still damaged');
+      } finally { window.syncHealth=real; renderSyncHealth(); }
+      Object.keys(HH_WELCOME).forEach(function(k){ if(I18N_EXTRA.indexOf(HH_WELCOME[k])===-1) throw new Error('the welcome is not in the translations: '+k); });
+      TOUR_STEPS.forEach(function(st){ if(I18N_EXTRA.indexOf(st.text)===-1) throw new Error('a tour step is not in the translations: '+st.text); });
+      var keep=Object.assign(Object.create(null), _i18nHarvested);
+      try{
+        i18nHarvestDemand(); i18nRegisterExtra();
+        ['Add your first recipe', '\u{1F517} From a website', 'Everyone in both households can read this.', 'First steps', 'Recipes in this collection']
+          .forEach(function(k){ if(!_i18nHarvested[k]) throw new Error('not collected for the translations: '+k); });
+        if(document.getElementById('i18nFirstRun') || document.getElementById('kitchenChatOverlay')) throw new Error('the harvest left a window behind');
+      } finally { _i18nHarvested=keep; }
+    }},
   { id:'recipe_bold', group:'UI', name:'Bold words in a recipe (v38.87): B and Ctrl+B put **…** round the selected words or the word at the cursor and take it off again; the recipe shows them bold (view, scaled amounts and steps, print, e-mail, page), WhatsApp text gets *bold*, search, the pantry and Bring! ignore the marks; Save / Update Recipe floats at the bottom of the editor',
     test: async()=>{
       // Tony, 24 Oct 2026: "Please create a "Bold" control, so I could mark words (either in the ingredients or Methods
@@ -9996,7 +10082,8 @@ window.SELF_TESTS = [
         if(await householdMayFound()!==false) throw new Error('an address nobody invited may start a kitchen');
         window._fbUser={ uid:'t3', email:'ann@x.example', emailVerified:false };
         if(await householdMayFound()!==false) throw new Error('an unconfirmed address may start a kitchen');
-        if(String(householdWelcome).indexOf('Invited to test the app? Sign in with the address the invitation came to')===-1) throw new Error('the welcome does not tell a tester at another address what to do');
+        // v38.90 — the welcome's paragraphs live in HH_WELCOME (so the translations can list them)
+        if(HH_WELCOME.tester.indexOf('Invited to test the app? Sign in with the address the invitation came to')===-1 || String(householdWelcome).indexOf('HH_WELCOME.tester')===-1) throw new Error('the welcome does not tell a tester at another address what to do');
         // Share This App: a tester invites to their kitchen; the app's link is not offered
         window._fbUser={ uid:'t1', email:'ann@x.example', emailVerified:true };
         _household={ hid:'hT', name:'Ann\u2019s kitchen', role:'owner' };
