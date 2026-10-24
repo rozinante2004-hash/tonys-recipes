@@ -2332,6 +2332,67 @@ window.SELF_TESTS = [
         feedbackKnown(null);
       }
     } },
+  { id:'manage_mark_selected', group:'Sharing', name:'👀 Seen / ✅ Done for the ticked notes, ✅ Done for the ticked error reports (v38.89): one request for them all, the ticks go, Done leaves “Not done yet”, an older server one by one',
+    test: async()=>{
+      // Tony, 24 Oct 2026: "Add a "Seen" and "Done" for selected notes too".
+      if(!feedbackInboxHere()) return;          // read in the family app only
+      var real={ db:window._fbDb, user:window._fbUser, toast:window.toast, err:window.showServiceError, owner:window.isAppOwner, fetch:window.fetch, h:_workerHealth, last:_fbLastNew };
+      var keptNew=null; try{ keptNew=localStorage.getItem(FB_NEW_KEY); }catch(e){}
+      var sent=[], toasts=[], errs=[], mode='new', at=Date.now()-3600e3;
+      try{
+        window.toast=function(m){ toasts.push(String(m)); }; window.showServiceError=function(m){ errs.push(String(m)); };
+        window.isAppOwner=function(){ return true; }; _workerHealth=null;
+        window._fbUser={ uid:'uOwner', email:'owner@example.com', getIdToken:async function(){ return 'tok'; } };
+        window._fbDb={ collection:function(c){
+            if(c==='feedback') return { orderBy:function(){ return { limit:function(){ return { get:async function(){ return { forEach:function(){} }; } }; } }; } };
+            return { get:async function(){ return { size:0, forEach:function(){} }; } }; },
+          collectionGroup:function(){ return { get:async function(){ return { size:0, forEach:function(){} }; } }; } };
+        window.fetch=async function(u, init){
+          var b={}; try{ b=JSON.parse(init.body); }catch(e){}
+          sent.push(b);
+          if(b.op==='notes') return new Response(JSON.stringify({ notes:[5,6,7].map(function(i){ return { id:i, project:'my-kitchen-notes-beta', uid:'u'+i, email:'t'+i+'@example.com', text:'Note '+i, at:at-i, status:'new', env:'beta' }; }), replies:[] }), { status:200 });
+          if(b.op==='errors') return new Response(JSON.stringify({ errors:[17,18].map(function(i){ return { id:i, project:'my-kitchen-notes-beta', uid:'u'+i, kind:'error', message:'Error '+i, version:'v38.88', env:'beta', first_at:at, last_at:at-i, n:1, status:'new' }; }) }), { status:200 });
+          if(b.op==='notes-status' || b.op==='errors-status') {
+            if(mode==='old') return new Response(JSON.stringify({ error: b.op==='notes-status' ? 'FEEDBACK: which note?' : 'SIGNALS: which error?' }), { status:400 });
+            return new Response(JSON.stringify({ ok:true, changed:b.ids.length }), { status:200 });
+          }
+          if(b.op==='note-status' || b.op==='error-status') return new Response('{"ok":true}', { status:200 });
+          return new Response('{"error":"METER: not set up"}', { status:503 });
+        };
+        var ops=function(){ return sent.map(function(b){ return b.op; }).filter(function(o){ return /status/.test(o); }); };
+        var cards=function(){ return Array.from(document.querySelectorAll('#manageOverlay .mg-card')).map(function(c){ return (c.querySelector('.mg-text, .mg-err') || {}).textContent + ':' + (c.querySelector('.mg-ptop > .mg-muted') || {}).textContent; }).join('|'); };
+        await openManagement(); await mknManage._notes(); mknManage.tabTo('feedback'); mknManage.noteFilter('open'); mknManage.pickAll(false);
+        if(document.getElementById('mgSeenPicked') || document.getElementById('mgDonePicked')) throw new Error('Seen / Done show with nothing ticked');
+        mknManage.pick('s5', true); mknManage.pick('s6', true);
+        var sb=document.getElementById('mgSeenPicked'), db=document.getElementById('mgDonePicked');
+        if(!sb || !/Seen \(2\)/.test(sb.textContent) || !db || !/Done \(2\)/.test(db.textContent)) throw new Error('no 👀 Seen (2) / ✅ Done (2)');
+        sent=[]; await mknManage.markPicked('seen');
+        var r1=sent.filter(function(b){ return b.op==='notes-status'; });
+        if(ops().join()!=='notes-status' || r1[0].ids.join()!=='5,6' || r1[0].status!=='seen') throw new Error('Seen: '+JSON.stringify(sent.map(function(b){ return [b.op, b.ids, b.status]; })));
+        if(cards()!=='Note 5:👀 seen|Note 6:👀 seen|Note 7:🆕 new' || document.getElementById('mgSeenPicked')) throw new Error('after Seen: '+cards());
+        mknManage.pick('s5', true); sent=[]; await mknManage.markPicked('done');
+        if(ops().join()!=='notes-status' || cards()!=='Note 6:👀 seen|Note 7:🆕 new') throw new Error('Done did not leave “Not done yet”: '+cards());
+        mknManage.noteFilter('all');
+        if(cards().indexOf('Note 5:✅ done')===-1) throw new Error('the done note is not under All: '+cards());
+        // an older server: one by one
+        mode='old'; mknManage.noteFilter('open'); mknManage.pick('s7', true); sent=[]; await mknManage.markPicked('seen');
+        if(ops().join()!=='notes-status,note-status' || cards().indexOf('Note 7:👀 seen')===-1) throw new Error('with an older server: '+ops().join()+' / '+cards());
+        if(!toasts.some(function(t){ return /2 notes marked seen/.test(t); })) throw new Error('no word that they were marked');
+        // ⚠️ Errors: ✅ Done for the ticked ones
+        mode='new'; await mknManage._errors(); mknManage.tabTo('errors'); mknManage.errFilter('open'); mknManage.errPickAll(true);
+        var eb=document.getElementById('mgErrDonePicked');
+        if(!eb || !/Done \(2\)/.test(eb.textContent)) throw new Error('no ✅ Done (2) in Errors');
+        sent=[]; await mknManage.errMarkPicked('done');
+        var r2=sent.filter(function(b){ return b.op==='errors-status'; });
+        if(ops().join()!=='errors-status' || r2[0].ids.slice().sort().join()!=='17,18' || r2[0].status!=='done' || cards()!=='') throw new Error('Errors Done: '+JSON.stringify(sent.map(function(b){ return [b.op, b.ids]; }))+' / '+cards());
+        if(errs.length) throw new Error('an error was shown: '+errs.join(' | '));
+      } finally {
+        window._fbDb=real.db; window._fbUser=real.user; window.toast=real.toast; window.showServiceError=real.err; window.isAppOwner=real.owner; window.fetch=real.fetch; _workerHealth=real.h;
+        if(window.mknManage) { mknManage.pickAll(false); mknManage.errPickAll(false); mknManage.close(); }
+        _fbLastNew=real.last; try{ if(keptNew===null) localStorage.removeItem(FB_NEW_KEY); else localStorage.setItem(FB_NEW_KEY, keptNew); }catch(e){}
+        feedbackKnown(null);
+      }
+    } },
   { id:'feedback_reply_in_app', group:'Sharing', name:'📲 Reply in app: Tony answers a note from the Feedback tab, the answer goes to the writer’s own app; the tab’s buttons press like the app’s own (v38.00)',
     test: async()=>{
       if(!feedbackInboxHere()) return;          // the notes are read in the family app only

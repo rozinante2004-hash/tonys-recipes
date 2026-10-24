@@ -1,4 +1,8 @@
-// Tony's Recipes — Cloudflare Worker v88
+// Tony's Recipes — Cloudflare Worker v89
+// v89: SEVERAL MARKED SEEN OR DONE AT ONCE (Tony, 24 Oct 2026: "Add a "Seen" and "Done" for selected notes too"):
+// meter-admin `notes-status` (new | seen | done) and `errors-status` (new | done) take `ids` — up to 99, with the
+// status that makes 100 values, D1's most a query — in one statement. Not an owner action that cannot be undone, so no
+// fresh sign-in and no alert.
 // v88: SEVERAL NOTES OR ERROR REPORTS DELETED AT ONCE (Tony, 24 Oct 2026: "In the Feedback and Errors tabs, please allow
 // to select multiple reports … there should appear a "Delete selected" button"): meter-admin `notes-delete` and
 // `errors-delete` take `ids` (up to 100 — D1 binds at most 100 values a query) and delete them in one statement: one
@@ -396,7 +400,7 @@
 //   AI_MAX_TOKENS   – the longest answer one call may ask for (32000; the
 //                     app's largest, reading several recipes at once, asks 8000).
 
-const WORKER_VERSION = 'v88';
+const WORKER_VERSION = 'v89';
 const VIDEO_MAX_MB_DEFAULT = 50;
 const GEMINI_API = 'https://generativelanguage.googleapis.com';
 const GEMINI_MODEL_DEFAULT = 'gemini-2.5-flash';
@@ -1881,11 +1885,12 @@ function fsValue(f) {
 // v73 — the owner's protections (see the top of the file).
 const OWNER_DESTRUCTIVE = new Set(['forget', 'mark-deleted', 'set-cap', 'survey-open', 'survey-close', 'note-delete', 'error-delete', 'copy-from',
   'notes-delete', 'errors-delete']);   // v88 — several at once
-// v88 — the ids of a batch: whole numbers above 0, each once, at most 100 (D1 binds at most 100 values a query)
-function idBatch(v) {
+// v88 — the ids of a batch: whole numbers above 0, each once, at most `max` (100: D1 binds at most 100 values a query;
+// v89: 99 when a status goes with them)
+function idBatch(v, max = 100) {
   const out = [];
   (Array.isArray(v) ? v : []).forEach(x => { const n = parseInt(x, 10); if (n > 0 && out.indexOf(n) === -1) out.push(n); });
-  return out.length <= 100 ? out : null;
+  return out.length <= max ? out : null;
 }
 const _ownerSec = new Map();
 async function ownerTwoStepOn(project, token, env) {
@@ -2458,6 +2463,13 @@ async function feedbackAdmin(env, db, body, claims) {
     const r = await db.prepare('DELETE FROM feedback WHERE id IN (' + ids.map((_, i) => '?' + (i + 1)).join(', ') + ')').bind(...ids).run();
     return jsonResp({ ok: true, deleted: (r && r.meta && r.meta.changes) != null ? r.meta.changes : ids.length });
   }
+  if (body.op === 'notes-status') {       // v89 — several marked seen or done: one statement
+    const ids = idBatch(body.ids, 99);
+    if (!ids || !ids.length) return jsonResp({ error: 'FEEDBACK: which notes? (1 to 99 at a time)' }, 400);
+    if (['new', 'seen', 'done'].indexOf(body.status) === -1) return jsonResp({ error: 'FEEDBACK: new, seen or done.' }, 400);
+    const r = await db.prepare('UPDATE feedback SET status = ?1 WHERE id IN (' + ids.map((_, i) => '?' + (i + 2)).join(', ') + ')').bind(body.status, ...ids).run();
+    return jsonResp({ ok: true, changed: (r && r.meta && r.meta.changes) != null ? r.meta.changes : ids.length });
+  }
   if (body.op === 'notes-new') {
     const r = await db.prepare("SELECT COUNT(*) AS n FROM feedback WHERE status = 'new'").first();
     return jsonResp({ new: (r && r.n) || 0, server: await serverNotices(env, { owner: true }) });   // v78/v79 — every allowance notice
@@ -2638,6 +2650,13 @@ async function signalsAdmin(env, db, body) {
     if (!ids || !ids.length) return jsonResp({ error: 'SIGNALS: which errors? (1 to 100 at a time)' }, 400);
     const r = await db.prepare('DELETE FROM app_errors WHERE id IN (' + ids.map((_, i) => '?' + (i + 1)).join(', ') + ')').bind(...ids).run();
     return jsonResp({ ok: true, deleted: (r && r.meta && r.meta.changes) != null ? r.meta.changes : ids.length });
+  }
+  if (body.op === 'errors-status') {      // v89 — several marked done (or not done) at once
+    const ids = idBatch(body.ids, 99);
+    if (!ids || !ids.length) return jsonResp({ error: 'SIGNALS: which errors? (1 to 99 at a time)' }, 400);
+    if (['new', 'done'].indexOf(body.status) === -1) return jsonResp({ error: 'SIGNALS: new or done.' }, 400);
+    const r = await db.prepare('UPDATE app_errors SET status = ?1 WHERE id IN (' + ids.map((_, i) => '?' + (i + 2)).join(', ') + ')').bind(body.status, ...ids).run();
+    return jsonResp({ ok: true, changed: (r && r.meta && r.meta.changes) != null ? r.meta.changes : ids.length });
   }
   const id = parseInt(body.id, 10);
   if (!(id > 0)) return jsonResp({ error: 'SIGNALS: which error?' }, 400);
@@ -3307,4 +3326,4 @@ export default {
   }
 };
 
-// ── END OF WORKER v88 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
+// ── END OF WORKER v89 ── If this is the last line in the Cloudflare editor, the whole file was pasted.

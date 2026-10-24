@@ -1141,6 +1141,20 @@ console.log('\nAI per household (v60):');
     f = await fb({ action: 'meter-admin', op: 'notes-delete', ids: [bIds[0], String(bIds[1]), bIds[0], 'x', -4], idToken: tOwner });
     expect('v88: the owner deletes several notes in one go (each once, nonsense left out); the others stay', f.status === 200 && f.d.deleted === 2
       && batchLeft().join() === String(bIds[2]), JSON.stringify([f, batchLeft()]));
+    // v89 — several marked seen or done at once
+    for (const t2 of ['Mark one', 'Mark two', 'Mark three']) await fb({ action: 'feedback-send', idToken: tA, note: { text: t2 } });
+    const mIds = db.raw.prepare("SELECT id FROM feedback WHERE text LIKE 'Mark %' ORDER BY id").all().map(x => x.id);
+    const mSt = () => db.raw.prepare("SELECT status FROM feedback WHERE text LIKE 'Mark %' ORDER BY id").all().map(x => x.status).join();
+    f = await fb({ action: 'meter-admin', op: 'notes-status', ids: mIds.slice(0, 2), status: 'done', idToken: tA });
+    expect('v89: only the owner marks several notes', f.status === 403 && mSt() === 'new,new,new', JSON.stringify(f));
+    f = await fb({ action: 'meter-admin', op: 'notes-status', ids: mIds.slice(0, 2), status: 'done', idToken: tOwner });
+    expect('v89: the owner marks several notes done in one go; the other stays', f.status === 200 && f.d.changed === 2 && mSt() === 'done,done,new', JSON.stringify([f, mSt()]));
+    f = await fb({ action: 'meter-admin', op: 'notes-status', ids: mIds, status: 'seen', idToken: tOwner });
+    expect('v89: …and seen', f.status === 200 && mSt() === 'seen,seen,seen', mSt());
+    f = await fb({ action: 'meter-admin', op: 'notes-status', ids: mIds, status: 'gone', idToken: tOwner });
+    expect('v89: …only new, seen or done', f.status === 400 && mSt() === 'seen,seen,seen', JSON.stringify(f));
+    f = await fb({ action: 'meter-admin', op: 'notes-status', ids: Array.from({ length: 100 }, (_, i) => i + 1), status: 'done', idToken: tOwner });
+    expect('v89: …at most 99 at once (with the status, D1\'s 100 values)', f.status === 400 && mSt() === 'seen,seen,seen', JSON.stringify(f));
     f = await fb({ action: 'meter-admin', op: 'notes-delete', ids: [], idToken: tOwner });
     expect('v88: …none named: refused', f.status === 400, JSON.stringify(f));
     f = await fb({ action: 'meter-admin', op: 'notes-delete', ids: Array.from({ length: 101 }, (_, i) => i + 1), idToken: tOwner });
@@ -1326,6 +1340,15 @@ console.log('\nAI per household (v60):');
     expect('v88: only the owner deletes several error reports', f.status === 403 && errLeft().length === 3, JSON.stringify(f));
     f = await fb({ action: 'meter-admin', op: 'errors-delete', ids: eIds.slice(0, 2), idToken: famOwner }, ORIGIN);
     expect('v88: the owner deletes several error reports in one go; the others stay', f.status === 200 && f.d.deleted === 2 && errLeft().join() === String(eIds[2]), JSON.stringify([f, errLeft()]));
+    // v89 — several marked done at once
+    const e4 = ['batch e4', 'batch e5'].map(m => Number(ein.run(m, Date.now(), Date.now()).lastInsertRowid));
+    const eSt = () => db.raw.prepare("SELECT status FROM app_errors WHERE message IN ('batch e4', 'batch e5') ORDER BY id").all().map(x => x.status).join();
+    f = await fb({ action: 'meter-admin', op: 'errors-status', ids: e4, status: 'done', idToken: tA });
+    expect('v89: only the owner marks several errors', f.status === 403 && eSt() === 'new,new', JSON.stringify(f));
+    f = await fb({ action: 'meter-admin', op: 'errors-status', ids: e4, status: 'done', idToken: famOwner }, ORIGIN);
+    expect('v89: the owner marks several errors done in one go', f.status === 200 && f.d.changed === 2 && eSt() === 'done,done', JSON.stringify([f, eSt()]));
+    f = await fb({ action: 'meter-admin', op: 'errors-status', ids: e4, status: 'seen', idToken: famOwner }, ORIGIN);
+    expect('v89: …only new or done for an error', f.status === 400 && eSt() === 'done,done', JSON.stringify(f));
     f = await fb({ action: 'meter-admin', op: 'list', all: true, idToken: famOwner }, ORIGIN);
     const hAu = ((f.d.households || []).filter(x => x.project === 'tonys-recipes-test' && x.hid === 'hA')[0] || {}).usage;
     expect('v69: the Households list carries each household\'s feature counts by month', hAu && hAu[nowMonth] && hAu[nowMonth]['added.link'] === 5 && hAu[nowMonth].scale === 1, JSON.stringify(hAu));

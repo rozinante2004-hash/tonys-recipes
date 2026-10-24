@@ -258,7 +258,10 @@
         + '<button type="button" class="mg-btn mg-primary" id="mgCopyReports"' + (nPicked ? '' : ' disabled title="Tick the notes to copy first"')
         + ' onclick="mknManage.copyReports()">📋 Copy reports' + (nPicked ? ' (' + nPicked + ')' : '') + '</button>'
         // v38.88 — Tony: "After selecting, there should appear a "Delete selected" button, to remove all the selected items."
-        + (nPicked ? '<button type="button" class="mg-btn mg-danger" id="mgDelPicked"' + (S.deleting ? ' disabled' : '') + ' onclick="mknManage.delPicked()">🗑 Delete selected (' + nPicked + ')</button>' : '') : '')
+        // v38.89 — Tony: "Add a "Seen" and "Done" for selected notes too"
+        + (nPicked ? '<button type="button" class="mg-btn" id="mgSeenPicked"' + (S.deleting ? ' disabled' : '') + ' onclick="mknManage.markPicked(\'seen\')">👀 Seen (' + nPicked + ')</button>'
+          + '<button type="button" class="mg-btn" id="mgDonePicked"' + (S.deleting ? ' disabled' : '') + ' onclick="mknManage.markPicked(\'done\')">✅ Done (' + nPicked + ')</button>'
+          + '<button type="button" class="mg-btn mg-danger" id="mgDelPicked"' + (S.deleting ? ' disabled' : '') + ' onclick="mknManage.delPicked()">🗑 Delete selected (' + nPicked + ')</button>' : '') : '')
       + '</div>';
     if (!list.length) return filt + '<div class="mg-empty">' + (S.notes.length ? 'Every note is done. 🎉' : 'No notes yet.') + '</div>';
     var tag = { new: '🆕 new', seen: '👀 seen', done: '✅ done' };
@@ -336,15 +339,17 @@
   // v38.88 — several deleted at once: Worker v88 takes up to 100 ids a request (one fresh sign-in, ONE owner alert for
   // the lot — one by one, each was an alert e-mail of its own). An older Worker does not know the op ("which note?"):
   // then one by one, as before.
-  async function deleteBatch(op, oneOp, ids) {
+  // v38.89 — and several marked seen or done (Worker v89: notes-status / errors-status, 99 a request — the status is
+  // the 100th value). `extra` goes with every request ({ status }); batches of 99 for both.
+  async function deleteBatch(op, oneOp, ids, extra) {
     var gone = [];
-    for (var i = 0; i < ids.length; i += 100) {
-      var part = ids.slice(i, i + 100);
-      try { await meterSet(op, '', { ids: part }); gone = gone.concat(part); }
+    for (var i = 0; i < ids.length; i += 99) {
+      var part = ids.slice(i, i + 99);
+      try { await meterSet(op, '', Object.assign({ ids: part }, extra || {})); gone = gone.concat(part); }
       catch (e) {
         if (!/which (note|error)\?/.test(String(e && e.message))) throw Object.assign(e, { gone: gone });
         for (var k = 0; k < part.length; k++) {
-          try { await meterSet(oneOp, '', { id: part[k] }); gone.push(part[k]); }
+          try { await meterSet(oneOp, '', Object.assign({ id: part[k] }, extra || {})); gone.push(part[k]); }
           catch (e2) { throw Object.assign(e2, { gone: gone }); }
         }
       }
@@ -375,6 +380,7 @@
       + (list.length ? '<span class="mg-sep"></span>'
         + '<button type="button" class="mg-btn" id="mgErrPickAll" onclick="mknManage.errPickAll(true)">☑ Select all shown</button>'
         + (nErrPicked ? '<button type="button" class="mg-btn" id="mgErrPickNone" onclick="mknManage.errPickAll(false)">☐ Clear</button>'
+          + '<button type="button" class="mg-btn" id="mgErrDonePicked"' + (S.deleting ? ' disabled' : '') + ' onclick="mknManage.errMarkPicked(\'done\')">✅ Done (' + nErrPicked + ')</button>'   // v38.89
           + '<button type="button" class="mg-btn mg-danger" id="mgErrDelPicked"' + (S.deleting ? ' disabled' : '') + ' onclick="mknManage.errDelPicked()">🗑 Delete selected (' + nErrPicked + ')</button>' : '') : '')
       + '</div>';
     if (!list.length) return tools + '<div class="mg-empty">' + (S.errors.length ? 'Every error is done. 🎉' : 'No errors reported. 🎉') + '</div>';
@@ -1095,6 +1101,21 @@
       if (on) (S.errors || []).filter(function (x) { return S.errFilter === 'all' || x.status !== 'done'; }).forEach(function (x) { S.errPicked[x.id] = true; });
       render(); return pickedErrors().length;
     },
+    // v38.89 — the ticked error reports marked done (or back to not done) at once; the ticks go, the list follows its filter
+    errMarkPicked: async function (status) {
+      var list = pickedErrors(), n = list.length;
+      if (!n || S.deleting || ['new', 'done'].indexOf(status) === -1) return false;
+      S.deleting = true; render();
+      var done = [], err = null;
+      try { done = await deleteBatch('errors-status', 'error-status', list.map(function (x) { return x.id; }), { status: status }); }
+      catch (e) { err = e; done = e.gone || []; }
+      S.deleting = false;
+      list.forEach(function (x) { if (done.indexOf(x.id) !== -1) { x.status = status; delete S.errPicked[x.id]; } });
+      render();
+      if (err) { showServiceError((done.length ? done.length + ' of ' + n + ' were marked; the rest could not be: ' : 'Could not mark them: ') + err.message); return done.length; }
+      toast((status === 'done' ? '✅ ' : '↩ ') + n + ' error report' + (n === 1 ? '' : 's') + (status === 'done' ? ' marked done' : ' marked not done'), 5000);
+      return done.length;
+    },
     errDelPicked: async function () {
       var list = pickedErrors(), n = list.length;
       if (!n || S.deleting) return false;
@@ -1151,6 +1172,33 @@
       S.notes = (S.notes || []).filter(function (x) { return x.key !== key; }); render(); syncDot(); return true;
     },
     copyLog: function (key) { var n = noteBy(key); if (n && typeof fbProbeCopy === 'function') fbProbeCopy(n.log, 'The log'); },
+    // v38.89 — the ticked notes marked seen or done at once (Worker v89); notes in a copy's own database, one batch
+    markPicked: async function (status) {
+      var list = pickedNotes(), n = list.length;
+      if (!n || S.deleting || ['new', 'seen', 'done'].indexOf(status) === -1) return false;
+      S.deleting = true; render();
+      var done = [], err = null;
+      try {
+        var server = list.filter(function (x) { return x.src === 'server'; }), local = list.filter(function (x) { return x.src !== 'server'; });
+        var ids = await deleteBatch('notes-status', 'note-status', server.map(function (x) { return x.id; }), { status: status });
+        done = server.filter(function (x) { return ids.indexOf(x.id) !== -1; });
+        if (local.length) {
+          var db = window._fbDb, b = db.batch();
+          local.forEach(function (x) { b.update(db.collection('feedback').doc(x.id), { status: status }); });
+          await b.commit();
+          done = done.concat(local);
+        }
+      } catch (e) {
+        err = e;
+        if (e.gone) done = list.filter(function (x) { return x.src === 'server' && e.gone.indexOf(x.id) !== -1; });
+      }
+      S.deleting = false;
+      done.forEach(function (x) { x.status = status; delete S.picked[x.key]; });
+      render(); syncDot();
+      if (err) { showServiceError((done.length ? done.length + ' of ' + n + ' were marked; the rest could not be: ' : 'Could not mark them: ') + err.message); return done.length; }
+      toast((status === 'done' ? '✅ ' : '👀 ') + n + ' note' + (n === 1 ? '' : 's') + ' marked ' + status, 5000);
+      return done.length;
+    },
     // v38.88 — 🗑 Delete selected: the inbox's notes in batches (Worker v88), any left in this copy's database one batch
     delPicked: async function () {
       var list = pickedNotes(), n = list.length;
