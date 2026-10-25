@@ -1220,9 +1220,14 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
     days after it was filed: issue, comments, screenshot and log. The Worker's daily sweep does it; once a month
     the files' storage is rewritten so deleted screenshots leave the history; at the end of the beta Tony deletes the
     repository.
-  - **To be built on Tue 27 Oct, after his weekly allowance renews** (11:00). Reminder at 12:00 Israel time:
-    send_later trig_01QvUa8FbunpnDRkieomPMXN. He was at 89% of his weekly usage on 25 Oct — keep work lean until
-    then.
+  - **ntfy instead of CallMeBot (Tony, 25 Oct):** he subscribed in the ntfy app to a hard-to-guess topic on ntfy.sh
+    (the first name, "My_Kitchen_Alerts", was guessable — replaced) and stored it as the GitHub secret NTFY_TOPIC.
+    Owner alerts go there too, short, with no addresses or names.
+  - **Both to be built on Tue 27 Oct at 12:00 Israel time**, after his weekly allowance renews (11:00); scheduled
+    task trig_01QvUa8FbunpnDRkieomPMXN. He was at 89% of his weekly usage on 25 Oct — keep work lean.
+  - **Standing permission for these two only** (Tony, 25 Oct: "as these are not customer-facing changes, you can push
+    them directly to Admin and Beta, without asking for permission"): the reports retention and the ntfy alerts
+    release on green without asking. Every other release still waits for his yes.
 - **Photo keys, 23 Oct:** Pexels: "New API key issuance is currently paused and cannot be requested" (Tony); Unsplash:
   "We can forego unsplash for now" (Tony). Photos stay Pixabay + Wikimedia Commons; the workflow is ready if a key
   ever comes (secrets PEXELS_API_KEY / UNSPLASH_ACCESS_KEY, then dispatch Deploy the Worker).
