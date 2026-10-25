@@ -1205,6 +1205,22 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
       Claude app acts for him).
     - Watcher: session_01Fu8gBmrPNVa7aQ7dJa8fPL ("📥 Beta reports", subscribed to PR #1; setup $0.43). The first,
       heavy one (session_01Qz8RpSM69y7NwfNyPr5EVE, $2.56 for setup) was archived.
+- **25 Oct (the testers' first day):**
+  - Tony sent 3 invitations; issue #21 in kitchen-reports came from the Gmail invitations. The cause: the Gmail API
+    had to be switched on. After that it sent fine, with Google's warnings about an unverified app (owner only;
+    testers never see it).
+  - **v38.92** (Tony: "Yes, release v38.92"):
+    - Error reports carry the details of a log entry kept as an object (`logDetailText`; keys that may hold a
+      name are skipped; insClean masks addresses and links).
+    - The Gmail invitations log Gmail's reason for not sending.
+    - Chrome on the iPhone: the storage gauge uses Safari's budget; the install hint says where Share is.
+  - **Reports retention, agreed:** in kitchen-reports, a report is deleted 90 days after it is closed and at most 180
+    days after it was filed: issue, comments, screenshot and log. The Worker's daily sweep does it; once a month
+    the files' storage is rewritten so deleted screenshots leave the history; at the end of the beta Tony deletes the
+    repository.
+  - **To be built on Tue 27 Oct, after his weekly allowance renews** (11:00). Reminder at 12:00 Israel time:
+    send_later trig_01QvUa8FbunpnDRkieomPMXN. He was at 89% of his weekly usage on 25 Oct — keep work lean until
+    then.
 - **Photo keys, 23 Oct:** Pexels: "New API key issuance is currently paused and cannot be requested" (Tony); Unsplash:
   "We can forego unsplash for now" (Tony). Photos stay Pixabay + Wikimedia Commons; the workflow is ready if a key
   ever comes (secrets PEXELS_API_KEY / UNSPLASH_ACCESS_KEY, then dispatch Deploy the Worker).
