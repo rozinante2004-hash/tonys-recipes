@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v38.91 -->
+<!-- Tony's Recipes Collection v38.92 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -904,11 +904,27 @@ function logMaskAddresses(t) {
   return String(t).replace(/([^\s@<>()"'`:,;=\/\\[\]{}|])[^\s@<>()"'`:,;=\/\\[\]{}|]*@([A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,})/g, '$1\u2026@$2');
 }
 window.logMaskAddresses = logMaskAddresses;
+// v38.92 — a log entry's details as one line, for the error report. Tony, 25 Oct: a report from the tester
+// invitations said only "Tester invitations by Gmail" — the details were an object, and only text was kept ("Otherwise
+// we are blind"). Keys that may hold a person's or a kitchen's name are left out; insClean masks addresses and links.
+var LOG_DETAIL_SKIP = /name|household|title|who|email|user|member|owner|to$|from$/i;
+function logDetailText(data) {
+  if (data == null || data === '') return '';
+  if (typeof data !== 'object') return String(data);
+  try {
+    return Object.keys(data).filter(function(k){ return !LOG_DETAIL_SKIP.test(k); }).slice(0, 12).map(function(k) {
+      var v = data[k];
+      if (v == null || v === '' || typeof v === 'function') return '';
+      if (typeof v === 'object') { try { v = JSON.stringify(v); } catch (e) { v = '…'; } }
+      return k + ': ' + String(v).slice(0, 160);
+    }).filter(Boolean).join(', ');
+  } catch (e) { return ''; }
+}
 function syncLog(kind, message, data) {
   // v38.15 — a fault the app notes is reported where `insights` is on (the beta,
   // the test copy), whether or not the log is kept on this device.
   if (kind === 'error' && !window._insFromRecord && typeof insightError === 'function') {
-    try { insightError('logged', String(message == null ? '' : message) + (typeof data === 'string' && data ? ' — ' + data : ''), ''); } catch(e) {}
+    try { var dt = logDetailText(data); insightError('logged', String(message == null ? '' : message) + (dt ? ' — ' + dt : ''), ''); } catch(e) {}
   }
   if (!logEnabled()) return false;
   try {
@@ -9355,7 +9371,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v38.91';
+var APP_VERSION = 'v38.92';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -12497,7 +12513,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.91</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.92</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -12585,7 +12601,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.91</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.92</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -13351,7 +13367,7 @@ body.banner-shown .header {
       <div style="font-size:11px;color:var(--muted);text-align:center;margin-top:6px;">Scan QR code to open on another device</div>
       </div>
       <div style="font-size:12px;color:var(--muted);margin-top:14px;line-height:1.6;">
-        <strong>📱 To install on iPhone:</strong> Open link in Safari → tap Share → "Add to Home Screen"<br>
+        <strong>📱 To install on iPhone:</strong> Open link in Safari or Chrome → tap Share → "Add to Home Screen"<br>
         <strong>🤖 To install on Android:</strong> Open link in Chrome → tap menu → "Add to Home Screen"<br>
         <strong>💻 To install on Desktop:</strong> Open link in Chrome → click ⊕ in address bar
       </div>
@@ -26249,7 +26265,8 @@ var _lastSyncOkAt = null, _lastSaveOkAt = null, _conflictCount = 0;
 // (measured) and about half that in Safari, which counts two bytes a character.
 // When it runs out, saving to the device fails. Nothing showed how close it was.
 function deviceStorageReport() {
-  var isSafari = /Safari/.test(navigator.userAgent) && !/Chrome|Chromium|CriOS|FxiOS|Edg/.test(navigator.userAgent);
+  // v38.92 — every browser on an iPhone or iPad is Safari underneath (Chrome too): Safari's budget
+  var isSafari = (/Safari/.test(navigator.userAgent) && !/Chrome|Chromium|CriOS|FxiOS|Edg/.test(navigator.userAgent)) || /iPhone|iPad|iPod/.test(navigator.userAgent);
   var budget = isSafari ? 2500000 : 5000000;
   var cats = { recipes: 0, languages: 0, translationUpkeep: 0, aiCache: 0, log: 0, other: 0 }, total = 0;
   try {
@@ -30337,7 +30354,8 @@ async function inviteSendGmail() {
   inviteSentShow();
   inviteOnlyShow();
   // counts only — never an address
-  syncLog(left.length ? 'error' : 'save', 'Tester invitations by Gmail', { sent: ok.length, notSent: left.length, language: lang });
+  syncLog(left.length ? 'error' : 'save', 'Tester invitations by Gmail', { sent: ok.length, notSent: left.length, language: lang,
+    reason: left.length ? (stop === 'api' ? 'the Gmail API is not switched on for this project' : String(stop || 'unknown').slice(0, 300)) : '' });   // v38.92 — why
   if (ok.length && typeof insightCount === 'function') insightCount('invite-testers');
   return { sent: ok.length, notSent: left.length };
 }
@@ -36614,7 +36632,7 @@ window.onHeaderScroll = onHeaderScroll;
   <div style="font-size:30px;flex-shrink:0;">📲</div>
   <div style="flex:1;">
     <div style="font-weight:700;font-size:14px;color:var(--ink);margin-bottom:4px;">Install the app</div>
-    <div style="font-size:12px;color:var(--muted);line-height:1.5;">Tap <strong>Share</strong> <span style="font-size:14px;">⎙</span> then <strong>"Add to Home Screen"</strong> to install as an app.</div>
+    <div style="font-size:12px;color:var(--muted);line-height:1.5;">Tap <strong>Share</strong> <span style="font-size:14px;">⎙</span> (in Safari at the bottom, in Chrome at the top) then <strong>"Add to Home Screen"</strong> to install as an app.</div>
   </div>
   <button onclick="pwaIosDismiss()" style="flex-shrink:0;width:28px;height:28px;border-radius:50%;background:var(--bg);border:1px solid var(--border);cursor:pointer;font-size:14px;color:var(--muted);">✕</button>
 </div>

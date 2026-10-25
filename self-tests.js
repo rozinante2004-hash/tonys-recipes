@@ -1909,9 +1909,12 @@ window.SELF_TESTS = [
           throw new Error('what would be sent: '+q[0].message);
         if(q[0].version!==APP_VERSION || q[0].kind!=='import' || !q[0].screen) throw new Error('without its version, kind or screen: '+JSON.stringify(q[0]));
         // A fault the app notes in its log, and the error windows, are reported too.
-        syncLog('error', 'Could not give the household its identifier', 'permission-denied');
+        // v38.92 — details kept as an object reach the report too, without names or addresses
+        syncLog('error', 'Could not give the household its identifier', { code:'permission-denied', tries:2, household:'Zed Kitchen', note:'for me@example.com' });
         showServiceError('Your note could not be sent: offline'); var so=document.getElementById('serviceErrorOverlay'); if(so) so.remove();
         q=JSON.parse(localStorage.getItem(INS_ERR_KEY)||'[]');
+        var lg=q.filter(function(e){ return e.kind==='logged'; })[0];
+        if(!lg || !/code: permission-denied, tries: 2/.test(lg.message) || /Zed Kitchen|me@example/.test(lg.message)) throw new Error('the log entry\'s details in the report: '+JSON.stringify(lg));
         if(!q.some(function(e){ return e.kind==='logged' && /identifier/.test(e.message); }) || !q.some(function(e){ return e.kind==='service'; })) throw new Error('the log and the error window are not reported: '+JSON.stringify(q));
         // Sent once signed in and the server takes them; taken off the device only then.
         window._fbUser={ uid:'uT', email:'t@example.com', getIdToken:async function(){ return 'tokT'; } };
