@@ -1,7 +1,7 @@
 {
  "lang": "fr",
- "updatedAt": 1792840124924,
- "count": 2461,
+ "updatedAt": 1792955920733,
+ "count": 2463,
  "strings": {
   "\"Add to Home Screen\"": "Ajouter à l'écran d'accueil",
   "\"Open Bring!\"": "Ouvrir Bring!",
@@ -762,6 +762,7 @@
   "Open": "Ouvrir",
   "Open GitHub": "Ouvrir GitHub",
   "Open deployed app": "Ouvrir l'app déployée",
+  "Open link in Safari or Chrome → tap Share → \"Add to Home Screen\"{2} {3} Open link in Chrome → tap menu → \"Add to Home Screen\"{4} {5} Open link in Chrome → click ⊕ in address bar": "Ouvrir le lien dans Safari ou Chrome → appuyer sur Partager → « Ajouter à l'écran d'accueil »{2} {3} Ouvrir le lien dans Chrome → appuyer sur le menu → « Ajouter à l'écran d'accueil »{4} {5} Ouvrir le lien dans Chrome → cliquer sur ⊕ dans la barre d'adresse",
   "Open link in Safari → tap Share → \"Add to Home Screen\"{2} {3} Open link in Chrome → tap menu → \"Add to Home Screen\"{4} {5} Open link in Chrome → click ⊕ in address bar": "Ouvrir le lien dans Safari → appuyer sur Partager → « Sur l'écran d'accueil »{2} {3} Ouvrir le lien dans Chrome → appuyer sur le menu → « Ajouter à l'écran d'accueil »{4} {5} Ouvrir le lien dans Chrome → cliquer sur ⊕ dans la barre d'adresse",
   "Open links in other apps": "Ouvrir les liens dans d'autres applis",
   "Open the e-mail sent to {1} (look in spam too) and press its link. Then come back and reload: you will be in the collection that added you.": "Ouvrez l'e-mail envoyé à {1} (regardez aussi dans les spams) et cliquez sur son lien. Revenez ensuite et actualisez : vous serez dans la collection qui vous a ajouté.",
@@ -1118,6 +1119,7 @@
   "Tap the box and choose Paste — the import starts by itself.": "Touchez le champ et choisissez Coller — l'import démarre tout seul.",
   "Tap the line you want first, then use this button": "Touchez d'abord la ligne voulue, puis utilisez ce bouton",
   "Tap to change the photo": "Touchez pour changer la photo",
+  "Tap {1} {2} (in Safari at the bottom, in Chrome at the top) then {3} to install as an app.": "Appuie sur {1} {2} (en bas dans Safari, en haut dans Chrome) puis {3} pour l'installer comme application.",
   "Tap {1} {2} then {3} to install as an app.": "Appuyez sur {1} {2} puis {3} pour l'installer comme application.",
   "Target servings": "Nombre de portions",
   "Tell me what's in your fridge and any diet requirements, and I'll suggest meals.": "Dis-moi ce qu'il y a dans ton frigo et tes contraintes alimentaires, et je te proposerai des plats.",

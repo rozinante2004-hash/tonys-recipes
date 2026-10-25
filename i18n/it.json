@@ -1,7 +1,7 @@
 {
  "lang": "it",
- "updatedAt": 1792840124924,
- "count": 2346,
+ "updatedAt": 1792955920733,
+ "count": 2348,
  "strings": {
   "\"Add to Home Screen\"": "Aggiungi a Home",
   "\"Open Bring!\"": "Apri Bring!",
@@ -724,6 +724,7 @@
   "Open": "Apri",
   "Open GitHub": "Apri GitHub",
   "Open deployed app": "Apri l'app pubblicata",
+  "Open link in Safari or Chrome → tap Share → \"Add to Home Screen\"{2} {3} Open link in Chrome → tap menu → \"Add to Home Screen\"{4} {5} Open link in Chrome → click ⊕ in address bar": "Apri il link in Safari o Chrome → tocca Condividi → \"Aggiungi alla schermata Home\"{2} {3} Apri il link in Chrome → tocca il menu → \"Aggiungi alla schermata Home\"{4} {5} Apri il link in Chrome → clicca su ⊕ nella barra degli indirizzi",
   "Open link in Safari → tap Share → \"Add to Home Screen\"{2} {3} Open link in Chrome → tap menu → \"Add to Home Screen\"{4} {5} Open link in Chrome → click ⊕ in address bar": "Apri il link in Safari → tocca Condividi → \"Aggiungi a Home\"{2} {3} Apri il link in Chrome → tocca il menu → \"Aggiungi a Home\"{4} {5} Apri il link in Chrome → clicca su ⊕ nella barra degli indirizzi",
   "Open links in other apps": "Apri i link in altre app",
   "Open the e-mail sent to {1} (look in spam too) and press its link. Then come back and reload: you will be in the collection that added you.": "Apri l'e-mail inviata a {1} (controlla anche lo spam) e premi il link. Poi torna qui e ricarica: sarai nella raccolta che ti ha aggiunto.",
@@ -1066,6 +1067,7 @@
   "Tap the box and choose Paste — the import starts by itself.": "Tocca la casella e scegli Incolla — l'importazione parte da sola.",
   "Tap the line you want first, then use this button": "Tocca prima la riga che vuoi, poi usa questo pulsante",
   "Tap to change the photo": "Tocca per cambiare la foto",
+  "Tap {1} {2} (in Safari at the bottom, in Chrome at the top) then {3} to install as an app.": "Tocca {1} {2} (in Safari in basso, in Chrome in alto) poi {3} per installarla come app.",
   "Tap {1} {2} then {3} to install as an app.": "Tocca {1} {2} poi {3} per installarla come app.",
   "Target servings": "Porzioni desiderate",
   "Tell me what's in your fridge and any diet requirements, and I'll suggest meals.": "Dimmi cosa c'è nel frigo e le tue esigenze alimentari, e ti suggerirò dei piatti.",

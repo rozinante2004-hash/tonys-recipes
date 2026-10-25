@@ -1,7 +1,7 @@
 {
  "lang": "ru",
- "updatedAt": 1792840124924,
- "count": 2794,
+ "updatedAt": 1792955920733,
+ "count": 2796,
  "strings": {
   "\"Add to Home Screen\"": "Добавить на главный экран",
   "\"One item away\" filter ({1}f.{2})": "Фильтр «Не хватает одного» ({1}ф.{2})",
@@ -919,6 +919,7 @@
   "Open": "Открыть",
   "Open GitHub": "Открыть GitHub",
   "Open deployed app": "Открыть развёрнутое приложение",
+  "Open link in Safari or Chrome → tap Share → \"Add to Home Screen\"{2} {3} Open link in Chrome → tap menu → \"Add to Home Screen\"{4} {5} Open link in Chrome → click ⊕ in address bar": "Откройте ссылку в Safari или Chrome → нажмите «Поделиться» → «На экран «Домой»{2} {3} Откройте ссылку в Chrome → нажмите на меню → «Добавить на главный экран»{4} {5} Откройте ссылку в Chrome → нажмите ⊕ в адресной строке",
   "Open link in Safari → tap Share → \"Add to Home Screen\"{2} {3} Open link in Chrome → tap menu → \"Add to Home Screen\"{4} {5} Open link in Chrome → click ⊕ in address bar": "Откройте ссылку в Safari → нажмите «Поделиться» → «На экран “Домой”»{2} {3} Откройте ссылку в Chrome → нажмите меню → «Добавить на главный экран»{4} {5} Откройте ссылку в Chrome → нажмите ⊕ в адресной строке",
   "Open links in other apps": "Открывать ссылки в других приложениях",
   "Open the e-mail sent to {1} (look in spam too) and press its link. Then come back and reload: you will be in the collection that added you.": "Откройте письмо, отправленное на {1} (проверьте и папку со спамом), и перейдите по ссылке в нём. Затем вернитесь сюда и обновите страницу: вы окажетесь в коллекции, которая вас добавила.",
@@ -1343,6 +1344,7 @@
   "Tap the box and choose Paste — the import starts by itself.": "Нажмите на поле и выберите «Вставить» — импорт начнётся сам.",
   "Tap the line you want first, then use this button": "Сначала нажмите на нужную строку, затем используйте эту кнопку",
   "Tap to change the photo": "Нажмите, чтобы изменить фото",
+  "Tap {1} {2} (in Safari at the bottom, in Chrome at the top) then {3} to install as an app.": "Нажмите {1} {2} (в Safari внизу, в Chrome вверху), затем {3}, чтобы установить приложение.",
   "Tap {1} {2} then {3} to install as an app.": "Нажмите {1} {2}, затем {3}, чтобы установить как приложение.",
   "Target servings": "Целевые порции",
   "Tell me what's in your fridge and any diet requirements, and I'll suggest meals.": "Расскажите, что у вас в холодильнике и какие есть диетические требования, и я предложу блюда.",

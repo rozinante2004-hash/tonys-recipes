@@ -1,7 +1,7 @@
 {
  "lang": "zh",
- "updatedAt": 1792840124924,
- "count": 2490,
+ "updatedAt": 1792955920733,
+ "count": 2492,
  "strings": {
   "\"Add to Home Screen\"": "添加到主屏幕",
   "\"Open Bring!\"": "打开 Bring!",
@@ -767,6 +767,7 @@
   "Open": "打开",
   "Open GitHub": "打开GitHub",
   "Open deployed app": "打开已部署的应用",
+  "Open link in Safari or Chrome → tap Share → \"Add to Home Screen\"{2} {3} Open link in Chrome → tap menu → \"Add to Home Screen\"{4} {5} Open link in Chrome → click ⊕ in address bar": "在 Safari 或 Chrome 中打开链接 → 点击「分享」→「添加到主屏幕」{2} {3}在 Chrome 中打开链接 → 点击菜单 →「添加到主屏幕」{4} {5}在 Chrome 中打开链接 → 点击地址栏中的 ⊕",
   "Open link in Safari → tap Share → \"Add to Home Screen\"{2} {3} Open link in Chrome → tap menu → \"Add to Home Screen\"{4} {5} Open link in Chrome → click ⊕ in address bar": "在 Safari 中打开链接 → 点按分享 → “添加到主屏幕”{2} {3} 在 Chrome 中打开链接 → 点按菜单 → “添加到主屏幕”{4} {5} 在 Chrome 中打开链接 → 点击地址栏中的 ⊕",
   "Open links in other apps": "在其他应用中打开链接",
   "Open the e-mail sent to {1} (look in spam too) and press its link. Then come back and reload: you will be in the collection that added you.": "打开发送到 {1} 的邮件（也看看垃圾邮件），点击里面的链接。然后回来刷新：你就会进入邀请你的那个收藏集。",
@@ -1124,6 +1125,7 @@
   "Tap the box and choose Paste — the import starts by itself.": "点按输入框并选择粘贴——导入会自动开始。",
   "Tap the line you want first, then use this button": "先点击你想要的那一行，再使用此按钮",
   "Tap to change the photo": "点击更换照片",
+  "Tap {1} {2} (in Safari at the bottom, in Chrome at the top) then {3} to install as an app.": "点击 {1} {2}（Safari 在底部，Chrome 在顶部），然后点击 {3} 即可安装为应用。",
   "Tap {1} {2} then {3} to install as an app.": "点击 {1} {2}，然后点击 {3} 以安装为应用。",
   "Target servings": "目标份数",
   "Tell me what's in your fridge and any diet requirements, and I'll suggest meals.": "告诉我冰箱里有什么，以及有什么饮食要求，我会推荐菜式。",

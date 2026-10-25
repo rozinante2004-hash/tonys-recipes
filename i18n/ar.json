@@ -1,7 +1,7 @@
 {
  "lang": "ar",
- "updatedAt": 1792840124924,
- "count": 2463,
+ "updatedAt": 1792955920733,
+ "count": 2465,
  "strings": {
   "\"Add to Home Screen\"": "إضافة إلى الشاشة الرئيسية",
   "\"Open Bring!\"": "فتح Bring!",
@@ -763,6 +763,7 @@
   "Open": "فتح",
   "Open GitHub": "فتح GitHub",
   "Open deployed app": "فتح التطبيق المنشور",
+  "Open link in Safari or Chrome → tap Share → \"Add to Home Screen\"{2} {3} Open link in Chrome → tap menu → \"Add to Home Screen\"{4} {5} Open link in Chrome → click ⊕ in address bar": "افتح الرابط في Safari أو Chrome ← اضغط على مشاركة ← \"إضافة إلى الشاشة الرئيسية\"{2} {3} افتح الرابط في Chrome ← اضغط على القائمة ← \"إضافة إلى الشاشة الرئيسية\"{4} {5} افتح الرابط في Chrome ← انقر على ⊕ في شريط العنوان",
   "Open link in Safari → tap Share → \"Add to Home Screen\"{2} {3} Open link in Chrome → tap menu → \"Add to Home Screen\"{4} {5} Open link in Chrome → click ⊕ in address bar": "افتح الرابط في Safari ← اضغط مشاركة ← \"إضافة إلى الشاشة الرئيسية\"{2} {3} افتح الرابط في Chrome ← اضغط القائمة ← \"إضافة إلى الشاشة الرئيسية\"{4} {5} افتح الرابط في Chrome ← اضغط ⊕ في شريط العنوان",
   "Open links in other apps": "فتح الروابط في تطبيقات أخرى",
   "Open the e-mail sent to {1} (look in spam too) and press its link. Then come back and reload: you will be in the collection that added you.": "افتح البريد الإلكتروني المُرسَل إلى {1} (تحقق من مجلد الرسائل غير المرغوب فيها أيضًا) واضغط على الرابط فيه. ثم عُد وأعد تحميل الصفحة: ستجد نفسك في المجموعة التي أضافتك.",
@@ -1119,6 +1120,7 @@
   "Tap the box and choose Paste — the import starts by itself.": "اضغط على المربع واختر لصق — يبدأ الاستيراد تلقائيًا.",
   "Tap the line you want first, then use this button": "اضغط على السطر الذي تريده أولاً، ثم استخدم هذا الزر",
   "Tap to change the photo": "اضغط لتغيير الصورة",
+  "Tap {1} {2} (in Safari at the bottom, in Chrome at the top) then {3} to install as an app.": "اضغط على {1} {2} (في الأسفل في Safari، وفي الأعلى في Chrome) ثم {3} لتثبيته كتطبيق.",
   "Tap {1} {2} then {3} to install as an app.": "اضغط على {1} {2} ثم {3} للتثبيت كتطبيق.",
   "Target servings": "عدد الحصص المستهدف",
   "Tell me what's in your fridge and any diet requirements, and I'll suggest meals.": "أخبرني بما في ثلاجتك وأي متطلبات غذائية، وسأقترح عليك وجبات.",
