@@ -1214,6 +1214,8 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
       name are skipped; insClean masks addresses and links).
     - The Gmail invitations log Gmail's reason for not sending.
     - Chrome on the iPhone: the storage gauge uses Safari's budget; the install hint says where Share is.
+  - **Released: v38.92 (25 Oct 2026, on 52ca537, with Tony's yes)** — every job success (Deploy to GitHub Pages,
+    Translate new phrases, Publish languages, Self Tests on main and test, Cloudflare Pages for both copies).
   - **Reports retention, agreed:** in kitchen-reports, a report is deleted 90 days after it is closed and at most 180
     days after it was filed: issue, comments, screenshot and log. The Worker's daily sweep does it; once a month
     the files' storage is rewritten so deleted screenshots leave the history; at the end of the beta Tony deletes the
