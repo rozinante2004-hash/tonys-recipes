@@ -1,7 +1,7 @@
 {
  "lang": "he",
- "updatedAt": 1792840124924,
- "count": 3004,
+ "updatedAt": 1792955920733,
+ "count": 3006,
  "strings": {
   "\"Add to Home Screen\"": "הוספה למסך הבית",
   "\"One item away\" filter ({1}f.{2})": "פילטר \"פריט אחד חסר\" ({1}f.{2})",
@@ -961,6 +961,7 @@
   "Open GitHub": "פתיחת GitHub",
   "Open deployed app": "פתחו את האפליקציה הפרוסה",
   "Open in a new tab ↗": "פתיחה בכרטיסייה חדשה ↗",
+  "Open link in Safari or Chrome → tap Share → \"Add to Home Screen\"{2} {3} Open link in Chrome → tap menu → \"Add to Home Screen\"{4} {5} Open link in Chrome → click ⊕ in address bar": "פתח קישור ב-Safari או Chrome ← הקש על שיתוף ← \"הוספה למסך הבית\"{2} {3} פתח קישור ב-Chrome ← הקש על התפריט ← \"הוספה למסך הבית\"{4} {5} פתח קישור ב-Chrome ← לחץ על ⊕ בשורת הכתובת",
   "Open link in Safari → tap Share → \"Add to Home Screen\"{2} {3} Open link in Chrome → tap menu → \"Add to Home Screen\"{4} {5} Open link in Chrome → click ⊕ in address bar": "פתח/י את הקישור ב-Safari ← הקש/י על שיתוף ← \"הוספה למסך הבית\"{2} {3} פתח/י את הקישור ב-Chrome ← הקש/י על התפריט ← \"הוספה למסך הבית\"{4} {5} פתח/י את הקישור ב-Chrome ← לחץ/י על ⊕ בשורת הכתובת",
   "Open links in other apps": "פתיחת קישורים באפליקציות אחרות",
   "Open the e-mail sent to {1} (look in spam too) and press its link. Then come back and reload: you will be in the collection that added you.": "פתחו את המייל שנשלח אל {1} (בדקו גם בספאם) ולחצו על הקישור. אחר כך חזרו ורעננו: תהיו באוסף שהוסיף אתכם.",
@@ -1411,6 +1412,7 @@
   "Tap the box and choose Paste — the import starts by itself.": "הקש/י על התיבה ובחר/י הדבק — הייבוא מתחיל מעצמו.",
   "Tap the line you want first, then use this button": "הקישו קודם על השורה הרצויה, ואז השתמשו בכפתור הזה",
   "Tap to change the photo": "הקישו כדי להחליף את התמונה",
+  "Tap {1} {2} (in Safari at the bottom, in Chrome at the top) then {3} to install as an app.": "הקש על {1} {2} (ב-Safari בתחתית, ב-Chrome למעלה) ואז על {3} כדי להתקין כאפליקציה.",
   "Tap {1} {2} then {3} to install as an app.": "יש להקיש על {1} {2} ואז על {3} כדי להתקין כאפליקציה.",
   "Target servings": "כמות מנות רצויה",
   "Tell me what's in your fridge and any diet requirements, and I'll suggest meals.": "ספרו לי מה יש לכם במקרר ואילו דרישות תזונה יש לכם, ואני אציע ארוחות.",

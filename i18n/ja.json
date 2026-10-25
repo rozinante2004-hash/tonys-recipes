@@ -1,7 +1,7 @@
 {
  "lang": "ja",
- "updatedAt": 1792840124924,
- "count": 2803,
+ "updatedAt": 1792955920733,
+ "count": 2805,
  "strings": {
   "\"Add to Home Screen\"": "ホーム画面に追加",
   "\"One item away\" filter ({1}f.{2})": "「あと1品」フィルター（{1}f.{2}）",
@@ -920,6 +920,7 @@
   "Open": "開く",
   "Open GitHub": "GitHubを開く",
   "Open deployed app": "デプロイ済みアプリを開く",
+  "Open link in Safari or Chrome → tap Share → \"Add to Home Screen\"{2} {3} Open link in Chrome → tap menu → \"Add to Home Screen\"{4} {5} Open link in Chrome → click ⊕ in address bar": "Safari または Chrome でリンクを開く → 共有をタップ → 「ホーム画面に追加」{2} {3}Chrome でリンクを開く → メニューをタップ → 「ホーム画面に追加」{4} {5}Chrome でリンクを開く → アドレスバーの ⊕ をクリック",
   "Open link in Safari → tap Share → \"Add to Home Screen\"{2} {3} Open link in Chrome → tap menu → \"Add to Home Screen\"{4} {5} Open link in Chrome → click ⊕ in address bar": "リンクをSafariで開く → 共有をタップ → 「ホーム画面に追加」{2} {3} リンクをChromeで開く → メニューをタップ → 「ホーム画面に追加」{4} {5} リンクをChromeで開く → アドレスバーの⊕をクリック",
   "Open links in other apps": "他のアプリでリンクを開く",
   "Open the e-mail sent to {1} (look in spam too) and press its link. Then come back and reload: you will be in the collection that added you.": "{1}宛てに届いたメール（迷惑メールフォルダも確認してください）を開き、リンクを押してください。それから戻って再読み込みすると、あなたを招待したコレクションに入っています。",
@@ -1344,6 +1345,7 @@
   "Tap the box and choose Paste — the import starts by itself.": "ボックスをタップして「貼り付け」を選択すると、インポートが自動で始まります。",
   "Tap the line you want first, then use this button": "先に対象の行をタップしてから、このボタンを使ってください",
   "Tap to change the photo": "タップして写真を変更",
+  "Tap {1} {2} (in Safari at the bottom, in Chrome at the top) then {3} to install as an app.": "{1} {2}(Safari では下部、Chrome では上部)をタップし、続いて{3}をタップするとアプリとしてインストールできます。",
   "Tap {1} {2} then {3} to install as an app.": "{1} {2} をタップし、続けて {3} をタップするとアプリとしてインストールできます。",
   "Target servings": "目標人数",
   "Tell me what's in your fridge and any diet requirements, and I'll suggest meals.": "冷蔵庫にあるものと食事の条件を教えてください。メニューを提案します。",
