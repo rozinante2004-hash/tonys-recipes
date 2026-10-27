@@ -1287,6 +1287,14 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
     is the normal form; rules and tour only for a new account; no store link on the test copy, so no computer page):
     ⚙️ → 👑 App owner → 🧑‍🍳 Preview the first-visit setup (`setupPreview`) walks every page, records and creates
     nothing (`legalShowGate(null, {preview:true})`, `setupDeviceStep(user, {preview:true})`).
+  - **Worker v92 (ntfy says why) — deployed alone (Deploy the Worker dispatched on `test`; standing permission for the
+    ntfy alerts), 27 Oct:** Tony's test alert said "ntfy: not delivered" and nothing more; ntfy.sh is unreachable from
+    the sandbox, so the Worker now says why — a topic ntfy does not take, ntfy's status and words, or no connection —
+    in the test alert's answer (`ntfyWhy`) and in its e-mail ("ntfy (the phone): NOT delivered — …"); the topic is never
+    shown. A secret holding the whole link (https://ntfy.sh/<topic>) is taken too.
+  - **v38.98 (waits for the yes with v38.94–97):** the test alert window shows ntfy's reason; `?setup=1` in the address
+    shows the wizard on a browser already used, and its device page after signing in (a browser keeps one private
+    session for all its private windows until the last one closes — why Tony's "fresh" private window skipped it).
 - **Photo keys, 23 Oct:** Pexels: "New API key issuance is currently paused and cannot be requested" (Tony); Unsplash:
   "We can forego unsplash for now" (Tony). Photos stay Pixabay + Wikimedia Commons; the workflow is ready if a key
   ever comes (secrets PEXELS_API_KEY / UNSPLASH_ACCESS_KEY, then dispatch Deploy the Worker).

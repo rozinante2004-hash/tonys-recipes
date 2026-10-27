@@ -1,4 +1,8 @@
-// Tony's Recipes — Cloudflare Worker v91
+// Tony's Recipes — Cloudflare Worker v92
+// v92: NTFY SAYS WHY (Tony, 27 Oct 2026: the test alert said "ntfy: not delivered" and nothing more). The topic is taken
+// also when the secret holds the whole link (https://ntfy.sh/<topic>), and the test alert — on screen and in its e-mail —
+// says why one did not go: a topic ntfy does not take, ntfy's own answer (its status and words), or no connection.
+// The topic itself is never shown.
 // v91: (1) THE REPORTS DO NOT STAY FOREVER (Tony, 25 Oct 2026): the daily sweep deletes a report 90 days after it was
 // closed, 180 at most — screenshot, log and issue (or empties it, if the token may not delete) — and once a month the
 // files branch is rewritten so deleted files leave its history. New screenshots and logs go to branch `files`.
@@ -411,7 +415,7 @@
 //   AI_MAX_TOKENS   – the longest answer one call may ask for (32000; the
 //                     app's largest, reading several recipes at once, asks 8000).
 
-const WORKER_VERSION = 'v91';
+const WORKER_VERSION = 'v92';
 const VIDEO_MAX_MB_DEFAULT = 50;
 const GEMINI_API = 'https://generativelanguage.googleapis.com';
 const GEMINI_MODEL_DEFAULT = 'gemini-2.5-flash';
@@ -2009,9 +2013,21 @@ async function ownerAlert(env, subject, text, opts) {
 // password, so it is never logged or shown. ntfy's server sees what is sent: the alert's title and its first line,
 // every e-mail address masked; the rest stays in the e-mail. Without the secret: nothing.
 const NTFY_URL = 'https://ntfy.sh/';
+// v92 — the topic as ntfy wants it: a whole link (https://ntfy.sh/<topic>) is taken too. `_ntfyWhy` says why the last
+// one did not go (the test alert shows it); never the topic itself.
+let _ntfyWhy = '';
+function ntfyTopic(env) {
+  return String(env.NTFY_TOPIC || '').trim().replace(/^https?:\/\//i, '').replace(/^(www\.)?ntfy\.sh\//i, '').replace(/^\/+|\/+$/g, '').replace(/[?#].*$/, '');
+}
 async function ownerNtfy(env, subject, text) {
-  const topic = String(env.NTFY_TOPIC || '').trim();
-  if (!/^[A-Za-z0-9_-]{1,64}$/.test(topic)) return false;
+  _ntfyWhy = '';
+  const topic = ntfyTopic(env);
+  if (!topic) { _ntfyWhy = 'the GitHub secret NTFY_TOPIC is empty'; return false; }
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(topic)) {
+    _ntfyWhy = 'the topic in NTFY_TOPIC has a character ntfy does not take (only letters, digits, - and _, at most 64)'
+      + (/\s/.test(topic) ? ' — it has a space' : /[^\x00-\x7f]/.test(topic) ? ' — it has a letter outside A–Z' : '');
+    return false;
+  }
   const mask = (v) => String(v || '').replace(/[^\s@<>()"',;]+@[^\s@<>()"',;]+\.[A-Za-z]{2,}/g, '[e-mail]');
   const title = mask(String(subject || '').replace(/^My Kitchen Notes: /, '')).slice(0, 120) || 'My Kitchen Notes';
   const first = mask(String(text || '').split('\n').filter(Boolean)[0] || '').slice(0, 300);
@@ -2019,8 +2035,11 @@ async function ownerNtfy(env, subject, text) {
     const r = await (env.__fetch || fetch)(NTFY_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ topic, title, message: (first ? first + '\n' : '') + '(the details are in your e-mail)', tags: ['bell'], priority: 4 }),
       signal: AbortSignal.timeout(10000) });
-    return r.ok;
-  } catch (e) { return false; }
+    if (r.ok) return true;
+    let said = ''; try { said = (await r.text()).split(topic).join('[topic]').replace(/\s+/g, ' ').slice(0, 160); } catch (e) {}
+    _ntfyWhy = 'ntfy answered ' + r.status + (said ? ': ' + said : '');
+    return false;
+  } catch (e) { _ntfyWhy = 'ntfy could not be reached (' + String((e && e.message) || e).slice(0, 80) + ')'; return false; }
 }
 // v84 — and on WhatsApp (Tony, 20 Oct 2026: "Whatsapp is actually better for me"), through CallMeBot's free service:
 // a message to the owner's own number, with the key CallMeBot gave him on it. The Worker's secrets WHATSAPP_PHONE and
@@ -2240,11 +2259,13 @@ async function meterAction(request, env, body) {
     _alertTestAt = Date.now();
     const wa = await ownerWhatsApp(env, 'A test alert', 'If you can read this, the server can reach you here. Sent from the app at ' + ilTime(Date.now()) + ' (Israel time).');
     const nt = await ownerNtfy(env, 'A test alert', 'If you can read this, the server can reach you in ntfy. Sent at ' + ilTime(Date.now()) + ' (Israel time).');   // v91
+    const ntWhy = nt ? '' : _ntfyWhy;   // v92
     const mailTo = String(env.ALERT_TO || '').split(',').filter(x => /@/.test(x)).length;
     let mailed = false;
     if (env.ALERTS && mailTo) mailed = await ownerAlert(env, 'My Kitchen Notes: a test alert',
-      'If you can read this, the server can reach you by e-mail. Sent from the app at ' + ilTime(Date.now()) + ' (Israel time).', { whatsapp: false });
-    return jsonResp({ ok: true, whatsapp: wa, whatsappSet: !!(env.WHATSAPP_PHONE && env.WHATSAPP_KEY), ntfy: nt, ntfySet: !!env.NTFY_TOPIC, mail: mailed, mailTo });
+      'If you can read this, the server can reach you by e-mail. Sent from the app at ' + ilTime(Date.now()) + ' (Israel time).'
+      + (env.NTFY_TOPIC ? '\n\nntfy (the phone): ' + (nt ? 'sent.' : 'NOT delivered — ' + ntWhy + '.') : ''), { whatsapp: false });
+    return jsonResp({ ok: true, whatsapp: wa, whatsappSet: !!(env.WHATSAPP_PHONE && env.WHATSAPP_KEY), ntfy: nt, ntfySet: !!env.NTFY_TOPIC, ntfyWhy: ntWhy, mail: mailed, mailTo });
   }
   if (body.op === 'allowances') {
     return jsonResp({ ok: true, usage: await usageSnapshot(env), notices: await serverNotices(env, { owner: true }), watch: !!env.USAGE_KEY,
@@ -3624,4 +3645,4 @@ export default {
   }
 };
 
-// ── END OF WORKER v91 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
+// ── END OF WORKER v92 ── If this is the last line in the Cloudflare editor, the whole file was pasted.

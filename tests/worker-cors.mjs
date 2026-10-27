@@ -1503,6 +1503,26 @@ console.log('\nAI per household (v60):');
     nposts.length = 0;
     await worker.fetch(post({ action: 'meter-admin', op: 'list', idToken: comOwner, device: 'dev-IIII9999' }, TEST_ORIGIN), Object.assign({}, envNt, { NTFY_TOPIC: 'bad topic/../x' }));
     expect('v91: …and nothing to a malformed topic', nposts.length === 0, String(nposts.length));
+    // v92 — a whole link is taken as the topic; a refusal says why, never the topic
+    nposts.length = 0;
+    Date.now = () => realNowWa() + 360e3;
+    try { ta = await (await worker.fetch(post({ action: 'meter-admin', op: 'alert-test', idToken: comOwner, device: 'dev-DDDD4444' }, TEST_ORIGIN),
+      Object.assign({}, envNt, { NTFY_TOPIC: ' https://ntfy.sh/Kitchen-test-123 ' }))).json(); }
+    finally { Date.now = realNowWa; }
+    expect('v92: the topic saved as a whole link still rings', ta.ntfy === true && nposts.length >= 1 && nposts[0].b.topic === 'Kitchen-test-123', JSON.stringify([ta, nposts[0] && nposts[0].b.topic]));
+    const mailsBeforeWhy = mails.length;
+    Date.now = () => realNowWa() + 480e3;
+    try { ta = await (await worker.fetch(post({ action: 'meter-admin', op: 'alert-test', idToken: comOwner, device: 'dev-DDDD4444' }, TEST_ORIGIN),
+      Object.assign({}, envNt, { __fetch: async () => new Response('{"code":42901,"http":429,"error":"limit reached for Kitchen-test-123"}', { status: 429 }) }))).json(); }
+    finally { Date.now = realNowWa; }
+    const whyMail = mails.slice(mailsBeforeWhy).map(m => m.raw).join('');
+    expect('v92: …a refusal says why (ntfy\'s status and words), on screen and in the e-mail, never the topic', ta.ntfy === false && /ntfy answered 429/.test(ta.ntfyWhy || '')
+      && !/Kitchen-test-123/.test(ta.ntfyWhy) && /NOT delivered/.test(whyMail) && !/Kitchen-test-123/.test(whyMail), JSON.stringify([ta, whyMail.slice(-300)]));
+    Date.now = () => realNowWa() + 600e3;
+    try { ta = await (await worker.fetch(post({ action: 'meter-admin', op: 'alert-test', idToken: comOwner, device: 'dev-DDDD4444' }, TEST_ORIGIN),
+      Object.assign({}, envNt, { NTFY_TOPIC: 'My Kitchen Alerts' }))).json(); }
+    finally { Date.now = realNowWa; }
+    expect('v92: …and a topic ntfy does not take is named as such', ta.ntfy === false && /has a space/.test(ta.ntfyWhy || ''), JSON.stringify(ta));
     // v85 — each kind of alert on WhatsApp, or not: all on by default, e-mail never affected.
     let ap = await (await worker.fetch(post({ action: 'meter-admin', op: 'alert-prefs', idToken: comOwner, device: 'dev-DDDD4444' }, TEST_ORIGIN), envWa)).json();
     expect('v85: eight kinds of alert, all on WhatsApp by default', ap.ok === true && ap.kinds.length === 8 && ap.kinds.every(k => k.on === true) && ap.whatsappSet === true

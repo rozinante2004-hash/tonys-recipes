@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v38.97 -->
+<!-- Tony's Recipes Collection v38.98 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -4490,7 +4490,8 @@ function testAlertText(d) {
   // v38.93 — WhatsApp (CallMeBot) only when its secrets are set; the phone alerts are ntfy now (Worker v91), on the owner's private topic
   if (d.whatsappSet) lines.push(d.whatsapp ? '✅ WhatsApp: sent — it arrives within a minute.' : '❌ WhatsApp: CallMeBot refused it — check the number and the key in the GitHub secrets.');
   if (d.ntfySet !== undefined) lines.push(!d.ntfySet ? '⚠️ ntfy: not set up — the GitHub secret NTFY_TOPIC is missing.'
-    : d.ntfy ? '✅ ntfy: sent — it should ring in the ntfy app now.' : '❌ ntfy: not delivered — check the topic name in the GitHub secret NTFY_TOPIC and in the ntfy app.');
+    : d.ntfy ? '✅ ntfy: sent — it should ring in the ntfy app now.'
+    : '❌ ntfy: not delivered — ' + (d.ntfyWhy ? d.ntfyWhy + '.' : 'check the topic name in the GitHub secret NTFY_TOPIC and in the ntfy app.'));   // v38.98 — why (Worker v92)
   return lines;
 }
 async function sendTestAlert() {
@@ -8412,10 +8413,18 @@ async function setupPreview() {
 }
 window.setupPreview = setupPreview;
 // After the language question, on a device nobody has used, signed out: the welcome, over the sign-in screen.
+// v38.98 — ?setup=1 in the address shows it on a browser already used (Tony, 27 Oct: a browser keeps one private
+// session for all its private windows until the last is closed, so a "fresh" one still remembered him), and the
+// device's page after signing in.
+function setupForced() { try { return /[?&]setup=1(&|$)/.test(location.search) || sessionStorage.getItem('mkn_setup_force') === '1'; } catch(e) { return false; } }
 async function setupWizMaybe() {
   if (!setupWizAllowed()) return false;
-  try { if (localStorage.getItem(SETUP_SEEN_KEY)) return false; } catch(e) { return false; }
-  if (setupDeviceUsedBefore()) { try { localStorage.setItem(SETUP_SEEN_KEY, 'before'); } catch(e) {} return false; }
+  var forced = setupForced();
+  if (forced) try { sessionStorage.setItem('mkn_setup_force', '1'); } catch(e) {}
+  if (!forced) {
+    try { if (localStorage.getItem(SETUP_SEEN_KEY)) return false; } catch(e) { return false; }
+    if (setupDeviceUsedBefore()) { try { localStorage.setItem(SETUP_SEEN_KEY, 'before'); } catch(e) {} return false; }
+  }
   try { if (window._fbAuth && _fbAuth.isSignInWithEmailLink && _fbAuth.isSignInWithEmailLink(location.href)) return false; } catch(e) {}
   if (navigator.webdriver && !window._setupWizTest) return false;   // the test suites drive the sign-in screen themselves
   for (var i = 0; i < 40 && !window._fbAuthSettled; i++) await new Promise(function(r){ setTimeout(r, 250); });   // who is signed in
@@ -8500,11 +8509,15 @@ function setupDeviceStep(user, opts) {
   setupWizClose();                       // (a sign-in that came another way, the welcome still open)
   if (!preview) {
     if (!user || !setupWizAllowed() || (navigator.webdriver && !window._setupWizTest)) return Promise.resolve();
-    try { if (localStorage.getItem(SETUP_DEVICE_KEY)) return Promise.resolve(); } catch(e) { return Promise.resolve(); }
-    if (!setupWizRan() && setupDeviceUsedBefore()) { try { localStorage.setItem(SETUP_DEVICE_KEY, 'before'); } catch(e) {} return Promise.resolve(); }
+    var forced = setupForced();
+    try { sessionStorage.removeItem('mkn_setup_force'); } catch(e) {}
+    if (!forced) {
+      try { if (localStorage.getItem(SETUP_DEVICE_KEY)) return Promise.resolve(); } catch(e) { return Promise.resolve(); }
+      if (!setupWizRan() && setupDeviceUsedBefore()) { try { localStorage.setItem(SETUP_DEVICE_KEY, 'before'); } catch(e) {} return Promise.resolve(); }
+    }
   }
   var kind = setupDeviceKind(), T = SETUP_TEXT;
-  if (preview && !kind) kind = isIOS() ? 'ios' : /Android/i.test(navigator.userAgent || '') ? 'android' : 'ext';
+  if ((preview || forced) && !kind) kind = isIOS() ? 'ios' : /Android/i.test(navigator.userAgent || '') ? 'android' : 'ext';
   if (!preview) try { localStorage.setItem(SETUP_DEVICE_KEY, kind || 'nothing'); } catch(e) {}
   if (!kind) return Promise.resolve();
   var storeUrl = kind === 'ext' ? (extStoreUrl(extBrowser()) || 'https://chromewebstore.google.com/') : '';
@@ -9644,7 +9657,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v38.97';
+var APP_VERSION = 'v38.98';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -12807,7 +12820,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.97</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.98</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -12895,7 +12908,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.97</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.98</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">

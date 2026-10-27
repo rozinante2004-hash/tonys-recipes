@@ -8938,6 +8938,8 @@ window.SELF_TESTS = [
         _selfTestRunning=false; await setupDeviceStep({ uid:'u1' }); _selfTestRunning=true;
         if(document.getElementById('setupWiz') || localStorage.getItem(SETUP_DEVICE_KEY)!=='before') throw new Error('a device in use was asked');
         if(await setupWizMaybe()) throw new Error('the welcome came again');
+        sessionStorage.setItem('mkn_setup_force','1');   // v38.98 — ?setup=1: shown on a browser already used
+        if(!setupForced()) throw new Error('?setup=1 not noticed'); sessionStorage.removeItem('mkn_setup_force');
         if(String(legalShowGate).indexOf('setupDotsHtml(3)')===-1) throw new Error('the rules are not the third page');
       } finally {
         _selfTestRunning=realRun; window._setupWizTest=false; window.setupDeviceKind=realKind; setupWizClose();
@@ -8981,6 +8983,8 @@ window.SELF_TESTS = [
       if(!/ntfy: not set up/.test(t) || !/NTFY_TOPIC/.test(t)) throw new Error('ntfy not set up: '+t);
       t=testAlertText({ mail:true, mailTo:1, ntfy:false, ntfySet:true }).join('\n');
       if(!/❌ ntfy: not delivered/.test(t)) throw new Error('ntfy refused: '+t);
+      t=testAlertText({ mail:true, mailTo:1, ntfy:false, ntfySet:true, ntfyWhy:'ntfy answered 429: limit reached' }).join('\n');
+      if(!/not delivered — ntfy answered 429/.test(t)) throw new Error('ntfy did not say why: '+t);   // v38.98
       t=testAlertText({ mail:false, mailTo:1, whatsapp:false, whatsappSet:true }).join('\n');
       if(!/❌ E-mail/.test(t) || !/❌ WhatsApp: CallMeBot refused/.test(t)) throw new Error('refused: '+t);
       var realOwner=window.isAppOwner, realUser=window._fbUser, realFetch=window.fetch, realConfirm=window.askConfirm, sent=null;
