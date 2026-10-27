@@ -8957,6 +8957,27 @@ window.SELF_TESTS = [
         sessionStorage.setItem('mkn_setup_force','1');   // v38.98 — ?setup=1: shown on a browser already used
         if(!setupForced()) throw new Error('?setup=1 not noticed'); sessionStorage.removeItem('mkn_setup_force');
         if(String(legalShowGate).indexOf('setupDotsHtml(3)')===-1) throw new Error('the rules are not the third page');
+        // v39.02 — Tony, 27 Oct: the sign-in put the device page up while "Create my account" was still finishing; that
+        // closed it, and the sign-in waited for ever. Now the account page closes only itself.
+        localStorage.removeItem(SETUP_DEVICE_KEY); localStorage.setItem(SETUP_SEEN_KEY,'wizard');
+        var realEmail=window.emailSignIn, realRender=window.renderSignInOptions, holder=document.createElement('div');
+        holder.innerHTML='<input id="emailSignInEmail"><input id="emailSignInPassword">'; document.body.appendChild(holder);
+        var dp=null;
+        try{
+          window._signInOverride.password=true;                    // (the family copy signs in with Google only)
+          setupAccount(true);
+          document.getElementById('swEmail').value='new@example.com'; document.getElementById('swPass').value='longenough1';
+          window.emailSignIn=async function(){                     // the sign-in runs while the account is being made
+            window.setupDeviceKind=function(){ return 'ext'; }; window.extStoreUrl=function(){ return 'https://example.com/store'; };
+            _selfTestRunning=false; window._setupWizTest=true; dp=setupDeviceStep({ uid:'u2' }); _selfTestRunning=true;
+            return { user:{ uid:'u2' } };
+          };
+          await setupCreate();
+          if(!dp || !document.getElementById('swNext')) throw new Error('"Create my account" closed the device page the sign-in had opened');
+          var gone=false; dp.then(function(){ gone=true; });
+          document.getElementById('swNext').click(); await new Promise(function(r){ setTimeout(r, 20); });
+          if(!gone) throw new Error('the sign-in did not go on after Next');
+        } finally { window.emailSignIn=realEmail; window.extStoreUrl=realStore; holder.remove(); delete window._signInOverride.password; }
       } finally {
         _selfTestRunning=realRun; window._setupWizTest=false; window.setupDeviceKind=realKind; setupWizClose();
         keys.forEach(function(k){ if(kept[k]===null) localStorage.removeItem(k); else localStorage.setItem(k, kept[k]); });

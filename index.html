@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.01 -->
+<!-- Tony's Recipes Collection v39.02 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -8393,7 +8393,12 @@ function setupWizPage(step, html) {
   setTimeout(function(){ var f = ov.querySelector('[autofocus]') || ov.querySelector('.tg-go'); if (f) try { f.focus(); } catch(e) {} }, 60);
   return ov;
 }
-function setupWizClose() { var ov = document.getElementById('setupWiz'); if (ov) ov.remove(); }
+var _setupDeviceGoOn = null;   // v39.02 — the device page's "go on", for whatever closes it
+function setupWizClose() {
+  var ov = document.getElementById('setupWiz'); if (ov) ov.remove();
+  document.documentElement.classList.remove('setup-first');
+  if (_setupDeviceGoOn) { var go = _setupDeviceGoOn; _setupDeviceGoOn = null; go(); }
+}
 // v38.97 — Tony: "How could I test the entire connection wizard on test?" The owner walks every page here, as a new
 // person meets them, and nothing is created, sent or recorded: the welcome, the account (Create my account just goes
 // on), this device (the computer's page with a stand-in link where this copy has none), the kitchen rules, the tour.
@@ -8424,6 +8429,11 @@ window.setupPreview = setupPreview;
 // device's page after signing in.
 function setupForced() { try { return /[?&]setup=1(&|$)/.test(location.search) || sessionStorage.getItem('mkn_setup_force') === '1'; } catch(e) { return false; } }
 async function setupWizMaybe() {
+  var shown = false;
+  try { shown = await setupWizMaybeNow(); } finally { if (!shown) document.documentElement.classList.remove('setup-first'); }
+  return shown;
+}
+async function setupWizMaybeNow() {
   if (!setupWizAllowed()) return false;
   var forced = setupForced();
   if (forced) try { sessionStorage.setItem('mkn_setup_force', '1'); } catch(e) {}
@@ -8488,7 +8498,10 @@ async function setupCreate() {
   if (btn) { btn.disabled = true; btn.textContent = SETUP_TEXT.creating; }
   var cred = null;
   try { cred = await emailSignIn('up'); } catch(x) {}
-  if (cred) { setupWizClose(); return cred; }   // signed in: this device's page comes next (setupDeviceStep)
+  // signed in: this device's page comes next (setupDeviceStep). v39.02 — only the account page is closed here: the
+  // sign-in may already have put the device page up meanwhile (it runs while the confirmation e-mail is sent), and
+  // closing that left the sign-in waiting for ever (Tony, 27 Oct: no rules, no kitchen, "Offline mode")
+  if (cred) { var cur = document.getElementById('setupWiz'); if (cur && cur.querySelector('#swForm')) setupWizClose(); return cred; }
   if (btn) { btn.disabled = false; btn.textContent = was; }
   var le = document.getElementById('loginError');
   if (err) err.textContent = (le && le.style.display !== 'none' && le.textContent) || SETUP_TEXT.failed;
@@ -8561,7 +8574,8 @@ function setupDeviceStep(user, opts) {
       }
       setTimeout(promote, 400);
     });
-    next.onclick = function(){ setupWizClose(); resolve(); };
+    _setupDeviceGoOn = resolve;
+    next.onclick = function(){ setupWizClose(); };
   });
 }
 window.setupWizMaybe = setupWizMaybe; window.setupWelcome = setupWelcome; window.setupAccount = setupAccount; window.setupCreate = setupCreate;
@@ -9666,7 +9680,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.01';
+var APP_VERSION = 'v39.02';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -10969,6 +10983,7 @@ body.i18n-harvesting #serviceErrorOverlay, body.i18n-harvesting #emailModalOverl
 @media (max-width: 520px) { :is(#termsGate, #setupWiz) .tg-page { padding: 30px 14px 18px 44px; background-image: linear-gradient(90deg, transparent 32px, rgba(193,68,14,.35) 32px, rgba(193,68,14,.35) 34px, transparent 34px), repeating-linear-gradient(#fdf8ec 0 27px, rgba(70,110,170,.18) 27px 28px); }
   :is(#termsGate, #setupWiz) .tg-title { font-size: 30px; } :is(#termsGate, #setupWiz) .tg-ring { width: 80px; height: 80px; } }
 .secret-mark { font-size: .82em; opacity: .85; }   /* v38.96 — 🔒 on a secret recipe's card */
+html.setup-first #loginScreen > * { visibility: hidden; }   /* v39.02 — a first visit: the welcome, not the old card first */
 /* v38.95 — the first-contact wizard: the same notebook page, a little lower (the rules and the language question go over it) */
 #setupWiz { z-index: 10040; }
 #setupWiz .sw-dots { display: flex; gap: 8px; justify-content: center; margin: 0 0 10px; }
@@ -12812,6 +12827,25 @@ body.banner-shown .header {
      first for the keyboard, ahead of the header it hides. -->
 <!-- LOGIN / STORAGE SCREEN -->
 <div id="offlineBanner" style="display:none;position:fixed;top:0;left:0;right:0;background:#6F6A60;color:white;text-align:center;padding:8px 16px;font-size:13px;font-family:'DM Sans','Heebo',sans-serif;font-weight:500;z-index:1001;">📵 Offline — changes saved locally, will sync when online</div>
+<script>
+  // v39.02 — Tony, 27 Oct: on a first visit the old sign-in card showed for a moment before the welcome came over it.
+  // A browser the welcome is for (setupWizMaybe decides for good, a moment later) hides the card from the first paint;
+  // setupWizClose — or 15 seconds, whatever happens — shows it again.
+  (function () {
+    try {
+      if (window.APP_CONFIG.dataLayout !== 'households' || navigator.webdriver) return;
+      var forced = /[?&]setup=1(&|$)/.test(location.search), used = false;
+      if (!forced) {
+        if (localStorage.getItem('mkn_setup_seen') || localStorage.getItem('tonys_tour_done') || localStorage.getItem('mkn_tester_welcome')
+            || localStorage.getItem('tonys_recipes_v1')) return;
+        for (var i = 0; i < localStorage.length; i++) if (String(localStorage.key(i) || '').indexOf('mkn_terms_ok_') === 0) used = true;
+        if (used) return;
+      }
+      document.documentElement.classList.add('setup-first');
+      setTimeout(function () { document.documentElement.classList.remove('setup-first'); }, 15000);
+    } catch (e) {}
+  })();
+</script>
 <div id="loginScreen">
   <div style="margin-bottom:6px;">
     <svg width="80" height="80" viewBox="0 0 80 80" style="display:block;margin:0 auto;">
@@ -12829,7 +12863,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.01</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.02</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -12917,7 +12951,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.01</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.02</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -30185,8 +30219,11 @@ if ('serviceWorker' in navigator) {
       .catch(function(e) { console.warn('[SW] Registration failed:', e); });
 
     // If the SW controller changes (update applied), reload automatically
-    var refreshing = false;
+    // v39.02 — but not on a first visit: there the service worker taking control for the first time is no update, and
+    // the reload showed a new person the sign-in page and the welcome twice (Tony, 27 Oct: "old, new, old, new")
+    var refreshing = false, hadController = !!navigator.serviceWorker.controller;
     navigator.serviceWorker.addEventListener('controllerchange', function() {
+      if (!hadController) { hadController = true; return; }
       if (!refreshing) { refreshing = true; window.location.reload(); }
     });
   });
@@ -36552,6 +36589,12 @@ function maybeOfferDeviceShortcut(tries) {
   tries = tries || 0;
   try { if (localStorage.getItem(deviceOfferLocalKey())) return false; } catch(e) { return false; }
   if (navigator.webdriver && !window._deviceOfferForce) return false;   // the automated checks run without it
+  // v39.02 — the first-visit wizard offers this itself (its device page): not again, and never over it or the rules
+  if (!window._deviceOfferForce && typeof setupWizRan === 'function' && setupWizRan()) { try { localStorage.setItem(deviceOfferLocalKey(), String(Date.now())); } catch(e) {} return false; }
+  if (!window._deviceOfferForce && document.querySelector('#setupWiz, #termsGate')) {
+    if (tries < 6) setTimeout(function(){ maybeOfferDeviceShortcut(tries + 1); }, 10000);
+    return false;
+  }
   // Never on top of something else: the welcome, the language offer, an import from a shared link.
   if (!window._deviceOfferForce && document.querySelector('#askOverlay, .modal-overlay.open, #deviceOfferOverlay, #tourOverlay')) {
     if (tries < 6) setTimeout(function(){ maybeOfferDeviceShortcut(tries + 1); }, 10000);

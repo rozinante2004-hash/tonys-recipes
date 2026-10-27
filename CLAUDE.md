@@ -1321,6 +1321,15 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
     address (the demo ones), and a browser with recipes opens on them offline, no sign-in screen — by design, no
     welcome. `?setup=1` now brings the sign-in screen back and the welcome over it. The preview's "Get the extension"
     went to the Chrome Web Store's front page only while the test copy had no store links (before v38.99).
+  - **v39.02 — Tony's fresh first visit (site data cleared) went wrong:** (1) the sign-in put the device page up while
+    "Create my account" was still finishing (it sends the confirmation e-mail), and `setupCreate` then closed "the
+    wizard" — the device page — so the sign-in waited for its Next for ever: no rules, no kitchen, "Offline mode". Now
+    `setupCreate` closes only the account page, and `setupWizClose` lets a waiting device page go on (`_setupDeviceGoOn`).
+    (2) The service worker taking control on a first visit reloaded the page (controllerchange) — "old, new, old, new";
+    no reload when there was no controller before. (3) The old sign-in card showed before the welcome: an inline
+    script before #loginScreen marks a browser the welcome is for (`html.setup-first`, card hidden; removed by
+    setupWizClose, by setupWizMaybe deciding no, or after 15 s). (4) The older device offer (maybeOfferDeviceShortcut)
+    popped up over/after the wizard: skipped when the wizard ran, and never over #setupWiz or #termsGate.
   - **The test copy behaves as the beta will (Tony, 27 Oct: "once a build is released to it, it behaves exactly the same
     as the Beta would have"; "Perhaps we should update the database rules and server immediately upon the release to the
     test version"):**
