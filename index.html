@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.02 -->
+<!-- Tony's Recipes Collection v39.03 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -8071,7 +8071,7 @@ async function householdWelcome(user) {
           // v38.69 — a tester invited at another address
           + (user && user.email ? '\n\n' + HH_WELCOME.tester.replace('{1}', function(){ return user.email; }) : ''))
       + (unconfirmed ? '\n\n' + HH_WELCOME.confirm.replace('{1}', function(){ return user.email; }) : ''),
-      choices, { icon: '\u{1F44B}', title: 'Welcome to ' + brand, cancelLabel: '\u{1F44B} Not now \u2014 sign me out', noBackdrop: true });
+      choices, { icon: '\u{1F44B}', title: 'Welcome to ' + brand, cancelLabel: '\u{1F44B} Not now \u2014 sign me out', noBackdrop: true, notebook: true });   // v39.03
     if (v === 'confirm') {
       await resendConfirmation();
       await askConfirm({ icon: '\u{1F4EC}', title: 'Check your inbox',
@@ -8103,7 +8103,7 @@ async function householdWelcome(user) {
     // Their own — named as they like (or, the name box closed, the suggested name).
     var name = v === 'own'
       ? await askPrompt('What shall we call your recipe collection? You can change it any time.', householdDefaultName(user),
-          { icon: '\u{1F3E0}', title: 'Name your kitchen', okLabel: 'Let\u2019s cook! \u{1F373}', cancelLabel: 'Use the suggested name' })
+          { icon: '\u{1F3E0}', title: 'Name your kitchen', okLabel: 'Let\u2019s cook! \u{1F373}', cancelLabel: 'Use the suggested name', notebook: true })   // v39.03
       : null;
     var hid2 = await householdFound(user, (typeof name === 'string' && name.trim()) ? name.trim().slice(0, 60) : householdDefaultName(user));
     _hhJustFounded = true;
@@ -8120,7 +8120,7 @@ function firstRunAfterFounding() {
   if (typeof featureOn === 'function' && featureOn('testerWelcome')) return;
   if (typeof setupWizRan === 'function' && setupWizRan()) { startTour(); return; }   // v38.95 — the wizard's last page: the tour itself
   askConfirm({ icon: '\u{1F9ED}', title: 'Your collection is ready',
-    message: 'A 30-second tour of where everything is?', okLabel: 'Show me', cancelLabel: 'Not now' })
+    message: 'A 30-second tour of where everything is?', okLabel: 'Show me', cancelLabel: 'Not now', notebook: true })
     .then(function(ok){ if (ok === true) startTour(); else { try { localStorage.setItem(TOUR_DONE_KEY, '1'); } catch(e) {} } });
 }
 function firstRunEmptyHtml() {
@@ -8234,6 +8234,7 @@ function startTour() {
   try { if (typeof applyHeaderGeometry === 'function') { _hdrHidden = 0; applyHeaderGeometry(); } } catch(e) {}
   var steps = tourTargets(), i = 0;
   if (!steps.length) return 0;
+  if (typeof legalFonts === 'function') legalFonts();   // v39.03 — its card on the first-visit pages' notebook
   var ov = document.createElement('div');
   ov.id = 'tourOverlay';
   ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-modal', 'true'); ov.setAttribute('aria-label', 'Tour');
@@ -8250,7 +8251,7 @@ function startTour() {
     var below = r.bottom + 170 < vh, w = Math.min(300, vw - 24), left = Math.max(12, Math.min(vw - w - 12, r.left + r.width / 2 - w / 2));
     ov.innerHTML = '<div style="position:fixed;left:' + (r.left - 4) + 'px;top:' + (r.top - 4) + 'px;width:' + (r.width + 8) + 'px;height:' + (r.height + 8)
         + 'px;border:3px solid var(--gold);border-radius:10px;box-shadow:0 0 0 9999px rgba(0,0,0,0.25);pointer-events:none;"></div>'
-      + '<div id="tourCard" style="position:fixed;left:' + left + 'px;' + (below ? 'top:' + (r.bottom + 12) : 'bottom:' + (vh - r.top + 12)) + 'px;width:' + w
+      + '<div id="tourCard" class="nb-page" style="position:fixed;left:' + left + 'px;' + (below ? 'top:' + (r.bottom + 12) : 'bottom:' + (vh - r.top + 12)) + 'px;width:' + w
         + 'px;background:var(--card-bg);color:var(--ink);border-radius:12px;padding:14px 16px;box-shadow:0 8px 28px rgba(0,0,0,0.3);font-family:DM Sans,Heebo,sans-serif;">'
       +   '<div dir="auto" style="font-size:14px;line-height:1.5;margin-bottom:10px;">' + escH(i18nAsk(st.text)) + '</div>'   // v38.90
       +   '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">'
@@ -9151,7 +9152,8 @@ function testerWelcome() {
   var prev = document.getElementById('testerWelcomeOverlay'); if (prev) prev.remove();
   var ov = document.createElement('div');
   ov.id = 'testerWelcomeOverlay'; ov.className = 'modal-overlay open';
-  ov.innerHTML = '<div class="ask-card" role="dialog" aria-modal="true" aria-labelledby="twTitle" style="max-width:520px;text-align:start;">'
+  if (typeof legalFonts === 'function') legalFonts();   // v39.03 — on the first-visit pages' notebook
+  ov.innerHTML = '<div class="ask-card nb-page" role="dialog" aria-modal="true" aria-labelledby="twTitle" style="max-width:520px;text-align:start;">'
     + '<div class="ask-icon" aria-hidden="true">\u{1F44B}</div>'
     + '<div class="ask-title" id="twTitle">Welcome to the My Kitchen Notes beta</div>'
     + '<div class="ask-body" style="text-align:start;">Thank you for trying the app before everyone else — what you tell us shapes what it becomes.</div>'
@@ -9680,7 +9682,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.02';
+var APP_VERSION = 'v39.03';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -10986,6 +10988,39 @@ body.i18n-harvesting #serviceErrorOverlay, body.i18n-harvesting #emailModalOverl
 html.setup-first #loginScreen > * { visibility: hidden; }   /* v39.02 — a first visit: the welcome, not the old card first */
 /* v38.95 — the first-contact wizard: the same notebook page, a little lower (the rules and the language question go over it) */
 #setupWiz { z-index: 10040; }
+/* v39.03 — Tony: "the wizard's font is a bit hard to decipher". The words in a clearer hand (Patrick Hand; Hebrew in
+   the rounded print, as in the rules' text); only the big titles keep the original handwriting. */
+:is(#termsGate, #setupWiz) .tg-hand { font-family: 'Patrick Hand', 'Varela Round', 'Playpen Sans Arabic', 'Comic Sans MS', cursive; }
+:is(#termsGate, #setupWiz) .tg-title { font-family: 'Caveat', 'Playpen Sans Hebrew', 'Playpen Sans Arabic', 'Comic Sans MS', cursive; }
+:is(#termsGate, #setupWiz) .tg-sub { font-size: 19px; line-height: 1.45; }
+:is(#termsGate, #setupWiz) .tg-check, #setupWiz .sw-label, #setupWiz .sw-list, #setupWiz .sw-steps { font-size: 19px; }
+:is(#termsGate, #setupWiz) .tg-also { font-size: 17px; }
+:is(#termsGate, #setupWiz) .tg-go, #setupWiz .sw-next { font-family: 'Patrick Hand', 'Varela Round', 'Playpen Sans Arabic', cursive; font-size: 22px; font-weight: 400; }
+#setupWiz .sw-link { font-size: 19px; }
+/* v39.03 — Tony: the windows after the wizard (the kitchen's welcome, its name, the beta's welcome, the tour) on the
+   same notebook page */
+.ask-card.nb-page, #tourCard.nb-page { position: relative; color: #2f2a26 !important; border-radius: 6px 10px 8px 12px !important;
+  background-color: #fdf8ec !important; background-image: linear-gradient(90deg, transparent 40px, rgba(193,68,14,.35) 40px, rgba(193,68,14,.35) 42px, transparent 42px),
+  repeating-linear-gradient(#fdf8ec 0 27px, rgba(70,110,170,.18) 27px 28px) !important; box-shadow: 0 10px 30px rgba(0,0,0,.3) !important; }
+.ask-card.nb-page { padding: 28px 18px 18px 54px !important; }
+#tourCard.nb-page { padding: 16px 14px 14px 52px !important; }
+.ask-card.nb-page::before { content: ''; position: absolute; top: -6px; left: 50%; width: 110px; height: 24px; margin-left: -55px; background: rgba(240,200,120,.55); transform: rotate(-3deg); }
+.nb-page .ask-title { font-family: 'Caveat', 'Playpen Sans Hebrew', 'Playpen Sans Arabic', cursive; font-size: 30px; font-weight: 700; color: #8a2e0a; line-height: 1.15; }
+.nb-page .ask-body, .nb-page .tw-h, .nb-page .tw-list, .nb-page .ask-opt-hint, .nb-page .ask-input, .nb-page, #tourCard.nb-page div {
+  font-family: 'Patrick Hand', 'Varela Round', 'Playpen Sans Arabic', 'Comic Sans MS', cursive; }
+.nb-page .ask-body, .nb-page .tw-list, #tourCard.nb-page div[dir] { font-size: 18px !important; line-height: 1.45 !important; color: #2f2a26 !important; }
+.nb-page .tw-h { font-size: 19px; color: #8a2e0a; }
+.nb-page .tw-small { font-size: 15px !important; color: #6b5444 !important; }
+.nb-page .ask-input { font-size: 18px; background: #fffdf6; color: #2f2a26; border: 1.5px solid rgba(138,46,10,.45); border-radius: 10px 8px 11px 9px; }
+.nb-page .ask-btn { font-family: 'Patrick Hand', 'Varela Round', 'Playpen Sans Arabic', cursive !important; font-size: 19px !important; border-radius: 22px 18px 24px 16px; }
+.nb-page .ask-btn:not(.ghost) { background: #c1440e !important; color: #fff !important; border: none !important; box-shadow: 0 3px 0 #8a2e0a; }
+.nb-page .ask-btn.ghost { background: transparent !important; color: #a8380a !important; border: 2px solid rgba(193,68,14,.7) !important; }
+#tourCard.nb-page span { color: #6b5444 !important; }
+@media (max-width: 520px) {
+  .ask-card.nb-page, #tourCard.nb-page { background-image: linear-gradient(90deg, transparent 28px, rgba(193,68,14,.35) 28px, rgba(193,68,14,.35) 30px, transparent 30px),
+    repeating-linear-gradient(#fdf8ec 0 27px, rgba(70,110,170,.18) 27px 28px) !important; }
+  .ask-card.nb-page { padding-left: 40px !important; } #tourCard.nb-page { padding-left: 38px !important; }
+}
 #setupWiz .sw-dots { display: flex; gap: 8px; justify-content: center; margin: 0 0 10px; }
 #setupWiz .sw-dots i, #termsGate .sw-dots i { width: 11px; height: 11px; border-radius: 50%; border: 2px solid #c1440e; background: transparent; }
 #termsGate .sw-dots { display: flex; gap: 8px; justify-content: center; margin: 0 0 10px; }
@@ -12863,7 +12898,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.02</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.03</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -12951,7 +12986,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.02</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.03</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -20603,7 +20638,8 @@ function askChoice(message, options, opts) {
     var ov = document.createElement('div');
     ov.id = 'askOverlay'; ov.className = 'modal-overlay';
     ov.style.cssText = 'display:flex;z-index:1300;';
-    ov.innerHTML = '<div class="ask-card">'
+    if (opts.notebook && typeof legalFonts === 'function') legalFonts();   // v39.03 — the first-visit pages' notebook
+    ov.innerHTML = '<div class="ask-card' + (opts.notebook ? ' nb-page' : '') + '">'
       + (opts.backLabel ? '<button type="button" class="ask-back" id="askBack">' + escH(opts.backLabel) + '</button>' : '')   // v38.53
       + (opts.icon ? '<div class="ask-icon">' + escH(opts.icon) + '</div>' : '')
       + (opts.title ? '<div class="ask-title">' + escH(opts.title) + '</div>' : '')
@@ -23573,8 +23609,9 @@ function askConfirm(opts) {
     ov.className = 'modal-overlay';
     ov.style.cssText = 'display:flex;z-index:' + (+opts.z || 1300) + ';';   // v38.38 — opts.z: above the sign-in screen (9999)
     var danger = !!opts.danger;
+    if (opts.notebook && typeof legalFonts === 'function') legalFonts();   // v39.03 — the first-visit pages' notebook
     ov.innerHTML =
-      '<div class="ask-card' + (opts.wide ? ' ask-wide' : '') + '">'
+      '<div class="ask-card' + (opts.wide ? ' ask-wide' : '') + (opts.notebook ? ' nb-page' : '') + '">'
       + (opts.backLabel ? '<button type="button" class="ask-back" id="askBack">' + escH(opts.backLabel) + '</button>' : '')   // v38.53
       + (opts.icon ? '<div class="ask-icon">' + escH(opts.icon) + '</div>' : '')
       + (opts.title ? '<div class="ask-title">' + escH(opts.title) + '</div>' : '')

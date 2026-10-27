@@ -1331,6 +1331,11 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
     script before #loginScreen marks a browser the welcome is for (`html.setup-first`, card hidden; removed by
     setupWizClose, by setupWizMaybe deciding no, or after 15 s). (4) The older device offer (maybeOfferDeviceShortcut)
     popped up over/after the wizard: skipped when the wizard ran, and never over #setupWiz or #termsGate.
+  - **v39.03 (Tony: the windows after the wizard "should match"; "the wizard's font is a bit hard to decipher"):**
+    askChoice/askConfirm take `notebook: true` → `.ask-card.nb-page` (lined paper, margin, tape, Caveat title, Patrick
+    Hand words, notebook buttons): the kitchen's welcome, "Name your kitchen", "Your collection is ready"; the beta's
+    welcome and the tour card always. The wizard and rules: words in Patrick Hand (Hebrew: Varela Round), only the
+    big titles in Caveat. Contrast scans pass in both themes.
   - **The test copy behaves as the beta will (Tony, 27 Oct: "once a build is released to it, it behaves exactly the same
     as the Beta would have"; "Perhaps we should update the database rules and server immediately upon the release to the
     test version"):**
