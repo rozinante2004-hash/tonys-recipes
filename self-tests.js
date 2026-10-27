@@ -9001,6 +9001,10 @@ window.SELF_TESTS = [
       if(!/❌ ntfy: not delivered/.test(t)) throw new Error('ntfy refused: '+t);
       t=testAlertText({ mail:true, mailTo:1, ntfy:false, ntfySet:true, ntfyWhy:'ntfy answered 429: limit reached' }).join('\n');
       if(!/not delivered — ntfy answered 429/.test(t)) throw new Error('ntfy did not say why: '+t);   // v38.98
+      t=testAlertText({ mail:true, mailTo:1, pushoverSet:true, pushover:true, ntfySet:true, ntfy:false }).join('\n');   // v39.00 — Pushover replaces ntfy
+      if(!/✅ Pushover: sent/.test(t) || /ntfy/.test(t)) throw new Error('Pushover: '+t);
+      t=testAlertText({ mail:true, mailTo:1, pushoverSet:true, pushover:false, pushoverWhy:'Pushover answered 400: invalid user' }).join('\n');
+      if(!/❌ Pushover: not delivered — Pushover answered 400/.test(t)) throw new Error('Pushover did not say why: '+t);
       t=testAlertText({ mail:false, mailTo:1, whatsapp:false, whatsappSet:true }).join('\n');
       if(!/❌ E-mail/.test(t) || !/❌ WhatsApp: CallMeBot refused/.test(t)) throw new Error('refused: '+t);
       var realOwner=window.isAppOwner, realUser=window._fbUser, realFetch=window.fetch, realConfirm=window.askConfirm, sent=null;

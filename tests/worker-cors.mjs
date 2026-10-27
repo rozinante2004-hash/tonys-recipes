@@ -1536,6 +1536,26 @@ console.log('\nAI per household (v60):');
     finally { Date.now = realNowWa; }
     expect('v93: …and the shared address\'s quota says what it is (v94: a paid plan, not a free token)', /answered 429: limit reached: daily message quota reached/.test(ta.ntfyWhy || '')
       && /paid ntfy plan/.test(ta.ntfyWhy) && !/"code"/.test(ta.ntfyWhy), JSON.stringify(ta));
+    // v95 — Pushover, when its two secrets are set: it rings instead of ntfy; addresses masked; a refusal says why
+    const pposts = [];
+    const envPo = Object.assign({}, envAlert, { NTFY_TOPIC: 'Kitchen-test-123', PUSHOVER_TOKEN: 'aTok123', PUSHOVER_USER: 'uKey456',
+      __fetch: async (url, init) => { pposts.push({ u: String(url), b: String(init.body) }); return new Response('{"status":1}', { status: 200 }); } });
+    Date.now = () => realNowWa() + 960e3;
+    try { ta = await (await worker.fetch(post({ action: 'meter-admin', op: 'alert-test', idToken: comOwner, device: 'dev-DDDD4444' }, TEST_ORIGIN), envPo)).json(); }
+    finally { Date.now = realNowWa; }
+    const pb = pposts[0] ? new URLSearchParams(pposts[0].b) : null;
+    expect('v95: with Pushover set, the test alert rings there (its key, the user key, a title), not in ntfy', ta.pushover === true && ta.pushoverSet === true
+      && pposts.length === 1 && pposts[0].u === 'https://api.pushover.net/1/messages.json' && pb.get('token') === 'aTok123' && pb.get('user') === 'uKey456'
+      && /test alert/i.test(pb.get('title')), JSON.stringify([ta, pposts]));
+    pposts.length = 0;
+    await worker.fetch(post({ action: 'meter-admin', op: 'list', idToken: comOwner, device: 'dev-JJJJ1111' }, TEST_ORIGIN), envPo);
+    expect('v95: …an owner alert too, with no e-mail address in it', pposts.length === 1 && !/@/.test(decodeURIComponent(pposts[0].b)), JSON.stringify(pposts));
+    Date.now = () => realNowWa() + 1080e3;
+    try { ta = await (await worker.fetch(post({ action: 'meter-admin', op: 'alert-test', idToken: comOwner, device: 'dev-DDDD4444' }, TEST_ORIGIN),
+      Object.assign({}, envPo, { __fetch: async () => new Response('{"user":"invalid","errors":["user identifier is not a valid user, group, or subscribed user key"],"status":0}', { status: 400 }) }))).json(); }
+    finally { Date.now = realNowWa; }
+    expect('v95: …and a refusal says why, never the keys', ta.pushover === false && /Pushover answered 400: user identifier is not a valid/.test(ta.pushoverWhy || '')
+      && /PUSHOVER_USER/.test(ta.pushoverWhy) && !/uKey456|aTok123/.test(ta.pushoverWhy), JSON.stringify(ta));
     // v85 — each kind of alert on WhatsApp, or not: all on by default, e-mail never affected.
     let ap = await (await worker.fetch(post({ action: 'meter-admin', op: 'alert-prefs', idToken: comOwner, device: 'dev-DDDD4444' }, TEST_ORIGIN), envWa)).json();
     expect('v85: eight kinds of alert, all on WhatsApp by default', ap.ok === true && ap.kinds.length === 8 && ap.kinds.every(k => k.on === true) && ap.whatsappSet === true

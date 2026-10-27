@@ -1,4 +1,8 @@
-// Tony's Recipes — Cloudflare Worker v94
+// Tony's Recipes — Cloudflare Worker v95
+// v95: THE PHONE ALERTS THROUGH PUSHOVER (Tony, 27 Oct 2026: "If it's a one time purchase of approx 5$, then I will go
+// with Pushover" — ntfy.sh counts this server's messages by Cloudflare's shared address, whose daily quota others use
+// up). With PUSHOVER_TOKEN (the application's key) and PUSHOVER_USER (Tony's user key): the alert's title and first
+// line, addresses masked, to his phone; then ntfy is not used. The test alert says whether it went, and why not.
 // v94: the 429 hint corrected — with NTFY_TOKEN set (a free account) ntfy.sh still answered "daily message quota
 // reached" (Tony, 27 Oct): a free account is still counted by the sending address; only a paid plan has its own.
 // v93: NTFY WITH ITS OWN ALLOWANCE (Tony, 27 Oct 2026: "ntfy answered 429 … daily message quota reached"). ntfy.sh counts
@@ -421,7 +425,7 @@
 //   AI_MAX_TOKENS   – the longest answer one call may ask for (32000; the
 //                     app's largest, reading several recipes at once, asks 8000).
 
-const WORKER_VERSION = 'v94';
+const WORKER_VERSION = 'v95';
 const VIDEO_MAX_MB_DEFAULT = 50;
 const GEMINI_API = 'https://generativelanguage.googleapis.com';
 const GEMINI_MODEL_DEFAULT = 'gemini-2.5-flash';
@@ -1992,13 +1996,14 @@ async function whatsappOff(env) {
 }
 async function alertPrefsAnswer(env) {
   const off = await whatsappOff(env);
-  return { ok: true, whatsappSet: !!(env.WHATSAPP_PHONE && env.WHATSAPP_KEY), ntfySet: !!env.NTFY_TOPIC, kinds: ALERT_KINDS.map(([key, label]) => ({ key, label, on: off[key] !== true })) };
+  return { ok: true, whatsappSet: !!(env.WHATSAPP_PHONE && env.WHATSAPP_KEY), ntfySet: !!env.NTFY_TOPIC, pushoverSet: pushoverSet(env), kinds: ALERT_KINDS.map(([key, label]) => ({ key, label, on: off[key] !== true })) };
 }
 async function ownerAlert(env, subject, text, opts) {
   const kindOff = opts && opts.kind ? (await whatsappOff(env))[opts.kind] === true : false;   // v85
   const quiet = (opts && opts.whatsapp === false) || kindOff;
   const wa = quiet ? false : await ownerWhatsApp(env, subject, text);   // v84
-  const nt = quiet ? false : await ownerNtfy(env, subject, text);        // v91
+  // v95 — the phone: Pushover when it is set up, else ntfy (v91)
+  const nt = quiet ? false : (pushoverSet(env) ? await ownerPushover(env, subject, text) : await ownerNtfy(env, subject, text));
   // v75 — every address in ALERT_TO (comma-separated): with a spare owner key, each owner hears what the
   // other did, so whoever controls one mailbox cannot hide the other account's actions.
   const tos = Array.from(new Set(String(env.ALERT_TO || '').split(',').map(x => x.trim()).filter(x => /^[^\s@<>]+@[^\s@<>]+$/.test(x))));
@@ -2013,6 +2018,30 @@ async function ownerAlert(env, subject, text, opts) {
     try { await env.ALERTS.send(new EmailMessage(from, to, raw)); sent++; } catch (e) {}   // one refused address must not stop the others
   }
   return sent > 0 || wa || nt;
+}
+// v95 — Pushover (https://pushover.net): a form POST with the application's key and Tony's user key, both secrets,
+// never logged. What goes: the alert's title and first line, every e-mail address masked; the rest stays in the e-mail.
+const PUSHOVER_URL = 'https://api.pushover.net/1/messages.json';
+let _pushoverWhy = '';
+function pushoverSet(env) { return !!(String(env.PUSHOVER_TOKEN || '').trim() && String(env.PUSHOVER_USER || '').trim()); }
+async function ownerPushover(env, subject, text) {
+  _pushoverWhy = '';
+  const token = String(env.PUSHOVER_TOKEN || '').trim(), user = String(env.PUSHOVER_USER || '').trim();
+  if (!token || !user) { _pushoverWhy = 'the GitHub secrets PUSHOVER_TOKEN and PUSHOVER_USER are not both set'; return false; }
+  const mask = (v) => String(v || '').replace(/[^\s@<>()"',;]+@[^\s@<>()"',;]+\.[A-Za-z]{2,}/g, '[e-mail]');
+  const title = mask(String(subject || '').replace(/^My Kitchen Notes: /, '')).slice(0, 120) || 'My Kitchen Notes';
+  const first = mask(String(text || '').split('\n').filter(Boolean)[0] || '').slice(0, 600);
+  const body = new URLSearchParams({ token, user, title, message: (first ? first + '\n' : '') + '(the details are in your e-mail)' });
+  try {
+    const r = await (env.__fetch || fetch)(PUSHOVER_URL, { method: 'POST', body, signal: AbortSignal.timeout(10000) });
+    if (r.ok) return true;
+    let said = '';
+    try { const j = await r.json(); said = (Array.isArray(j.errors) ? j.errors.join('; ') : '') || ''; } catch (e) {}
+    said = said.split(token).join('[key]').split(user).join('[key]').replace(/\s+/g, ' ').slice(0, 160);
+    _pushoverWhy = 'Pushover answered ' + r.status + (said ? ': ' + said : '')
+      + (r.status === 400 && /token|user/i.test(said) ? ' — check the GitHub secrets PUSHOVER_TOKEN (the application\'s key) and PUSHOVER_USER (your user key)' : '');
+    return false;
+  } catch (e) { _pushoverWhy = 'Pushover could not be reached (' + String((e && e.message) || e).slice(0, 80) + ')'; return false; }
 }
 // v91 — and to the owner's phone through ntfy (Tony, 25 Oct 2026: CallMeBot never answered; he chose ntfy). A POST to
 // his private topic on ntfy.sh — the secret NTFY_TOPIC, set from the GitHub secret of that name; the topic name is the
@@ -2275,14 +2304,18 @@ async function meterAction(request, env, body) {
     if (Date.now() - _alertTestAt < 60e3) return jsonResp({ error: 'ALERTS: a test was sent less than a minute ago.' }, 429);
     _alertTestAt = Date.now();
     const wa = await ownerWhatsApp(env, 'A test alert', 'If you can read this, the server can reach you here. Sent from the app at ' + ilTime(Date.now()) + ' (Israel time).');
-    const nt = await ownerNtfy(env, 'A test alert', 'If you can read this, the server can reach you in ntfy. Sent at ' + ilTime(Date.now()) + ' (Israel time).');   // v91
-    const ntWhy = nt ? '' : _ntfyWhy;   // v92
+    // v95 — Pushover when set up, else ntfy (v91)
+    const po = pushoverSet(env);
+    const nt = po ? await ownerPushover(env, 'A test alert', 'If you can read this, the server can reach your phone. Sent at ' + ilTime(Date.now()) + ' (Israel time).')
+                  : await ownerNtfy(env, 'A test alert', 'If you can read this, the server can reach you in ntfy. Sent at ' + ilTime(Date.now()) + ' (Israel time).');
+    const ntWhy = nt ? '' : (po ? _pushoverWhy : _ntfyWhy);   // v92
     const mailTo = String(env.ALERT_TO || '').split(',').filter(x => /@/.test(x)).length;
     let mailed = false;
     if (env.ALERTS && mailTo) mailed = await ownerAlert(env, 'My Kitchen Notes: a test alert',
       'If you can read this, the server can reach you by e-mail. Sent from the app at ' + ilTime(Date.now()) + ' (Israel time).'
-      + (env.NTFY_TOPIC ? '\n\nntfy (the phone): ' + (nt ? 'sent.' : 'NOT delivered — ' + ntWhy + '.') : ''), { whatsapp: false });
-    return jsonResp({ ok: true, whatsapp: wa, whatsappSet: !!(env.WHATSAPP_PHONE && env.WHATSAPP_KEY), ntfy: nt, ntfySet: !!env.NTFY_TOPIC, ntfyToken: !!env.NTFY_TOKEN, ntfyWhy: ntWhy, mail: mailed, mailTo });
+      + (po || env.NTFY_TOPIC ? '\n\n' + (po ? 'Pushover' : 'ntfy') + ' (the phone): ' + (nt ? 'sent.' : 'NOT delivered — ' + ntWhy + '.') : ''), { whatsapp: false });
+    return jsonResp({ ok: true, whatsapp: wa, whatsappSet: !!(env.WHATSAPP_PHONE && env.WHATSAPP_KEY), ntfy: po ? undefined : nt, ntfySet: po ? undefined : !!env.NTFY_TOPIC, ntfyToken: !!env.NTFY_TOKEN, ntfyWhy: po ? undefined : ntWhy,
+      pushover: po ? nt : undefined, pushoverSet: po, pushoverWhy: po ? ntWhy : undefined, mail: mailed, mailTo });
   }
   if (body.op === 'allowances') {
     return jsonResp({ ok: true, usage: await usageSnapshot(env), notices: await serverNotices(env, { owner: true }), watch: !!env.USAGE_KEY,
@@ -3662,4 +3695,4 @@ export default {
   }
 };
 
-// ── END OF WORKER v94 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
+// ── END OF WORKER v95 ── If this is the last line in the Cloudflare editor, the whole file was pasted.

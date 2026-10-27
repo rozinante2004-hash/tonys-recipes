@@ -1310,6 +1310,13 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
     **It did not help:** still 429 "daily message quota reached" — a free ntfy account is still counted by the sending
     address (only a paid plan has its own allowance). Worker v94 corrects the hint. E-mail alerts work (Tony: "I got the
     email"). Offered: Telegram bot (free; TELEGRAM_BOT_TOKEN), Pushover (~$5 once), or a paid ntfy plan — his choice.
+  - **Pushover chosen (Tony, 27 Oct: "If it's a one time purchase of approx 5$, then I will go with Pushover").** Worker
+    v95 (deployed from `test`): with PUSHOVER_TOKEN (the application's API token) and PUSHOVER_USER (Tony's user key) —
+    GitHub secrets, passed by deploy-worker.yml — the phone alerts go to https://api.pushover.net/1/messages.json
+    (title + first line, addresses masked) and ntfy is not used; the test alert says sent / not delivered — why.
+    v39.00 (waits for the yes with v38.94–99): the test-alert window and 📲 Phone alerts say Pushover; Privacy
+    Statement 1.10 lists "Pushover (Pushover, LLC)" where 1.9 had ntfy. Tony's part: the app, an account, an
+    application, the two secrets.
   - **The test copy behaves as the beta will (Tony, 27 Oct: "once a build is released to it, it behaves exactly the same
     as the Beta would have"; "Perhaps we should update the database rules and server immediately upon the release to the
     test version"):**
