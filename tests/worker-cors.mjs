@@ -1534,8 +1534,8 @@ console.log('\nAI per household (v60):');
     try { ta = await (await worker.fetch(post({ action: 'meter-admin', op: 'alert-test', idToken: comOwner, device: 'dev-DDDD4444' }, TEST_ORIGIN),
       Object.assign({}, envNt, { __fetch: async () => new Response('{"code":42908,"http":429,"error":"limit reached: daily message quota reached; increase your limits with a paid plan, see https://ntfy.sh","link":"https://ntfy.sh/docs/publish/#limitations"}', { status: 429 }) }))).json(); }
     finally { Date.now = realNowWa; }
-    expect('v93: …and without one, the shared address\'s quota says to add one', /answered 429: limit reached: daily message quota reached/.test(ta.ntfyWhy || '')
-      && /NTFY_TOKEN/.test(ta.ntfyWhy) && !/"code"/.test(ta.ntfyWhy), JSON.stringify(ta));
+    expect('v93: …and the shared address\'s quota says what it is (v94: a paid plan, not a free token)', /answered 429: limit reached: daily message quota reached/.test(ta.ntfyWhy || '')
+      && /paid ntfy plan/.test(ta.ntfyWhy) && !/"code"/.test(ta.ntfyWhy), JSON.stringify(ta));
     // v85 — each kind of alert on WhatsApp, or not: all on by default, e-mail never affected.
     let ap = await (await worker.fetch(post({ action: 'meter-admin', op: 'alert-prefs', idToken: comOwner, device: 'dev-DDDD4444' }, TEST_ORIGIN), envWa)).json();
     expect('v85: eight kinds of alert, all on WhatsApp by default', ap.ok === true && ap.kinds.length === 8 && ap.kinds.every(k => k.on === true) && ap.whatsappSet === true

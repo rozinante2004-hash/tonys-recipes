@@ -1,4 +1,6 @@
-// Tony's Recipes — Cloudflare Worker v93
+// Tony's Recipes — Cloudflare Worker v94
+// v94: the 429 hint corrected — with NTFY_TOKEN set (a free account) ntfy.sh still answered "daily message quota
+// reached" (Tony, 27 Oct): a free account is still counted by the sending address; only a paid plan has its own.
 // v93: NTFY WITH ITS OWN ALLOWANCE (Tony, 27 Oct 2026: "ntfy answered 429 … daily message quota reached"). ntfy.sh counts
 // an anonymous sender's messages by its address, and a Worker sends from Cloudflare's, shared with everyone else's — so
 // the day's allowance was gone before ours was sent. With the secret NTFY_TOKEN (an access token of a free ntfy.sh
@@ -419,7 +421,7 @@
 //   AI_MAX_TOKENS   – the longest answer one call may ask for (32000; the
 //                     app's largest, reading several recipes at once, asks 8000).
 
-const WORKER_VERSION = 'v93';
+const WORKER_VERSION = 'v94';
 const VIDEO_MAX_MB_DEFAULT = 50;
 const GEMINI_API = 'https://generativelanguage.googleapis.com';
 const GEMINI_MODEL_DEFAULT = 'gemini-2.5-flash';
@@ -2050,8 +2052,8 @@ async function ownerNtfy(env, subject, text) {
       said = said.split(topic).join('[topic]').split(tok || '\u0000').join('[token]').replace(/\s+/g, ' ').slice(0, 160);
     } catch (e) {}
     _ntfyWhy = 'ntfy answered ' + r.status + (said ? ': ' + said : '')
-      + (r.status === 429 && !tok ? ' — ntfy.sh counts messages by the sending address, which this server shares with many others; '
-         + 'a free ntfy account\'s access token in the GitHub secret NTFY_TOKEN gives it an allowance of its own' : '')
+      + (r.status === 429 ? ' — ntfy.sh counts messages by the sending address, which this server shares with many others '
+         + '(a free account too); only a paid ntfy plan has an allowance of its own' : '')
       + (r.status === 401 || r.status === 403 ? ' — check the access token in the GitHub secret NTFY_TOKEN' : '');
     return false;
   } catch (e) { _ntfyWhy = 'ntfy could not be reached (' + String((e && e.message) || e).slice(0, 80) + ')'; return false; }
@@ -3660,4 +3662,4 @@ export default {
   }
 };
 
-// ── END OF WORKER v93 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
+// ── END OF WORKER v94 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
