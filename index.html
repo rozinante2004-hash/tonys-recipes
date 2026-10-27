@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v38.98 -->
+<!-- Tony's Recipes Collection v38.99 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -7581,7 +7581,9 @@ async function householdWipe(hid, onStep) {
   var kinds = ['recipes', 'photos', 'secretRecipes', 'secretPhotos', 'chats', 'state'];   // v38.96 — 🔒 the secret ones too
   for (var k = 0; k < kinds.length; k++) {
     if (onStep) onStep(k, 'Deleting the ' + kinds[k] + '…');
-    var snap = await hhRef(hid).collection(kinds[k]).get(), refs = [];
+    var snap, refs = [];
+    try { snap = await hhRef(hid).collection(kinds[k]).get(); }
+    catch (e) { if (/^secret/.test(kinds[k]) && e && e.code === 'permission-denied') continue; throw e; }   // v38.99 — rules not yet there
     snap.forEach(function(d){ refs.push(d.ref); });
     await inBatches(refs);
   }
@@ -9657,7 +9659,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v38.98';
+var APP_VERSION = 'v38.99';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -12820,7 +12822,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.98</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.99</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -12908,7 +12910,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.98</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.99</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -16463,7 +16465,8 @@ var I18N_EXTRA = [
   // v38.90 — the welcome's paragraphs and the tour's steps (each drawn inside dir="auto", translated by i18nAsk)
   Object.keys(HH_WELCOME).map(function(k){ return HH_WELCOME[k]; }), TOUR_STEPS.map(function(st){ return st.text; }),
   setupPhrases(), ['\u{1F9ED} Show me around', 'I’ll look around by myself'],   // v38.95 — the wizard
-  ['Secret — linked kitchens do not see it']);   // v38.96   // v38.18 — 📝 the end-of-beta question   // v38.17 — ✨ What can this app do, ✉️ Contact us
+  ['Secret — linked kitchens do not see it',
+   '🔒 Secret recipes are not switched on for this copy yet — the {1} you marked stay as they were (linked kitchens still see them) until they are.']);   // v38.96, v38.99   // v38.18 — 📝 the end-of-beta question   // v38.17 — ✨ What can this app do, ✉️ Contact us
 function i18nRegisterExtra() {
   // v38.90 — the recipe badge says its words one by one (i18nPhrase), and RECIPE_RANKS comes after I18N_EXTRA
   ['recipe', 'recipes', 'next', 'Recipes in this collection', '{1} more for {2}', 'The highest rank there is.', 'Close']
@@ -27155,6 +27158,7 @@ async function saveRecipeDoc(r, db, again) {
   // recipes. The local copy is brought into line after a successful write.
   var stamped = stampedAt;
   var refused = false;
+  try {
   await db.runTransaction(async function(tx) {
     var snap = await tx.get(ref);
     var other = otherExists ? await tx.get(otherRef) : null;
@@ -27171,6 +27175,13 @@ async function saveRecipeDoc(r, db, again) {
     if (other && other.exists && (wantSecret || moving)) tx.delete(otherRef);
     if (ph && ph.exists) { tx.set(herePhoto, ph.data()); tx.delete(otherPhoto); }
   });
+  } catch (e) {
+    // v38.99 — a copy whose rules do not have the secret collections yet (they are published with the release — Tony,
+    // 27 Oct, on the test copy: "PERMISSION: The cloud write was denied"): nothing moved, so it is NOT secret yet; said
+    // so, and the other recipes go on saving
+    if (wantSecret && e && e.code === 'permission-denied') { secretNote(sid, false); return { id: r.id, skipped: 'secret-not-ready' }; }
+    throw e;
+  }
   if (madeSecretElsewhere) {
     r.secret = true;
     secretNote(sid, true); _secretLives[sid] = true;
@@ -27225,7 +27236,8 @@ async function writeCloudMeta(list, nextIdVal, db) {
     var ids  = {}, secret = {};
     (cur.ids || []).forEach(function(i){ ids[i] = true; });
     (scur.ids || []).forEach(function(i){ ids[i] = true; secret[String(i)] = true; });
-    list.forEach(function(r){ ids[r.id] = true; if (hh && r.secret) secret[String(r.id)] = true; else delete secret[String(r.id)]; });
+    // (a recipe marked but not moved — its save refused — is still where linked households read: listed there)
+    list.forEach(function(r){ ids[r.id] = true; if (hh && r.secret && _secretLives[String(r.id)] !== false) secret[String(r.id)] = true; else delete secret[String(r.id)]; });
     Object.keys(_pendingCloudDeletes).forEach(function(i){ delete ids[i]; delete ids[parseInt(i,10)]; });
     // v38.71 — ids this device found listed without a document (deleted long ago) leave the index
     if (_cloudLayout === 'households') (cloudSyncMark().absent || []).forEach(function(i){
@@ -27267,8 +27279,8 @@ async function flushCloudDeletes(db) {
       // v38.96 — and wherever else it may be (marked 🔒 on another device): a deleted recipe must not come back
       if (_cloudLayout === 'households') {
         var hb = 'households/' + _cloudHid + '/', inSecret = !!_secretIds[String(id)];
-        await db.collection(hb + (inSecret ? 'recipes' : 'secretRecipes')).doc(String(id)).delete();
-        await db.collection(hb + (inSecret ? 'photos' : 'secretPhotos')).doc(String(id)).delete();
+        try { await db.collection(hb + (inSecret ? 'recipes' : 'secretRecipes')).doc(String(id)).delete(); } catch(e2) {}   // v38.99 — refused
+        try { await db.collection(hb + (inSecret ? 'photos' : 'secretPhotos')).doc(String(id)).delete(); } catch(e2) {}   //   where rules lag
         secretNote(id, false); delete _secretLives[String(id)];
       }
     } catch(e) {
@@ -27723,7 +27735,7 @@ async function saveToFirestore() {
 
     // 1) 5.4 — one document per changed recipe. Only what actually changed is
     //    written, so favouriting one recipe no longer re-uploads all of them.
-    var conflicts = [], oversized = [];
+    var conflicts = [], oversized = [], secretWaiting = 0;
     // Test fixtures are filtered out HERE, at the one place recipes leave the
     // device, rather than trusting every test to finish its cleanup before the
     // next sync fires. See isTestFixture.
@@ -27736,8 +27748,13 @@ async function saveToFirestore() {
       // saveRecipeDoc logs the refusal itself; this level owns the UI state.
       if (res.skipped === 'conflict') { conflicts.push(dr); _conflictCount++; markRecipeConflicted(dr.id); }
       else if (res.skipped === 'too-big') oversized.push((dr.name || ('#' + dr.id)) + ' — ' + Math.round(res.bytes / 1024) + ' KB');
+      else if (res.skipped === 'secret-not-ready') secretWaiting++;   // v38.99
     }
 
+    if (secretWaiting && !window._secretWaitTold) {   // v38.99 — once a session
+      window._secretWaitTold = true;
+      toast(i18nPhrase('🔒 Secret recipes are not switched on for this copy yet — the {1} you marked stay as they were (linked kitchens still see them) until they are.').replace('{1}', String(secretWaiting)), 9000);
+    }
     // 2) Deletions the user actually made, and the membership/nextId document
     var delRes = await flushCloudDeletes();
     // 5.9 — record the stamp we just wrote, so our own save doesn't force the

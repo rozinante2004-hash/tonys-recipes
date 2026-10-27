@@ -8867,6 +8867,7 @@ window.SELF_TESTS = [
       var F={ collection:function(c){ return { doc:function(id){ return mk(c+'/'+id); } }; },
         runTransaction:async function(fn){ var ops=[]; var tx={ get:function(r){ return r.get(); }, set:function(r,v){ ops.push(function(){ return r.set(v); }); }, delete:function(r){ ops.push(function(){ return r.delete(); }); } };
           var out=await fn(tx); for(var i=0;i<ops.length;i++) await ops[i](); return out; } };
+      var cloudWas=_cloudSnapshotForTest();
       var keep={ layout:_cloudLayout, hid:_cloudHid, ids:JSON.stringify(_secretIds), lives:JSON.stringify(_secretLives), base:JSON.stringify(_cloudRecipeBase), del:JSON.stringify(_pendingCloudDeletes) };
       var H='households/hS/';
       try{
@@ -8895,10 +8896,25 @@ window.SELF_TESTS = [
         var r2={ id:503, name:'Grandma', updatedAt:16, ingredients:[], steps:[] };
         res=await saveRecipeDoc(r2, F);
         if(docs[H+'recipes/503'] || r2.secret!==true || res.skipped!=='conflict') throw new Error('written back where linked kitchens read: '+JSON.stringify(res));
+        // v38.99 — a copy whose rules lack the secret places: nothing breaks, nothing moves, nothing is called secret
+        var deny=function(path){ if(/secret(Recipes|Photos)\//.test(path)){ var e=new Error('Missing or insufficient permissions.'); e.code='permission-denied'; throw e; } };
+        var mk2=function(path){ return { path:path, get:async function(){ deny(path); return { exists:Object.prototype.hasOwnProperty.call(docs,path), data:function(){ return docs[path]; } }; },
+          set:async function(v){ deny(path); docs[path]=JSON.parse(JSON.stringify(v)); }, delete:async function(){ deny(path); delete docs[path]; } }; };
+        var F2={ collection:function(c){ return { doc:function(id){ return mk2(c+'/'+id); } }; }, runTransaction:F.runTransaction };
+        docs[H+'recipes/504']={ r:'{}', updatedAt:5 }; _cloudRecipeBase[504]=5; _secretLives['504']=false;
+        var r4={ id:504, name:'Not yet', secret:true, updatedAt:9, ingredients:[], steps:[] };
+        res=await saveRecipeDoc(r4, F2);
+        if(res.skipped!=='secret-not-ready' || !docs[H+'recipes/504'] || _secretIds['504']) throw new Error('refused rules: '+JSON.stringify(res));
+        await writeCloudMeta([r4], 600, F2);
+        if((docs[H+'state/meta'].ids||[]).indexOf(504)===-1) throw new Error('a recipe not moved was taken out of the index');
+        _pendingCloudDeletes={ '505':true }; docs[H+'recipes/505']={ r:'{}' };
+        var dres=await flushCloudDeletes(F2);
+        if(dres.denied.length || docs[H+'recipes/505']) throw new Error('a deletion was refused for the secret place: '+JSON.stringify(dres));
       } finally {
         _cloudLayout=keep.layout; _cloudHid=keep.hid; _secretIds=JSON.parse(keep.ids); _secretLives=JSON.parse(keep.lives);
         _cloudRecipeBase=JSON.parse(keep.base); _pendingCloudDeletes=JSON.parse(keep.del);
-        [501,502,503].forEach(function(i){ delete _cloudRecipeStamp[i]; delete _cloudRecipeIds[i]; try{ clearRecipeConflict(i); }catch(e){} });
+        [501,502,503,504,505].forEach(function(i){ delete _cloudRecipeStamp[i]; delete _cloudRecipeIds[i]; try{ clearRecipeConflict(i); }catch(e){} });
+        _cloudRestoreForTest(cloudWas);
       }
     } },
 

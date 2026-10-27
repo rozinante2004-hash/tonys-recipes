@@ -1295,6 +1295,12 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
   - **v38.98 (waits for the yes with v38.94–97):** the test alert window shows ntfy's reason; `?setup=1` in the address
     shows the wizard on a browser already used, and its device page after signing in (a browser keeps one private
     session for all its private windows until the last one closes — why Tony's "fresh" private window skipped it).
+  - **v38.99:** Tony signed in on the test copy and got "PERMISSION: The cloud write was denied" — a recipe ticked 🔒 there
+    was saved into `secretRecipes`, which the test project's rules do not have yet (rules publish only from `main`, to all
+    three projects at once — not done ahead of his yes). A refused secret save now returns `secret-not-ready`: nothing
+    moves, it stays listed in `state/meta` (`_secretLives` false), the other recipes go on saving, and a toast once a
+    session says it is not secret yet. The extra deletions in the secret places and `householdWipe`'s secret kinds
+    swallow a refusal.
 - **Photo keys, 23 Oct:** Pexels: "New API key issuance is currently paused and cannot be requested" (Tony); Unsplash:
   "We can forego unsplash for now" (Tony). Photos stay Pixabay + Wikimedia Commons; the workflow is ready if a key
   ever comes (secrets PEXELS_API_KEY / UNSPLASH_ACCESS_KEY, then dispatch Deploy the Worker).
