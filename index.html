@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.00 -->
+<!-- Tony's Recipes Collection v39.01 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -8436,7 +8436,10 @@ async function setupWizMaybe() {
   for (var i = 0; i < 40 && !window._fbAuthSettled; i++) await new Promise(function(r){ setTimeout(r, 250); });   // who is signed in
   for (var j = 0; j < 240 && document.getElementById('askOverlay'); j++) await new Promise(function(r){ setTimeout(r, 250); });
   var ls = document.getElementById('loginScreen');
-  if (fbSignedInUser() || !ls || getComputedStyle(ls).display === 'none' || document.getElementById('setupWiz')) return false;
+  if (fbSignedInUser() || !ls || document.getElementById('setupWiz')) return false;
+  // v39.01 — a browser holding recipes of its own opens on them, offline, with no sign-in screen (Tony, 27 Oct: a
+  // "fresh" private window still had the demo recipes): ?setup=1 brings the sign-in screen back, and the welcome over it
+  if (getComputedStyle(ls).display === 'none') { if (!forced) return false; ls.style.display = 'flex'; }
   setupWelcome();
   return true;
 }
@@ -9663,7 +9666,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.00';
+var APP_VERSION = 'v39.01';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -12826,7 +12829,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.00</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.01</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -12914,7 +12917,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.00</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.01</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
