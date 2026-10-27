@@ -8831,6 +8831,30 @@ window.SELF_TESTS = [
       if(!/⚠️ my-kitchen-notes-beta: 36,000 of 50,000 \(72%\)/.test(lines) || !/✓ tonys-recipes-test: 120 of 50,000 \(0%\)/.test(lines)) throw new Error('the page: '+lines);
     } },
 
+  { id:'linked_photo_redrawn_meanwhile', group:'Core', name:'🤝 A linked kitchen\u2019s photo reaches its card even when the list was drawn again while it was on its way, a failed read is tried again, and 🔄 Reload sits beside 💬 Chat (v38.94)',
+    test: async()=>{
+      if(String(renderLinkedInAll).indexOf('linkedReload(')===-1) throw new Error('no 🔄 Reload beside a linked kitchen');
+      var realRef=window.hhRef, realCache=_linkCache['hPH'], calls=0, pend=[], fail=false, box=document.createElement('div');
+      var GIF='data:image/gif;base64,R0lGODlhAQABAAAAACw=';
+      var card=function(rid){ var d=document.createElement('div'); d.setAttribute('data-hid','hPH'); d.setAttribute('data-lph',rid);
+        d.innerHTML='<div class="card-image"><span class="linked-emoji">🍲</span></div>'; box.appendChild(d); return d; };
+      try{
+        document.body.appendChild(box);
+        _linkCache['hPH']={ at:0, list:[], photos:{} };
+        window.hhRef=function(){ return { collection:function(){ return { doc:function(){ return { get:function(){ calls++;
+          return new Promise(function(ok, no){ pend.push(function(){ if(fail) no(new Error('offline')); else ok({ exists:true, data:function(){ return { photo:GIF }; } }); }); }); } }; } }; } }; };
+        var el1=card('7'), p1=linkedPhotoLoad(el1);
+        el1.remove(); var el2=card('7'), p2=linkedPhotoLoad(el2);        // drawn again before the photo came
+        pend.splice(0).forEach(function(f){ f(); }); await p1; await p2;
+        if(calls!==1) throw new Error('read '+calls+' times for one photo');
+        if(!el2.querySelector('img') || el2.querySelector('.linked-emoji')) throw new Error('the card on the page has no photo');
+        fail=true; var el3=card('8'), p3=linkedPhotoLoad(el3); pend.splice(0).forEach(function(f){ f(); }); await p3;
+        if(el3.querySelector('img')) throw new Error('a failed read showed a photo');
+        fail=false; var p4=linkedPhotoLoad(el3); pend.splice(0).forEach(function(f){ f(); }); await p4;
+        if(calls!==3 || !el3.querySelector('img')) throw new Error('a failed read was not tried again ('+calls+' reads)');
+      } finally { window.hhRef=realRef; box.remove(); if(realCache) _linkCache['hPH']=realCache; else delete _linkCache['hPH']; }
+    } },
+
   { id:'owner_test_alert', group:'Core', name:'📲 The owner can send a test alert, and is told what reached them — e-mail, ntfy, and WhatsApp only when its secrets are set (v38.64, Worker v84; v38.93 ntfy)',
     test: async()=>{
       if(!document.querySelector('[onclick*="openWhatsAppAlerts()"][data-owner-only]')) throw new Error('no owner-only "WhatsApp alerts"');

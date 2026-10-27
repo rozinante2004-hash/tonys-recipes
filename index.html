@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v38.93 -->
+<!-- Tony's Recipes Collection v38.94 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -6864,6 +6864,7 @@ function renderLinkedInAll(q) {
     sec.className = 'linked-all'; sec.setAttribute('data-hid', l.hid);
     sec.innerHTML = '<div class="linked-all-head"><b>\u{1F91D} <bdi data-no-i18n>' + escH(hhLinkName(l)) + '</bdi></b>'
       + '<span>their recipes — read-only, linked with your kitchen</span>'
+      + '<button type="button" class="linked-chat-btn" title="Read this kitchen\u2019s recipes and photos again" onclick="linkedReload(' + jsA(l.hid) + ')">\u{1F504} Reload</button>'   // v38.94
       + '<button type="button" class="linked-chat-btn" onclick="openKitchenChats(' + jsA(l.hid) + ')">\u{1F4AC} Chat</button></div><div class="linked-all-cards"></div>';   // v38.50
     box.appendChild(sec);
     linkedCardsInto(sec.querySelector('.linked-all-cards'), list, c, l.hid, true, hhLinkName(l));
@@ -6883,25 +6884,50 @@ function linkedPhotosObserve(box) {
   }, { rootMargin: '400px' });
   Array.prototype.forEach.call(cards, function(el){ _linkedPhotoIO.observe(el); });
 }
+// v38.94 — one read per photo, shared by every card drawn meanwhile. Right after signing in the list is drawn again
+// while the first photos are on their way: the photo went into the card that was gone, and the new card, told it had
+// been asked for, stayed without (the top of the list, with emojis — Tony, 27 Oct). It now goes into every card of that
+// recipe on the page when it arrives, and a read that failed is tried again the next time the card shows.
 async function linkedPhotoLoad(el) {
   var hid = el.getAttribute('data-hid'), rid = el.getAttribute('data-lph'), c = _linkCache[hid];
   if (!c || !rid) return;
   c.photoAsk = c.photoAsk || {};
-  if (!c.photos[rid] && !c.photoAsk[rid]) {
-    c.photoAsk[rid] = true;
-    try {
-      var s = await hhRef(hid).collection('photos').doc(rid).get();
+  if (!c.photos[rid]) {
+    var ask = c.photoAsk[rid];
+    if (!ask || typeof ask.then !== 'function') ask = c.photoAsk[rid] = hhRef(hid).collection('photos').doc(rid).get().then(function(s) {
       var pd = s.exists ? (s.data() || {}) : {};
       if (pd.photo || pd.photoUrl) c.photos[rid] = pd.photo || pd.photoUrl;
-    } catch(e) {}
+    }, function() { if (c.photoAsk && c.photoAsk[rid] === ask) delete c.photoAsk[rid]; });
+    await ask;
   }
-  var src = c.photos[rid], holder = el.querySelector('.card-image, .recipe-list-thumb');
-  if (!src || !holder || holder.querySelector('img')) return;
-  var em = holder.querySelector('.linked-emoji'); if (em) em.remove();   // (the photo goes in first: under the badges)
-  var img = document.createElement('img'); img.src = src; img.alt = ''; img.decoding = 'async';
-  holder.insertBefore(img, holder.firstChild);
-  el.removeAttribute('data-lph');
+  var src = c.photos[rid];
+  if (!src) return;
+  var els = Array.prototype.filter.call(document.querySelectorAll('[data-lph]'), function(x) {
+    return x.getAttribute('data-hid') === hid && x.getAttribute('data-lph') === rid; });
+  if (els.indexOf(el) === -1) els.push(el);
+  els.forEach(function(x) {
+    var holder = x.querySelector('.card-image, .recipe-list-thumb');
+    if (!holder || holder.querySelector('img')) return;
+    var em = holder.querySelector('.linked-emoji'); if (em) em.remove();   // (the photo goes in first: under the badges)
+    var img = document.createElement('img'); img.src = src; img.alt = ''; img.decoding = 'async';
+    holder.insertBefore(img, holder.firstChild);
+    x.removeAttribute('data-lph');
+  });
 }
+// v38.94 — 🔄 Reload beside 💬 Chat (Tony, 27 Oct): a linked kitchen's recipes and photos read again from the start —
+// what this device kept of it is forgotten, so the next answer is the whole kitchen.
+function linkedReload(h) {
+  var c = _linkCache[h];
+  if (c) { c.photos = {}; c.photoAsk = {}; }
+  linkedForget(h);
+  var l = hhLinks().filter(function(x){ return x.hid === h; })[0];
+  try { syncLog('load', 'A linked kitchen read again (Reload)', { name: l ? hhLinkName(l) : '' }); } catch(e) {}
+  toast('\u{1F504} Reading their recipes again…', 3000);   // (no kitchen name: it would be filed as a phrase to translate)
+  if (_live.recipes && _live.recipes[h]) { try { _live.recipes[h](); } catch(e) {} delete _live.recipes[h]; }
+  if (_household && _live.hid && _live.hid === _household.hid) linkLiveRecipes();
+  else hhFetchLinkedNow(h, c || (_linkCache[h] = { at: 0, list: [], photos: {} }));
+}
+window.linkedReload = linkedReload;
 window.renderLinkedInAll = renderLinkedInAll; window.linkedInAllOn = linkedInAllOn; window.linkedPhotoLoad = linkedPhotoLoad;
 function linkedLinesHtml(r) {
   var parts = isCollection(r) ? recipeParts(r) : [r];
@@ -9374,7 +9400,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v38.93';
+var APP_VERSION = 'v38.94';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -12516,7 +12542,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.93</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.94</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -12604,7 +12630,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.93</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.94</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -31512,6 +31538,7 @@ var HELP_SYSTEM_PROMPT = [
   "- Once linked, each household sees the other's recipes, read-only — and live: a change in their kitchen shows in yours within seconds, the changed card glowing for a moment: after its own in the main list, under that household's name, on a faint blue (hover one: 'A recipe from …'). 🏠 Kitchens ▾ in the filter bar chooses whose recipes show — tick one, several or all. 📥 Save a copy to my recipes makes one your own. Links do not chain: a third household linked to theirs is not seen. Links are listed, and removed, in ⚙️ → 🏠 My household → 👥 Family Access. ⚙️ → 🏠 My household → 🤝 Link requests through the app: blocked stops requests by identifier; requests by e-mail always arrive.",
   "- 📬 LINK REQUESTS: ⚙️ → 🏠 My household → 📬 Link requests — the number in brackets beside it is how many wait for an answer. Every request in one place: Waiting (Accept / Reject / 🚫 Block), Sent by your household (Withdraw), Linked now (Revoke access), and earlier answers. A request may carry a note, and the two households can write to each other there — the latest message shows, highlighted, with ↩ Reply; earlier ones are under 💬 Conversation. Only the household's name is shown, never a person's. Reject is for now: if they ask again — by identifier or by e-mail — their request is back under Waiting. 🚫 Block is for good, until you Unblock it under the earlier answers; they are never told, and on their side it reads “waiting”. A new message or request arrives while the app is open: a red dot (and a short notice with Open) within seconds, no reload needed. A red dot on ⚙️ leads to anything new. The switch there decides whether other households may ask through the app at all.",
   "- 👪 CHAT WITH FAMILY MEMBERS (the people in YOUR household only): ⋯ More → 👪 Chat with family members — or 💬 Chat beside a person in 👥 Family Access (someone added by address who has not signed in yet says ⏳ hasn’t signed in yet: their 💬 Chat comes once they do). 📣 Everyone in <your kitchen> is the room for announcements: everyone in the household reads it. Or choose one person: only the two of you read that conversation. Everyone in the household can write, readers too. Messages arrive live: a short notice with Open, and a red dot on ⋯ More until you have read them. Nothing is changed or deleted afterwards; deleting the household deletes them.",
+  "- 🔄 RELOAD A LINKED KITCHEN: beside a linked kitchen's name in your recipe list, 🔄 Reload reads its recipes and photos again from the start — for when something looks missing or out of date.",
   "- 💬 CHATS WITH LINKED KITCHENS: ⋯ More → 💬 Chats with linked kitchens — or 💬 Chat beside a linked kitchen's name in your recipe list, or in 👥 Family Access. Every conversation, newest first, with what is new; open one to read it all and write (Enter sends, Shift+Enter starts a new line). The same conversations are also on 📬 Link requests. A red dot on ⋯ More and on ⚙️ says something new arrived.",
   "- ♿ ACCESSIBILITY: ⚙️ → ♿ Accessibility, on this device: 🎨 Colours for red–green colour blindness (the most common colour blindness, where reds and greens look alike, brownish): wherever a colour says something, green becomes blue and red becomes a deep orange — all right / a problem, the sync dot, Easy and Hard, the Self Test's results, delete buttons — and a notification dot turns blue inside its ring; and the recipe photos are colour-corrected, so a red tomato and a green pepper no longer look alike (they look a little different to everyone else). For the whole phone, an iPhone has its own: Settings → Accessibility → Display & Text Size → Color Filters → Red/Green Filter; Android: Settings → Accessibility → Color correction. 🟡 A yellow ring round the notification dots (on unless turned off) so a new message or request catches the eye, on ⋯ More and in ⚙️. 🌗 Theme: light, dark, or as the device. 🔔 the sound when something arrives, and 🎵 which sound.",
   "- 👉 NOTICES THAT TAKE YOU THERE: a notice at the bottom of the screen with a › at its end is a button — tap or click it (or Enter) to go where it points: a new message opens its chat; a kitchen linked or accepted shows only that kitchen's recipes; a recipe saved, imported, copied, translated or added opens it; a note from a tester opens 👑 → 📊 Households → 💬 Feedback; someone asking to add recipes, or joining, opens 👥 Family Access; a link request sent opens 📬 Link requests; a backup opens 💾 Backups; a failed sync or the AI allowance opens Sync Health; an error opens the log. The place it leads to is marked with a yellow ring for a moment. Such a notice stays up at least 6 seconds; a notice about what is already on the screen has no › and goes nowhere. On a notice with a button (Open, ↩︎ Undo, Back up now) the button does its own thing — tapping the words of an Undo notice never undoes.",
