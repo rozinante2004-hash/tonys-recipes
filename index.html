@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.03 -->
+<!-- Tony's Recipes Collection v39.04 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -5570,7 +5570,7 @@ async function linkReqFromUrl() {
   if (u.emailVerified === false) {
     var go = await askConfirm({ icon: '\u{1F4EC}', title: 'Confirm your e-mail address first',
       message: 'A request to link kitchens was sent to ' + u.email + '. It shows here once that address is confirmed — open the link in the e-mail we send you, then open this app again.',
-      okLabel: '\u{1F4E8} Send the confirmation e-mail', cancelLabel: 'Not now' });
+      okLabel: '\u{1F4E8} Send the confirmation e-mail', cancelLabel: 'Not now', notebook: true });   // v39.04 — on the notebook page
     if (go === true && typeof resendConfirmation === 'function') await resendConfirmation();
     return 'unconfirmed';
   }
@@ -9682,7 +9682,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.03';
+var APP_VERSION = 'v39.04';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -12898,7 +12898,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.03</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.04</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -12986,7 +12986,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.03</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.04</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -27763,7 +27763,7 @@ function handleFirestoreSaveError(err) {
     if (window._fbUser && window._fbUser.emailVerified === false) {
       askConfirm({ icon: '\u2709\ufe0f', title: 'Please confirm your e-mail address first',
         message: 'The family\u2019s recipes open for ' + window._fbUser.email + ' once it is confirmed from the e-mail we sent (look in spam too). '
-          + 'Your change is safe on this device and goes up once it is.', okLabel: 'Send the e-mail again', cancelLabel: 'Later' })
+          + 'Your change is safe on this device and goes up once it is.', okLabel: 'Send the e-mail again', cancelLabel: 'Later', notebook: true })   // v39.04
         .then(function(ok){ if (ok === true) resendConfirmation(); });
       return;
     }
@@ -28588,12 +28588,13 @@ function emailVerifyNudge(user) {
   var quiet = 0, tries = 0;
   (function whenQuiet() {
     if (++tries > 120) return;
-    quiet = (document.getElementById('askOverlay') || document.getElementById('tourOverlay')) ? 0 : quiet + 1;
+    // v39.04 — nor over the first-visit pages: the wizard, the rules, the beta's welcome
+    quiet = document.querySelector('#askOverlay, #tourOverlay, #setupWiz, #termsGate, #testerWelcomeOverlay') ? 0 : quiet + 1;
     if (quiet < 3) { setTimeout(whenQuiet, 1000); return; }
     askConfirm({ icon: '✉️', title: 'Please confirm your e-mail address',
       message: 'We have not yet confirmed that ' + user.email + ' is yours. Until you do, places kept for that address '
         + '(and a family list that names it) cannot open for you. Invitation links work either way.',
-      okLabel: 'Send the confirmation e-mail', cancelLabel: 'Later' })
+      okLabel: 'Send the confirmation e-mail', cancelLabel: 'Later', notebook: true })   // v39.04 — Tony: in the wizard's style
       .then(function(ok){ if (ok === true) user.sendEmailVerification({ url: continueUrl() })
         .then(function(){ toast('✉️ Sent to ' + user.email + ' — open it, then come back and reload the app.', 9000); })
         .catch(function(e){ toast('❌ ' + authErrorText(e), 8000); }); });

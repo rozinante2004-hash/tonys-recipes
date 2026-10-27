@@ -1337,6 +1337,10 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
     Hand words, notebook buttons): the kitchen's welcome, "Name your kitchen", "Your collection is ready"; the beta's
     welcome and the tour card always. The wizard and rules: words in Patrick Hand (Hebrew: Varela Round), only the
     big titles in Caveat. Contrast scans pass in both themes.
+  - **v39.04:** the three "confirm your e-mail address" windows on the notebook page too (Tony: "still in the old style");
+    the first-visit nudge waits until the wizard, the rules and the beta's welcome are closed.
+  - **Tony, 27 Oct: "Once you fix it, please release it to family and beta"** — the yes for v38.94–v39.04 (with the
+    secret recipes' rules for the family's and the beta's projects).
   - **The test copy behaves as the beta will (Tony, 27 Oct: "once a build is released to it, it behaves exactly the same
     as the Beta would have"; "Perhaps we should update the database rules and server immediately upon the release to the
     test version"):**
