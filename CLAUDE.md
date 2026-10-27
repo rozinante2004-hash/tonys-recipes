@@ -1264,6 +1264,18 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
     (`setupDeviceUsedBefore`: tour, tester welcome or rules agreed here); never in an automated browser
     (`navigator.webdriver`, unless `_setupWizTest`). Phrases in `SETUP_TEXT` (I18N_EXTRA). The kitchen's name is
     still asked in its own window after the rules.
+  - **v38.96 (waits for Tony's yes; the rules publish with that release): 🔒 secret recipes** (Tony, 25 Oct). Real
+    secrecy by place, not by a field: `households/<hid>/secretRecipes` and `…/secretPhotos`, which firestore.rules let
+    only members read (no `linkedReader`); their ids in `state/secretIndex` (state is members-only apart from meta), never
+    in `state/meta`. Why not a `secret` field and a query filter: the emulator let an unfiltered list through a
+    `get('secret', false)` rule (it cannot be trusted to judge it as production does), and the field route needs a
+    backfill and composite indexes. App: `cloudDocPath` routes `recipe_`/`photo_` by `_secretIds`; whole reads
+    (`cloudRange`) and the incremental read take both collections (a refused secret read = none, so a copy whose rules are
+    not yet released keeps syncing); `writeCloudMeta` splits the ids in one transaction; `saveRecipeDoc` moves a marked
+    or unmarked recipe and its photo in its own transaction (`_secretLives`), and an ordinary save of a recipe another
+    device made secret is saved as secret instead (never written back where linked kitchens read); a deletion clears both
+    places; `householdWipe` includes them. Editor: "🔒 Secret — only your own kitchen sees it" (`f-secret`); 🔒 on the
+    card. Rules tests (household suite) and Self Test `secret_recipes_kept_apart`.
 - **Photo keys, 23 Oct:** Pexels: "New API key issuance is currently paused and cannot be requested" (Tony); Unsplash:
   "We can forego unsplash for now" (Tony). Photos stay Pixabay + Wikimedia Commons; the workflow is ready if a key
   ever comes (secrets PEXELS_API_KEY / UNSPLASH_ACCESS_KEY, then dispatch Deploy the Worker).

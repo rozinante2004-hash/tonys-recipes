@@ -232,6 +232,9 @@ await check('…people reading in two of them', (async () => {
   await setDoc(doc(ivy, 'households/L2/recipes/1'), { name: 'Ivy\'s soup' });
   await setDoc(doc(ivy, 'households/L2/photos/1'), { photo: 'data:' });
   await setDoc(doc(gina, 'households/L1/recipes/7'), { name: 'Gina\'s cake' });
+  await setDoc(doc(ivy, 'households/L2/secretRecipes/3'), { name: 'Ivy\'s secret sauce' });   // v38.96
+  await setDoc(doc(ivy, 'households/L2/secretPhotos/3'), { photo: 'data:' });
+  await setDoc(doc(ivy, 'households/L2/state/secretIndex'), { ids: [3] });
 })(), true);
 const byCode = (from, to, by, extra) => Object.assign({ from, fromName: 'Coded', fromCode: { L1: 'MKN-GGGG-2222', L2: 'MKN-HHHH-3333', L3: 'MKN-KKKK-4444' }[from],
   to, via: 'code', by, at: 1 }, extra || {});
@@ -316,6 +319,16 @@ await check('…nor the household itself',                     getDoc(doc(hank, 
 await check('…reads its index of recipes (state/meta, v38.65)', getDoc(doc(hank, 'households/L2/state/meta')), true);
 await check('…nor any other state',                          getDoc(doc(hank, 'households/L2/state/settings')), false);
 await check('…nor writes the index',                         setDoc(doc(hank, 'households/L2/state/meta'), { ids: [1] }), false);
+// v38.96 — 🔒 secret recipes: the household's own, never a linked household's
+await check('🔒 hank cannot read L2\'s secret recipe',          getDoc(doc(hank, 'households/L2/secretRecipes/3')), false);
+await check('…nor list them',                                getDocs(collection(hank, 'households/L2/secretRecipes')), false);
+await check('…nor its photo',                                getDoc(doc(hank, 'households/L2/secretPhotos/3')), false);
+await check('…nor the secret index',                         getDoc(doc(hank, 'households/L2/state/secretIndex')), false);
+await check('…nor write one',                                setDoc(doc(hank, 'households/L2/secretRecipes/4'), { name: 'X' }), false);
+await check('jo, in L2, reads the secrets of her own kitchen', Promise.all([getDoc(doc(jo, 'households/L2/secretRecipes/3')),
+  getDocs(collection(jo, 'households/L2/secretRecipes')), getDoc(doc(jo, 'households/L2/state/secretIndex'))]), true);
+await check('…but, a viewer, writes none',                   setDoc(doc(jo, 'households/L2/secretRecipes/3'), { name: 'Y' }), false);
+await check('ivy, its owner, deletes one',                   deleteDoc(doc(ivy, 'households/L2/secretPhotos/3')), true);
 await check('jo, in L2, reads L1\'s recipes too', (async () => { await setDoc(doc(jo, 'homes/jo'), { hid: 'L2', at: 1 });
   await getDoc(doc(jo, 'households/L1/recipes/7')); })(), true);
 await check('a household not linked reads nothing', (async () => { await setDoc(doc(kim, 'homes/kim'), { hid: 'L3', at: 1 });

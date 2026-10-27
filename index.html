@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v38.95 -->
+<!-- Tony's Recipes Collection v38.96 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -7577,7 +7577,7 @@ async function householdWipe(hid, onStep) {
       await b.commit(); n += Math.min(400, refs.length - i);
     }
   }
-  var kinds = ['recipes', 'photos', 'chats', 'state'];
+  var kinds = ['recipes', 'photos', 'secretRecipes', 'secretPhotos', 'chats', 'state'];   // v38.96 — 🔒 the secret ones too
   for (var k = 0; k < kinds.length; k++) {
     if (onStep) onStep(k, 'Deleting the ' + kinds[k] + '…');
     var snap = await hhRef(hid).collection(kinds[k]).get(), refs = [];
@@ -9611,7 +9611,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v38.95';
+var APP_VERSION = 'v38.96';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -10913,6 +10913,7 @@ body.i18n-harvesting #serviceErrorOverlay, body.i18n-harvesting #emailModalOverl
 :is(#termsGate, #setupWiz) .tg-splash { position: absolute; left: 8px; bottom: 60px; width: 120px; height: 96px; pointer-events: none; }
 @media (max-width: 520px) { :is(#termsGate, #setupWiz) .tg-page { padding: 30px 14px 18px 44px; background-image: linear-gradient(90deg, transparent 32px, rgba(193,68,14,.35) 32px, rgba(193,68,14,.35) 34px, transparent 34px), repeating-linear-gradient(#fdf8ec 0 27px, rgba(70,110,170,.18) 27px 28px); }
   :is(#termsGate, #setupWiz) .tg-title { font-size: 30px; } :is(#termsGate, #setupWiz) .tg-ring { width: 80px; height: 80px; } }
+.secret-mark { font-size: .82em; opacity: .85; }   /* v38.96 — 🔒 on a secret recipe's card */
 /* v38.95 — the first-contact wizard: the same notebook page, a little lower (the rules and the language question go over it) */
 #setupWiz { z-index: 10040; }
 #setupWiz .sw-dots { display: flex; gap: 8px; justify-content: center; margin: 0 0 10px; }
@@ -12773,7 +12774,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.95</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.96</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -12861,7 +12862,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.95</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.96</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -13314,6 +13315,13 @@ body.banner-shown .header {
         <label style="font-size:13px;font-weight:500;color:var(--ink);cursor:pointer;display:flex;align-items:center;gap:8px;">
           <input type="checkbox" id="f-isclip" style="width:16px;height:16px;cursor:pointer;accent-color:var(--terracotta);">
           🎥 This is a video clip (no written recipe)
+        </label>
+      </div>
+      <!-- v38.96 — Tony: "the option to mark a recipe as Secret, i.e. invisible to shared kitchens" -->
+      <div class="form-group" id="f-secret-row" style="display:flex;align-items:center;gap:10px;padding:4px 0;">
+        <label style="font-size:13px;font-weight:500;color:var(--ink);cursor:pointer;display:flex;align-items:center;gap:8px;">
+          <input type="checkbox" id="f-secret" style="width:16px;height:16px;cursor:pointer;accent-color:var(--terracotta);">
+          🔒 Secret — only your own kitchen sees it, not the kitchens you link with
         </label>
       </div>
       <!-- v38.87 — floats at the bottom of the editor, as ✕ does at its top (Tony: "will save me the need to scroll
@@ -16406,7 +16414,8 @@ var I18N_EXTRA = [
 ].concat(appFeaturePhrases(), contactPhrases(), surveyPhrases(),
   // v38.90 — the welcome's paragraphs and the tour's steps (each drawn inside dir="auto", translated by i18nAsk)
   Object.keys(HH_WELCOME).map(function(k){ return HH_WELCOME[k]; }), TOUR_STEPS.map(function(st){ return st.text; }),
-  setupPhrases(), ['\u{1F9ED} Show me around', 'I’ll look around by myself']);   // v38.95 — the wizard   // v38.18 — 📝 the end-of-beta question   // v38.17 — ✨ What can this app do, ✉️ Contact us
+  setupPhrases(), ['\u{1F9ED} Show me around', 'I’ll look around by myself'],   // v38.95 — the wizard
+  ['Secret — linked kitchens do not see it']);   // v38.96   // v38.18 — 📝 the end-of-beta question   // v38.17 — ✨ What can this app do, ✉️ Contact us
 function i18nRegisterExtra() {
   // v38.90 — the recipe badge says its words one by one (i18nPhrase), and RECIPE_RANKS comes after I18N_EXTRA
   ['recipe', 'recipes', 'next', 'Recipes in this collection', '{1} more for {2}', 'The highest rank there is.', 'Close']
@@ -19703,7 +19712,7 @@ function renderGrid() {
           ${listBadgesHtml(r, !!r.photo)}
         </div>
         <div class="recipe-list-info">
-          <div class="recipe-list-name" dir="auto"><button type="button" class="card-open">${escH(r.name)}</button>${r.cookCount>=3?` <span title="${escA(T('Cooked ' + r.cookCount + ' times'))}" style="font-size:12px;">🔥</span>`:''}</div>
+          <div class="recipe-list-name" dir="auto"><button type="button" class="card-open">${escH(r.name)}</button>${r.secret?` <span class="secret-mark" title="${escA(T('Secret — linked kitchens do not see it'))}">🔒</span>`:''}${r.cookCount>=3?` <span title="${escA(T('Cooked ' + r.cookCount + ' times'))}" style="font-size:12px;">🔥</span>`:''}</div>
           <div class="recipe-list-meta">
             <span>${escH(T(r.category))}</span>
             ${metaVal(r.prep) ? `<bdi>⏱ ${escH(r.prep)}</bdi>` : ''}
@@ -19727,7 +19736,7 @@ function renderGrid() {
           ${gridBadgesHtml(r)}
         </div>
         <div class="card-body">
-          <div class="card-title" dir="auto"><button type="button" class="card-open">${escH(r.name)}</button></div>
+          <div class="card-title" dir="auto"><button type="button" class="card-open">${escH(r.name)}</button>${r.secret?` <span class="secret-mark" title="${escA(T('Secret — linked kitchens do not see it'))}">🔒</span>`:''}</div>
           <div class="card-meta">${[metaVal(r.prep) ? `<bdi>⏱ ${escH(r.prep)}</bdi>` : '',
             !metaVal(r.servings) ? '' : servingsIsYield(r.servings) ? `<bdi>${escH(r.servings)}</bdi>` : `<bdi><span>${escH(r.servings)}</span> ${escH(T('srv'))}</bdi>`]
             .filter(Boolean).join('<div class="card-meta-dot"></div>')}</div>
@@ -22221,6 +22230,9 @@ function openAddModal(id){
   // Auto-set isClip if recipe has no ingredients and no steps
   var autoClip = r ? (!r.ingredients||!r.ingredients.length) && (!r.steps||!r.steps.length||r.steps[0]==='Enjoy!') : false;
   if(document.getElementById('f-isclip'))document.getElementById('f-isclip').checked=r?(r.isClip||autoClip):false;
+  // v38.96 — 🔒 only where kitchens link (the household layout)
+  if(document.getElementById('f-secret')){ document.getElementById('f-secret').checked=!!(r&&r.secret);
+    document.getElementById('f-secret-row').style.display=(_cloudLayout==='households')?'flex':'none'; }
   applyEditWide();          // v36.30 — honour the remembered width before it is seen
   document.getElementById('editOverlay').classList.add('open');
   _editFormSnapshot = editFormState(); // remember the pristine state (see editFormIsDirty)
@@ -22348,6 +22360,7 @@ async function saveRecipe(){
     diets: getSelectedDiets(),
     notes: (document.getElementById('f-notes')||{value:''}).value.trim(),
     isClip: !!(document.getElementById('f-isclip')||{}).checked,
+    secret: _cloudLayout === 'households' && !!(document.getElementById('f-secret')||{}).checked,   // v38.96
     difficulty:document.getElementById('f-diff').value,
     prep:document.getElementById('f-prep').value||'\u2014',
     servings:document.getElementById('f-srv').value||'\u2014',
@@ -26336,6 +26349,29 @@ window.photoDeletesRefused = function(){ return Object.keys(_photoDeleteRefused)
 // is one setting rather than forty edits (firestore.rules, HOUSEHOLDS part).
 var _cloudLayout = (window.APP_CONFIG.dataLayout === 'households') ? 'households' : 'shared';
 var _cloudHid = null;          // the household in use, in the household layout
+// ─── v38.96 — 🔒 SECRET RECIPES (Tony, 25 Oct: "the option to mark a recipe as Secret, i.e. invisible to shared kitchens") ──
+// Kept apart: households/<hid>/secretRecipes and …/secretPhotos, which firestore.rules let only the household itself
+// read — a linked household cannot ask for them in any way, so nothing has to be trusted to hide them. Their ids are
+// in state/secretIndex (the household's own), never in state/meta (which linked households read). `_secretIds`: which
+// recipe documents are in secretRecipes (cloudDocPath routes by it); `_secretLives`: where each one was last read or
+// written, so a recipe marked or unmarked is moved — in the same transaction as its save.
+var _secretIds = {}, _secretLives = {};
+function secretNote(id, on) { id = String(id); if (on) _secretIds[id] = true; else delete _secretIds[id]; }
+function idsUnion(a, b) {
+  var seen = {}, out = [];
+  (a || []).concat(b || []).forEach(function(i){ var k = String(i); if (k && !seen[k]) { seen[k] = 1; out.push(/^\d+$/.test(k) ? parseInt(k, 10) : i); } });
+  return out;
+}
+async function readSecretIndex(db) {
+  if (_cloudLayout !== 'households' || !_cloudHid) return [];
+  try {
+    var s = await cloudDoc('secretIndex', db).get(); countCloudRead();
+    var ids = s.exists && Array.isArray((s.data() || {}).ids) ? s.data().ids : [];
+    ids.forEach(function(i){ secretNote(i, true); });
+    return ids;
+  } catch(e) { return []; }
+}
+window.secretNote = secretNote; window.idsUnion = idsUnion;
 function cloudLayout() { return _cloudLayout; }
 function cloudDocPath(name, layout, hid) {
   name = String(name);
@@ -26348,8 +26384,9 @@ function cloudDocPath(name, layout, hid) {
   if (layout !== 'households') return ['shared', name];
   if (!hid) throw new Error('No household is selected yet');
   var base = 'households/' + hid + '/';
-  if (name.indexOf('recipe_') === 0) return [base + 'recipes', name.slice(7)];
-  if (name.indexOf('photo_') === 0)  return [base + 'photos', name.slice(6)];
+  // v38.96 — 🔒 a secret recipe, and its photo, live where only the household reads (secretRecipes, secretPhotos)
+  if (name.indexOf('recipe_') === 0) return [base + (_secretIds[name.slice(7)] ? 'secretRecipes' : 'recipes'), name.slice(7)];
+  if (name.indexOf('photo_') === 0)  return [base + (_secretIds[name.slice(6)] ? 'secretPhotos' : 'photos'), name.slice(6)];
   if (name.indexOf('chat') === 0)    return [base + 'chats', name];
   return [base + 'state', name];
 }
@@ -26370,6 +26407,18 @@ async function cloudRange(lo, hi, db) {
   } else if (lo === 'recipe_' || lo === 'photo_') {
     q = await db.collection(cloudDocPath(lo + '0')[0]).get();
     q.forEach(function(d){ out.push({ id: lo + d.id, d: d.data() }); });
+    // v38.96 — and the household's secret ones; a recipe found in both (a move cut short) counts once, the newer
+    // (refused — the rules of a copy not yet released — is read as none: an ordinary kitchen goes on syncing)
+    var q2 = { forEach: function(){} }, at = {};
+    try { q2 = await db.collection('households/' + _cloudHid + '/' + (lo === 'recipe_' ? 'secretRecipes' : 'secretPhotos')).get(); } catch(e) {}
+    out.forEach(function(o, i){ at[o.id] = i; });
+    q2.forEach(function(d){
+      var x = Object.assign({}, d.data() || {}, { _secret: true }), k = lo + d.id;
+      if (lo === 'recipe_') { secretNote(d.id, true); _secretLives[String(d.id)] = true; }
+      if (at[k] === undefined) { at[k] = out.length; out.push({ id: k, d: x }); }
+      else if ((x.updatedAt || 0) >= ((out[at[k]].d || {}).updatedAt || 0)) out[at[k]] = { id: k, d: x };
+    });
+    if (lo === 'recipe_') q.forEach(function(d){ if (!_secretIds[String(d.id)]) _secretLives[String(d.id)] = false; });
   } else {
     q = await db.collection(cloudDocPath(lo)[0]).where(fp, '>=', lo).where(fp, '<', hi).get();
     q.forEach(function(d){ out.push({ id: d.id, d: d.data() }); });
@@ -27022,9 +27071,24 @@ window.PHOTO_DOC_LO = PHOTO_DOC_LO; window.PHOTO_DOC_HI = PHOTO_DOC_HI;
 
 // Write one recipe's document, refusing a stale-base write.
 // Returns {id, ok} | {id, skipped:'conflict'} | {id, skipped:'too-big', bytes}
-async function saveRecipeDoc(r, db) {
+async function saveRecipeDoc(r, db, again) {
   db = db || _fbDb;
+  // v38.96 — 🔒 where it goes: a secret recipe to the household's own collection. Marked or unmarked since it was last
+  // there, it moves — the old document (and its photo) go in the same transaction, so a linked household never sees
+  // the recipe in two places, nor a secret one left behind.
+  var hh = _cloudLayout === 'households' && _cloudHid, sid = String(r.id), wantSecret = !!(hh && r.secret);
+  if (hh) secretNote(sid, wantSecret);
   var ref  = cloudDoc(recipeDocId(r.id), db);
+  var hb = hh ? 'households/' + _cloudHid + '/' : '';
+  // the other place: always looked at for a secret recipe (nothing may stay readable), and for an ordinary one that was
+  // secret — or that another device may have made secret meanwhile (then it is saved as secret, see below)
+  var otherRef = hh ? db.collection(hb + (wantSecret ? 'recipes' : 'secretRecipes')).doc(sid) : null;
+  var moving = hh && (wantSecret ? _secretLives[sid] !== true : _secretLives[sid] === true);
+  var otherPhoto = moving ? db.collection(hb + (wantSecret ? 'photos' : 'secretPhotos')).doc(sid) : null;
+  var herePhoto = moving ? db.collection(hb + (wantSecret ? 'secretPhotos' : 'photos')).doc(sid) : null;
+  var madeSecretElsewhere = false, otherExists = false;
+  // looked at outside the transaction first (a refusal — rules not yet released — is read as "not there")
+  if (otherRef) { try { otherExists = (await otherRef.get()).exists; } catch(e) { otherExists = false; } }
   var base = _cloudRecipeBase[r.id];
   // Decide the version FIRST and serialise with it, so the stored change-stamp
   // describes exactly the recipe we will hold afterwards. Serialising before
@@ -27045,12 +27109,27 @@ async function saveRecipeDoc(r, db) {
   var refused = false;
   await db.runTransaction(async function(tx) {
     var snap = await tx.get(ref);
+    var other = otherExists ? await tx.get(otherRef) : null;
+    var ph = otherPhoto ? await tx.get(otherPhoto) : null;
+    madeSecretElsewhere = false;
+    // v38.96 — an ordinary save, while another device made it secret: it is not written back where linked households read
+    if (!wantSecret && other && other.exists && _secretLives[sid] !== true && !again) { madeSecretElsewhere = true; return; }
     var cloudAt = snap.exists ? ((snap.data() || {}).updatedAt) : null;
+    if (!snap.exists && other && other.exists && moving) cloudAt = (other.data() || {}).updatedAt;   // judged against where it was
     if (!cloudWriteAllowed(cloudAt, base, r.updatedAt)) { refused = true; return; }
     // v38.65 — and the server's own time: what a reading device asks for (incrementalCloudLoad). A recipe edited
     // offline days ago and sent today has an old updatedAt, but its syncedAt is today.
     tx.set(ref, { r: json, updatedAt: stamped, id: r.id, syncedAt: firebase.firestore.FieldValue.serverTimestamp() });
+    if (other && other.exists && (wantSecret || moving)) tx.delete(otherRef);
+    if (ph && ph.exists) { tx.set(herePhoto, ph.data()); tx.delete(otherPhoto); }
   });
+  if (madeSecretElsewhere) {
+    r.secret = true;
+    secretNote(sid, true); _secretLives[sid] = true;
+    syncLog('save', 'Made 🔒 secret on another device — saved as secret', { id: r.id });
+    return saveRecipeDoc(r, db, true);
+  }
+  if (hh) _secretLives[sid] = wantSecret;
   if (refused) {
     // Logged HERE, not in the caller. The successful write is logged a few lines
     // down, and splitting the two halves of the same fact across two levels
@@ -27087,21 +27166,30 @@ async function writeCloudMeta(list, nextIdVal, db) {
   var stamp = Date.now();
   noteOwnMetaStamp(stamp);
   var ref = cloudDoc('meta', db);
+  // v38.96 — 🔒 the secret recipes' ids go to state/secretIndex, the household's own: state/meta is read by linked
+  // households, and must not even say that they exist. A recipe here says which it is; one held only elsewhere stays.
+  var hh = _cloudLayout === 'households', sref = hh ? cloudDoc('secretIndex', db) : null;
   await db.runTransaction(async function(tx) {
     var snap = await tx.get(ref);
     var cur  = snap.exists ? (snap.data() || {}) : {};
-    var ids  = {};
+    var ssnap = sref ? await tx.get(sref) : null;
+    var scur = ssnap && ssnap.exists ? (ssnap.data() || {}) : {};
+    var ids  = {}, secret = {};
     (cur.ids || []).forEach(function(i){ ids[i] = true; });
-    list.forEach(function(r){ ids[r.id] = true; });
+    (scur.ids || []).forEach(function(i){ ids[i] = true; secret[String(i)] = true; });
+    list.forEach(function(r){ ids[r.id] = true; if (hh && r.secret) secret[String(r.id)] = true; else delete secret[String(r.id)]; });
     Object.keys(_pendingCloudDeletes).forEach(function(i){ delete ids[i]; delete ids[parseInt(i,10)]; });
     // v38.71 — ids this device found listed without a document (deleted long ago) leave the index
     if (_cloudLayout === 'households') (cloudSyncMark().absent || []).forEach(function(i){
       if (!list.some(function(r){ return String(r.id) === String(i); })) { delete ids[i]; delete ids[parseInt(i,10)]; } });
+    var all = Object.keys(ids).map(function(i){ return parseInt(i, 10); }).filter(function(i){ return !isNaN(i); });
+    var secretList = all.filter(function(i){ return secret[String(i)]; });
+    if (sref && (secretList.length || ssnap.exists)) tx.set(sref, { ids: secretList, updatedAt: stamp });
     tx.set(ref, {
       // nextId must never regress — two devices minting the same id would hand
       // two different recipes the same document.
       nextId: mergeNextId(nextIdVal, cur.nextId),
-      ids: Object.keys(ids).map(function(i){ return parseInt(i, 10); }).filter(function(i){ return !isNaN(i); }),
+      ids: all.filter(function(i){ return !secret[String(i)]; }),
       schema: CLOUD_SCHEMA,
       // v32.3 — `legacyAt` used to live here as the high-water mark for the
       // legacy `shared/recipes` document. That document has been deleted, so the
@@ -27128,6 +27216,13 @@ async function flushCloudDeletes(db) {
     try {
       await cloudDoc(recipeDocId(id), db).delete();
       await cloudDoc(photoDocId(id), db).delete();
+      // v38.96 — and wherever else it may be (marked 🔒 on another device): a deleted recipe must not come back
+      if (_cloudLayout === 'households') {
+        var hb = 'households/' + _cloudHid + '/', inSecret = !!_secretIds[String(id)];
+        await db.collection(hb + (inSecret ? 'recipes' : 'secretRecipes')).doc(String(id)).delete();
+        await db.collection(hb + (inSecret ? 'photos' : 'secretPhotos')).doc(String(id)).delete();
+        secretNote(id, false); delete _secretLives[String(id)];
+      }
     } catch(e) {
       // A fixture's delete being refused is not worth telling anyone about: it
       // is leftover test junk, not one of their recipes. Reporting it would put
@@ -27179,6 +27274,7 @@ function parseCloudRecipeDocs(docs, opts) {
     noteCloudSyncedAt(d.syncedAt);   // v38.65
     var r;
     try { r = JSON.parse(d.r || 'null'); } catch(e) { r = null; }
+    if (r && typeof r === 'object' && d._secret) r.secret = true;   // v38.96 — read from where only the household reads
     if (!r || typeof r !== 'object') {
       // v29.4 — a document we cannot read used to be skipped outright. That left
       // no base for it, so every later save refused it as a "conflict" and there
@@ -27272,9 +27368,19 @@ async function incrementalCloudLoad(meta, offlineQueued, db) {
   Object.keys(_cloudRecipeBase).forEach(function(k){ var v = _cloudRecipeBase[k]; if (typeof v === 'number' && v > newestHeld) newestHeld = v; });
   _cloudSyncedMax = mark.at || 0;
   var got = {}, reads = 0;
-  var take = function(q) { reads += Math.max(1, q.size || 0); q.forEach(function(d){ got[String(d.id)] = { id: recipeDocId(d.id), data: d.data() }; }); };
-  take(await col.where('syncedAt', '>', firebase.firestore.Timestamp.fromMillis(Math.max(0, (mark.at || 0) - INCR_SYNC_MARGIN_MS))).get());
-  take(await col.where('updatedAt', '>', Math.max(0, newestHeld - INCR_SKEW_MS)).get());
+  var take = function(q, secret) { reads += Math.max(1, q.size || 0); q.forEach(function(d){
+    var x = d.data() || {}, k = String(d.id);
+    if (secret) { x = Object.assign({}, x, { _secret: true }); secretNote(k, true); }
+    if (got[k] && ((got[k].data || {}).updatedAt || 0) > (x.updatedAt || 0)) return;   // v38.96 — a move cut short: the newer
+    if (!secret && !_secretIds[k]) _secretLives[k] = false;
+    if (secret) _secretLives[k] = true;
+    got[k] = { id: recipeDocId(d.id), data: x }; }); };
+  var sinceTs = firebase.firestore.Timestamp.fromMillis(Math.max(0, (mark.at || 0) - INCR_SYNC_MARGIN_MS)), sinceAt = Math.max(0, newestHeld - INCR_SKEW_MS);
+  take(await col.where('syncedAt', '>', sinceTs).get());
+  take(await col.where('updatedAt', '>', sinceAt).get());
+  // v38.96 — 🔒 and the household's secret recipes, read the same way
+  var scol = db.collection('households').doc(_cloudHid).collection('secretRecipes');
+  try { take(await scol.where('syncedAt', '>', sinceTs).get(), true); take(await scol.where('updatedAt', '>', sinceAt).get(), true); } catch(e) {}
   var changedIds = Object.keys(got);
   if (changedIds.length > INCR_MAX_CHANGED) { countCloudRead(reads); return null; }   // most of it changed: read it all
   var cloudIds = {}, heldIds = {};
@@ -27737,6 +27843,13 @@ async function _loadFromFirestoreInner(user) {
     countCloudRead();
     var meta = metaSnap.exists ? (metaSnap.data() || {}) : {};
     _cloudSchema = meta.schema || 0;
+    // v38.96 — 🔒 the index linked households read leaves the secret recipes out; ours puts them back: from this
+    // device's own recipes while nothing changed (one read, as before), from state/secretIndex when something did
+    var metaPublic = Array.isArray(meta.ids) ? meta.ids.slice() : null;
+    if (_cloudLayout === 'households' && metaPublic) {
+      recipes.forEach(function(r){ if (r && r.secret) secretNote(r.id, true); });
+      meta.ids = idsUnion(metaPublic, recipes.filter(function(r){ return r && r.secret; }).map(function(r){ return r.id; }));
+    }
 
     var hasData = false;
     var fsRecipes = null, cloudNextId = 0;
@@ -27770,6 +27883,7 @@ async function _loadFromFirestoreInner(user) {
       // missing or stale `schema` field now loads the collection rather than
       // reporting an empty cloud.
       // v38.65 — only what changed, when that can be known for sure; otherwise everything, as before
+      if (_cloudLayout === 'households' && metaPublic) meta.ids = idsUnion(metaPublic, await readSecretIndex());   // v38.96
       var inc = null;
       try { inc = await incrementalCloudLoad(meta, offlineQueued); }
       catch (e) { inc = null; dlog('[v38.65] reading only what changed failed — reading everything:', e && e.message); }
@@ -31772,6 +31886,7 @@ var HELP_SYSTEM_PROMPT = [
   "- 📬 LINK REQUESTS: ⚙️ → 🏠 My household → 📬 Link requests — the number in brackets beside it is how many wait for an answer. Every request in one place: Waiting (Accept / Reject / 🚫 Block), Sent by your household (Withdraw), Linked now (Revoke access), and earlier answers. A request may carry a note, and the two households can write to each other there — the latest message shows, highlighted, with ↩ Reply; earlier ones are under 💬 Conversation. Only the household's name is shown, never a person's. Reject is for now: if they ask again — by identifier or by e-mail — their request is back under Waiting. 🚫 Block is for good, until you Unblock it under the earlier answers; they are never told, and on their side it reads “waiting”. A new message or request arrives while the app is open: a red dot (and a short notice with Open) within seconds, no reload needed. A red dot on ⚙️ leads to anything new. The switch there decides whether other households may ask through the app at all.",
   "- 👪 CHAT WITH FAMILY MEMBERS (the people in YOUR household only): ⋯ More → 👪 Chat with family members — or 💬 Chat beside a person in 👥 Family Access (someone added by address who has not signed in yet says ⏳ hasn’t signed in yet: their 💬 Chat comes once they do). 📣 Everyone in <your kitchen> is the room for announcements: everyone in the household reads it. Or choose one person: only the two of you read that conversation. Everyone in the household can write, readers too. Messages arrive live: a short notice with Open, and a red dot on ⋯ More until you have read them. Nothing is changed or deleted afterwards; deleting the household deletes them.",
   "- 🧑‍🍳 FIRST VISIT: a one-time setup on a notebook page — your account (your e-mail and a password you make up; or 'I already have an account', or Continue offline), this device's Save button (the iPhone shortcut, the Android app in the Share menu, or the computer's browser extension — each new device asks this once; later from ⚙️ Settings), the kitchen rules, then a quick tour.",
+  "- 🔒 SECRET RECIPES: in the editor, tick 🔒 Secret — the recipe (and its photo) is then kept where only your own kitchen can read it; the kitchens you link with do not see it, nor know it exists. Untick it to share it again. A 🔒 shows on its card.",
   "- 🔄 RELOAD A LINKED KITCHEN: beside a linked kitchen's name in your recipe list, 🔄 Reload reads its recipes and photos again from the start — for when something looks missing or out of date.",
   "- 💬 CHATS WITH LINKED KITCHENS: ⋯ More → 💬 Chats with linked kitchens — or 💬 Chat beside a linked kitchen's name in your recipe list, or in 👥 Family Access. Every conversation, newest first, with what is new; open one to read it all and write (Enter sends, Shift+Enter starts a new line). The same conversations are also on 📬 Link requests. A red dot on ⋯ More and on ⚙️ says something new arrived.",
   "- ♿ ACCESSIBILITY: ⚙️ → ♿ Accessibility, on this device: 🎨 Colours for red–green colour blindness (the most common colour blindness, where reds and greens look alike, brownish): wherever a colour says something, green becomes blue and red becomes a deep orange — all right / a problem, the sync dot, Easy and Hard, the Self Test's results, delete buttons — and a notification dot turns blue inside its ring; and the recipe photos are colour-corrected, so a red tomato and a green pepper no longer look alike (they look a little different to everyone else). For the whole phone, an iPhone has its own: Settings → Accessibility → Display & Text Size → Color Filters → Red/Green Filter; Android: Settings → Accessibility → Color correction. 🟡 A yellow ring round the notification dots (on unless turned off) so a new message or request catches the eye, on ⋯ More and in ⚙️. 🌗 Theme: light, dark, or as the device. 🔔 the sound when something arrives, and 🎵 which sound.",

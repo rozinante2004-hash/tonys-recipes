@@ -794,6 +794,12 @@ commit so deleted files leave the history. Every owner alert also rings in ntfy 
 secret NTFY_TOPIC): subject and first line only, addresses masked. Privacy Statement 1.9. v38.93 removed the owner's
 "Bring the family app's allowances" button, and the service worker's update check fails quietly when offline.
 
+**Linked photos, the wizard, secret recipes (v38.94–v38.96):** a linked kitchen's photo read is shared by every card
+drawn meanwhile and lands in the card on the page; 🔄 Reload beside 💬 Chat reads that kitchen again. A device nobody has
+used greets with a one-time setup on the rules' notebook page (welcome → account → this device's Save button → rules →
+tour). 🔒 Secret recipes live in `secretRecipes`/`secretPhotos` (members-only), listed in `state/secretIndex`, never in
+`state/meta`; marking moves a recipe and its photo in its save's transaction.
+
 **A new kitchen's first hour (v38.90):** 📡 Sync Health says "new — nothing saved to the cloud yet" for a kitchen
 with no index and no recipes in the cloud (an empty read counts as a sync; a save that wrote sets the schema);
 `boldTidy` drops an empty `****` before saving, only outside bold words and line by line; `metaVal` hides a "-"

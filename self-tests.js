@@ -8831,6 +8831,49 @@ window.SELF_TESTS = [
       if(!/⚠️ my-kitchen-notes-beta: 36,000 of 50,000 \(72%\)/.test(lines) || !/✓ tonys-recipes-test: 120 of 50,000 \(0%\)/.test(lines)) throw new Error('the page: '+lines);
     } },
 
+  { id:'secret_recipes_kept_apart', group:'Core', name:'🔒 A secret recipe (and its photo) lives where only its own kitchen reads — moved there and back in one transaction, left out of the index linked kitchens read, and never written back where they read by a device that had not heard (v38.96)',
+    test: async()=>{
+      var docs={};
+      var mk=function(path){ return { path:path, get:async function(){ return { exists:Object.prototype.hasOwnProperty.call(docs,path), data:function(){ return docs[path]; } }; },
+        set:async function(v){ docs[path]=JSON.parse(JSON.stringify(v)); }, delete:async function(){ delete docs[path]; } }; };
+      var F={ collection:function(c){ return { doc:function(id){ return mk(c+'/'+id); } }; },
+        runTransaction:async function(fn){ var ops=[]; var tx={ get:function(r){ return r.get(); }, set:function(r,v){ ops.push(function(){ return r.set(v); }); }, delete:function(r){ ops.push(function(){ return r.delete(); }); } };
+          var out=await fn(tx); for(var i=0;i<ops.length;i++) await ops[i](); return out; } };
+      var keep={ layout:_cloudLayout, hid:_cloudHid, ids:JSON.stringify(_secretIds), lives:JSON.stringify(_secretLives), base:JSON.stringify(_cloudRecipeBase), del:JSON.stringify(_pendingCloudDeletes) };
+      var H='households/hS/';
+      try{
+        _cloudLayout='households'; _cloudHid='hS'; _pendingCloudDeletes={};
+        secretNote(777,true);
+        if(!/secretRecipes$/.test(cloudDocPath('recipe_777')[0]) || !/secretPhotos$/.test(cloudDocPath('photo_777')[0]) || !/\/recipes$/.test(cloudDocPath('recipe_778')[0])) throw new Error('not routed by secrecy');
+        secretNote(777,false);
+        // marked secret: moved, photo too, in one go
+        docs[H+'recipes/501']={ r:'{}', updatedAt:5 }; docs[H+'photos/501']={ photo:'data:x' };
+        _cloudRecipeBase[501]=5; _secretLives['501']=false;
+        var r={ id:501, name:'Secret sauce', secret:true, updatedAt:10, ingredients:[], steps:[] };
+        var res=await saveRecipeDoc(r, F);
+        if(!res.ok || !docs[H+'secretRecipes/501'] || docs[H+'recipes/501'] || !docs[H+'secretPhotos/501'] || docs[H+'photos/501']) throw new Error('not moved apart: '+Object.keys(docs).join());
+        // the index linked kitchens read says nothing of it
+        await writeCloudMeta([r, { id:502, name:'Soup' }], 600, F);
+        var m=docs[H+'state/meta'], si=docs[H+'state/secretIndex'];
+        if(!m || JSON.stringify(m.ids)!=='[502]' || !si || JSON.stringify(si.ids)!=='[501]') throw new Error('index: '+JSON.stringify([m&&m.ids, si&&si.ids]));
+        // unmarked: back, photo too
+        r.secret=false; r.updatedAt=11;
+        res=await saveRecipeDoc(r, F);
+        if(!res.ok || !docs[H+'recipes/501'] || docs[H+'secretRecipes/501'] || !docs[H+'photos/501'] || docs[H+'secretPhotos/501']) throw new Error('not moved back: '+Object.keys(docs).join());
+        await writeCloudMeta([r, { id:502, name:'Soup' }], 600, F);
+        if(JSON.stringify(docs[H+'state/meta'].ids)!=='[501,502]' || docs[H+'state/secretIndex'].ids.length) throw new Error('index after: '+JSON.stringify(docs[H+'state/meta'].ids));
+        // another device made it secret; this one, not knowing, saves it: it is not written where linked kitchens read
+        docs[H+'secretRecipes/503']={ r:'{"secret":true}', updatedAt:20 }; _cloudRecipeBase[503]=15; _secretLives['503']=false;
+        var r2={ id:503, name:'Grandma', updatedAt:16, ingredients:[], steps:[] };
+        res=await saveRecipeDoc(r2, F);
+        if(docs[H+'recipes/503'] || r2.secret!==true || res.skipped!=='conflict') throw new Error('written back where linked kitchens read: '+JSON.stringify(res));
+      } finally {
+        _cloudLayout=keep.layout; _cloudHid=keep.hid; _secretIds=JSON.parse(keep.ids); _secretLives=JSON.parse(keep.lives);
+        _cloudRecipeBase=JSON.parse(keep.base); _pendingCloudDeletes=JSON.parse(keep.del);
+        [501,502,503].forEach(function(i){ delete _cloudRecipeStamp[i]; delete _cloudRecipeIds[i]; try{ clearRecipeConflict(i); }catch(e){} });
+      }
+    } },
+
   { id:'first_contact_wizard', group:'Core', name:'🧑‍🍳 First contact: a one-time setup on the notebook page — welcome, the account (e-mail, a made-up password, Remember me, I already have an account, Continue offline), this device, then the rules and the tour (v38.95)',
     test: async()=>{
       var keys=[SETUP_SEEN_KEY, SETUP_DEVICE_KEY, TOUR_DONE_KEY, TESTER_WELCOME_KEY], kept={};

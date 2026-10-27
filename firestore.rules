@@ -321,6 +321,19 @@ service cloud.firestore {
         allow create, update: if atLeast(hid, 'editor');
         allow delete: if atLeast(hid, 'admin') || beingDeleted(hid);
       }
+      // v38.96 — 🔒 secret recipes (Tony, 25 Oct: "invisible to shared kitchens"): kept apart, where only the
+      // household itself reads — no linked household, whatever it asks. Their ids are in state/secretIndex (state is
+      // the household's own, apart from meta), never in the index linked households read.
+      match /secretRecipes/{id} {
+        allow read: if isMember(hid) || beingDeleted(hid);
+        allow create, update: if atLeast(hid, 'editor');
+        allow delete: if atLeast(hid, 'admin') || beingDeleted(hid);
+      }
+      match /secretPhotos/{id} {
+        allow read: if isMember(hid) || beingDeleted(hid);
+        allow create, update: if atLeast(hid, 'editor');
+        allow delete: if atLeast(hid, 'admin') || beingDeleted(hid);
+      }
       match /chats/{id} {
         allow read: if isMember(hid) || beingDeleted(hid);
         allow create, update: if atLeast(hid, 'editor');
