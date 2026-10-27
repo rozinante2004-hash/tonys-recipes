@@ -1,4 +1,8 @@
-// Tony's Recipes — Cloudflare Worker v92
+// Tony's Recipes — Cloudflare Worker v93
+// v93: NTFY WITH ITS OWN ALLOWANCE (Tony, 27 Oct 2026: "ntfy answered 429 … daily message quota reached"). ntfy.sh counts
+// an anonymous sender's messages by its address, and a Worker sends from Cloudflare's, shared with everyone else's — so
+// the day's allowance was gone before ours was sent. With the secret NTFY_TOKEN (an access token of a free ntfy.sh
+// account) the messages count against that account instead. ntfy's refusal is told in its own short words.
 // v92: NTFY SAYS WHY (Tony, 27 Oct 2026: the test alert said "ntfy: not delivered" and nothing more). The topic is taken
 // also when the secret holds the whole link (https://ntfy.sh/<topic>), and the test alert — on screen and in its e-mail —
 // says why one did not go: a topic ntfy does not take, ntfy's own answer (its status and words), or no connection.
@@ -415,7 +419,7 @@
 //   AI_MAX_TOKENS   – the longest answer one call may ask for (32000; the
 //                     app's largest, reading several recipes at once, asks 8000).
 
-const WORKER_VERSION = 'v92';
+const WORKER_VERSION = 'v93';
 const VIDEO_MAX_MB_DEFAULT = 50;
 const GEMINI_API = 'https://generativelanguage.googleapis.com';
 const GEMINI_MODEL_DEFAULT = 'gemini-2.5-flash';
@@ -2032,12 +2036,23 @@ async function ownerNtfy(env, subject, text) {
   const title = mask(String(subject || '').replace(/^My Kitchen Notes: /, '')).slice(0, 120) || 'My Kitchen Notes';
   const first = mask(String(text || '').split('\n').filter(Boolean)[0] || '').slice(0, 300);
   try {
-    const r = await (env.__fetch || fetch)(NTFY_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    const headers = { 'Content-Type': 'application/json' };
+    const tok = String(env.NTFY_TOKEN || '').trim();
+    if (tok) headers.Authorization = 'Bearer ' + tok;   // v93 — the account's own allowance, not the shared address's
+    const r = await (env.__fetch || fetch)(NTFY_URL, { method: 'POST', headers,
       body: JSON.stringify({ topic, title, message: (first ? first + '\n' : '') + '(the details are in your e-mail)', tags: ['bell'], priority: 4 }),
       signal: AbortSignal.timeout(10000) });
     if (r.ok) return true;
-    let said = ''; try { said = (await r.text()).split(topic).join('[topic]').replace(/\s+/g, ' ').slice(0, 160); } catch (e) {}
-    _ntfyWhy = 'ntfy answered ' + r.status + (said ? ': ' + said : '');
+    let said = '', code = 0;
+    try {
+      const raw = await r.text();
+      try { const j = JSON.parse(raw); said = String(j.error || ''); code = Number(j.code) || 0; } catch (e) { said = raw; }
+      said = said.split(topic).join('[topic]').split(tok || '\u0000').join('[token]').replace(/\s+/g, ' ').slice(0, 160);
+    } catch (e) {}
+    _ntfyWhy = 'ntfy answered ' + r.status + (said ? ': ' + said : '')
+      + (r.status === 429 && !tok ? ' — ntfy.sh counts messages by the sending address, which this server shares with many others; '
+         + 'a free ntfy account\'s access token in the GitHub secret NTFY_TOKEN gives it an allowance of its own' : '')
+      + (r.status === 401 || r.status === 403 ? ' — check the access token in the GitHub secret NTFY_TOKEN' : '');
     return false;
   } catch (e) { _ntfyWhy = 'ntfy could not be reached (' + String((e && e.message) || e).slice(0, 80) + ')'; return false; }
 }
@@ -2265,7 +2280,7 @@ async function meterAction(request, env, body) {
     if (env.ALERTS && mailTo) mailed = await ownerAlert(env, 'My Kitchen Notes: a test alert',
       'If you can read this, the server can reach you by e-mail. Sent from the app at ' + ilTime(Date.now()) + ' (Israel time).'
       + (env.NTFY_TOPIC ? '\n\nntfy (the phone): ' + (nt ? 'sent.' : 'NOT delivered — ' + ntWhy + '.') : ''), { whatsapp: false });
-    return jsonResp({ ok: true, whatsapp: wa, whatsappSet: !!(env.WHATSAPP_PHONE && env.WHATSAPP_KEY), ntfy: nt, ntfySet: !!env.NTFY_TOPIC, ntfyWhy: ntWhy, mail: mailed, mailTo });
+    return jsonResp({ ok: true, whatsapp: wa, whatsappSet: !!(env.WHATSAPP_PHONE && env.WHATSAPP_KEY), ntfy: nt, ntfySet: !!env.NTFY_TOPIC, ntfyToken: !!env.NTFY_TOKEN, ntfyWhy: ntWhy, mail: mailed, mailTo });
   }
   if (body.op === 'allowances') {
     return jsonResp({ ok: true, usage: await usageSnapshot(env), notices: await serverNotices(env, { owner: true }), watch: !!env.USAGE_KEY,
@@ -3645,4 +3660,4 @@ export default {
   }
 };
 
-// ── END OF WORKER v92 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
+// ── END OF WORKER v93 ── If this is the last line in the Cloudflare editor, the whole file was pasted.

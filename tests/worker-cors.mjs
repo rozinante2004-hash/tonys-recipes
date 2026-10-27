@@ -1523,6 +1523,19 @@ console.log('\nAI per household (v60):');
       Object.assign({}, envNt, { NTFY_TOPIC: 'My Kitchen Alerts' }))).json(); }
     finally { Date.now = realNowWa; }
     expect('v92: …and a topic ntfy does not take is named as such', ta.ntfy === false && /has a space/.test(ta.ntfyWhy || ''), JSON.stringify(ta));
+    // v93 — with NTFY_TOKEN: sent with it; a 429 without one says what to do
+    let auth = '';
+    Date.now = () => realNowWa() + 720e3;
+    try { ta = await (await worker.fetch(post({ action: 'meter-admin', op: 'alert-test', idToken: comOwner, device: 'dev-DDDD4444' }, TEST_ORIGIN),
+      Object.assign({}, envNt, { NTFY_TOKEN: 'tk_test123', __fetch: async (u, init) => { auth = (init.headers || {}).Authorization || ''; return new Response('{"id":"x"}', { status: 200 }); } }))).json(); }
+    finally { Date.now = realNowWa; }
+    expect('v93: with NTFY_TOKEN the message goes with the account\'s token', ta.ntfy === true && ta.ntfyToken === true && auth === 'Bearer tk_test123', JSON.stringify([ta, auth]));
+    Date.now = () => realNowWa() + 840e3;
+    try { ta = await (await worker.fetch(post({ action: 'meter-admin', op: 'alert-test', idToken: comOwner, device: 'dev-DDDD4444' }, TEST_ORIGIN),
+      Object.assign({}, envNt, { __fetch: async () => new Response('{"code":42908,"http":429,"error":"limit reached: daily message quota reached; increase your limits with a paid plan, see https://ntfy.sh","link":"https://ntfy.sh/docs/publish/#limitations"}', { status: 429 }) }))).json(); }
+    finally { Date.now = realNowWa; }
+    expect('v93: …and without one, the shared address\'s quota says to add one', /answered 429: limit reached: daily message quota reached/.test(ta.ntfyWhy || '')
+      && /NTFY_TOKEN/.test(ta.ntfyWhy) && !/"code"/.test(ta.ntfyWhy), JSON.stringify(ta));
     // v85 — each kind of alert on WhatsApp, or not: all on by default, e-mail never affected.
     let ap = await (await worker.fetch(post({ action: 'meter-admin', op: 'alert-prefs', idToken: comOwner, device: 'dev-DDDD4444' }, TEST_ORIGIN), envWa)).json();
     expect('v85: eight kinds of alert, all on WhatsApp by default', ap.ok === true && ap.kinds.length === 8 && ap.kinds.every(k => k.on === true) && ap.whatsappSet === true

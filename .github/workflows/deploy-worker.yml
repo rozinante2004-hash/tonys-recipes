@@ -108,8 +108,9 @@ jobs:
           UNSPLASH_ACCESS_KEY: ${{ secrets.UNSPLASH_ACCESS_KEY }}
           REPORTS_GITHUB_TOKEN: ${{ secrets.REPORTS_GITHUB_TOKEN }}
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          NTFY_TOKEN: ${{ secrets.NTFY_TOKEN }}
         run: |
-          for name in WHATSAPP_PHONE WHATSAPP_KEY CF_ANALYTICS_TOKEN PEXELS_API_KEY UNSPLASH_ACCESS_KEY REPORTS_GITHUB_TOKEN NTFY_TOPIC; do
+          for name in WHATSAPP_PHONE WHATSAPP_KEY CF_ANALYTICS_TOKEN PEXELS_API_KEY UNSPLASH_ACCESS_KEY REPORTS_GITHUB_TOKEN NTFY_TOPIC NTFY_TOKEN; do
             value="${!name}"
             if [ -n "$value" ]; then printf '%s' "$value" | npx --yes wrangler@4 secret put "$name" --config worker/wrangler.jsonc >/dev/null; echo "$name is set"
             else echo "::notice::$name is not set (Settings → Secrets and variables → Actions) — left as it is"; fi

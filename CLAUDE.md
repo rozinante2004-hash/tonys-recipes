@@ -1301,6 +1301,11 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
     moves, it stays listed in `state/meta` (`_secretLives` false), the other recipes go on saving, and a toast once a
     session says it is not secret yet. The extra deletions in the secret places and `householdWipe`'s secret kinds
     swallow a refusal.
+  - **Worker v93 (deployed alone, dispatched on `test`):** the reason came back — `429 … daily message quota reached`:
+    ntfy.sh limits anonymous senders by address, and the Worker sends from Cloudflare's shared addresses. With the GitHub
+    secret NTFY_TOKEN (a free ntfy.sh account's access token; deploy-worker.yml passes it) the Worker sends
+    `Authorization: Bearer …`, so the account's own allowance counts. Tony's part: sign up at https://ntfy.sh/signup,
+    create a token at https://ntfy.sh/account, store it as NTFY_TOKEN; then I redeploy and he sends a test alert.
 - **Photo keys, 23 Oct:** Pexels: "New API key issuance is currently paused and cannot be requested" (Tony); Unsplash:
   "We can forego unsplash for now" (Tony). Photos stay Pixabay + Wikimedia Commons; the workflow is ready if a key
   ever comes (secrets PEXELS_API_KEY / UNSPLASH_ACCESS_KEY, then dispatch Deploy the Worker).
