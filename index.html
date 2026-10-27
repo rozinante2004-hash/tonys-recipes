@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v38.96 -->
+<!-- Tony's Recipes Collection v38.97 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -8379,10 +8379,38 @@ function setupWizPage(step, html) {
     document.body.appendChild(ov);
   }
   ov.innerHTML = '<div class="tg-page"><div class="tg-tape" aria-hidden="true"></div>' + (step ? setupDotsHtml(step) : '') + html + '</div>';
+  // v38.97 — each line in its own direction: a phrase not translated yet is English in a right-to-left app (Tony's iPhone:
+  // ".tap away", ".Tap Get the shortcut .1")
+  Array.prototype.forEach.call(ov.querySelectorAll('.tg-title, .tg-sub, .sw-list > div, .sw-steps, .sw-hint, .sw-later, .sw-label, .sw-err, .tg-check, .sw-link, .tg-out, .tg-go, .sw-next'),
+    function(el){ el.setAttribute('dir', 'auto'); });
   setTimeout(function(){ var f = ov.querySelector('[autofocus]') || ov.querySelector('.tg-go'); if (f) try { f.focus(); } catch(e) {} }, 60);
   return ov;
 }
 function setupWizClose() { var ov = document.getElementById('setupWiz'); if (ov) ov.remove(); }
+// v38.97 — Tony: "How could I test the entire connection wizard on test?" The owner walks every page here, as a new
+// person meets them, and nothing is created, sent or recorded: the welcome, the account (Create my account just goes
+// on), this device (the computer's page with a stand-in link where this copy has none), the kitchen rules, the tour.
+var _setupPreview = false;
+async function setupPreview() {
+  _setupPreview = true;
+  try {
+    setupWelcome();
+    await new Promise(function(res){ var g = document.getElementById('swGo'); g.onclick = function(){ setupAccount(true); res(); }; });
+    var ov = document.getElementById('setupWiz');
+    var next = await new Promise(function(res){
+      var f = ov.querySelector('#swForm'); if (f) f.onsubmit = function(e){ e.preventDefault(); res(true); };
+      var c = ov.querySelector('#swCreate'); if (c) c.onclick = function(e){ e.preventDefault(); res(true); };
+      Array.prototype.forEach.call(ov.querySelectorAll('#swHave, .tg-out, .tg-go:not(#swCreate)'), function(b){ b.onclick = function(e){ e.preventDefault(); res(!c); }; });
+    });
+    if (!next) { setupWizClose(); toast('\u{1F9D1}\u200D\u{1F373} Preview ended — that button opens the sign-in screen, or goes on offline.', 5000); return; }
+    var keep = null; try { keep = localStorage.getItem(SETUP_DEVICE_KEY); localStorage.removeItem(SETUP_DEVICE_KEY); } catch(e) {}
+    await setupDeviceStep({ uid: 'preview' }, { preview: true });
+    try { if (keep === null) localStorage.removeItem(SETUP_DEVICE_KEY); else localStorage.setItem(SETUP_DEVICE_KEY, keep); } catch(e) {}
+    await legalShowGate(null, { preview: true });
+    startTour();
+  } finally { _setupPreview = false; setupWizClose(); }
+}
+window.setupPreview = setupPreview;
 // After the language question, on a device nobody has used, signed out: the welcome, over the sign-in screen.
 async function setupWizMaybe() {
   if (!setupWizAllowed()) return false;
@@ -8403,12 +8431,12 @@ function setupWelcome() {
     + '<div class="tg-hand tg-sub">' + escH(T.helloSub) + '</div>'
     + '<div class="tg-hand sw-list">' + T.helloList.map(function(l){ return '<div>' + escH(l) + '</div>'; }).join('') + '</div>'
     + '<button type="button" class="tg-go" id="swGo">' + escH(T.ready) + '</button>');
-  ov.querySelector('#swGo').onclick = setupAccount;
+  ov.querySelector('#swGo').onclick = function(){ setupAccount(); };
   return ov;
 }
-function setupAccount() {
+function setupAccount(preview) {
   var T = SETUP_TEXT;
-  try { localStorage.setItem(SETUP_SEEN_KEY, 'wizard'); } catch(e) {}
+  if (preview !== true) try { localStorage.setItem(SETUP_SEEN_KEY, 'wizard'); } catch(e) {}
   var remember = '<label class="tg-check tg-hand"><input type="checkbox" id="swRemember"' + (rememberChoice() ? ' checked' : '')
     + ' onchange="rememberSet(this.checked)"> ' + escH(T.remember) + '</label>';
   var offline = '<button type="button" class="tg-out" onclick="setupOffline()">' + escH(T.offline) + '</button>';
@@ -8467,19 +8495,24 @@ function setupDeviceKind() {
   return b && typeof extStoreUrl === 'function' && extStoreUrl(b) && !extInstalledVersion() ? 'ext' : '';
 }
 // Once on every device, after signing in and before the kitchen rules. Resolves when the person goes on.
-function setupDeviceStep(user) {
+function setupDeviceStep(user, opts) {
+  var preview = !!(opts && opts.preview);
   setupWizClose();                       // (a sign-in that came another way, the welcome still open)
-  if (!user || !setupWizAllowed() || (navigator.webdriver && !window._setupWizTest)) return Promise.resolve();
-  try { if (localStorage.getItem(SETUP_DEVICE_KEY)) return Promise.resolve(); } catch(e) { return Promise.resolve(); }
-  if (!setupWizRan() && setupDeviceUsedBefore()) { try { localStorage.setItem(SETUP_DEVICE_KEY, 'before'); } catch(e) {} return Promise.resolve(); }
+  if (!preview) {
+    if (!user || !setupWizAllowed() || (navigator.webdriver && !window._setupWizTest)) return Promise.resolve();
+    try { if (localStorage.getItem(SETUP_DEVICE_KEY)) return Promise.resolve(); } catch(e) { return Promise.resolve(); }
+    if (!setupWizRan() && setupDeviceUsedBefore()) { try { localStorage.setItem(SETUP_DEVICE_KEY, 'before'); } catch(e) {} return Promise.resolve(); }
+  }
   var kind = setupDeviceKind(), T = SETUP_TEXT;
-  try { localStorage.setItem(SETUP_DEVICE_KEY, kind || 'nothing'); } catch(e) {}
+  if (preview && !kind) kind = isIOS() ? 'ios' : /Android/i.test(navigator.userAgent || '') ? 'android' : 'ext';
+  if (!preview) try { localStorage.setItem(SETUP_DEVICE_KEY, kind || 'nothing'); } catch(e) {}
   if (!kind) return Promise.resolve();
+  var storeUrl = kind === 'ext' ? (extStoreUrl(extBrowser()) || 'https://chromewebstore.google.com/') : '';
   var steps = function(list){ return '<ol class="tg-hand sw-steps">' + list.map(function(l){ return '<li>' + escH(l) + '</li>'; }).join('') + '</ol>'; };
   var body, act;
   if (kind === 'ios') {
     body = '<div class="tg-hand tg-title" id="swTitle">' + escH(T.iosTitle) + '</div><div class="tg-hand tg-sub">' + escH(T.iosSub) + '</div>' + steps(T.iosSteps)
-      + '<a class="tg-go sw-act" id="swAct" href="' + escA(APP_CONFIG.iosShortcutUrl) + '" target="_blank" rel="noopener">' + escH(T.iosBtn) + '</a>'
+      + '<a class="tg-go sw-act" id="swAct" href="' + escA(APP_CONFIG.iosShortcutUrl || 'https://www.icloud.com/shortcuts/') + '" target="_blank" rel="noopener">' + escH(T.iosBtn) + '</a>'
       + (setupStandalone() ? '' : '<div class="tg-hand sw-hint">' + escH(T.iosHome) + '</div>');
   } else if (kind === 'android') {
     body = '<div class="tg-hand tg-title" id="swTitle">' + escH(T.andTitle) + '</div><div class="tg-hand tg-sub">' + escH(T.andSub) + '</div>'
@@ -8488,7 +8521,7 @@ function setupDeviceStep(user) {
       + '<div class="tg-hand sw-hint" id="swDone" hidden>' + escH(T.andDone) + '</div>';
   } else {
     body = '<div class="tg-hand tg-title" id="swTitle">' + escH(T.extTitle) + '</div><div class="tg-hand tg-sub">' + escH(T.extSub) + '</div>' + steps(T.extSteps)
-      + '<a class="tg-go sw-act" id="swAct" href="' + escA(extStoreUrl(extBrowser())) + '" target="_blank" rel="noopener">' + escH(T.extBtn) + '</a>';
+      + '<a class="tg-go sw-act" id="swAct" href="' + escA(storeUrl) + '" target="_blank" rel="noopener">' + escH(T.extBtn) + '</a>';
   }
   return new Promise(function(resolve) {
     var ov = setupWizPage(2, body + '<div class="tg-hand sw-later">' + escH(T.later) + '</div>'
@@ -9611,7 +9644,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v38.96';
+var APP_VERSION = 'v38.97';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -10933,7 +10966,7 @@ body.i18n-harvesting #serviceErrorOverlay, body.i18n-harvesting #emailModalOverl
 #setupWiz .sw-act.sw-did { background: #cdb9a8; box-shadow: 0 4px 0 #a8968a; font-size: 22px; }
 #setupWiz .sw-later { font-size: 18px; color: #6b5444; margin: 14px 0 10px; }
 #setupWiz .sw-next { display: block; margin: 0 auto; padding: 8px 22px; border: 2px solid #c1440e; border-radius: 22px 18px 24px 16px; background: none; color: #a8380a; font-family: 'Caveat', 'Patrick Hand', cursive; font-size: 24px; font-weight: 700; cursor: pointer; }
-#setupWiz .sw-next.tg-go { width: 100%; color: #fff; border: none; }
+#setupWiz .sw-next.tg-go { width: 100%; color: #fff; border: none; background: #c1440e; box-shadow: 0 4px 0 #8a2e0a; }   /* v38.97 — was white on paper (Tony) */
 /* v37.80 — the red dots along the path to something new (pathDots). */
 /* v38.83 — Tony: the red dot on ⋯ More "is very hard to miss" (easy to miss: red on the brown header) — "add a yellow
    circle around the dot, so it could catch the eye better". A ring drawn outside the dot (box-shadow: no layout). */
@@ -12774,7 +12807,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.96</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.97</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -12862,7 +12895,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.96</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.97</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -12978,6 +13011,8 @@ body.banner-shown .header {
               <button class="drop-item" data-owner-only title="How much of the free daily allowances (Cloudflare) is used, and anything paused right now (the app&#39;s owner only)." onclick="closeDrop('settingsDrop');openServerAllowances()">🩺 Server allowances</button>
               <!-- v38.64 — Tony: the warnings on WhatsApp too (Worker v84); v38.65 — each kind on or off, and the test (Worker v85) -->
               <button class="drop-item" data-owner-only title="Which alerts also ring on your phone (the ntfy app) — each on or off — and a test alert (the app&#39;s owner only)." onclick="closeDrop('settingsDrop');openWhatsAppAlerts()">📲 Phone alerts</button>
+              <!-- v38.97 — Tony: "How could I test the entire connection wizard on test?" -->
+              <button class="drop-item" data-owner-only title="Walk through the setup a new person sees on a first visit — every page, nothing created or sent (the app's owner only)." onclick="closeDrop('settingsDrop');setupPreview()">🧑‍🍳 Preview the first-visit setup</button>
               <!-- v38.42 — Tony: "Let's make the invitations sendable from the app, from the Admin account." -->
               <button class="drop-item" data-owner-only title="The tester invitation, in English or Hebrew, with this copy's link — sent through your Gmail, one e-mail to each person, or by WhatsApp or the mail app (the app's owner only)." onclick="closeDrop('settingsDrop');openInviteTesters()">✉️ Invite testers</button>
               <button class="drop-item" title="The app's running costs and billing (the app's owner only)." data-owner-only onclick="closeDrop('settingsDrop');openPayments()">💳 Payments</button>
@@ -29822,7 +29857,8 @@ function legalFonts() {
   l.href = 'fonts/legal-fonts.css';   // v38.29 — the app's own copy (fonts/), not Google Fonts
   document.head.appendChild(l);
 }
-function legalShowGate(user) {
+function legalShowGate(user, opts) {
+  var preview = !!(opts && opts.preview);   // v38.97 — the owner's preview of the first-visit setup
   legalFonts();
   return new Promise(function(resolve) {
     var prev = document.getElementById('termsGate'); if (prev) prev.remove();
@@ -29830,7 +29866,7 @@ function legalShowGate(user) {
     ov.id = 'termsGate'; ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-modal', 'true'); ov.setAttribute('aria-labelledby', 'tgTitle');
     ov.innerHTML = '<div class="tg-page">'
       + '<div class="tg-tape" aria-hidden="true"></div>'
-      + (typeof setupWizRan === 'function' && setupWizRan() ? setupDotsHtml(3) : '')   // v38.95 — the wizard's third page
+      + (preview || (typeof setupWizRan === 'function' && setupWizRan()) ? setupDotsHtml(3) : '')   // v38.95 — the wizard's third page
       + '<svg class="tg-ring" viewBox="0 0 120 120" aria-hidden="true"><circle cx="60" cy="60" r="44" fill="none" stroke="#8a5a2b" stroke-width="7" stroke-dasharray="210 14 40 9" opacity=".16"/><circle cx="62" cy="58" r="40" fill="none" stroke="#8a5a2b" stroke-width="2" opacity=".12"/></svg>'
       + '<svg class="tg-splash" viewBox="0 0 100 80" aria-hidden="true"><path d="M30 40c-8-14 6-26 20-20 6-12 26-8 24 6 14 2 16 22 2 26 2 14-18 18-24 8-12 8-28 0-22-12-12-2-12-14 0-8z" fill="#c1440e" opacity=".09"/><circle cx="86" cy="18" r="4" fill="#c1440e" opacity=".1"/><circle cx="12" cy="66" r="3" fill="#c1440e" opacity=".1"/></svg>'
       + '<div class="tg-hand tg-title" id="tgTitle">Before we start cooking…</div>'
@@ -29849,14 +29885,14 @@ function legalShowGate(user) {
     go.onclick = async function() {
       if (!box.checked) return;
       go.disabled = true; go.textContent = '⏳ One moment…';
-      await legalRecord(user);
+      if (!preview) await legalRecord(user);
       ov.remove();
       toast('\u{1F373} Welcome to the kitchen!', 4000);
       resolve(true);
     };
     ov.querySelector('#tgOut').onclick = function() {
       ov.remove();
-      legalLeave();
+      if (!preview) legalLeave();
       resolve(false);
     };
     legalLoadTerms();

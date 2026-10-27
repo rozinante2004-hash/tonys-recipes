@@ -1281,6 +1281,12 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
     device made secret is saved as secret instead (never written back where linked kitchens read); a deletion clears both
     places; `householdWipe` includes them. Editor: "🔒 Secret — only your own kitchen sees it" (`f-secret`); 🔒 on the
     card. Rules tests (household suite) and Self Test `secret_recipes_kept_apart`.
+  - **v38.97 (with them, waits for Tony's yes):** the wizard's Next was white on paper once promoted (CSS order), and on
+    a Hebrew iPhone its untranslated English read right-to-left (".tap away") — each line is `dir="auto"` now. Tony could
+    not see the whole wizard on the test copy (the welcome is for a browser nobody used; "I already have an account"
+    is the normal form; rules and tour only for a new account; no store link on the test copy, so no computer page):
+    ⚙️ → 👑 App owner → 🧑‍🍳 Preview the first-visit setup (`setupPreview`) walks every page, records and creates
+    nothing (`legalShowGate(null, {preview:true})`, `setupDeviceStep(user, {preview:true})`).
 - **Photo keys, 23 Oct:** Pexels: "New API key issuance is currently paused and cannot be requested" (Tony); Unsplash:
   "We can forego unsplash for now" (Tony). Photos stay Pixabay + Wikimedia Commons; the workflow is ready if a key
   ever comes (secrets PEXELS_API_KEY / UNSPLASH_ACCESS_KEY, then dispatch Deploy the Worker).

@@ -8831,6 +8831,34 @@ window.SELF_TESTS = [
       if(!/⚠️ my-kitchen-notes-beta: 36,000 of 50,000 \(72%\)/.test(lines) || !/✓ tonys-recipes-test: 120 of 50,000 \(0%\)/.test(lines)) throw new Error('the page: '+lines);
     } },
 
+  { id:'first_contact_wizard_preview', group:'Core', name:'🧑‍🍳 The owner previews the whole first-visit setup — welcome, account, this device, the rules, the tour — and nothing is created, recorded or signed out (v38.97)',
+    test: async()=>{
+      if(!document.querySelector('[onclick*="setupPreview()"][data-owner-only]')) throw new Error('no owner-only preview in ⚙️');
+      var seen=localStorage.getItem(SETUP_SEEN_KEY), dev=localStorage.getItem(SETUP_DEVICE_KEY), realRecord=window.legalRecord, realLeave=window.legalLeave, realTour=window.startTour, realEmail=window.emailSignIn;
+      var recorded=0, left=0, toured=0, signedUp=0;
+      var tick=function(){ return new Promise(function(r){ setTimeout(r, 30); }); };
+      try{
+        window.legalRecord=async function(){ recorded++; }; window.legalLeave=function(){ left++; }; window.startTour=function(){ toured++; return 0; };
+        window.emailSignIn=async function(){ signedUp++; return null; };
+        var p=setupPreview(); await tick();
+        document.getElementById('swGo').click(); await tick();
+        var c=document.getElementById('swCreate') || document.querySelector('#setupWiz .tg-go');
+        if(!c) throw new Error('no account page'); c.click(); await tick();
+        var n=document.getElementById('swNext'); if(!n) throw new Error('no page for this device');
+        if(n.classList.contains('tg-go') && getComputedStyle(n).backgroundColor==='rgba(0, 0, 0, 0)') throw new Error('Next is white on paper');
+        n.click(); await tick(); await tick();
+        var box=document.getElementById('tgAgree'), go=document.getElementById('tgGo');
+        if(!box || !go || !document.querySelector('#termsGate .sw-dots')) throw new Error('no rules page with its dots');
+        box.checked=true; box.onchange(); go.click(); await p;
+        if(recorded || left || signedUp) throw new Error('the preview did something: '+JSON.stringify([recorded,left,signedUp]));
+        if(toured!==1) throw new Error('no tour at the end');
+        if(localStorage.getItem(SETUP_SEEN_KEY)!==seen || localStorage.getItem(SETUP_DEVICE_KEY)!==dev) throw new Error('the preview left a mark');
+      } finally {
+        window.legalRecord=realRecord; window.legalLeave=realLeave; window.startTour=realTour; window.emailSignIn=realEmail;
+        setupWizClose(); var g=document.getElementById('termsGate'); if(g) g.remove();
+      }
+    } },
+
   { id:'secret_recipes_kept_apart', group:'Core', name:'🔒 A secret recipe (and its photo) lives where only its own kitchen reads — moved there and back in one transaction, left out of the index linked kitchens read, and never written back where they read by a device that had not heard (v38.96)',
     test: async()=>{
       var docs={};
