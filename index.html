@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.04 -->
+<!-- Tony's Recipes Collection v39.05 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -8279,7 +8279,7 @@ async function firstRunLanguageOffer() {
   if (window.APP_CONFIG.dataLayout !== 'households' || window._selfTestRunning) return null;
   try { if (localStorage.getItem(I18N_LANG_KEY) || localStorage.getItem(LANG_OFFERED_KEY)) return null; } catch(e) { return null; }
   var avail = [];
-  try { var idx = await i18nStaticIndex(); avail = Object.keys((idx && idx.langs) || {}); } catch(e) {}
+  try { var idx = await i18nStaticIndex(); avail = Object.keys((idx && idx.langs) || {}).filter(i18nEnsureLang); } catch(e) {}
   var code = i18nDeviceLangOffer(navigator.languages || [navigator.language], avail);
   if (!code || document.getElementById('askOverlay')) return null;
   try { localStorage.setItem(LANG_OFFERED_KEY, code); } catch(e) {}
@@ -9682,7 +9682,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.04';
+var APP_VERSION = 'v39.05';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -12898,7 +12898,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.04</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.05</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -12986,7 +12986,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.04</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.05</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -15338,8 +15338,31 @@ var I18N_LANGS = {
   it: { label: 'Italiano',   en: 'Italian',    rtl: false },
   pt: { label: 'Português',  en: 'Portuguese', rtl: false },
   zh: { label: '中文',        en: 'Chinese (Simplified)', rtl: false },
-  ja: { label: '日本語',      en: 'Japanese',   rtl: false }
+  ja: { label: '日本語',      en: 'Japanese',   rtl: false },
+  // v39.05 — published since a device added it (⚙️ → 🌐 → Add another language), but not offered: a language is offered
+  // (on a first visit and in 🌐) only when it is in this list (Tony, 27 Oct: "If for example the default language is
+  // Hungarian…")
+  hu: { label: 'Magyar',     en: 'Hungarian',  rtl: false }
 };
+// v39.05 — and every other language that is translated, without waiting for this list to name it (Tony, 27 Oct:
+// "A user should be able to get the wizard in any of the 11 translated languages (and additional languages, if they
+// are translated in the future)"). A code the app reads from the published languages, a backup or this device's own
+// choice joins the list here, named by the browser in itself and in English. Nothing the browser cannot name joins it.
+var I18N_RTL = ['ar', 'he', 'fa', 'ur', 'yi', 'ps', 'sd', 'ug', 'dv', 'ckb'];
+function i18nEnsureLang(code) {
+  code = String(code || '').toLowerCase();
+  if (I18N_LANGS[code]) return true;
+  if (!/^[a-z]{2,3}$/.test(code) || code === 'en') return false;
+  var native = '', english = '';
+  try { native = new Intl.DisplayNames([code], { type: 'language' }).of(code) || ''; } catch(e) {}
+  try { english = new Intl.DisplayNames(['en'], { type: 'language' }).of(code) || ''; } catch(e) {}
+  if (native.toLowerCase() === code) native = '';
+  if (english.toLowerCase() === code) english = '';
+  if (!native && !english) return false;
+  native = native ? native.charAt(0).toLocaleUpperCase(code) + native.slice(1) : english;
+  I18N_LANGS[code] = { label: native, en: english || native, rtl: I18N_RTL.indexOf(code) !== -1 };
+  return true;
+}
 var I18N_LANG_KEY = 'tonys_ui_lang';
 var I18N_CACHE_PREFIX = 'tonys_i18n_';
 var _i18nDict = null;          // { english: translation } for the active language
@@ -16982,7 +17005,7 @@ async function i18nCentralIndex(force) {
     var idx = await i18nCentralGet(i18nCentral() && i18nCentral().index);
     var langs = (idx && idx.langs) || {};
     Object.keys(langs).forEach(function(c){
-      if (!I18N_LANGS[c]) return;
+      if (!i18nEnsureLang(c)) return;
       i18nNoteKnown(c);
       _i18nCentralAt[c] = (langs[c] && langs[c].at) || 0;
     });
@@ -17013,7 +17036,7 @@ async function i18nStaticIndex(force) {
   if (_i18nStaticIndexed && !force) return _i18nStaticIndex;
   _i18nStaticIndexed = true;
   _i18nStaticIndex = await i18nStaticGet('index');
-  Object.keys((_i18nStaticIndex && _i18nStaticIndex.langs) || {}).forEach(function(c){ if (I18N_LANGS[c]) i18nNoteKnown(c); });
+  Object.keys((_i18nStaticIndex && _i18nStaticIndex.langs) || {}).forEach(function(c){ if (i18nEnsureLang(c)) i18nNoteKnown(c); });
   return _i18nStaticIndex;
 }
 // The best copy of a language this device can reach: the app's own file when
@@ -17193,11 +17216,12 @@ async function i18nIndexFetch(force) {
     try { await cloudDoc(I18N_INDEX_DOC).set({ langs: found, probed: true }, { merge: true }); }
     catch(e) { dlog('[i18n] could not write the language index', e && e.message); }
   }
-  Object.keys(langs).forEach(function(c){ if (I18N_LANGS[c]) i18nNoteKnown(c); });
+  Object.keys(langs).forEach(function(c){ if (i18nEnsureLang(c)) i18nNoteKnown(c); });
   return i18nKnownLangs();
 }
 // Every language that is translated, as far as this device can tell.
 function i18nSupportedLangs() {
+  i18nKnownLangs().forEach(i18nEnsureLang);
   return Object.keys(I18N_LANGS).filter(function(c) {
     return !!i18nReadCache(c) || i18nKnownLangs().indexOf(c) !== -1;
   });
@@ -17547,7 +17571,7 @@ async function i18nEnsureBaseSaved() {
 }
 async function i18nSetLanguage(lang) {
   if (!lang) lang = 'en';
-  if (lang !== 'en' && !I18N_LANGS[lang]) { toast('Unknown language: ' + lang); return false; }
+  if (lang !== 'en' && !i18nEnsureLang(lang)) { toast('Unknown language: ' + lang); return false; }
   await i18nEnsureBaseSaved();
 
   if (lang === 'en') {
@@ -18389,7 +18413,7 @@ function i18nPackLanguages(docs, from) {
   var langs = {};
   Object.keys(docs || {}).forEach(function(code) {
     var d = docs[code];
-    if (code !== 'en' && I18N_LANGS[code] && d && d.strings && typeof d.strings === 'object') langs[code] = d;
+    if (code !== 'en' && i18nEnsureLang(code) && d && d.strings && typeof d.strings === 'object') langs[code] = d;
   });
   return { kind: I18N_FILE_KIND, v: 1, exportedAt: new Date().toISOString(), from: from || '', langs: langs };
 }
@@ -18413,7 +18437,7 @@ function i18nUnpackLanguages(text) {
   var langs = {}, skipped = [];
   Object.keys(o.langs).forEach(function(code) {
     var d = o.langs[code];
-    if (code === 'en' || !I18N_LANGS[code] || !d || !d.strings || typeof d.strings !== 'object') { skipped.push(code); return; }
+    if (code === 'en' || !i18nEnsureLang(code) || !d || !d.strings || typeof d.strings !== 'object') { skipped.push(code); return; }
     var strings = {};
     Object.keys(d.strings).forEach(function(k){ if (typeof d.strings[k] === 'string') strings[k] = d.strings[k]; });
     var doc = {}; Object.keys(d).forEach(function(k){ if (k !== 'strings') doc[k] = d[k]; });
@@ -18505,7 +18529,7 @@ async function i18nPutBack() {
   if (!isAppOwner()) { toast('Putting back a language is for the app\u2019s owner.'); return null; }
   var arch = await i18nArchiveGet('index.json');
   var kept = (arch && arch.langs) || {};
-  var langs = Object.keys(kept).filter(function(c){ return I18N_LANGS[c] && c !== 'en' && (kept[c] || []).length; })
+  var langs = Object.keys(kept).filter(function(c){ return c !== 'en' && i18nEnsureLang(c) && (kept[c] || []).length; })
     .sort(function(a, b){ return i18nLangName(a).localeCompare(i18nLangName(b)); });
   var FROM_FILE = '#file';
   var options = langs.map(function(c){
@@ -19214,7 +19238,7 @@ async function addLanguage() {
 window.addLanguage = addLanguage;
 window.i18nRevertAll = i18nRevertAll; window.i18nSetLanguage = i18nSetLanguage;
 window.i18nEnsureBaseSaved = i18nEnsureBaseSaved;
-window.I18N_LANGS = I18N_LANGS; window.i18nUnits = i18nUnits; window.i18nCatalogue = i18nCatalogue;
+window.I18N_LANGS = I18N_LANGS; window.i18nEnsureLang = i18nEnsureLang; window.i18nUnits = i18nUnits; window.i18nCatalogue = i18nCatalogue;
 window.i18nApply = i18nApply; window.i18nLang = i18nLang; window.i18nIsRTL = i18nIsRTL;
 window.i18nTranslatable = i18nTranslatable; window.i18nLangName = i18nLangName;
 
@@ -37029,6 +37053,7 @@ window.onHeaderScroll = onHeaderScroll;
   // on a Firestore read, and the observer catches everything rendered meanwhile.
   (function(){
     var want = i18nLang();
+    if (want !== 'en' && !i18nEnsureLang(want)) want = 'en';   // v39.05 — a language added here is named again
     renderLangMenu();
     if (want === 'en') { i18nApplyDirection(); return; }
     i18nStartObserver();

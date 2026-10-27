@@ -19,6 +19,10 @@
  * and checks (i18nTranslateAll). Only its `aiCall` is answered from here —
  * straight from Anthropic, with ANTHROPIC_API_KEY, on the model the app names.
  *
+ * v39.05 — a language in the app's own list (I18N_LANGS) that is not published yet is translated IN FULL and
+ * published with the rest (Tony, 27 Oct: "Please add all the translated languages to the app's built in
+ * languages"): Portuguese was in the list but never translated, so a Portuguese device was never offered it.
+ *
  * The new phrases are then ADDED to the central translations (the family
  * project's i18n/<lang>, read afresh just before and written only if unchanged
  * since — nothing an admin changed meanwhile is lost; nothing already there is
@@ -37,6 +41,7 @@ const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const argv = process.argv.slice(2);
 const DRY = argv.includes('--dry-run');
 const MAX_NEW = 600;              // more than this at once means something is wrong (a broken harvest): stop
+const MAX_FRESH = 2, MAX_FULL = 6000;   // v39.05 — languages translated in full in one run, and phrases in each
 
 const html = fs.readFileSync(path.join(repo, 'index.html'), 'utf8');
 const version = (/var APP_VERSION = '([^']+)'/.exec(html) || [])[1] || '?';
@@ -117,11 +122,13 @@ const fsInt = n => ({ integerValue: String(Math.round(n)) });
 // the document is still what was read (updateTime): otherwise read again and merge.
 async function patchDoc(docPath, fields, updateTime, paths) {
   const mask = (paths || Object.keys(fields)).map(f => 'updateMask.fieldPaths=' + encodeURIComponent(f)).join('&');
-  const pre = updateTime ? '&currentDocument.updateTime=' + encodeURIComponent(updateTime) : '';
+  // updateTime false: the document must not exist yet (a language translated for the first time).
+  const pre = updateTime === false ? '&currentDocument.exists=false'
+    : updateTime ? '&currentDocument.updateTime=' + encodeURIComponent(updateTime) : '';
   const r = await fetch(DOCS + docPath + '?' + mask + pre, { method: 'PATCH', headers: await authHeaders(), body: JSON.stringify({ fields }) });
   if (r.ok) return 'ok';
   const t = await r.text();
-  if (r.status === 400 && /FAILED_PRECONDITION|precondition/i.test(t)) return 'changed';
+  if ((r.status === 400 && /FAILED_PRECONDITION|precondition/i.test(t)) || r.status === 409) return 'changed';
   if (r.status === 403) throw new Error('the service account may not write the translations (403) — give it the "Cloud Datastore User" role on ' + projectId + ': ' + t.slice(0, 200));
   throw new Error(docPath + ': HTTP ' + r.status + ' ' + t.slice(0, 300));
 }
@@ -157,7 +164,12 @@ try {
   // 2. The published languages, as they are NOW in the central store.
   const idx = await readDoc(indexPath);
   const langs = Object.keys((idx && idx.data && idx.data.langs) || {}).filter(c => /^[a-z]{2,3}$/.test(c) && c !== 'en').sort();
-  if (!langs.length) { console.log('no languages in ' + indexPath + ' — nothing to do'); process.exit(0); }
+  // 2b. v39.05 — the app's own languages that nobody has translated yet: translated in full, a few at a time.
+  // The list as written in index.html, not as the page holds it: the page adds whatever it finds published.
+  const own = [...(/var I18N_LANGS = \{([\s\S]*?)\n\};/.exec(html) || ['', ''])[1].matchAll(/^\s*([a-z]{2,3}):/gm)].map(m => m[1]);
+  const fresh = own.filter(c => /^[a-z]{2,3}$/.test(c) && c !== 'en' && !langs.includes(c)).sort();
+  if (fresh.length) console.log('not translated yet: ' + fresh.join(', ') + (fresh.length > MAX_FRESH ? ` — the first ${MAX_FRESH} this time` : ''));
+  if (!langs.length && !fresh.length) { console.log('no languages in ' + indexPath + ' — nothing to do'); process.exit(0); }
 
   // 2a. v38.26 — no e-mail address belongs in the translations. Members' addresses
   // got in through the ✉️ Notify button's tooltip ("Send <address> a note about the
@@ -205,6 +217,12 @@ try {
     plan.push({ lang, gaps });
     console.log(`  ${lang}: ${gaps.length ? gaps.length + ' new phrase' + (gaps.length === 1 ? '' : 's') : 'up to date'}`);
   }
+  for (const lang of fresh.slice(0, MAX_FRESH)) {
+    if (await readDoc(prefix + lang)) { console.log(`  ${lang}: a document but not in the index — left for the app`); continue; }
+    const gaps = await page.evaluate(cat => i18nGapList({}, [], cat), catalogue);
+    plan.push({ lang, gaps, fresh: true });
+    console.log(`  ${lang}: all ${gaps.length} phrases (a new language)`);
+  }
   const total = plan.reduce((n, p) => n + p.gaps.length, 0);
   if (!total) { console.log('every language is up to date'); process.exit(0); }
   if (DRY) {
@@ -212,7 +230,7 @@ try {
     console.log('(dry run — nothing translated, nothing written)');
     process.exit(0);
   }
-  if (plan.some(p => p.gaps.length > MAX_NEW)) {
+  if (plan.some(p => p.gaps.length > (p.fresh ? MAX_FULL : MAX_NEW))) {
     console.log(`::error::${total} phrases to translate at once — more than a release ever adds. Nothing was translated: run "🔄 Update all supported languages" in the family app, or this job with a reason to trust it.`);
     process.exit(1);
   }
@@ -248,7 +266,7 @@ try {
       gaps.forEach(g => { if (res.dict[g]) out[g] = res.dict[g]; });
       return { filled: out, missing: (res.missing || []).length };
     }, [p.lang, p.gaps]);
-    results.push({ lang: p.lang, filled: got.filled, missing: got.missing });
+    results.push({ lang: p.lang, filled: got.filled, missing: got.missing, fresh: !!p.fresh });
   }
   console.log(`AI: ${calls} call${calls === 1 ? '' : 's'}, ${inTok} tokens in, ${outTok} out`);
 
@@ -266,10 +284,11 @@ try {
       if (!added) { console.log(`  ${r.lang}: already there`); break; }
       const fields = { strings: { mapValue: { fields: Object.fromEntries(Object.entries(strings).map(([k, v]) => [k, fsString(v)])) } },
         count: fsInt(Object.keys(strings).length), updatedAt: fsInt(now), by: fsString('GitHub, after ' + version) };
-      const w = await patchDoc(prefix + r.lang, fields, d && d.updateTime);
+      if (!d) fields.lang = fsString(r.lang);
+      const w = await patchDoc(prefix + r.lang, fields, d ? d.updateTime : false);
       if (w === 'changed') { console.log(`  ${r.lang}: changed meanwhile — reading it again`); continue; }
       await patchDoc(indexPath, { langs: { mapValue: { fields: { [r.lang]: { mapValue: { fields: { at: fsInt(now), count: fsInt(Object.keys(strings).length) } } } } } } }, null, ['langs.' + r.lang]);
-      console.log(`  ${r.lang}: +${added}` + (r.missing ? ` (${r.missing} could not be translated)` : ''));
+      console.log(`  ${r.lang}: +${added}` + (r.fresh ? ' (a new language)' : '') + (r.missing ? ` (${r.missing} could not be translated)` : ''));
       wrote += added;
       break;
     }

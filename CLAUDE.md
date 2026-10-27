@@ -1345,6 +1345,21 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
     success: Deploy to GitHub Pages, pages build, Publish the database rules (the family's and the beta's — 2 projects,
     `--not-test`), Deploy the Worker (live v95 = published, kept), Publish languages, Translate new phrases, Self Tests on
     main and test, Cloudflare Pages for both copies.
+  - **v39.05 — every translated language is offered (Tony, 27 Oct: "Please add all the translated languages to the app's
+    built in languages. A user should be able to get the wizard in any of the 11 translated languages (and additional
+    languages, if they are translated in the future)"):**
+    - The first-visit question is always "the device's own language vs English" (`i18nDeviceLangOffer`): a Hungarian
+      phone is asked [Magyar] [English], never about Hebrew. A language is offered only if it is published (i18n/index.json)
+      AND in `I18N_LANGS`. Hungarian was published (added from a device) but not in the list, so it was never offered.
+    - `hu` is in `I18N_LANGS`; and `i18nEnsureLang(code)` adds any other published language at run time, named by the
+      browser (`Intl.DisplayNames`: itself and in English; right-to-left from `I18N_RTL`). It runs wherever the app reads
+      languages from outside: the static and central indexes, the per-kitchen index, the first-visit offer, choosing a
+      language, the saved choice at start-up, export/import of languages and Put back. A code the browser cannot name is
+      refused. A future language published from a device is offered everywhere with no change to the app.
+    - Portuguese was in the list but never translated. tools/translate-new.mjs (on each release to `main`) now translates
+      IN FULL any language in the list as written in index.html that is not published (at most 2 a run, 6000 phrases
+      each; the document is created only if it does not exist), then Publish languages puts it in i18n/pt.json. Dry run
+      on v39.05: pt, all 2174 phrases. One-off AI cost: a few dollars.
   - **The test copy behaves as the beta will (Tony, 27 Oct: "once a build is released to it, it behaves exactly the same
     as the Beta would have"; "Perhaps we should update the database rules and server immediately upon the release to the
     test version"):**

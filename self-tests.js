@@ -4492,7 +4492,7 @@ window.SELF_TESTS = [
 
   { id:'wpo_first_visit', group:'UI', name:'A first visit: welcome, an empty collection that teaches, a tour (v37.00)',
     test: async()=>{
-      ['householdWelcome','householdCodeFrom','firstRunEmptyHtml','addSampleRecipes','startTour','i18nDeviceLangOffer','feedbackMailto','sendFeedback'].forEach(function(f){
+      ['householdWelcome','householdCodeFrom','firstRunEmptyHtml','addSampleRecipes','startTour','i18nDeviceLangOffer','i18nEnsureLang','feedbackMailto','sendFeedback'].forEach(function(f){
         if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
       // An invitation is found in whatever was pasted.
       var code='a'.repeat(36);
@@ -4563,8 +4563,18 @@ window.SELF_TESTS = [
       }
       // The device's language is offered only when the app speaks it.
       if(i18nDeviceLangOffer(['he-IL','en'],['he','ru'])!=='he' || i18nDeviceLangOffer(['iw'],['he'])!=='he'
-         || i18nDeviceLangOffer(['en-US','he'],['he'])!==null || i18nDeviceLangOffer(['fr-FR'],['he'])!==null)
+         || i18nDeviceLangOffer(['en-US','he'],['he'])!==null || i18nDeviceLangOffer(['fr-FR'],['he'])!==null
+         || i18nDeviceLangOffer(['hu-HU','en'],['he','hu'])!=='hu')   // v39.05 — Hungarian, published, is offered too
         throw new Error('the language offer picks the wrong language');
+      // v39.05 — a language that is published but not in the app's own list is offered all the same, named by the
+      // browser; nothing it cannot name joins the list.
+      var nlWas=I18N_LANGS.nl, faWas=I18N_LANGS.fa;
+      try{
+        if(i18nDeviceLangOffer(['nl-NL','en'],['he','nl'].filter(i18nEnsureLang))!=='nl') throw new Error('a newly published language (Dutch) is not offered');
+        if(I18N_LANGS.nl.label!=='Nederlands' || I18N_LANGS.nl.en!=='Dutch' || I18N_LANGS.nl.rtl) throw new Error('Dutch is named '+JSON.stringify(I18N_LANGS.nl));
+        if(!i18nEnsureLang('fa') || !I18N_LANGS.fa.rtl) throw new Error('Persian is not written right to left');
+        if(i18nEnsureLang('xx') || I18N_LANGS.xx || i18nEnsureLang('en') || i18nEnsureLang('<b>') || I18N_LANGS['<b>']) throw new Error('a code that is not a language joined the list');
+      } finally { if(!nlWas) delete I18N_LANGS.nl; if(!faWas) delete I18N_LANGS.fa; }
       // The tour points at what is on screen, and ends.
       try{
         var n=startTour();
