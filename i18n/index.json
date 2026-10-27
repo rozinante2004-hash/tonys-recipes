@@ -1,6 +1,6 @@
 {
  "source": "my-kitchen-notes-beta/i18n/*",
- "publishedAt": 1793096953888,
+ "publishedAt": 1793111949979,
  "requestedBy": "",
  "langs": {
   "ar": {
@@ -22,6 +22,10 @@
   "he": {
    "at": 1793096922010,
    "count": 3010
+  },
+  "hu": {
+   "at": 1793099062903,
+   "count": 2200
   },
   "it": {
    "at": 1793096922010,
