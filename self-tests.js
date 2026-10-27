@@ -8831,6 +8831,49 @@ window.SELF_TESTS = [
       if(!/⚠️ my-kitchen-notes-beta: 36,000 of 50,000 \(72%\)/.test(lines) || !/✓ tonys-recipes-test: 120 of 50,000 \(0%\)/.test(lines)) throw new Error('the page: '+lines);
     } },
 
+  { id:'first_contact_wizard', group:'Core', name:'🧑‍🍳 First contact: a one-time setup on the notebook page — welcome, the account (e-mail, a made-up password, Remember me, I already have an account, Continue offline), this device, then the rules and the tour (v38.95)',
+    test: async()=>{
+      var keys=[SETUP_SEEN_KEY, SETUP_DEVICE_KEY, TOUR_DONE_KEY, TESTER_WELCOME_KEY], kept={};
+      keys.forEach(function(k){ kept[k]=localStorage.getItem(k); });
+      var realKind=window.setupDeviceKind, realRun=_selfTestRunning;
+      try{
+        setupWelcome();
+        var ov=document.getElementById('setupWiz');
+        if(!ov || !/one-time setup/.test(ov.textContent) || !ov.querySelector('.tg-page') || !ov.querySelector('#swGo')) throw new Error('no welcome page');
+        ov.querySelector('#swGo').click();
+        if(localStorage.getItem(SETUP_SEEN_KEY)!=='wizard') throw new Error('the welcome was not noted');
+        if(signInOn('password')){
+          ['#swEmail','#swPass','#swRemember','#swCreate','#swHave'].forEach(function(q){ if(!ov.querySelector(q)) throw new Error('the account page has no '+q); });
+          if(ov.querySelector('#swPass').getAttribute('autocomplete')!=='new-password') throw new Error('the password is not a new one');
+          if(!/Make up a password/.test(ov.textContent)) throw new Error('not told to make up a password');
+        }
+        if(!/Continue offline/.test(ov.textContent)) throw new Error('no Continue offline');
+        if(!ov.querySelector('.sw-dots i.on')) throw new Error('no step dots');
+        setupHaveAccount();
+        if(document.getElementById('setupWiz')) throw new Error('I already have an account left the wizard open');
+        // this device: once, then never again; a device used before is left alone
+        localStorage.removeItem(SETUP_DEVICE_KEY); localStorage.removeItem(TOUR_DONE_KEY); localStorage.removeItem(TESTER_WELCOME_KEY);
+        window.setupDeviceKind=function(){ return 'ext'; }; window._setupWizTest=true; _selfTestRunning=false;
+        var realStore=window.extStoreUrl; window.extStoreUrl=function(){ return 'https://example.com/store'; };
+        var p=setupDeviceStep({ uid:'u1' }); _selfTestRunning=true;
+        var dv=document.getElementById('setupWiz');
+        window.extStoreUrl=realStore;
+        if(!dv || !dv.querySelector('#swAct') || !dv.querySelector('#swNext') || !/later from/.test(dv.textContent)) throw new Error('no page for this device');
+        dv.querySelector('#swNext').click(); await p;
+        if(document.getElementById('setupWiz') || localStorage.getItem(SETUP_DEVICE_KEY)!=='ext') throw new Error('Next did not go on');
+        _selfTestRunning=false; await setupDeviceStep({ uid:'u1' }); _selfTestRunning=true;
+        if(document.getElementById('setupWiz')) throw new Error('asked twice on one device');
+        localStorage.removeItem(SETUP_DEVICE_KEY); localStorage.setItem(SETUP_SEEN_KEY,'before'); localStorage.setItem(TOUR_DONE_KEY,'1');
+        _selfTestRunning=false; await setupDeviceStep({ uid:'u1' }); _selfTestRunning=true;
+        if(document.getElementById('setupWiz') || localStorage.getItem(SETUP_DEVICE_KEY)!=='before') throw new Error('a device in use was asked');
+        if(await setupWizMaybe()) throw new Error('the welcome came again');
+        if(String(legalShowGate).indexOf('setupDotsHtml(3)')===-1) throw new Error('the rules are not the third page');
+      } finally {
+        _selfTestRunning=realRun; window._setupWizTest=false; window.setupDeviceKind=realKind; setupWizClose();
+        keys.forEach(function(k){ if(kept[k]===null) localStorage.removeItem(k); else localStorage.setItem(k, kept[k]); });
+      }
+    } },
+
   { id:'linked_photo_redrawn_meanwhile', group:'Core', name:'🤝 A linked kitchen\u2019s photo reaches its card even when the list was drawn again while it was on its way, a failed read is tried again, and 🔄 Reload sits beside 💬 Chat (v38.94)',
     test: async()=>{
       if(String(renderLinkedInAll).indexOf('linkedReload(')===-1) throw new Error('no 🔄 Reload beside a linked kitchen');

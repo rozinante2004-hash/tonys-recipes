@@ -1247,6 +1247,23 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
       an unhandled-rejection report (beta v38.92, Android Chrome, 26 Oct).
     - Privacy Statement 1.9 (11 languages): ntfy as a provider (the Team's own alerts, nothing about users) and the
       reports' retention. No one is asked to agree again.
+  - **v38.94 (waits for Tony's yes):** a linked kitchen's photos — the list is drawn again right after sign-in while
+    the first photos are on their way; the photo went into the discarded card and the new one, "already asked", kept its
+    emoji (Tony's screenshot, 27 Oct: the top 6 cards of a linked kitchen). One read per photo now, shared, put into
+    every card of that recipe on the page; a failed read is tried again. 🔄 Reload beside 💬 Chat (`linkedReload`)
+    forgets what the device kept of that kitchen and reads it whole. (The device in the screenshot was still on
+    v38.79.)
+  - **v38.95 (waits for Tony's yes): the first-contact wizard** (Tony, 27 Oct: "a wizard-type first-contact procedure
+    … one-time short setup … as little clicks and decisions as possible … the kitchen scrap book page … light and
+    humoristic"). `#setupWiz` shares the rules' notebook page (`:is(#termsGate, #setupWiz)`). Welcome ("Ready? Let's
+    go!") → 1 account (e-mail, "Make up a password", Remember me, Create my account → `emailSignIn('up')` through
+    the sign-in screen's own form; I already have an account → that form, open; Continue offline) → 2 this device
+    (`setupDeviceStep`, in the sign-in path before `legalGate`, once per device: the iPhone shortcut, Android's
+    install prompt, the computer's extension store page; nothing on a device with nothing to offer) → 3 the rules
+    (dots) → 4 the tour (straight after founding, or first in the beta's welcome). Only on a device nobody used
+    (`setupDeviceUsedBefore`: tour, tester welcome or rules agreed here); never in an automated browser
+    (`navigator.webdriver`, unless `_setupWizTest`). Phrases in `SETUP_TEXT` (I18N_EXTRA). The kitchen's name is
+    still asked in its own window after the rules.
 - **Photo keys, 23 Oct:** Pexels: "New API key issuance is currently paused and cannot be requested" (Tony); Unsplash:
   "We can forego unsplash for now" (Tony). Photos stay Pixabay + Wikimedia Commons; the workflow is ready if a key
   ever comes (secrets PEXELS_API_KEY / UNSPLASH_ACCESS_KEY, then dispatch Deploy the Worker).

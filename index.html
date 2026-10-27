@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v38.94 -->
+<!-- Tony's Recipes Collection v38.95 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -681,6 +681,8 @@
             if (loginSc)   loginSc.style.display   = 'none';
             if (notice2) notice2.style.display = 'none';
             // v37.83 — the kitchen rules, agreed to once, before anything else.
+            // v38.95 — the wizard's page for this device (the shortcut, the app, the extension), once on each new device
+            if (typeof setupDeviceStep === 'function') { try { await setupDeviceStep(user); } catch(e) {} }
             if (typeof legalGate === 'function' && !(await legalGate(user))) { _autoLoginTimer = null; return; }
             // v38.40 — another account's copy on this device is set aside before anything is drawn or sent.
             if (typeof localCopyForAccount === 'function') { try { await localCopyForAccount(user, null); } catch(e) {} }
@@ -8109,6 +8111,7 @@ function firstRunAfterFounding() {
   try { if (localStorage.getItem(TOUR_DONE_KEY)) return; } catch(e) {}
   // v38.15 — where testers are greeted, the welcome offers the tour: one window, not two.
   if (typeof featureOn === 'function' && featureOn('testerWelcome')) return;
+  if (typeof setupWizRan === 'function' && setupWizRan()) { startTour(); return; }   // v38.95 — the wizard's last page: the tour itself
   askConfirm({ icon: '\u{1F9ED}', title: 'Your collection is ready',
     message: 'A 30-second tour of where everything is?', okLabel: 'Show me', cancelLabel: 'Not now' })
     .then(function(ok){ if (ok === true) startTour(); else { try { localStorage.setItem(TOUR_DONE_KEY, '1'); } catch(e) {} } });
@@ -8304,10 +8307,211 @@ function sendFeedbackByEmail() {
     title: 'Send feedback', intro: 'Your note goes to ' + to + '. Choose how to write it \u2014 it opens ready, and you press Send:',
     subject: 'Feedback \u2014 ' + (APP_CONFIG.brandName || 'My Kitchen Notes') + ' ' + APP_VERSION, text: body });
 }
-setTimeout(function(){ firstRunLanguageOffer().catch(function(){}); }, 1200);
+setTimeout(function(){ firstRunLanguageOffer().catch(function(){}).then(function(){ return setupWizMaybe(); }).catch(function(){}); }, 1200);   // v38.95 — then the wizard
 window.householdCodeFrom = householdCodeFrom; window.householdWelcome = householdWelcome; window.firstRunEmptyHtml = firstRunEmptyHtml;
 window.addSampleRecipes = addSampleRecipes; window.startTour = startTour; window.tourTargets = tourTargets;
 window.i18nDeviceLangOffer = i18nDeviceLangOffer; window.firstRunLanguageOffer = firstRunLanguageOffer;
+// ─── v38.95 — THE FIRST-CONTACT WIZARD (Tony, 27 Oct) ────────────────────────
+// Tony: "a wizard-type first-contact procedure … a one-time short setup … as little clicks and decisions as possible.
+// Simply tell him what to click and where, and do whatever the app can do for him … the kitchen scrap book page …
+// a light and humoristic tone." One page at a time, on the kitchen rules' notebook page (#setupWiz shares its look):
+//   welcome ("Ready?") → 1 the account (an e-mail, a made-up password, Create my account; I already have an account
+//   opens the sign-in screen's e-mail form; Continue offline; Remember me) → 2 this device (the iPhone shortcut, the
+//   Android app in the Share menu, or the computer's extension — on every new device, after signing in, before the
+//   rules) → 3 the kitchen rules (legalGate) → 4 the tour (the beta's welcome offers it first).
+// Only on a device nobody has used yet (an update brings no wizard to a device in use); the language is asked first.
+var SETUP_SEEN_KEY = 'mkn_setup_seen', SETUP_DEVICE_KEY = 'mkn_setup_device';
+var SETUP_TEXT = {
+  hello: 'Welcome to My Kitchen Notes! \u{1F44B}',
+  helloSub: 'Let’s get you settled in with this one-time setup. It takes about a minute — less than boiling an egg. \u{1F95A}',
+  helloList: ['\u{1F511} Your account', '\u{1F4F2} This device', '\u{1F4DC} The kitchen rules', '\u{1F9ED} A quick look around'],
+  ready: 'Ready? Let’s go! \u{1F373}',
+  key: 'Your kitchen key \u{1F511}',
+  email: 'Your e-mail address',
+  pass: 'Make up a password — at least 8 characters',
+  passHint: 'A brand-new one, just for your kitchen — not your e-mail’s password. \u{1F92B}',
+  remember: 'Remember me on this device',
+  create: 'Create my account \u{1F389}',
+  creating: '⏳ Setting the table…',
+  have: 'I already have an account',
+  offline: 'Continue offline (sign in later — nothing is lost)',
+  google: 'Sign in with Google — one tap, and your recipes follow you to every device.',
+  googleBtn: 'Sign in with Google',
+  failed: 'That did not work — have another go.',
+  later: 'You can always do this later from ⚙️ Settings — but now is the perfect moment to get it out of the way. \u{1F609}',
+  next: 'Next ➜',
+  iosTitle: 'Save recipes from anywhere \u{1F4F2}',
+  iosSub: 'Put “Save to My Kitchen Notes” in your iPhone’s Share button: any recipe in Safari, Instagram or Facebook is then one tap away.',
+  iosSteps: ['Tap Get the shortcut.', 'Tap Add Shortcut.', 'Come back here. That’s it!'],
+  iosBtn: 'Get the shortcut',
+  iosHome: 'Bonus: put the app on your Home Screen — tap Share ⬆, then Add to Home Screen.',
+  andTitle: 'Save recipes from anywhere \u{1F4F2}',
+  andSub: 'Install the app: it then appears when you tap Share in Instagram, Facebook or Chrome.',
+  andBtn: 'Install the app',
+  andSteps: 'Tap ⋮ at the top right, then Install app (or Add to Home screen).',
+  andDone: '✅ Installed — look for it in your Share menu.',
+  extTitle: 'A Save button for your browser \u{1F9E9}',
+  extSub: 'Adds a \u{1F4D8} Save recipe button under Facebook, Instagram and TikTok posts, and to any recipe website.',
+  extSteps: ['Click Get the extension.', 'In the store, click Add, then Add extension.', 'Come back to this tab.'],
+  extBtn: 'Get the extension'
+};
+function setupPhrases() { return [].concat.apply([], Object.keys(SETUP_TEXT).map(function(k){ return SETUP_TEXT[k]; })); }
+function setupWizAllowed() { return window.APP_CONFIG.dataLayout === 'households' && !window._selfTestRunning; }
+function setupWizRan() { try { return localStorage.getItem(SETUP_SEEN_KEY) === 'wizard'; } catch(e) { return false; } }
+// A device someone has used before (the tour, the beta's welcome, the rules agreed here): nothing here is new to it.
+function setupDeviceUsedBefore() {
+  try {
+    if (localStorage.getItem(TOUR_DONE_KEY) || localStorage.getItem(TESTER_WELCOME_KEY)) return true;
+    for (var i = 0; i < localStorage.length; i++) if (String(localStorage.key(i) || '').indexOf(TERMS_OK_KEY) === 0) return true;
+  } catch(e) { return true; }
+  return false;
+}
+function setupDotsHtml(step) {
+  return '<div class="sw-dots" aria-hidden="true">' + [1, 2, 3, 4].map(function(n){
+    return '<i class="' + (n === step ? 'on' : n < step ? 'done' : '') + '"></i>'; }).join('') + '</div>';
+}
+function setupWizPage(step, html) {
+  legalFonts();
+  var ov = document.getElementById('setupWiz');
+  if (!ov) {
+    ov = document.createElement('div');
+    ov.id = 'setupWiz'; ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-modal', 'true'); ov.setAttribute('aria-labelledby', 'swTitle');
+    document.body.appendChild(ov);
+  }
+  ov.innerHTML = '<div class="tg-page"><div class="tg-tape" aria-hidden="true"></div>' + (step ? setupDotsHtml(step) : '') + html + '</div>';
+  setTimeout(function(){ var f = ov.querySelector('[autofocus]') || ov.querySelector('.tg-go'); if (f) try { f.focus(); } catch(e) {} }, 60);
+  return ov;
+}
+function setupWizClose() { var ov = document.getElementById('setupWiz'); if (ov) ov.remove(); }
+// After the language question, on a device nobody has used, signed out: the welcome, over the sign-in screen.
+async function setupWizMaybe() {
+  if (!setupWizAllowed()) return false;
+  try { if (localStorage.getItem(SETUP_SEEN_KEY)) return false; } catch(e) { return false; }
+  if (setupDeviceUsedBefore()) { try { localStorage.setItem(SETUP_SEEN_KEY, 'before'); } catch(e) {} return false; }
+  try { if (window._fbAuth && _fbAuth.isSignInWithEmailLink && _fbAuth.isSignInWithEmailLink(location.href)) return false; } catch(e) {}
+  if (navigator.webdriver && !window._setupWizTest) return false;   // the test suites drive the sign-in screen themselves
+  for (var i = 0; i < 40 && !window._fbAuthSettled; i++) await new Promise(function(r){ setTimeout(r, 250); });   // who is signed in
+  for (var j = 0; j < 240 && document.getElementById('askOverlay'); j++) await new Promise(function(r){ setTimeout(r, 250); });
+  var ls = document.getElementById('loginScreen');
+  if (fbSignedInUser() || !ls || getComputedStyle(ls).display === 'none' || document.getElementById('setupWiz')) return false;
+  setupWelcome();
+  return true;
+}
+function setupWelcome() {
+  var T = SETUP_TEXT;
+  var ov = setupWizPage(0, '<div class="tg-hand tg-title" id="swTitle">' + escH(T.hello) + '</div>'
+    + '<div class="tg-hand tg-sub">' + escH(T.helloSub) + '</div>'
+    + '<div class="tg-hand sw-list">' + T.helloList.map(function(l){ return '<div>' + escH(l) + '</div>'; }).join('') + '</div>'
+    + '<button type="button" class="tg-go" id="swGo">' + escH(T.ready) + '</button>');
+  ov.querySelector('#swGo').onclick = setupAccount;
+  return ov;
+}
+function setupAccount() {
+  var T = SETUP_TEXT;
+  try { localStorage.setItem(SETUP_SEEN_KEY, 'wizard'); } catch(e) {}
+  var remember = '<label class="tg-check tg-hand"><input type="checkbox" id="swRemember"' + (rememberChoice() ? ' checked' : '')
+    + ' onchange="rememberSet(this.checked)"> ' + escH(T.remember) + '</label>';
+  var offline = '<button type="button" class="tg-out" onclick="setupOffline()">' + escH(T.offline) + '</button>';
+  return setupWizPage(1, '<div class="tg-hand tg-title" id="swTitle">' + escH(T.key) + '</div>'
+    + (signInOn('password')
+      ? '<form id="swForm" autocomplete="on" onsubmit="event.preventDefault();setupCreate();">'
+        + '<label class="tg-hand sw-label" for="swEmail">' + escH(T.email) + '</label>'
+        + '<input id="swEmail" name="username" type="email" autocomplete="username" dir="ltr" class="sw-input" enterkeyhint="next" autofocus'
+        +   ' onkeydown="if(event.key===\'Enter\'){event.preventDefault();document.getElementById(\'swPass\').focus();}">'
+        + '<label class="tg-hand sw-label" for="swPass">' + escH(T.pass) + '</label>'
+        + '<div class="sw-hint">' + escH(T.passHint) + '</div>'
+        + '<input id="swPass" name="password" type="password" autocomplete="new-password" dir="ltr" class="sw-input" enterkeyhint="go">'
+        + remember
+        + '<div class="sw-err" id="swErr" role="alert"></div>'
+        + '<button type="submit" class="tg-go" id="swCreate">' + escH(T.create) + '</button>'
+        + '</form>'
+        + '<button type="button" class="sw-link tg-hand" id="swHave" onclick="setupHaveAccount()">' + escH(T.have) + '</button>'
+      : '<div class="tg-hand tg-sub">' + escH(T.google) + '</div>' + remember
+        + '<button type="button" class="tg-go" onclick="setupWizClose();startGoogleSignIn()">' + escH(T.googleBtn) + '</button>')
+    + offline);
+}
+// Create my account: the sign-in screen's own form does it (the same checks, the confirmation e-mail, Remember me).
+async function setupCreate() {
+  var e = document.getElementById('swEmail'), p = document.getElementById('swPass'), err = document.getElementById('swErr'), btn = document.getElementById('swCreate');
+  if (!document.getElementById('emailSignInEmail') && typeof renderSignInOptions === 'function') renderSignInOptions();
+  var fe = document.getElementById('emailSignInEmail'), fp = document.getElementById('emailSignInPassword');
+  if (!e || !p || !fe || !fp) return null;
+  fe.value = e.value.trim(); fp.value = p.value;
+  if (err) err.textContent = '';
+  var was = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = SETUP_TEXT.creating; }
+  var cred = null;
+  try { cred = await emailSignIn('up'); } catch(x) {}
+  if (cred) { setupWizClose(); return cred; }   // signed in: this device's page comes next (setupDeviceStep)
+  if (btn) { btn.disabled = false; btn.textContent = was; }
+  var le = document.getElementById('loginError');
+  if (err) err.textContent = (le && le.style.display !== 'none' && le.textContent) || SETUP_TEXT.failed;
+  return null;
+}
+function setupHaveAccount() {
+  var e = document.getElementById('swEmail'), v = e ? e.value.trim() : '';
+  setupWizClose();
+  var f = document.getElementById('emailSignInForm');
+  if (f && f.style.display === 'none' && typeof toggleEmailSignIn === 'function') toggleEmailSignIn();
+  var fe = document.getElementById('emailSignInEmail'); if (fe && v) fe.value = v;
+  setTimeout(function(){ var x = document.getElementById(v ? 'emailSignInPassword' : 'emailSignInEmail'); if (x) try { x.focus(); } catch(err) {} }, 80);
+}
+function setupOffline() { setupWizClose(); useOfflineMode(); }
+function setupStandalone() { try { return !!(navigator.standalone || (window.matchMedia && matchMedia('(display-mode: standalone)').matches)); } catch(e) { return false; } }
+// What this device can be given: 'ios' (the shortcut), 'android' (the installed app, in the Share menu), 'ext' (the
+// computer's extension), or '' (nothing to offer: a Mac's Safari, an installed Android app, …).
+function setupDeviceKind() {
+  if (isIOS()) return APP_CONFIG.iosShortcutUrl ? 'ios' : '';
+  if (/Android/i.test(navigator.userAgent || '')) return setupStandalone() ? '' : 'android';
+  var b = typeof extBrowser === 'function' ? extBrowser() : '';
+  return b && typeof extStoreUrl === 'function' && extStoreUrl(b) && !extInstalledVersion() ? 'ext' : '';
+}
+// Once on every device, after signing in and before the kitchen rules. Resolves when the person goes on.
+function setupDeviceStep(user) {
+  setupWizClose();                       // (a sign-in that came another way, the welcome still open)
+  if (!user || !setupWizAllowed() || (navigator.webdriver && !window._setupWizTest)) return Promise.resolve();
+  try { if (localStorage.getItem(SETUP_DEVICE_KEY)) return Promise.resolve(); } catch(e) { return Promise.resolve(); }
+  if (!setupWizRan() && setupDeviceUsedBefore()) { try { localStorage.setItem(SETUP_DEVICE_KEY, 'before'); } catch(e) {} return Promise.resolve(); }
+  var kind = setupDeviceKind(), T = SETUP_TEXT;
+  try { localStorage.setItem(SETUP_DEVICE_KEY, kind || 'nothing'); } catch(e) {}
+  if (!kind) return Promise.resolve();
+  var steps = function(list){ return '<ol class="tg-hand sw-steps">' + list.map(function(l){ return '<li>' + escH(l) + '</li>'; }).join('') + '</ol>'; };
+  var body, act;
+  if (kind === 'ios') {
+    body = '<div class="tg-hand tg-title" id="swTitle">' + escH(T.iosTitle) + '</div><div class="tg-hand tg-sub">' + escH(T.iosSub) + '</div>' + steps(T.iosSteps)
+      + '<a class="tg-go sw-act" id="swAct" href="' + escA(APP_CONFIG.iosShortcutUrl) + '" target="_blank" rel="noopener">' + escH(T.iosBtn) + '</a>'
+      + (setupStandalone() ? '' : '<div class="tg-hand sw-hint">' + escH(T.iosHome) + '</div>');
+  } else if (kind === 'android') {
+    body = '<div class="tg-hand tg-title" id="swTitle">' + escH(T.andTitle) + '</div><div class="tg-hand tg-sub">' + escH(T.andSub) + '</div>'
+      + (_pwaInstallEvent ? '<button type="button" class="tg-go sw-act" id="swAct">' + escH(T.andBtn) + '</button>'
+                          : '<div class="tg-hand sw-steps">' + escH(T.andSteps) + '</div>')
+      + '<div class="tg-hand sw-hint" id="swDone" hidden>' + escH(T.andDone) + '</div>';
+  } else {
+    body = '<div class="tg-hand tg-title" id="swTitle">' + escH(T.extTitle) + '</div><div class="tg-hand tg-sub">' + escH(T.extSub) + '</div>' + steps(T.extSteps)
+      + '<a class="tg-go sw-act" id="swAct" href="' + escA(extStoreUrl(extBrowser())) + '" target="_blank" rel="noopener">' + escH(T.extBtn) + '</a>';
+  }
+  return new Promise(function(resolve) {
+    var ov = setupWizPage(2, body + '<div class="tg-hand sw-later">' + escH(T.later) + '</div>'
+      + '<button type="button" class="sw-next" id="swNext">' + escH(T.next) + '</button>');
+    var next = ov.querySelector('#swNext'), a = ov.querySelector('#swAct');
+    // once the thing is done (or under way in the other tab), Next is the big button
+    var promote = function(){ if (a) a.classList.add('sw-did'); next.classList.add('tg-go'); };
+    if (a) a.addEventListener('click', function(ev){
+      if (kind === 'android' && _pwaInstallEvent) {
+        ev.preventDefault();
+        var p = _pwaInstallEvent; _pwaInstallEvent = null;
+        p.prompt();
+        Promise.resolve(p.userChoice).then(function(c){ if (c && c.outcome === 'accepted') { var d = ov.querySelector('#swDone'); if (d) d.hidden = false; } promote(); }, promote);
+        return;
+      }
+      setTimeout(promote, 400);
+    });
+    next.onclick = function(){ setupWizClose(); resolve(); };
+  });
+}
+window.setupWizMaybe = setupWizMaybe; window.setupWelcome = setupWelcome; window.setupAccount = setupAccount; window.setupCreate = setupCreate;
+window.setupHaveAccount = setupHaveAccount; window.setupOffline = setupOffline; window.setupDeviceStep = setupDeviceStep;
+window.setupWizClose = setupWizClose; window.setupDeviceKind = setupDeviceKind; window.setupWizRan = setupWizRan;
 window.feedbackMailto = feedbackMailto; window.sendFeedback = sendFeedback; window.TOUR_STEPS = TOUR_STEPS;
 window.sendFeedbackByEmail = sendFeedbackByEmail;
 // ─── NOTES FROM TESTERS (v37.64) ─────────────────────────────────────────────
@@ -8894,6 +9098,13 @@ function testerWelcome() {
   document.body.appendChild(ov);
   ov.querySelector('#twOk').onclick = close;
   ov.querySelector('#twTour').onclick = function(){ close(); if (typeof startTour === 'function') startTour(); };
+  // v38.95 — after the wizard, its last page: the tour first
+  if (typeof setupWizRan === 'function' && setupWizRan()) {
+    var ok = ov.querySelector('#twOk'), tr = ov.querySelector('#twTour');
+    ok.textContent = '\u{1F9ED} Show me around'; tr.textContent = 'I’ll look around by myself';
+    ok.onclick = function(){ close(); if (typeof startTour === 'function') startTour(); };
+    tr.onclick = close;
+  }
   setTimeout(function(){ var b = ov.querySelector('#twOk'); if (b) b.focus(); }, 60);
   return ov;
 }
@@ -9400,7 +9611,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v38.94';
+var APP_VERSION = 'v38.95';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -10670,38 +10881,58 @@ body.banner-shown #envRibbon.env-beta { padding-top: 2px; }
 .fv-style { display: flex; align-items: center; gap: 6px; padding: 6px 12px; border: 1px solid var(--border); border-radius: 999px; font-size: 13.5px; cursor: pointer; }
 .fv-style input { accent-color: var(--terracotta); }
 /* v37.84 — windows drawn only so the translator can read them (i18nHarvestDemand). */
-body.i18n-harvesting #aboutOverlay, body.i18n-harvesting #termsGate, body.i18n-harvesting #linkReqOverlay, body.i18n-harvesting #feedbackOverlay,
+body.i18n-harvesting #aboutOverlay, body.i18n-harvesting #termsGate, body.i18n-harvesting #setupWiz, body.i18n-harvesting #linkReqOverlay, body.i18n-harvesting #feedbackOverlay,
 body.i18n-harvesting #deviceOfferOverlay, body.i18n-harvesting #extOfferOverlay, body.i18n-harvesting #logNudge, body.i18n-harvesting #importErrorModal,
 body.i18n-harvesting #serviceErrorOverlay, body.i18n-harvesting #emailModalOverlay, body.i18n-harvesting #farmOverlay { visibility: hidden !important; }
 /* v37.83 — the kitchen rules: a page from a recipe notebook. */
-#termsGate { position: fixed; inset: 0; z-index: 10050; background: rgba(60,40,30,.55); display: flex; align-items: center; justify-content: center; padding: 14px; padding-top: calc(14px + var(--top-safe)); }
-#termsGate .tg-page { position: relative; width: 100%; max-width: 640px; max-height: 94vh; overflow-y: auto; border-radius: 6px 10px 8px 12px;
+#termsGate, #setupWiz { position: fixed; inset: 0; z-index: 10050; background: rgba(60,40,30,.55); display: flex; align-items: center; justify-content: center; padding: 14px; padding-top: calc(14px + var(--top-safe)); }
+:is(#termsGate, #setupWiz) .tg-page { position: relative; width: 100%; max-width: 640px; max-height: 94vh; overflow-y: auto; border-radius: 6px 10px 8px 12px;
   background-color: #fdf8ec; background-image: linear-gradient(90deg, transparent 46px, rgba(193,68,14,.35) 46px, rgba(193,68,14,.35) 48px, transparent 48px),
   repeating-linear-gradient(#fdf8ec 0 27px, rgba(70,110,170,.18) 27px 28px);
   box-shadow: 0 14px 40px rgba(0,0,0,.35), inset 0 0 60px rgba(160,120,60,.12); padding: 34px 22px 22px 62px; color: #3a2a20; transform: rotate(-.4deg); }
-#termsGate .tg-hand { font-family: 'Caveat', 'Patrick Hand', 'Playpen Sans Hebrew', 'Playpen Sans Arabic', 'Comic Sans MS', cursive; }
-#termsGate .tg-title { font-size: 34px; font-weight: 700; color: #8a2e0a; line-height: 1.1; }
-#termsGate .tg-sub { font-size: 21px; margin: 4px 0 12px; }
-#termsGate .tg-terms { font-family: 'Patrick Hand', 'Caveat', 'Varela Round', 'Playpen Sans Arabic', 'Comic Sans MS', cursive; font-size: 16px; line-height: 28px; max-height: 42vh; overflow-y: auto;
+:is(#termsGate, #setupWiz) .tg-hand { font-family: 'Caveat', 'Patrick Hand', 'Playpen Sans Hebrew', 'Playpen Sans Arabic', 'Comic Sans MS', cursive; }
+:is(#termsGate, #setupWiz) .tg-title { font-size: 34px; font-weight: 700; color: #8a2e0a; line-height: 1.1; }
+:is(#termsGate, #setupWiz) .tg-sub { font-size: 21px; margin: 4px 0 12px; }
+:is(#termsGate, #setupWiz) .tg-terms { font-family: 'Patrick Hand', 'Caveat', 'Varela Round', 'Playpen Sans Arabic', 'Comic Sans MS', cursive; font-size: 16px; line-height: 28px; max-height: 42vh; overflow-y: auto;
   padding: 0 8px 6px 0; border-top: 1px dashed rgba(138,46,10,.35); border-bottom: 1px dashed rgba(138,46,10,.35); }
-#termsGate .tg-terms h2 { font-family: 'Caveat', 'Playpen Sans Hebrew', 'Playpen Sans Arabic', cursive; font-size: 24px; color: #8a2e0a; margin: 14px 0 2px; border: 0; padding: 0; }
-#termsGate .tg-terms p, #termsGate .tg-terms li { font-size: 16px; line-height: 28px; margin: 0 0 4px; }
-#termsGate .tg-terms .box { border: 1.5px dashed rgba(138,46,10,.45); border-radius: 10px; padding: 4px 10px; margin: 8px 0; background: rgba(255,240,200,.45); }
-#termsGate .tg-terms .meta { font-size: 14px; color: #7a6555; }
-#termsGate .tg-terms .caps { font-weight: 400; }
-#termsGate a { color: #a8380a; }
-#termsGate .tg-also { font-size: 19px; margin: 10px 0 6px; }
-#termsGate .tg-check { display: flex; gap: 10px; align-items: flex-start; font-size: 21px; line-height: 1.25; margin: 10px 0 14px; cursor: pointer; }
-#termsGate .tg-check input { width: 22px; height: 22px; margin-top: 3px; accent-color: #c1440e; flex-shrink: 0; }
-#termsGate .tg-go { display: block; width: 100%; padding: 12px; border: none; border-radius: 26px 22px 28px 20px; background: #c1440e; color: #fff;
+:is(#termsGate, #setupWiz) .tg-terms h2 { font-family: 'Caveat', 'Playpen Sans Hebrew', 'Playpen Sans Arabic', cursive; font-size: 24px; color: #8a2e0a; margin: 14px 0 2px; border: 0; padding: 0; }
+:is(#termsGate, #setupWiz) .tg-terms p, :is(#termsGate, #setupWiz) .tg-terms li { font-size: 16px; line-height: 28px; margin: 0 0 4px; }
+:is(#termsGate, #setupWiz) .tg-terms .box { border: 1.5px dashed rgba(138,46,10,.45); border-radius: 10px; padding: 4px 10px; margin: 8px 0; background: rgba(255,240,200,.45); }
+:is(#termsGate, #setupWiz) .tg-terms .meta { font-size: 14px; color: #7a6555; }
+:is(#termsGate, #setupWiz) .tg-terms .caps { font-weight: 400; }
+:is(#termsGate, #setupWiz) a { color: #a8380a; }
+:is(#termsGate, #setupWiz) .tg-also { font-size: 19px; margin: 10px 0 6px; }
+:is(#termsGate, #setupWiz) .tg-check { display: flex; gap: 10px; align-items: flex-start; font-size: 21px; line-height: 1.25; margin: 10px 0 14px; cursor: pointer; }
+:is(#termsGate, #setupWiz) .tg-check input { width: 22px; height: 22px; margin-top: 3px; accent-color: #c1440e; flex-shrink: 0; }
+:is(#termsGate, #setupWiz) .tg-go { display: block; width: 100%; padding: 12px; border: none; border-radius: 26px 22px 28px 20px; background: #c1440e; color: #fff;
   font-family: 'Caveat', 'Patrick Hand', cursive; font-size: 27px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 0 #8a2e0a; }
-#termsGate .tg-go:disabled { background: #cdb9a8; box-shadow: 0 4px 0 #a8968a; cursor: not-allowed; }
-#termsGate .tg-out { display: block; margin: 14px auto 0; background: none; border: none; color: #7a6555; font-family: 'Patrick Hand', cursive; font-size: 16px; text-decoration: underline; cursor: pointer; }
-#termsGate .tg-tape { position: absolute; top: -6px; left: 50%; width: 120px; height: 26px; margin-left: -60px; background: rgba(240,200,120,.55); transform: rotate(-3deg); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
-#termsGate .tg-ring { position: absolute; right: 10px; top: 8px; width: 110px; height: 110px; pointer-events: none; }
-#termsGate .tg-splash { position: absolute; left: 8px; bottom: 60px; width: 120px; height: 96px; pointer-events: none; }
-@media (max-width: 520px) { #termsGate .tg-page { padding: 30px 14px 18px 44px; background-image: linear-gradient(90deg, transparent 32px, rgba(193,68,14,.35) 32px, rgba(193,68,14,.35) 34px, transparent 34px), repeating-linear-gradient(#fdf8ec 0 27px, rgba(70,110,170,.18) 27px 28px); }
-  #termsGate .tg-title { font-size: 30px; } #termsGate .tg-ring { width: 80px; height: 80px; } }
+:is(#termsGate, #setupWiz) .tg-go:disabled { background: #cdb9a8; box-shadow: 0 4px 0 #a8968a; cursor: not-allowed; }
+:is(#termsGate, #setupWiz) .tg-out { display: block; margin: 14px auto 0; background: none; border: none; color: #7a6555; font-family: 'Patrick Hand', cursive; font-size: 16px; text-decoration: underline; cursor: pointer; }
+:is(#termsGate, #setupWiz) .tg-tape { position: absolute; top: -6px; left: 50%; width: 120px; height: 26px; margin-left: -60px; background: rgba(240,200,120,.55); transform: rotate(-3deg); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+:is(#termsGate, #setupWiz) .tg-ring { position: absolute; right: 10px; top: 8px; width: 110px; height: 110px; pointer-events: none; }
+:is(#termsGate, #setupWiz) .tg-splash { position: absolute; left: 8px; bottom: 60px; width: 120px; height: 96px; pointer-events: none; }
+@media (max-width: 520px) { :is(#termsGate, #setupWiz) .tg-page { padding: 30px 14px 18px 44px; background-image: linear-gradient(90deg, transparent 32px, rgba(193,68,14,.35) 32px, rgba(193,68,14,.35) 34px, transparent 34px), repeating-linear-gradient(#fdf8ec 0 27px, rgba(70,110,170,.18) 27px 28px); }
+  :is(#termsGate, #setupWiz) .tg-title { font-size: 30px; } :is(#termsGate, #setupWiz) .tg-ring { width: 80px; height: 80px; } }
+/* v38.95 — the first-contact wizard: the same notebook page, a little lower (the rules and the language question go over it) */
+#setupWiz { z-index: 10040; }
+#setupWiz .sw-dots { display: flex; gap: 8px; justify-content: center; margin: 0 0 10px; }
+#setupWiz .sw-dots i, #termsGate .sw-dots i { width: 11px; height: 11px; border-radius: 50%; border: 2px solid #c1440e; background: transparent; }
+#termsGate .sw-dots { display: flex; gap: 8px; justify-content: center; margin: 0 0 10px; }
+#setupWiz .sw-dots i.on, #termsGate .sw-dots i.on { background: #c1440e; transform: scale(1.2); }
+#setupWiz .sw-dots i.done, #termsGate .sw-dots i.done { background: rgba(193,68,14,.4); }
+#setupWiz .sw-list { font-size: 21px; line-height: 1.5; margin: 6px 0 16px; }
+#setupWiz .sw-label { display: block; font-size: 21px; margin: 8px 0 2px; }
+#setupWiz .sw-hint { font-family: 'Patrick Hand', 'Varela Round', cursive; font-size: 16px; color: #6b5444; margin: 0 0 6px; }
+#setupWiz .sw-input { width: 100%; box-sizing: border-box; padding: 11px 12px; font-size: 17px; border: 1.5px solid rgba(138,46,10,.45); border-radius: 10px 8px 11px 9px; background: #fffdf6; color: #2f2a26; margin: 0 0 4px; }
+#setupWiz .sw-input:focus { outline: 2px solid #c1440e; outline-offset: 1px; }
+#setupWiz .sw-err { min-height: 1.2em; color: #a8380a; font-size: 15px; margin: 0 0 8px; }
+#setupWiz .sw-link { display: block; margin: 12px auto 0; background: none; border: none; color: #a8380a; font-size: 21px; text-decoration: underline; cursor: pointer; }
+#setupWiz .sw-steps { font-size: 20px; line-height: 1.45; margin: 4px 0 14px; padding-inline-start: 26px; }
+#setupWiz a.tg-go { text-align: center; text-decoration: none; box-sizing: border-box; }
+#setupWiz .sw-act.sw-did { background: #cdb9a8; box-shadow: 0 4px 0 #a8968a; font-size: 22px; }
+#setupWiz .sw-later { font-size: 18px; color: #6b5444; margin: 14px 0 10px; }
+#setupWiz .sw-next { display: block; margin: 0 auto; padding: 8px 22px; border: 2px solid #c1440e; border-radius: 22px 18px 24px 16px; background: none; color: #a8380a; font-family: 'Caveat', 'Patrick Hand', cursive; font-size: 24px; font-weight: 700; cursor: pointer; }
+#setupWiz .sw-next.tg-go { width: 100%; color: #fff; border: none; }
 /* v37.80 — the red dots along the path to something new (pathDots). */
 /* v38.83 — Tony: the red dot on ⋯ More "is very hard to miss" (easy to miss: red on the brown header) — "add a yellow
    circle around the dot, so it could catch the eye better". A ring drawn outside the dot (box-shadow: no layout). */
@@ -10971,7 +11202,7 @@ body.i18n-harvesting #serviceErrorOverlay, body.i18n-harvesting #emailModalOverl
 .calc-overlay > *, .prog-overlay > *, #stDetailOverlay > *, #emailModalOverlay > *, #importErrorModal > *,
 #serviceErrorOverlay > * { max-height: min(90vh, 100%) !important; }
 #helpDetailOverlay > * { max-height: min(85vh, 100%) !important; }
-#termsGate > * { max-height: min(94vh, 100%) !important; }
+#termsGate > *, #setupWiz > * { max-height: min(94vh, 100%) !important; }
 .modal-overlay.open { display: flex; }
 /* v38.36 — the install hint never sits on an open window: on an iPhone it covered
    "✓ Add to My Collection" in the import window. */
@@ -12542,7 +12773,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.94</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.95</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -12630,7 +12861,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.94</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.95</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -16174,7 +16405,8 @@ var I18N_EXTRA = [
     + 'The sync log in ⚙️ → 🔧 Troubleshooting → Logging & debugging stays on this device, is never put into a backup, and leaves it only when you choose to send it to the app\u2019s admin.'
 ].concat(appFeaturePhrases(), contactPhrases(), surveyPhrases(),
   // v38.90 — the welcome's paragraphs and the tour's steps (each drawn inside dir="auto", translated by i18nAsk)
-  Object.keys(HH_WELCOME).map(function(k){ return HH_WELCOME[k]; }), TOUR_STEPS.map(function(st){ return st.text; }));   // v38.18 — 📝 the end-of-beta question   // v38.17 — ✨ What can this app do, ✉️ Contact us
+  Object.keys(HH_WELCOME).map(function(k){ return HH_WELCOME[k]; }), TOUR_STEPS.map(function(st){ return st.text; }),
+  setupPhrases(), ['\u{1F9ED} Show me around', 'I’ll look around by myself']);   // v38.95 — the wizard   // v38.18 — 📝 the end-of-beta question   // v38.17 — ✨ What can this app do, ✉️ Contact us
 function i18nRegisterExtra() {
   // v38.90 — the recipe badge says its words one by one (i18nPhrase), and RECIPE_RANKS comes after I18N_EXTRA
   ['recipe', 'recipes', 'next', 'Recipes in this collection', '{1} more for {2}', 'The highest rank there is.', 'Close']
@@ -20244,7 +20476,7 @@ window.addSelectedToCollection = addSelectedToCollection;
 // window, or on the page when that is where it began. A box that closes, or opens, under the mouse between the
 // two clicks no longer takes the second one. Real clicks only — what the app clicks for itself is never held back.
 var _clickLayer = { at: 0, layer: null };
-var CLICK_LAYERS = '#askOverlay, #termsGate, .modal-overlay';
+var CLICK_LAYERS = '#askOverlay, #termsGate, #setupWiz, .modal-overlay';
 function clickLayerOf(el) { return (el && el.closest) ? el.closest(CLICK_LAYERS) : null; }
 function clickIsGhost(detail, layer, now) {
   return detail >= 2 && now - _clickLayer.at < 700 && layer !== _clickLayer.layer;
@@ -27912,7 +28144,7 @@ function rememberChoice() {
   return a ? !!a.checked : true;
 }
 function rememberSet(on) {
-  ['rememberMe', 'emailRememberMe'].forEach(function (id) { var el = document.getElementById(id); if (el) el.checked = !!on; });
+  ['rememberMe', 'emailRememberMe', 'swRemember'].forEach(function (id) { var el = document.getElementById(id); if (el) el.checked = !!on; });
 }
 function rememberApply(on) {
   if (!window._fbAuth || typeof firebase === 'undefined') return Promise.resolve();
@@ -29484,6 +29716,7 @@ function legalShowGate(user) {
     ov.id = 'termsGate'; ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-modal', 'true'); ov.setAttribute('aria-labelledby', 'tgTitle');
     ov.innerHTML = '<div class="tg-page">'
       + '<div class="tg-tape" aria-hidden="true"></div>'
+      + (typeof setupWizRan === 'function' && setupWizRan() ? setupDotsHtml(3) : '')   // v38.95 — the wizard's third page
       + '<svg class="tg-ring" viewBox="0 0 120 120" aria-hidden="true"><circle cx="60" cy="60" r="44" fill="none" stroke="#8a5a2b" stroke-width="7" stroke-dasharray="210 14 40 9" opacity=".16"/><circle cx="62" cy="58" r="40" fill="none" stroke="#8a5a2b" stroke-width="2" opacity=".12"/></svg>'
       + '<svg class="tg-splash" viewBox="0 0 100 80" aria-hidden="true"><path d="M30 40c-8-14 6-26 20-20 6-12 26-8 24 6 14 2 16 22 2 26 2 14-18 18-24 8-12 8-28 0-22-12-12-2-12-14 0-8z" fill="#c1440e" opacity=".09"/><circle cx="86" cy="18" r="4" fill="#c1440e" opacity=".1"/><circle cx="12" cy="66" r="3" fill="#c1440e" opacity=".1"/></svg>'
       + '<div class="tg-hand tg-title" id="tgTitle">Before we start cooking…</div>'
@@ -31538,6 +31771,7 @@ var HELP_SYSTEM_PROMPT = [
   "- Once linked, each household sees the other's recipes, read-only — and live: a change in their kitchen shows in yours within seconds, the changed card glowing for a moment: after its own in the main list, under that household's name, on a faint blue (hover one: 'A recipe from …'). 🏠 Kitchens ▾ in the filter bar chooses whose recipes show — tick one, several or all. 📥 Save a copy to my recipes makes one your own. Links do not chain: a third household linked to theirs is not seen. Links are listed, and removed, in ⚙️ → 🏠 My household → 👥 Family Access. ⚙️ → 🏠 My household → 🤝 Link requests through the app: blocked stops requests by identifier; requests by e-mail always arrive.",
   "- 📬 LINK REQUESTS: ⚙️ → 🏠 My household → 📬 Link requests — the number in brackets beside it is how many wait for an answer. Every request in one place: Waiting (Accept / Reject / 🚫 Block), Sent by your household (Withdraw), Linked now (Revoke access), and earlier answers. A request may carry a note, and the two households can write to each other there — the latest message shows, highlighted, with ↩ Reply; earlier ones are under 💬 Conversation. Only the household's name is shown, never a person's. Reject is for now: if they ask again — by identifier or by e-mail — their request is back under Waiting. 🚫 Block is for good, until you Unblock it under the earlier answers; they are never told, and on their side it reads “waiting”. A new message or request arrives while the app is open: a red dot (and a short notice with Open) within seconds, no reload needed. A red dot on ⚙️ leads to anything new. The switch there decides whether other households may ask through the app at all.",
   "- 👪 CHAT WITH FAMILY MEMBERS (the people in YOUR household only): ⋯ More → 👪 Chat with family members — or 💬 Chat beside a person in 👥 Family Access (someone added by address who has not signed in yet says ⏳ hasn’t signed in yet: their 💬 Chat comes once they do). 📣 Everyone in <your kitchen> is the room for announcements: everyone in the household reads it. Or choose one person: only the two of you read that conversation. Everyone in the household can write, readers too. Messages arrive live: a short notice with Open, and a red dot on ⋯ More until you have read them. Nothing is changed or deleted afterwards; deleting the household deletes them.",
+  "- 🧑‍🍳 FIRST VISIT: a one-time setup on a notebook page — your account (your e-mail and a password you make up; or 'I already have an account', or Continue offline), this device's Save button (the iPhone shortcut, the Android app in the Share menu, or the computer's browser extension — each new device asks this once; later from ⚙️ Settings), the kitchen rules, then a quick tour.",
   "- 🔄 RELOAD A LINKED KITCHEN: beside a linked kitchen's name in your recipe list, 🔄 Reload reads its recipes and photos again from the start — for when something looks missing or out of date.",
   "- 💬 CHATS WITH LINKED KITCHENS: ⋯ More → 💬 Chats with linked kitchens — or 💬 Chat beside a linked kitchen's name in your recipe list, or in 👥 Family Access. Every conversation, newest first, with what is new; open one to read it all and write (Enter sends, Shift+Enter starts a new line). The same conversations are also on 📬 Link requests. A red dot on ⋯ More and on ⚙️ says something new arrived.",
   "- ♿ ACCESSIBILITY: ⚙️ → ♿ Accessibility, on this device: 🎨 Colours for red–green colour blindness (the most common colour blindness, where reds and greens look alike, brownish): wherever a colour says something, green becomes blue and red becomes a deep orange — all right / a problem, the sync dot, Easy and Hard, the Self Test's results, delete buttons — and a notification dot turns blue inside its ring; and the recipe photos are colour-corrected, so a red tomato and a green pepper no longer look alike (they look a little different to everyone else). For the whole phone, an iPhone has its own: Settings → Accessibility → Display & Text Size → Color Filters → Red/Green Filter; Android: Settings → Accessibility → Color correction. 🟡 A yellow ring round the notification dots (on unless turned off) so a new message or request catches the eye, on ⋯ More and in ⚙️. 🌗 Theme: light, dark, or as the device. 🔔 the sound when something arrives, and 🎵 which sound.",
