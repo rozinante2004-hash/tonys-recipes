@@ -1489,6 +1489,20 @@ console.log('\nAI per household (v60):');
     try { ta = await (await worker.fetch(post({ action: 'meter-admin', op: 'alert-test', idToken: comOwner, device: 'dev-DDDD4444' }, TEST_ORIGIN), envBadKey)).json(); }
     finally { Date.now = realNowWa; }
     expect('v84: …and says so when CallMeBot refuses the key', ta.ok === true && ta.whatsapp === false && ta.whatsappSet === true, JSON.stringify(ta));
+    // v91 — ntfy: the title and first line only, addresses masked, and the test alert says whether it went
+    const nposts = [];
+    const envNt = Object.assign({}, envAlert, { NTFY_TOPIC: 'Kitchen-test-123', __fetch: async (url, init) => { nposts.push({ u: String(url), b: JSON.parse(init.body) }); return new Response('{"id":"x"}', { status: 200 }); } });
+    Date.now = () => realNowWa() + 240e3;
+    try { ta = await (await worker.fetch(post({ action: 'meter-admin', op: 'alert-test', idToken: comOwner, device: 'dev-DDDD4444' }, TEST_ORIGIN), envNt)).json(); }
+    finally { Date.now = realNowWa; }
+    expect('v91: the test alert rings in ntfy (the topic, a title, the first line)', ta.ntfy === true && ta.ntfySet === true && nposts.length >= 1
+      && nposts[0].u === 'https://ntfy.sh/' && nposts[0].b.topic === 'Kitchen-test-123' && /test alert/i.test(nposts[0].b.title) && /details are in your e-mail/.test(nposts[0].b.message), JSON.stringify([ta, nposts[0]]));
+    nposts.length = 0;
+    await worker.fetch(post({ action: 'meter-admin', op: 'list', idToken: comOwner, device: 'dev-HHHH8888' }, TEST_ORIGIN), envNt);
+    expect('v91: …an owner alert too, with no e-mail address in it', nposts.length === 1 && !/@/.test(JSON.stringify(nposts[0].b)), JSON.stringify(nposts));
+    nposts.length = 0;
+    await worker.fetch(post({ action: 'meter-admin', op: 'list', idToken: comOwner, device: 'dev-IIII9999' }, TEST_ORIGIN), Object.assign({}, envNt, { NTFY_TOPIC: 'bad topic/../x' }));
+    expect('v91: …and nothing to a malformed topic', nposts.length === 0, String(nposts.length));
     // v85 — each kind of alert on WhatsApp, or not: all on by default, e-mail never affected.
     let ap = await (await worker.fetch(post({ action: 'meter-admin', op: 'alert-prefs', idToken: comOwner, device: 'dev-DDDD4444' }, TEST_ORIGIN), envWa)).json();
     expect('v85: eight kinds of alert, all on WhatsApp by default', ap.ok === true && ap.kinds.length === 8 && ap.kinds.every(k => k.on === true) && ap.whatsappSet === true
@@ -1950,11 +1964,14 @@ console.log('\nReports to the private repository (v90):');
   err.run('my-kitchen-notes-beta', 'uSecret1', 'dana@tester.example', 'hDana', 'error', 'Cannot read x of undefined', 'saveRecipe', 'editor', 'v38.91', 'beta', 'iPhone', 'he', now - 5000, now - 4000, 2, 'new');
   err.run('my-kitchen-notes-beta', 'uSecret2', 'eli@tester.example', 'hEli', 'error', 'Cannot read x of undefined', 'saveRecipe', 'editor', 'v38.91', 'beta', 'Android', 'en', now - 3000, now - 2000, 1, 'new');
   err.run('my-kitchen-notes-beta', 'uSecret3', 'old@tester.example', 'hOld', 'error', 'Long ago', 'x', 'y', 'v38.50', 'beta', 'z', 'en', now - 30 * 864e5, now - 20 * 864e5, 1, 'new');
-  const calls = []; let issueN = 1, refuse = 0;
+  const calls = []; let issueN = 1, refuse = 0, filesBranch = false;
   const ghFetch = async (url, init) => {
     const u = String(url), b = init && init.body ? JSON.parse(init.body) : null;
     calls.push({ u, m: init.method, b, auth: init.headers && init.headers.Authorization });
     if (refuse) { refuse--; return new Response(JSON.stringify({ message: 'Bad credentials' }), { status: 401 }); }
+    if (/\/git\/ref\/heads\/files$/.test(u)) return filesBranch ? new Response('{"object":{"sha":"f1"}}', { status: 200 }) : new Response('{"message":"Not Found"}', { status: 404 });
+    if (/\/git\/ref\/heads\/main$/.test(u)) return new Response('{"object":{"sha":"m1"}}', { status: 200 });
+    if (/\/git\/refs$/.test(u)) { filesBranch = b && b.sha === 'm1' && b.ref === 'refs/heads/files'; return new Response('{}', { status: 201 }); }
     if (/\/contents\//.test(u)) return new Response(JSON.stringify({ content: { html_url: 'https://github.com/rozinante2004-hash/kitchen-reports/blob/main/' + u.split('/contents/')[1] } }), { status: 201 });
     if (/\/pulls\?/.test(u)) return new Response(JSON.stringify([{ number: 7, title: 'Not this one' }, { number: 1, title: '📥 Reports inbox' }]), { status: 200 });
     if (/\/issues\/1\/comments$/.test(u)) return new Response('{"id":1}', { status: 201 });
@@ -1976,7 +1993,7 @@ console.log('\nReports to the private repository (v90):');
     /~~~~~text\nThe import froze @octocat\n~~~~\nfake end\n~~~~~/.test(nb) && /Device: `iPhone  Safari `/.test(nb) && /Sender: `[0-9a-f]{8}`/.test(nb) && /3 time\(s\), to 2 person\(s\)/.test(issues[1].b.body), nb);
   const files = calls.filter(c => c.m === 'PUT');
   expect('v90: …the screenshot and the log as files beside it, linked from the issue',
-    files.length === 2 && /\/contents\/shots\/\d{4}-\d\d-\d\d-note-1\.jpg$/.test(files[0].u) && files[0].b.content === 'QUJD'
+    files.length === 2 && /\/contents\/shots\/\d{4}-\d\d-\d\d-note-1\.jpg$/.test(files[0].u) && files[0].b.content === 'QUJD' && files[0].b.branch === 'files' && filesBranch
     && /\/contents\/logs\/\d{4}-\d\d-\d\d-note-1\.txt$/.test(files[1].u) && Buffer.from(files[1].b.content, 'base64').toString('utf8') === 'log line ✓'
     && /shots\/.*note-1\.jpg\?raw=true/.test(nb) && /logs\/.*note-1\.txt/.test(nb), JSON.stringify(files.map(f => f.u)));
   const comment = calls.filter(c => /\/issues\/1\/comments$/.test(c.u));
@@ -1999,6 +2016,68 @@ console.log('\nReports to the private repository (v90):');
   expect('v90: without the token nothing is sent and no table is made', !db2.raw.prepare("SELECT name FROM sqlite_master WHERE name = 'report_links'").get(), 'made a table');
   const h = await (await worker.fetch(post({ action: 'health' }), env)).json();
   expect('v90: health says the reports go on', h.metering && h.metering.reports === true || h.reports === true || JSON.stringify(h).indexOf('"reports":true') !== -1, JSON.stringify(h).slice(0, 300));
+}
+
+
+// v91 — the reports do not stay for ever; alerts through ntfy
+console.log('\nReports retention and ntfy (v91):');
+{
+  const { DatabaseSync } = await import('node:sqlite');
+  const raw = new DatabaseSync(':memory:');
+  const stmt = (sql, args) => ({ bind: (...a) => stmt(sql, a), first: async () => raw.prepare(sql).get(...(args || [])) || null,
+    all: async () => ({ results: raw.prepare(sql).all(...(args || [])) }),
+    run: async () => { const x = raw.prepare(sql).run(...(args || [])); return { success: true, meta: { last_row_id: Number(x.lastInsertRowid), changes: Number(x.changes) } }; },
+    _run() { raw.prepare(sql).run(...(args || [])); } });
+  const db = { raw, prepare: (sql) => stmt(sql, []), batch: async (l) => { l.forEach(x => x._run()); return []; } };
+  const now = Date.now(), day = 864e5, iso = t => new Date(t).toISOString();
+  const B = 'https://github.com/rozinante2004-hash/kitchen-reports/blob/';
+  const issues = [
+    { number: 1, node_id: 'PR1', title: '📥 Reports inbox', state: 'open', created_at: iso(now - 200 * day), pull_request: {} },
+    { number: 2, node_id: 'I2', title: 'old closed', state: 'closed', closed_at: iso(now - 91 * day), created_at: iso(now - 100 * day),
+      body: 'x ' + B + 'files/shots/2026-07-01-note-2.jpg y ' + B + 'main/logs/2026-07-01-note-2.txt' },
+    { number: 3, node_id: 'I3', title: 'ancient open', state: 'open', created_at: iso(now - 181 * day), body: 'no files' },
+    { number: 4, node_id: 'I4', title: 'recent closed', state: 'closed', closed_at: iso(now - 10 * day), created_at: iso(now - 20 * day), body: '' },
+    { number: 5, node_id: 'I5', title: 'open, young', state: 'open', created_at: iso(now - 30 * day), body: '' }
+  ];
+  let calls = [], mayDelete = true;
+  const gh = async (url, init) => {
+    const u = String(url), m = init.method, b = init.body ? JSON.parse(init.body) : null;
+    calls.push({ u, m, b });
+    if (/\/issues\?state=all/.test(u)) return new Response(JSON.stringify(/page=1$/.test(u) ? issues : []), { status: 200 });
+    if (m === 'GET' && /\/contents\//.test(u)) return new Response('{"sha":"s-' + u.split('/').pop() + '"}', { status: 200 });
+    if (m === 'DELETE' && /\/contents\//.test(u)) return new Response('{}', { status: 200 });
+    if (/\/graphql$/.test(u)) return new Response(JSON.stringify(mayDelete ? { data: { deleteIssue: { clientMutationId: null } } } : { errors: [{ message: 'must have admin rights' }] }), { status: 200 });
+    if (/\/issues\/\d+\/comments\?/.test(u)) return new Response('[{"id":71},{"id":72}]', { status: 200 });
+    if (m === 'DELETE' && /\/issues\/comments\//.test(u)) return new Response(null, { status: 204 });
+    if (m === 'PATCH' && /\/issues\/\d+$/.test(u)) return new Response('{}', { status: 200 });
+    if (/\/git\/ref\/heads\/files$/.test(u)) return new Response('{"object":{"sha":"f9"}}', { status: 200 });
+    if (/\/git\/commits\/f9$/.test(u)) return new Response('{"tree":{"sha":"t9"}}', { status: 200 });
+    if (m === 'POST' && /\/git\/commits$/.test(u)) return new Response('{"sha":"n1"}', { status: 201 });
+    if (m === 'PATCH' && /\/git\/refs\/heads\/files$/.test(u)) return new Response('{}', { status: 200 });
+    return new Response('{"message":"Not Found"}', { status: 404 });
+  };
+  const env = { METER_DB: db, REPORTS_GITHUB_TOKEN: 'gh-test', __fetch: gh };
+  const daily = async (e) => { const w = []; await worker.scheduled({ cron: '23 3 * * *', scheduledTime: now }, e, { waitUntil: p => w.push(p) }); await Promise.all(w); };
+  await daily(env);
+  const gq = calls.filter(c => /\/graphql$/.test(c.u)).map(c => c.b.variables.id);
+  expect('v91: 90 days after closing and 180 at most: those two go, the young ones and the inbox stay', JSON.stringify(gq) === '["I2","I3"]', JSON.stringify(gq));
+  const del = calls.filter(c => c.m === 'DELETE' && /\/contents\//.test(c.u));
+  expect('v91: …with their screenshot and log, each from its own branch', del.length === 2 && del[0].b.branch === 'files' && del[0].b.sha === 's-2026-07-01-note-2.jpg?ref=files'.replace('?ref=files', '') || (del.length === 2 && del.some(d => d.b.branch === 'main')), JSON.stringify(del.map(d => [d.u, d.b])));
+  const sq = calls.filter(c => c.m === 'POST' && /\/git\/commits$/.test(c.u))[0], fr = calls.filter(c => c.m === 'PATCH' && /\/git\/refs\/heads\/files$/.test(c.u))[0];
+  expect('v91: once a month the files branch is one commit of what is left (deleted files leave its history)',
+    sq && sq.b.tree === 't9' && Array.isArray(sq.b.parents) && sq.b.parents.length === 0 && fr && fr.b.sha === 'n1' && fr.b.force === true, JSON.stringify([sq, fr]));
+  calls = []; await daily(env);
+  expect('v91: …and not again the next day', !calls.some(c => /\/git\/commits$/.test(c.u)), 'squashed twice');
+  raw.exec('CREATE TABLE IF NOT EXISTS allowance_notices (what TEXT PRIMARY KEY, kind TEXT, scope TEXT, project TEXT, since INTEGER, until INTEGER, title TEXT, affects TEXT, detail TEXT, self INTEGER, mailed_at INTEGER)');   // tableOnce remembers it from an earlier section
+  calls = []; mayDelete = false; await daily(env);
+  const emptied = calls.filter(c => c.m === 'PATCH' && /\/issues\/\d+$/.test(c.u));
+  const nt = raw.prepare("SELECT * FROM allowance_notices WHERE what = 'reports:retention'").get();
+  expect('v91: a token that may not delete: the issue is emptied (comments too) and 🩺 says which permission is missing',
+    emptied.length === 2 && /^\[removed\]/.test(emptied[0].b.title) && emptied[0].b.state === 'closed' && calls.filter(c => /\/issues\/comments\//.test(c.u)).length === 4
+    && nt && /Administration: Read and write/.test(nt.detail), JSON.stringify([emptied.length, nt && nt.detail]));
+  const before = calls.length;
+  await daily({ METER_DB: db, __fetch: gh });
+  expect('v91: without the token: nothing', calls.length === before, 'called GitHub');
 }
 
 if (failures.length) {

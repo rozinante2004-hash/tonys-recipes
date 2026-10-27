@@ -737,10 +737,8 @@
       + '<button type="button" class="mg-btn" onclick="mknManage.reload()">↻</button></div></div>';
     if (S.loadError) head += '<div class="mg-note" id="mgLoadError">The households could not be read from the database: ' + esc(S.loadError)
       + (/permission/i.test(S.loadError) ? ' \u2014 this copy\u2019s database rules need publishing: ⚙️ → 🏠 My household → 👥 Family Access → 🔧 Show Firestore security rules → Copy → Firebase → Publish, then ↻.' : '') + '</div>';
-    // v38.22 — once the family has moved here: its allowances and history come too.
-    if (env === 'beta') head += '<div class="mg-muted" id="mgFamilyMove" style="margin:6px 0 2px;">After the family\u2019s move: '
-      + '<button type="button" class="mg-btn" id="mgCopyFrom" style="min-height:28px;padding:3px 10px;" onclick="mknManage.copyFromFamily()">'
-      + '📦 Bring the family app\u2019s allowances and AI history here</button> <span>(safe to press twice)</span></div>';
+    // v38.93 — (the v38.22 "📦 Bring the family app's allowances and AI history here" button is gone: it was used on the
+    // move day, 20 Oct, and has no purpose since — Tony, 26 Oct. The Worker's owner-only copy-from stays, unused.)
     // v37.96 — Tony (security audit, "b"): newcomers by invitation only, per copy.
     // v38.47 — the button said the OTHER state ("🔒 Invitation only" while it was open), and the community copy was
     // switched to invitation only by mistake on 15 Oct: a tester then could not get in at all. Now the state is
@@ -1279,19 +1277,6 @@
     sortTo: function (v) { var p = String(v || '').split(':'); if (!p[0]) return; S.sort = p[0]; S.dir = +p[1] < 0 ? -1 : 1; render(); },
     show: function (hid) { S.open = (hid && S.open !== hid) ? hid : null; render();
       if (S.open) { var p = document.querySelector('#manageOverlay .mg-panel'); if (p && p.scrollIntoView) p.scrollIntoView({ behavior: 'smooth', block: 'start' }); } },
-    copyFromFamily: async function () {
-      var ok = await askConfirm({ icon: '\u{1F4E6}', title: 'Bring the family\u2019s allowances here?',
-        message: 'Each household that moved from the family app gets its AI allowance (the family\u2019s $10 a month unless it had its own), '
-          + 'your notes about it and its spending so far, here in this copy. Anything already here is kept. The family app\u2019s own figures are not touched.',
-        okLabel: 'Bring them' });
-      if (ok !== true) return false;
-      var d;
-      try { d = await meterSet('copy-from', '', { from: 'recipes-f379d' }); }
-      catch (e) { showServiceError('Could not bring them: ' + e.message); return false; }
-      toast('\u2705 ' + d.copied.households + ' of ' + d.of + ' households brought over (' + d.copied.months + ' months of spending)', 7000);
-      await api.reload();
-      return d;
-    },
     setExtra: async function (name, on) {
       var r = openRow();
       if (!r || r.remote || EXTRAS.map(function (x) { return x[0]; }).indexOf(name) === -1) return false;

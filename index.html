@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v38.92 -->
+<!-- Tony's Recipes Collection v38.93 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -4485,8 +4485,10 @@ function testAlertText(d) {
   var lines = [];
   lines.push(d.mailTo ? (d.mail ? '✅ E-mail: sent to your alert address' + (d.mailTo > 1 ? 'es (' + d.mailTo + ')' : '') + ' — look in your inbox.' : '❌ E-mail: could not be sent.')
                       : '⚠️ E-mail: no alert address is set on the server.');
-  lines.push(!d.whatsappSet ? '⚠️ WhatsApp: not set up yet — the GitHub secrets WHATSAPP_PHONE and WHATSAPP_KEY are missing (the steps are in the audit plan).'
-    : d.whatsapp ? '✅ WhatsApp: sent — it arrives within a minute.' : '❌ WhatsApp: CallMeBot refused it — check the number and the key in the GitHub secrets.');
+  // v38.93 — WhatsApp (CallMeBot) only when its secrets are set; the phone alerts are ntfy now (Worker v91), on the owner's private topic
+  if (d.whatsappSet) lines.push(d.whatsapp ? '✅ WhatsApp: sent — it arrives within a minute.' : '❌ WhatsApp: CallMeBot refused it — check the number and the key in the GitHub secrets.');
+  if (d.ntfySet !== undefined) lines.push(!d.ntfySet ? '⚠️ ntfy: not set up — the GitHub secret NTFY_TOPIC is missing.'
+    : d.ntfy ? '✅ ntfy: sent — it should ring in the ntfy app now.' : '❌ ntfy: not delivered — check the topic name in the GitHub secret NTFY_TOPIC and in the ntfy app.');
   return lines;
 }
 async function sendTestAlert() {
@@ -4517,14 +4519,15 @@ async function openWhatsAppAlerts() {
     var d;
     try { d = await ask({ op: 'alert-prefs' }); }
     catch(e) { toast('❌ Could not ask the server: ' + String((e && e.message) || e).slice(0, 140), 8000); return false; }
-    var a = await askConfirm({ icon: '📲', title: 'WhatsApp alerts',
-      message: (d.whatsappSet ? 'WhatsApp is set up: the alerts ticked below also come to your phone.'
-                              : 'WhatsApp is not set up yet — until it is, these choices are kept but nothing is sent there (the steps are in the audit plan).')
+    // v38.93 — the phone alerts ring through ntfy (Worker v91); WhatsApp only if its secrets are ever set again
+    var a = await askConfirm({ icon: '📲', title: 'Phone alerts',
+      message: (d.ntfySet || d.whatsappSet ? 'Phone alerts are set up: the alerts ticked below also ring on your phone, in the ntfy app.'
+                              : 'Phone alerts are not set up yet (the GitHub secret NTFY_TOPIC is missing) — until they are, these choices are kept but nothing is sent.')
         + ' E-mail alerts are not affected: they always come.',
       checks: d.kinds || [], okLabel: 'Save', altLabel: '📲 Send me a test alert', cancelLabel: 'Close' });
     if (a === 'alt') { await sendTestAlert(); continue; }
     if (!a || !a.ok) return false;
-    try { await ask({ op: 'alert-prefs-set', prefs: a.checks }); toast('✅ Saved — which alerts come on WhatsApp'); return true; }
+    try { await ask({ op: 'alert-prefs-set', prefs: a.checks }); toast('✅ Saved — which alerts ring on your phone'); return true; }
     catch(e) { toast('❌ Not saved: ' + String((e && e.message) || e).slice(0, 140), 8000); return false; }
   }
 }
@@ -9371,7 +9374,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v38.92';
+var APP_VERSION = 'v38.93';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -12513,7 +12516,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.92</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.93</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -12601,7 +12604,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.92</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v38.93</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -12716,7 +12719,7 @@ body.banner-shown .header {
               <!-- v38.55 — Tony: "Please make sure the Admin gets a notification if any allowance is exceeded or blocked." -->
               <button class="drop-item" data-owner-only title="How much of the free daily allowances (Cloudflare) is used, and anything paused right now (the app&#39;s owner only)." onclick="closeDrop('settingsDrop');openServerAllowances()">🩺 Server allowances</button>
               <!-- v38.64 — Tony: the warnings on WhatsApp too (Worker v84); v38.65 — each kind on or off, and the test (Worker v85) -->
-              <button class="drop-item" data-owner-only title="Which alerts also come to you on WhatsApp — each on or off — and a test alert (the app&#39;s owner only)." onclick="closeDrop('settingsDrop');openWhatsAppAlerts()">📲 WhatsApp alerts</button>
+              <button class="drop-item" data-owner-only title="Which alerts also ring on your phone (the ntfy app) — each on or off — and a test alert (the app&#39;s owner only)." onclick="closeDrop('settingsDrop');openWhatsAppAlerts()">📲 Phone alerts</button>
               <!-- v38.42 — Tony: "Let's make the invitations sendable from the app, from the Admin account." -->
               <button class="drop-item" data-owner-only title="The tester invitation, in English or Hebrew, with this copy's link — sent through your Gmail, one e-mail to each person, or by WhatsApp or the mail app (the app's owner only)." onclick="closeDrop('settingsDrop');openInviteTesters()">✉️ Invite testers</button>
               <button class="drop-item" title="The app's running costs and billing (the app's owner only)." data-owner-only onclick="closeDrop('settingsDrop');openPayments()">💳 Payments</button>
@@ -29715,7 +29718,8 @@ if ('serviceWorker' in navigator) {
 
         // Check for updates every time the page gains focus
         document.addEventListener('visibilitychange', function() {
-          if (document.visibilityState === 'visible') reg.update();
+          // v38.93 — a phone between networks cannot fetch sw.js: harmless (the next look tries again), not an error report
+          if (document.visibilityState === 'visible') reg.update().catch(function(e) { dlog('[SW] update check failed (offline?)', e && e.message); });
         });
 
         // Detect when a new SW is waiting to activate
@@ -31544,7 +31548,7 @@ var HELP_SYSTEM_PROMPT = [
   "- Every item in ⚙️ explains itself when you point at it.",
   "",
   "=== FOR THE APP'S OWNER ===",
-  "- ⚙️ → 👑 App owner is shown only to the app's owner: 📊 Households, 🩺 Server allowances, 📲 WhatsApp alerts (which alerts also come on WhatsApp, each on or off, and a test), ✉️ Invite testers, 💳 Payments, 🚀 Deployments, 🔑 Check the app's key, 🔐 Two-step sign-in for the owner, 📧 Gmail Setup, 🛒 Bring!",
+  "- ⚙️ → 👑 App owner is shown only to the app's owner: 📊 Households, 🩺 Server allowances, 📲 Phone alerts (which alerts also ring on the phone in the ntfy app, each on or off, and a test), ✉️ Invite testers, 💳 Payments, 🚀 Deployments, 🔑 Check the app's key, 🔐 Two-step sign-in for the owner, 📧 Gmail Setup, 🛒 Bring!",
   "- 📊 Households → 💬 Feedback and ⚠️ Errors (the owner's): tick several (or Select all shown), then 👀 Seen (n), ✅ Done (n) or 🗑 Delete selected (n) for all of them at once. 👀 Seen = read, off the ⚙️ red dot, still under 'Not done yet'; ✅ Done = also off that list (still under All). Deleting several asks once and sends one alert",
   "- ✉️ Invite testers: the tester invitation in English or עברית, with this copy's link; the wording can be changed (this device keeps it; 'The original words' brings it back). Paste the addresses; 📧 Send with Gmail sends each person their own e-mail, from the app's address when the owner's Gmail may send as it. Also ✉️ Mail app, 💬 WhatsApp and 📋 Copy. The first Gmail send needs the Gmail API switched on for the copy's Google Cloud project, and Google's permission",
   "- The beta is by invitation only when 📊 Households says so: every address in To (however the invitation goes) may then start a kitchen, signed in with that address; the window says how many are invited. Only a fingerprint of each address is kept, never the address. The invitation asks testers to sign in with that address, not to forward it, and to invite family from inside the app",

@@ -1228,6 +1228,25 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
   - **Standing permission for these two only** (Tony, 25 Oct: "as these are not customer-facing changes, you can push
     them directly to Admin and Beta, without asking for permission"): the reports retention and the ntfy alerts
     release on green without asking. Every other release still waits for his yes.
+  - **Tuesday build, started early (Tony, 27 Oct 02:00: "let's start immediately with our plans instead of waiting
+    for noon"). v38.93 + Worker v91:**
+    - **Reports retention** (`reportsRetention`, in the daily sweep): issues closed more than 90 days ago or filed
+      more than 180 days ago (the 📥 PR and "[removed]" ones skipped; 20 a day at most) lose their screenshot and log,
+      then the issue itself (GraphQL `deleteIssue`). A token without "Administration: Read and write" cannot delete
+      an issue: it is then emptied (comments deleted, title "[removed] after the retention period", closed) and 🩺
+      raises `reports:retention` saying which permission to add. Screenshots and logs now go to the branch `files`
+      (created from main on first use); once every 30 days that branch is replaced by one commit of what is left
+      (`report_links` kind `squash`), so deleted files leave the history.
+    - **ntfy** (`ownerNtfy`): every owner alert also goes to https://ntfy.sh/ on the topic in the secret NTFY_TOPIC
+      (deploy-worker.yml passes it) — the subject and first line only, addresses masked, "(the details are in your
+      e-mail)". The kinds switched off for WhatsApp are off here too. The test alert reports ntfy (sent / not
+      delivered / not set up). CallMeBot code stays, unused without its secrets.
+    - **Removed:** the owner's "Bring the family app's allowances and AI history here" button (manage.js
+      `copyFromFamily`); the Worker op `copy-from` stays.
+    - **The service worker's update check is quiet:** a phone between networks failing to fetch sw.js is no longer
+      an unhandled-rejection report (beta v38.92, Android Chrome, 26 Oct).
+    - Privacy Statement 1.9 (11 languages): ntfy as a provider (the Team's own alerts, nothing about users) and the
+      reports' retention. No one is asked to agree again.
 - **Photo keys, 23 Oct:** Pexels: "New API key issuance is currently paused and cannot be requested" (Tony); Unsplash:
   "We can forego unsplash for now" (Tony). Photos stay Pixabay + Wikimedia Commons; the workflow is ready if a key
   ever comes (secrets PEXELS_API_KEY / UNSPLASH_ACCESS_KEY, then dispatch Deploy the Worker).

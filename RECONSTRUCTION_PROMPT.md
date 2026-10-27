@@ -787,6 +787,13 @@ words in a fence, @ never live. A comment on the open "📥" pull request wakes 
 session prepares fixes on `test` and releases only on the owner's yes typed in that session. Privacy Statement 1.8
 says so.
 
+**Reports retention and ntfy (Worker v91):** the daily sweep deletes reports closed 90 days ago or filed 180 days
+ago — screenshot and log, then the issue (GraphQL `deleteIssue`; without admin rights the issue is emptied and 🩺
+says which permission is missing). Screenshots and logs live on the branch `files`, rewritten once a month as one
+commit so deleted files leave the history. Every owner alert also rings in ntfy (https://ntfy.sh/, topic from the
+secret NTFY_TOPIC): subject and first line only, addresses masked. Privacy Statement 1.9. v38.93 removed the owner's
+"Bring the family app's allowances" button, and the service worker's update check fails quietly when offline.
+
 **A new kitchen's first hour (v38.90):** 📡 Sync Health says "new — nothing saved to the cloud yet" for a kitchen
 with no index and no recipes in the cloud (an empty read counts as a sync; a save that wrote sets the schema);
 `boldTidy` drops an empty `****` before saving, only outside bold words and line by line; `metaVal` hides a "-"

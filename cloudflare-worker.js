@@ -1,4 +1,9 @@
-// Tony's Recipes — Cloudflare Worker v90
+// Tony's Recipes — Cloudflare Worker v91
+// v91: (1) THE REPORTS DO NOT STAY FOREVER (Tony, 25 Oct 2026): the daily sweep deletes a report 90 days after it was
+// closed, 180 at most — screenshot, log and issue (or empties it, if the token may not delete) — and once a month the
+// files branch is rewritten so deleted files leave its history. New screenshots and logs go to branch `files`.
+// (2) ALERTS ON THE OWNER'S PHONE THROUGH NTFY (CallMeBot never answered): ownerNtfy posts the alert's title and first
+// line, addresses masked, to his private topic NTFY_TOPIC on ntfy.sh; "Send me a test alert" says if it went.
 // v90: REPORTS TO A PRIVATE REPOSITORY (Tony, 24 Oct 2026: "Please find a way in which reports, sent by the beta users,
 // could be read by you, without me having to copy/paste them"): each new note and each new kind of error report
 // becomes an issue in the private repository REPORTS_REPO (rozinante2004-hash/kitchen-reports), with its screenshot
@@ -406,7 +411,7 @@
 //   AI_MAX_TOKENS   – the longest answer one call may ask for (32000; the
 //                     app's largest, reading several recipes at once, asks 8000).
 
-const WORKER_VERSION = 'v90';
+const WORKER_VERSION = 'v91';
 const VIDEO_MAX_MB_DEFAULT = 50;
 const GEMINI_API = 'https://generativelanguage.googleapis.com';
 const GEMINI_MODEL_DEFAULT = 'gemini-2.5-flash';
@@ -1977,15 +1982,17 @@ async function whatsappOff(env) {
 }
 async function alertPrefsAnswer(env) {
   const off = await whatsappOff(env);
-  return { ok: true, whatsappSet: !!(env.WHATSAPP_PHONE && env.WHATSAPP_KEY), kinds: ALERT_KINDS.map(([key, label]) => ({ key, label, on: off[key] !== true })) };
+  return { ok: true, whatsappSet: !!(env.WHATSAPP_PHONE && env.WHATSAPP_KEY), ntfySet: !!env.NTFY_TOPIC, kinds: ALERT_KINDS.map(([key, label]) => ({ key, label, on: off[key] !== true })) };
 }
 async function ownerAlert(env, subject, text, opts) {
   const kindOff = opts && opts.kind ? (await whatsappOff(env))[opts.kind] === true : false;   // v85
-  const wa = (opts && opts.whatsapp === false) || kindOff ? false : await ownerWhatsApp(env, subject, text);   // v84
+  const quiet = (opts && opts.whatsapp === false) || kindOff;
+  const wa = quiet ? false : await ownerWhatsApp(env, subject, text);   // v84
+  const nt = quiet ? false : await ownerNtfy(env, subject, text);        // v91
   // v75 — every address in ALERT_TO (comma-separated): with a spare owner key, each owner hears what the
   // other did, so whoever controls one mailbox cannot hide the other account's actions.
   const tos = Array.from(new Set(String(env.ALERT_TO || '').split(',').map(x => x.trim()).filter(x => /^[^\s@<>]+@[^\s@<>]+$/.test(x))));
-  if (!env.ALERTS || !tos.length) return wa;
+  if (!env.ALERTS || !tos.length) return wa || nt;
   const from = String(env.ALERT_FROM || ['alerts', 'mykitchennotes.community'].join('@'));   // v74 — not written out (harvested)
   const EmailMessage = env.__EmailMessage || (await import('cloudflare:email')).EmailMessage;
   let sent = 0;
@@ -1995,7 +2002,25 @@ async function ownerAlert(env, subject, text, opts) {
       'MIME-Version: 1.0', 'Content-Type: text/plain; charset=utf-8', 'Content-Transfer-Encoding: 8bit', '', text].join('\r\n');
     try { await env.ALERTS.send(new EmailMessage(from, to, raw)); sent++; } catch (e) {}   // one refused address must not stop the others
   }
-  return sent > 0 || wa;
+  return sent > 0 || wa || nt;
+}
+// v91 — and to the owner's phone through ntfy (Tony, 25 Oct 2026: CallMeBot never answered; he chose ntfy). A POST to
+// his private topic on ntfy.sh — the secret NTFY_TOPIC, set from the GitHub secret of that name; the topic name is the
+// password, so it is never logged or shown. ntfy's server sees what is sent: the alert's title and its first line,
+// every e-mail address masked; the rest stays in the e-mail. Without the secret: nothing.
+const NTFY_URL = 'https://ntfy.sh/';
+async function ownerNtfy(env, subject, text) {
+  const topic = String(env.NTFY_TOPIC || '').trim();
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(topic)) return false;
+  const mask = (v) => String(v || '').replace(/[^\s@<>()"',;]+@[^\s@<>()"',;]+\.[A-Za-z]{2,}/g, '[e-mail]');
+  const title = mask(String(subject || '').replace(/^My Kitchen Notes: /, '')).slice(0, 120) || 'My Kitchen Notes';
+  const first = mask(String(text || '').split('\n').filter(Boolean)[0] || '').slice(0, 300);
+  try {
+    const r = await (env.__fetch || fetch)(NTFY_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ topic, title, message: (first ? first + '\n' : '') + '(the details are in your e-mail)', tags: ['bell'], priority: 4 }),
+      signal: AbortSignal.timeout(10000) });
+    return r.ok;
+  } catch (e) { return false; }
 }
 // v84 — and on WhatsApp (Tony, 20 Oct 2026: "Whatsapp is actually better for me"), through CallMeBot's free service:
 // a message to the owner's own number, with the key CallMeBot gave him on it. The Worker's secrets WHATSAPP_PHONE and
@@ -2214,11 +2239,12 @@ async function meterAction(request, env, body) {
     if (Date.now() - _alertTestAt < 60e3) return jsonResp({ error: 'ALERTS: a test was sent less than a minute ago.' }, 429);
     _alertTestAt = Date.now();
     const wa = await ownerWhatsApp(env, 'A test alert', 'If you can read this, the server can reach you here. Sent from the app at ' + ilTime(Date.now()) + ' (Israel time).');
+    const nt = await ownerNtfy(env, 'A test alert', 'If you can read this, the server can reach you in ntfy. Sent at ' + ilTime(Date.now()) + ' (Israel time).');   // v91
     const mailTo = String(env.ALERT_TO || '').split(',').filter(x => /@/.test(x)).length;
     let mailed = false;
     if (env.ALERTS && mailTo) mailed = await ownerAlert(env, 'My Kitchen Notes: a test alert',
       'If you can read this, the server can reach you by e-mail. Sent from the app at ' + ilTime(Date.now()) + ' (Israel time).', { whatsapp: false });
-    return jsonResp({ ok: true, whatsapp: wa, whatsappSet: !!(env.WHATSAPP_PHONE && env.WHATSAPP_KEY), mail: mailed, mailTo });
+    return jsonResp({ ok: true, whatsapp: wa, whatsappSet: !!(env.WHATSAPP_PHONE && env.WHATSAPP_KEY), ntfy: nt, ntfySet: !!env.NTFY_TOPIC, mail: mailed, mailTo });
   }
   if (body.op === 'allowances') {
     return jsonResp({ ok: true, usage: await usageSnapshot(env), notices: await serverNotices(env, { owner: true }), watch: !!env.USAGE_KEY,
@@ -3347,8 +3373,9 @@ async function reportsClaim(db, kind, ref) {
   return !!(r && r.meta && r.meta.changes);
 }
 async function reportsFile(env, repo, path, b64, what) {
-  const d = await reportsGh(env, 'PUT', '/repos/' + repo + '/contents/' + path, { message: what, content: b64 });
-  return (d && d.content && d.content.html_url) || ('https://github.com/' + repo + '/blob/main/' + path);
+  await reportsEnsureBranch(env, repo);   // v91 — on their own branch, rewritten monthly (reportsRetention)
+  const d = await reportsGh(env, 'PUT', '/repos/' + repo + '/contents/' + path, { message: what, content: b64, branch: REPORTS_FILES_BRANCH });
+  return (d && d.content && d.content.html_url) || ('https://github.com/' + repo + '/blob/' + REPORTS_FILES_BRANCH + '/' + path);
 }
 async function reportsForward(env, opts) {
   const out = { configured: !!(env.REPORTS_GITHUB_TOKEN && env.METER_DB), sent: [], errors: [] };
@@ -3453,6 +3480,84 @@ async function reportsForward(env, opts) {
   }
   return out;
 }
+// v91 — HOW LONG THE REPORTS STAY (Tony, 25 Oct 2026: "They cannot stay there forever. We need some cleanup
+// mechanism"; agreed: 90 days after a report is closed, 180 days at most). Run by the daily sweep. An expired report's
+// screenshot and log are deleted, then the issue itself (GraphQL deleteIssue — GitHub lets only an admin's token do it).
+// If GitHub refuses that, the issue is emptied instead (title, body, comments) and the owner is told once, in 🩺, which
+// permission the token lacks. New screenshots and logs go to their own branch (REPORTS_FILES_BRANCH), which once a
+// month is rewritten as a single commit of what is left, so a deleted screenshot leaves the history too; the inbox pull
+// request (on main) is not touched. At the end of the beta Tony deletes the repository.
+const REPORTS_FILES_BRANCH = 'files';
+const REPORTS_KEEP_CLOSED_DAYS = 90, REPORTS_KEEP_MAX_DAYS = 180, REPORTS_SQUASH_DAYS = 30, REPORTS_EXPIRE_PER_RUN = 20;
+async function reportsEnsureBranch(env, repo) {
+  try { await reportsGh(env, 'GET', '/repos/' + repo + '/git/ref/heads/' + REPORTS_FILES_BRANCH); return true; }
+  catch (e) { if (!/GitHub 404/.test(String(e.message))) throw e; }
+  const main = await reportsGh(env, 'GET', '/repos/' + repo + '/git/ref/heads/main');
+  await reportsGh(env, 'POST', '/repos/' + repo + '/git/refs', { ref: 'refs/heads/' + REPORTS_FILES_BRANCH, sha: main.object.sha });
+  return true;
+}
+async function reportsRetention(env, now) {
+  const out = { expired: 0, deleted: 0, emptied: 0, files: 0, squashed: false, errors: [] };
+  if (!env.REPORTS_GITHUB_TOKEN || !env.METER_DB) return out;
+  now = now || Date.now();
+  const repo = reportsRepo(env), db = await meterDb(env);
+  await reportLinksTable(db);
+  try {
+    const old = [];
+    for (let page = 1; page <= 5 && old.length < REPORTS_EXPIRE_PER_RUN; page++) {
+      const list = await reportsGh(env, 'GET', '/repos/' + repo + '/issues?state=all&sort=created&direction=asc&per_page=100&page=' + page);
+      if (!Array.isArray(list) || !list.length) break;
+      list.forEach(i => {
+        if (i.pull_request || /^\[removed\]/.test(String(i.title || ''))) return;   // the inbox; one already emptied
+        const closed = i.state === 'closed' && Date.parse(i.closed_at) < now - REPORTS_KEEP_CLOSED_DAYS * 864e5;
+        const ancient = Date.parse(i.created_at) < now - REPORTS_KEEP_MAX_DAYS * 864e5;
+        if ((closed || ancient) && old.length < REPORTS_EXPIRE_PER_RUN) old.push(i);
+      });
+      if (list.length < 100) break;
+    }
+    out.expired = old.length;
+    for (const i of old) {
+      const paths = Array.from(new Set((String(i.body || '').match(/\/blob\/(?:main|files)\/(?:shots|logs)\/[A-Za-z0-9._-]+/g) || [])));
+      for (const p of paths) {
+        const m = /\/blob\/(main|files)\/(.+)$/.exec(p);
+        try {
+          const f = await reportsGh(env, 'GET', '/repos/' + repo + '/contents/' + m[2] + '?ref=' + m[1]);
+          await reportsGh(env, 'DELETE', '/repos/' + repo + '/contents/' + m[2], { message: 'Retention: issue #' + i.number, sha: f.sha, branch: m[1] });
+          out.files++;
+        } catch (e) { if (!/GitHub 404/.test(String(e.message))) throw e; }
+      }
+      const g = await reportsGh(env, 'POST', '/graphql', { query: 'mutation($id: ID!) { deleteIssue(input: { issueId: $id }) { clientMutationId } }', variables: { id: i.node_id } });
+      if (g && !g.errors) { out.deleted++; continue; }
+      // Not allowed to delete: empty it, and its comments.
+      const cs = await reportsGh(env, 'GET', '/repos/' + repo + '/issues/' + i.number + '/comments?per_page=100');
+      for (const c of (Array.isArray(cs) ? cs : [])) await reportsGh(env, 'DELETE', '/repos/' + repo + '/issues/comments/' + c.id);
+      await reportsGh(env, 'PATCH', '/repos/' + repo + '/issues/' + i.number, { title: '[removed] after the retention period',
+        body: 'Removed under the reports retention (' + REPORTS_KEEP_CLOSED_DAYS + ' days after closing, ' + REPORTS_KEEP_MAX_DAYS + ' at most).', state: 'closed', labels: [] });
+      out.emptied++;
+    }
+    if (out.emptied) {
+      try {
+        await raiseNotice(env, { what: 'reports:retention', kind: 'warning', scope: 'owner', until: nextUtcMidnight(now) + 6 * 864e5, self: true,
+          title: 'Old reports were emptied, not deleted', affects: 'the reports retention in the private repository',
+          detail: 'GitHub lets only a token with admin rights delete issues. To delete them fully, give the token REPORTS_GITHUB_TOKEN the repository permission "Administration: Read and write" (github.com → Settings → Developer settings → Fine-grained tokens → kitchen-reports-worker → Edit).' });
+      } catch (e) {}
+    }
+    // Once a month: the files branch as one commit of what is left.
+    const last = await db.prepare('SELECT at FROM report_links WHERE kind = \'squash\' AND ref = \'files\'').first();
+    if (!last || last.at < now - REPORTS_SQUASH_DAYS * 864e5) {
+      let ref = null;
+      try { ref = await reportsGh(env, 'GET', '/repos/' + repo + '/git/ref/heads/' + REPORTS_FILES_BRANCH); } catch (e) { if (!/GitHub 404/.test(String(e.message))) throw e; }
+      if (ref) {
+        const head = await reportsGh(env, 'GET', '/repos/' + repo + '/git/commits/' + ref.object.sha);
+        const fresh = await reportsGh(env, 'POST', '/repos/' + repo + '/git/commits', { message: 'Reports files as of ' + new Date(now).toISOString().slice(0, 10) + ' (monthly: deleted files leave the history)', tree: head.tree.sha, parents: [] });
+        await reportsGh(env, 'PATCH', '/repos/' + repo + '/git/refs/heads/' + REPORTS_FILES_BRANCH, { sha: fresh.sha, force: true });
+        out.squashed = true;
+      }
+      await db.prepare('INSERT OR REPLACE INTO report_links (kind, ref, issue, at) VALUES (\'squash\', \'files\', NULL, ?1)').bind(now).run();
+    }
+  } catch (e) { out.errors.push(String((e && e.message) || e).slice(0, 300)); }
+  return out;
+}
 function reportsLater(env, ctx) {
   if (!env.REPORTS_GITHUB_TOKEN || !env.METER_DB) return;
   const p = reportsForward(env).catch(() => null);
@@ -3470,6 +3575,8 @@ export default {
       if (ctx && ctx.waitUntil) ctx.waitUntil(h); else await h; return;
     }
     const p = retentionSweep(env, at).then(async function (done) {
+      // v91 — and the reports in the private repository that have run their time
+      if (env.REPORTS_GITHUB_TOKEN && env.METER_DB) { try { done = Object.assign({}, done, { reports: await reportsRetention(env, at) }); } catch (e) {} }
       // v78 — the AI ceiling counters and the allowance notices that have run their time.
       if (env.METER_DB) {
         try { await env.METER_DB.prepare('DELETE FROM counters WHERE until < ?1').bind(at).run(); } catch (e) {}
@@ -3517,4 +3624,4 @@ export default {
   }
 };
 
-// ── END OF WORKER v90 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
+// ── END OF WORKER v91 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
