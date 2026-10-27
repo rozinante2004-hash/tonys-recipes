@@ -8831,13 +8831,18 @@ window.SELF_TESTS = [
       if(!/⚠️ my-kitchen-notes-beta: 36,000 of 50,000 \(72%\)/.test(lines) || !/✓ tonys-recipes-test: 120 of 50,000 \(0%\)/.test(lines)) throw new Error('the page: '+lines);
     } },
 
-  { id:'owner_test_alert', group:'Core', name:'📲 The owner can send himself a test alert, and is told what reached him — e-mail, and WhatsApp once its secrets are set (v38.64, Worker v84)',
+  { id:'owner_test_alert', group:'Core', name:'📲 The owner can send a test alert, and is told what reached them — e-mail, ntfy, and WhatsApp only when its secrets are set (v38.64, Worker v84; v38.93 ntfy)',
     test: async()=>{
       if(!document.querySelector('[onclick*="openWhatsAppAlerts()"][data-owner-only]')) throw new Error('no owner-only "WhatsApp alerts"');
       var t=testAlertText({ mail:true, mailTo:2, whatsapp:true, whatsappSet:true }).join('\n');
       if(!/✅ E-mail: sent to your alert addresses \(2\)/.test(t) || !/✅ WhatsApp: sent/.test(t)) throw new Error('both sent: '+t);
-      t=testAlertText({ mail:true, mailTo:1, whatsapp:false, whatsappSet:false }).join('\n');
-      if(!/WhatsApp: not set up yet/.test(t) || !/WHATSAPP_PHONE and WHATSAPP_KEY/.test(t)) throw new Error('not set up: '+t);
+      // v38.93 — no WhatsApp line without its secrets (the phone alerts are ntfy now); ntfy says sent, not delivered or not set up
+      t=testAlertText({ mail:true, mailTo:1, whatsapp:false, whatsappSet:false, ntfy:true, ntfySet:true }).join('\n');
+      if(/WhatsApp/.test(t) || !/✅ ntfy: sent/.test(t)) throw new Error('ntfy only: '+t);
+      t=testAlertText({ mail:true, mailTo:1, ntfy:false, ntfySet:false }).join('\n');
+      if(!/ntfy: not set up/.test(t) || !/NTFY_TOPIC/.test(t)) throw new Error('ntfy not set up: '+t);
+      t=testAlertText({ mail:true, mailTo:1, ntfy:false, ntfySet:true }).join('\n');
+      if(!/❌ ntfy: not delivered/.test(t)) throw new Error('ntfy refused: '+t);
       t=testAlertText({ mail:false, mailTo:1, whatsapp:false, whatsappSet:true }).join('\n');
       if(!/❌ E-mail/.test(t) || !/❌ WhatsApp: CallMeBot refused/.test(t)) throw new Error('refused: '+t);
       var realOwner=window.isAppOwner, realUser=window._fbUser, realFetch=window.fetch, realConfirm=window.askConfirm, sent=null;
