@@ -1317,6 +1317,7 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
     v39.00 (waits for the yes with v38.94–99): the test-alert window and 📲 Phone alerts say Pushover; Privacy
     Statement 1.10 lists "Pushover (Pushover, LLC)" where 1.9 had ntfy. Tony's part: the app, an account, an
     application, the two secrets.
+    Done (Tony, 27 Oct): both secrets added; Worker redeployed 18:42 Israel time — "PUSHOVER_TOKEN is set", "PUSHOVER_USER is set", live v95.
   - **v39.01:** Tony still saw no wizard in "fresh" private windows: that browser held recipes for the test copy's
     address (the demo ones), and a browser with recipes opens on them offline, no sign-in screen — by design, no
     welcome. `?setup=1` now brings the sign-in screen back and the welcome over it. The preview's "Get the extension"
