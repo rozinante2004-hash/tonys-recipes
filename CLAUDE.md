@@ -1306,6 +1306,7 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
     secret NTFY_TOKEN (a free ntfy.sh account's access token; deploy-worker.yml passes it) the Worker sends
     `Authorization: Bearer …`, so the account's own allowance counts. Tony's part: sign up at https://ntfy.sh/signup,
     create a token at https://ntfy.sh/account, store it as NTFY_TOKEN; then I redeploy and he sends a test alert.
+    Done (Tony, 27 Oct): NTFY_TOKEN added; Worker redeployed 17:34 Israel time — "NTFY_TOKEN is set", live v93.
   - **The test copy behaves as the beta will (Tony, 27 Oct: "once a build is released to it, it behaves exactly the same
     as the Beta would have"; "Perhaps we should update the database rules and server immediately upon the release to the
     test version"):**
