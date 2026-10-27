@@ -1247,6 +1247,11 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
       an unhandled-rejection report (beta v38.92, Android Chrome, 26 Oct).
     - Privacy Statement 1.9 (11 languages): ntfy as a provider (the Team's own alerts, nothing about users) and the
       reports' retention. No one is asked to agree again.
+  - **Released: v38.93 + Worker v91 (27 Oct 2026, 12:27 Israel time, on 8969ba5; standing permission for these items)** —
+    every job success: Deploy the Worker ("REPORTS_GITHUB_TOKEN is set", "NTFY_TOPIC is set", live v91 with database,
+    storage and owner), Deploy to GitHub Pages, pages build, Publish languages, Translate new phrases, Self Tests on main
+    and test, Cloudflare Pages for both copies. The first try (816da90) stopped on one Self Test still expecting the
+    WhatsApp line in the test alert (fixed in the suite).
   - **v38.94 (waits for Tony's yes):** a linked kitchen's photos — the list is drawn again right after sign-in while
     the first photos are on their way; the photo went into the discarded card and the new one, "already asked", kept its
     emoji (Tony's screenshot, 27 Oct: the top 6 cards of a linked kitchen). One read per photo now, shared, put into
