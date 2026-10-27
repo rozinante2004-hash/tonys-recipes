@@ -86,4 +86,4 @@ for (const p of targets) {
   }
 }
 if (failed) { console.log(failed + ' of ' + targets.length + ' not published'); process.exit(1); }
-console.log('published to all ' + targets.length + (only ? ' (the test copy\'s project only)' : ''));
+console.log('published to all ' + targets.length + (onlyArg === 'test' ? ' (the test copy\'s project only)' : only ? ' (the family\'s and the beta\'s)' : ''));

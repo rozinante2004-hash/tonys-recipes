@@ -1341,6 +1341,10 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
     the first-visit nudge waits until the wizard, the rules and the beta's welcome are closed.
   - **Tony, 27 Oct: "Once you fix it, please release it to family and beta"** — the yes for v38.94–v39.04 (with the
     secret recipes' rules for the family's and the beta's projects).
+  - **Released: v39.04 (27 Oct 2026, 19:34 Israel time, on e435e14, with Tony's yes)** — v38.94–v39.04. Every job
+    success: Deploy to GitHub Pages, pages build, Publish the database rules (the family's and the beta's — 2 projects,
+    `--not-test`), Deploy the Worker (live v95 = published, kept), Publish languages, Translate new phrases, Self Tests on
+    main and test, Cloudflare Pages for both copies.
   - **The test copy behaves as the beta will (Tony, 27 Oct: "once a build is released to it, it behaves exactly the same
     as the Beta would have"; "Perhaps we should update the database rules and server immediately upon the release to the
     test version"):**
