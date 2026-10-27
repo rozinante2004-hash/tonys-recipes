@@ -24,6 +24,14 @@ const version = (/var APP_VERSION = '([^']+)'/.exec(html) || [])[1];
 const live = (/projectId:\s*'([^']+)'/.exec(html) || [])[1];
 const projects = [live, envs.test && envs.test.firebase && envs.test.firebase.projectId, envs.beta && envs.beta.firebase && envs.beta.firebase.projectId].filter(Boolean);
 if (!owner || !version || projects.length !== 3) throw new Error('could not read the owner, the version or the three projects: ' + JSON.stringify({ owner, version, projects }));
+// v38.99 — Tony, 27 Oct: "once a build is released to [the test copy], it behaves exactly the same as the Beta would
+// have." The test copy runs the `test` branch at once, so its own project gets that branch's rules at once too
+// (--only=test, from a push to `test`); the family's and the beta's still only with a release to `main`.
+const onlyArg = (process.argv.find(a => a.startsWith('--only=')) || '').slice(7);
+const only = onlyArg === 'test' ? [envs.test.firebase.projectId]
+  : process.argv.includes('--not-test') ? projects.filter(p => p !== envs.test.firebase.projectId)   // a release: the test copy has its own, newer or the same
+  : null;
+if (onlyArg && !only) throw new Error('--only takes "test" alone — the family and the beta get their rules with a release');
 
 const q = '"' + owner + '"';
 // v38.29 — the spare owner key (GitHub secret OWNER_SECONDARY_EMAIL, when set) is an app admin too;
@@ -37,7 +45,8 @@ let rules = readFileSync(new URL('firestore.rules', root), 'utf8')
 rules = /^rules_version = '2';/m.test(rules) ? rules.replace(/^(rules_version = '2';)/m, '$1\n' + stamp) : stamp + '\n' + rules;
 if (/\{\{[A-Z_]+\}\}/.test(rules)) throw new Error('a placeholder is left: ' + rules.match(/\{\{[A-Z_]+\}\}/)[0]);
 
-console.log('rules from ' + version + ' for ' + projects.join(', ') + ' (' + rules.length + ' characters' + (spare ? ', with the spare owner key' : '') + ')');   // never the address: the log is public
+const targets = only || projects;
+console.log('rules from ' + version + ' for ' + targets.join(', ') + ' (' + rules.length + ' characters' + (spare ? ', with the spare owner key' : '') + ')');   // never the address: the log is public
 if (DRY) process.exit(0);
 
 const key = process.env.FIREBASE_RULES_KEY;
@@ -57,7 +66,7 @@ const client = await auth.getClient();
 const api = 'https://firebaserules.googleapis.com/v1/';
 
 let failed = 0;
-for (const p of projects) {
+for (const p of targets) {
   try {
     // 1. The rules as a new ruleset — Firebase checks them here and refuses a mistake.
     const rs = await client.request({ url: api + 'projects/' + p + '/rulesets', method: 'POST',
@@ -76,5 +85,5 @@ for (const p of projects) {
     console.log('  ✗ ' + p + ' — ' + msg);
   }
 }
-if (failed) { console.log(failed + ' of ' + projects.length + ' not published'); process.exit(1); }
-console.log('published to all ' + projects.length);
+if (failed) { console.log(failed + ' of ' + targets.length + ' not published'); process.exit(1); }
+console.log('published to all ' + targets.length + (only ? ' (the test copy\'s project only)' : ''));

@@ -19,10 +19,13 @@
     "_why_movedTo": "v38.31 — the family copy forwards every visit to the community copy since move day (13 Oct 2026); this copy forwards nowhere.",
     "dataLayout": "households",
     "_why_dataLayout": "WP-D rehearsal (28 Sep 2026): the test copy runs in the household layout after Tony copied its collection into a household (Family Access → Copy this collection into a household). Its `shared` collection is untouched; setting this back to 'shared' returns to it.",
-    "extensionStores": { "chrome": "", "edge": "", "firefox": "" },
+    "extensionStores": { "chrome": "https://chrome.google.com/webstore/detail/dofokgilnfbpkjncmnkgfolhpjhpeglk", "edge": "", "firefox": "https://addons.mozilla.org/firefox/addon/my-kitchen-notes/" },
+    "_why_sameAsBeta": "v38.99 — Tony, 27 Oct: \"once a build is released to it, it behaves exactly the same as the Beta would have\". So the test copy's features, diagnostics and store links are the beta's; it differs only in who it is (its Firebase project, address, name, icons and banner). The store extension itself opens the beta.",
     "_why_extensionStores": "v37.73 — the stores list the FAMILY's extension; this copy offers its own download (my-kitchen-notes-extension-TEST.zip), never the family's listing.",
     "features": {
+      "whatsapp": true,
       "bringDirect": false,
+      "gmail": false,
       "feedbackButton": true,
       "selfTestForAll": true,
       "insights": true,
@@ -32,7 +35,7 @@
     "_why_insights": "v38.15 — Tony, before the beta: errors and feature counts go to the app's own server (Worker v69), so the testers' use can be learned from; tried here first. The welcome too.",
     "diagnostics": {
       "logging": true,
-      "debug": true
+      "debug": false
     },
     "_why_diagnostics": "v37.09 — Tony: logging and debugging on in the test copy, so any report he sends carries the log. His own switch, once used on a device, is kept.",
     "signIn": {
@@ -46,6 +49,7 @@
       "name": "Tony's Recipes (test)",
       "short_name": "Recipes TEST"
     },
+    "homeScreen": { "title": "Recipes TEST", "statusBar": "black-translucent" },
     "brand": {
       "iconFrom": "#5C3D2E",
       "color": "#1F6F78",

@@ -1306,6 +1306,20 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
     secret NTFY_TOKEN (a free ntfy.sh account's access token; deploy-worker.yml passes it) the Worker sends
     `Authorization: Bearer …`, so the account's own allowance counts. Tony's part: sign up at https://ntfy.sh/signup,
     create a token at https://ntfy.sh/account, store it as NTFY_TOKEN; then I redeploy and he sends a test alert.
+  - **The test copy behaves as the beta will (Tony, 27 Oct: "once a build is released to it, it behaves exactly the same
+    as the Beta would have"; "Perhaps we should update the database rules and server immediately upon the release to the
+    test version"):**
+    - **Rules:** a push to `test` that changes the rules publishes them to the test project only (deploy-rules.yml,
+      `publish-rules.mjs --only=test`), after the same emulator checks; a release to `main` publishes to the family's
+      and the beta's only (`--not-test`), so an earlier build never replaces the test copy's newer rules.
+    - **Server:** a push to `test` that changes the Worker deploys it (deploy-worker.yml), after the Worker checks. There
+      is ONE server for all three copies, so every server change must keep working with the apps already released.
+      The deploy never puts an older version over a newer live one (it reads the live version first).
+    - **Settings:** tools/environments.json `test` = the beta's features (whatsapp on, gmail off), diagnostics (debug
+      off), store links and home-screen status bar; it differs only in who it is (project, address, name, icons, banner,
+      its own iPhone shortcut). The store extension itself opens the beta.
+    - Not yet: a server of its own for the test copy — the AI and photo keys (ANTHROPIC_API_KEY, GEMINI_API_KEY,
+      PIXABAY_API_KEY, YOUTUBE_API_KEY, FB_APP_TOKEN) are only in Cloudflare, not GitHub; offered to Tony.
 - **Photo keys, 23 Oct:** Pexels: "New API key issuance is currently paused and cannot be requested" (Tony); Unsplash:
   "We can forego unsplash for now" (Tony). Photos stay Pixabay + Wikimedia Commons; the workflow is ready if a key
   ever comes (secrets PEXELS_API_KEY / UNSPLASH_ACCESS_KEY, then dispatch Deploy the Worker).

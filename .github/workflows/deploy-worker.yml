@@ -6,9 +6,13 @@ name: Deploy the Worker
 # Needs the repository secret CLOUDFLARE_API_TOKEN ("Edit Cloudflare Workers"
 # token); without it the job says so and does nothing.
 
+# v38.99 — and from `test` (Tony, 27 Oct: "Perhaps we should update the database rules and server immediately upon
+# the release to the test version"): the test copy then runs against the server its build expects. There is one server
+# for all three copies, so a server change is written to keep working with the app already released (as before), and
+# is published only when the Worker checks below pass.
 on:
   push:
-    branches: ["main"]
+    branches: ["main", "test"]
     paths: ["cloudflare-worker.js", "worker/wrangler.jsonc", ".github/workflows/deploy-worker.yml"]
   workflow_dispatch:
 
@@ -38,7 +42,16 @@ jobs:
             echo "::warning::CLOUDFLARE_API_TOKEN is not set — the Worker was NOT published. Add it under Settings → Secrets and variables → Actions."
             echo "ok=false" >> "$GITHUB_OUTPUT"
           else
-            echo "ok=true" >> "$GITHUB_OUTPUT"
+            # v38.99 — never older over newer: the test copy publishes its server first, and a release of an earlier
+            # build to main must not take the live server back.
+            want=$(grep -oE "^const WORKER_VERSION = 'v[0-9]+'" cloudflare-worker.js | grep -oE "[0-9]+")
+            live=$(curl -s -m 15 -X POST -H 'Content-Type: application/json' -d '{"action":"health"}' https://lively-bread-273a.rozinante2004.workers.dev/ | grep -oE '"version":"v[0-9]+"' | grep -oE '[0-9]+')
+            if [ -n "$live" ] && [ -n "$want" ] && [ "$live" -gt "$want" ]; then
+              echo "::notice::the live Worker is v$live, newer than this v$want — left as it is"
+              echo "ok=false" >> "$GITHUB_OUTPUT"
+            else
+              echo "ok=true" >> "$GITHUB_OUTPUT"
+            fi
           fi
 
       # Never publish a Worker that fails its own checks.

@@ -7,9 +7,11 @@ name: Publish the database rules
 # the JSON key of a service account with "Firebase Rules Admin" in all three
 # projects. Without it the job says so and does nothing.
 
+# v38.99 — and from a push to `test`, to the test copy's project only (Tony, 27 Oct: the test copy must behave exactly
+# as the beta will — it runs the `test` branch at once, so it needs that branch's rules at once).
 on:
   push:
-    branches: ["main"]
+    branches: ["main", "test"]
     paths: ["firestore.rules", "tools/publish-rules.mjs", ".github/workflows/deploy-rules.yml"]
   workflow_dispatch:
 
@@ -61,11 +63,13 @@ jobs:
           npx firebase emulators:exec --only firestore --project demo-rules "node tests/firestore-rules.test.mjs"
           npx firebase emulators:exec --only firestore --project demo-households "node tests/firestore-households-rules.test.mjs"
 
-      - name: Publish to the three projects
+      - name: Publish (main — the family's and the beta's; test — the test copy's)
         if: steps.key.outputs.ok == 'true'
         env:
           OWNER_EMAIL: ${{ secrets.OWNER_EMAIL }}     # v38.27 — the owner's address, no longer in index.html
           OWNER_SECONDARY_EMAIL: ${{ secrets.OWNER_SECONDARY_EMAIL }}     # v38.29 — the spare owner key
         run: |
           npm install --no-audit --no-fund --no-save google-auth-library@9 >/dev/null
-          node tools/publish-rules.mjs
+          # main (a release): the family's and the beta's — the test copy's came with its own build, and an earlier build's
+          # rules must not replace them; test: the test copy's only
+          if [ "$GITHUB_REF_NAME" = "main" ]; then node tools/publish-rules.mjs --not-test; else node tools/publish-rules.mjs --only=test; fi
