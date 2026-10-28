@@ -1430,8 +1430,35 @@ console.log('\nAI per household (v60):');
     f = await fb({ action: 'meter-admin', op: 'list', idToken: owner2f });
     expect('v73: …Google with the authenticator is', f.status === 200, JSON.stringify(f).slice(0, 200));
     security['tonys-recipes-test'] = 'fail';
+    let asksBefore = firestoreAsks.length;
     f = await fb({ action: 'meter-admin', op: 'list', idToken: owner2f });
-    expect('v73: if the switch cannot be read, the tools stay shut (never "off" by mistake)', f.status === 502, JSON.stringify(f));
+    expect('v96: signed in with the authenticator, he is let in without the switch being read (on or off, it passes)',
+      f.status === 200 && !firestoreAsks.slice(asksBefore).some(a => /config\/security$/.test(a.url)), JSON.stringify(f).slice(0, 200));
+    f = await fb({ action: 'meter-admin', op: 'list', idToken: comOwner });
+    expect('v96: the switch unreadable: the setting read last ("on") still asks Google alone for the code', f.status === 403 && f.d.needTwoStep === true, JSON.stringify(f));
+    const keptRow = db.raw.prepare("SELECT v FROM owner_prefs WHERE k = 'two_step:tonys-recipes-test'").get();
+    expect('v96: …it was kept in D1 when it was read', keptRow && JSON.parse(keptRow.v).on === true, JSON.stringify(keptRow));
+    db.raw.prepare("DELETE FROM owner_prefs WHERE k = 'two_step:tonys-recipes-test'").run();
+    f = await fb({ action: 'meter-admin', op: 'list', idToken: comOwner });
+    expect('v73: if the switch cannot be read and nothing was kept, the tools stay shut (never "off" by mistake)', f.status === 502, JSON.stringify(f));
+    // v96 — a read the database never answers: asked twice, then the kept setting decides.
+    security['tonys-recipes-test'] = false;
+    f = await fb({ action: 'meter-admin', op: 'list', idToken: comOwner });
+    expect('v96: switched off and read: Google alone opens the tools', f.status === 200, JSON.stringify(f).slice(0, 200));
+    const fetchWas = globalThis.fetch;
+    let hung = 0;
+    globalThis.fetch = async (url, init) => {
+      if (/\/config\/security$/.test(String(url))) { hung++; throw Object.assign(new Error('The operation was aborted due to timeout'), { name: 'TimeoutError' }); }
+      return fetchWas(url, init);
+    };
+    try {
+      f = await fb({ action: 'meter-admin', op: 'list', idToken: comOwner });
+      expect('v96: the database does not answer: asked twice, and the setting read a moment ago ("off") decides', f.status === 200 && hung === 2, hung + ' ' + JSON.stringify(f).slice(0, 200));
+      db.raw.prepare("UPDATE owner_prefs SET v = ?1 WHERE k = 'two_step:tonys-recipes-test'").run(JSON.stringify({ on: false, at: Date.now() - 31 * 864e5 }));
+      f = await fb({ action: 'meter-admin', op: 'list', idToken: comOwner });
+      expect('v96: …but an "off" not read for a month does not', f.status === 502 && /timeout/.test(f.d.error), JSON.stringify(f));
+    } finally { globalThis.fetch = fetchWas; }
+    db.raw.prepare("DELETE FROM owner_prefs WHERE k = 'two_step:tonys-recipes-test'").run();
     delete security['tonys-recipes-test'];
     // …and he hears about it.
     const mails = [];

@@ -1,4 +1,12 @@
-// Tony's Recipes — Cloudflare Worker v95
+// Tony's Recipes — Cloudflare Worker v96
+// v96: THE OWNER'S TOOLS WHEN THE DATABASE IS SLOW (Tony, 28 Oct 2026: "The notes could not be read: the server: METER:
+// could not check the owner's two-step setting (The operation was aborted due to timeout) — try again", and the same
+// after a reload). The Worker's read of config/security went unanswered for 8 seconds. Now: (1) a sign-in made WITH the
+// authenticator's code is not asked about at all — it is let in whether the switch is on or off; (2) a Firestore read
+// the database leaves unanswered for 5 seconds is asked once more, on a fresh connection (also the household checks);
+// (3) the last setting read is kept in D1 (owner_prefs), and decides when the database cannot be reached: "on" still
+// asks for the code, "off" counts only if read in the last 30 days, nothing kept still shuts the tools — never "off" by
+// mistake. Each unanswered read is written to the Worker's log (Cloudflare → Workers → Logs).
 // v95: THE PHONE ALERTS THROUGH PUSHOVER (Tony, 27 Oct 2026: "If it's a one time purchase of approx 5$, then I will go
 // with Pushover" — ntfy.sh counts this server's messages by Cloudflare's shared address, whose daily quota others use
 // up). With PUSHOVER_TOKEN (the application's key) and PUSHOVER_USER (Tony's user key): the alert's title and first
@@ -425,7 +433,7 @@
 //   AI_MAX_TOKENS   – the longest answer one call may ask for (32000; the
 //                     app's largest, reading several recipes at once, asks 8000).
 
-const WORKER_VERSION = 'v95';
+const WORKER_VERSION = 'v96';
 const VIDEO_MAX_MB_DEFAULT = 50;
 const GEMINI_API = 'https://generativelanguage.googleapis.com';
 const GEMINI_MODEL_DEFAULT = 'gemini-2.5-flash';
@@ -1926,17 +1934,54 @@ function idBatch(v, max = 100) {
   (Array.isArray(v) ? v : []).forEach(x => { const n = parseInt(x, 10); if (n > 0 && out.indexOf(n) === -1) out.push(n); });
   return out.length <= max ? out : null;
 }
+// v96 — a read from Firestore, asked twice: one the database leaves unanswered for 5 seconds is dropped and asked once
+// more, on a fresh connection. Logged without the document's path (it holds a household's and a person's ids).
+async function fsFetch(url, headers) {
+  let last;
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try { return await fetch(url, { headers, signal: AbortSignal.timeout(5000) }); }
+    catch (e) { last = e; console.log('[firestore] no answer (' + attempt + ' of 2) from ' + url.replace(/\/documents\/.*$/, '/documents/…') + ': ' + (e && e.message)); }
+  }
+  throw last;
+}
 const _ownerSec = new Map();
-async function ownerTwoStepOn(project, token, env) {
+async function ownerTwoStepOn(project, token, env, db) {
   const c = env.__firestoreBase ? null : _ownerSec.get(project);   // (the tests change it between calls)
   if (c && Date.now() - c.at < 60e3) return c.on;
   const url = (env.__firestoreBase || 'https://firestore.googleapis.com') + '/v1/projects/' + encodeURIComponent(project)
     + '/databases/(default)/documents/config/security';
-  const r = await fetch(url, { headers: { Authorization: 'Bearer ' + token }, signal: AbortSignal.timeout(8000) });
-  let on = false;
-  if (r.ok) { try { on = fsValue((((await r.json()) || {}).fields || {}).ownerTwoStep) === true; } catch (e) { on = false; } }
-  else if (r.status !== 404) throw new Error('the database answered ' + r.status);   // never "off" by mistake
+  let on = null, why = '';
+  try {
+    const r = await fsFetch(url, { Authorization: 'Bearer ' + token });
+    if (r.ok) { try { on = fsValue((((await r.json()) || {}).fields || {}).ownerTwoStep) === true; } catch (e) { on = false; } }
+    else if (r.status === 404) on = false;
+    else why = 'the database answered ' + r.status;
+  } catch (e) { why = (e && e.message) || String(e); }
+  // v96 — the last setting read, kept in D1: it decides when the database cannot be reached.
+  const key = 'two_step:' + project;
+  let kept = null;
+  if (db) {
+    try {
+      await tableOnce(db, 'owner_prefs', 'CREATE TABLE IF NOT EXISTS owner_prefs (k TEXT PRIMARY KEY, v TEXT)');
+      const row = await db.prepare('SELECT v FROM owner_prefs WHERE k = ?1').bind(key).first();
+      kept = row ? JSON.parse(row.v) : null;
+    } catch (e) { kept = null; }
+  }
+  if (on === null) {   // never "off" by mistake: "on" asks for the code; "off" only if read lately; nothing kept: shut
+    if (kept && (kept.on === true || Date.now() - Number(kept.at) < 30 * 864e5)) {
+      console.log('[owner] the two-step setting could not be read (' + why + '); the one read ' + ilTime(Number(kept.at)) + ' decides');
+      return kept.on === true;
+    }
+    throw new Error(why);
+  }
   _ownerSec.set(project, { on, at: Date.now() });
+  // Written when it changed, or once a day (D1 writes are counted: v78).
+  if (db && (!kept || kept.on !== on || !(Date.now() - Number(kept.at) < 864e5))) {
+    try {
+      await db.prepare('INSERT INTO owner_prefs (k, v) VALUES (?1, ?2) ON CONFLICT (k) DO UPDATE SET v = excluded.v')
+        .bind(key, JSON.stringify({ on, at: Date.now() })).run();
+    } catch (e) {}
+  }
   return on;
 }
 // v78 — the table is made once per isolate, and a known device's "last seen" is
@@ -2108,9 +2153,7 @@ async function meterMembership(claims, hid, token, env) {
   const base = (env.__firestoreBase || 'https://firestore.googleapis.com') + '/v1/projects/' + encodeURIComponent(claims.aud)
     + '/databases/(default)/documents/households/' + encodeURIComponent(hid);
   const h = { Authorization: 'Bearer ' + token };
-  const [m, hh] = await Promise.all([
-    fetch(base + '/members/' + encodeURIComponent(claims.sub), { headers: h, signal: AbortSignal.timeout(8000) }),
-    fetch(base, { headers: h, signal: AbortSignal.timeout(8000) })]);
+  const [m, hh] = await Promise.all([fsFetch(base + '/members/' + encodeURIComponent(claims.sub), h), fsFetch(base, h)]);   // v96
   if (m.status === 403 || m.status === 404) return { member: false };   // not remembered: they may join any minute
   if (!m.ok) throw new Error('the household could not be checked (' + m.status + ')');
   let role = '';
@@ -2253,11 +2296,14 @@ async function meterAction(request, env, body) {
   const fb = claims.firebase || {};
   if (fb.sign_in_provider !== 'google.com')
     return jsonResp({ error: 'METER: the owner\'s tools need a sign-in with Google (not an e-mail link or a password).', needGoogle: true }, 403);
-  let twoStep;
-  try { twoStep = await ownerTwoStepOn(claims.aud, body.idToken, env); }
-  catch (e) { return jsonResp({ error: 'METER: could not check the owner\'s two-step setting (' + e.message + ') — try again.' }, 502); }
-  if (twoStep && fb.sign_in_second_factor !== 'totp')
-    return jsonResp({ error: 'METER: the owner\'s tools need a sign-in with the code from your authenticator app.', needTwoStep: true }, 403);
+  // v96 — signed in with the authenticator's code: let in whether the switch is on or off, so there is nothing to ask.
+  if (fb.sign_in_second_factor !== 'totp') {
+    let twoStep;
+    try { twoStep = await ownerTwoStepOn(claims.aud, body.idToken, env, db); }
+    catch (e) { return jsonResp({ error: 'METER: could not check the owner\'s two-step setting (' + e.message + ') — try again.' }, 502); }
+    if (twoStep)
+      return jsonResp({ error: 'METER: the owner\'s tools need a sign-in with the code from your authenticator app.', needTwoStep: true }, 403);
+  }
   if (OWNER_DESTRUCTIVE.has(String(body.op || '')) && !(Number(claims.auth_time) > Date.now() / 1000 - 900))
     return jsonResp({ error: 'REAUTH: confirm it is you — sign in again, then do it once more.', reauth: true }, 401);
   try { await ownerWatch(env, db, claims, body, request); } catch (e) {}
@@ -3695,4 +3741,4 @@ export default {
   }
 };
 
-// ── END OF WORKER v95 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
+// ── END OF WORKER v96 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
