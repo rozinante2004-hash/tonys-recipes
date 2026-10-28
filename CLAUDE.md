@@ -1360,6 +1360,15 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
       IN FULL any language in the list as written in index.html that is not published (at most 2 a run, 6000 phrases
       each; the document is created only if it does not exist), then Publish languages puts it in i18n/pt.json. Dry run
       on v39.05: pt, all 2174 phrases. One-off AI cost: a few dollars.
+  - **Released: v39.05 (28 Oct 2026, 01:58 Israel time, on 913114f, Tony: "Yes, release v39.05").** Every job success:
+    Deploy to GitHub Pages, pages build, Publish the database rules (nothing changed), Self Tests on main and test,
+    Cloudflare Pages for the beta and test. Translate new phrases: pt +2174 (a new language) and "Magyar" +1 in each of
+    the other ten (96 AI calls, 103k tokens in, 186k out); Publish languages then wrote i18n/pt.json (24e0b78, on main
+    and merged into test). **The beta branch does not get the language files from Publish languages** (only main and
+    test), and the first-visit question reads the copy's own i18n/index.json — so 24e0b78 (i18n/ files only, a fast
+    forward) was pushed to `beta` at 02:12 as part of the same release; its Cloudflare build succeeded. Between
+    releases, a language published from a device shows in 🌐 on the beta at once (central index) but in the
+    first-visit question only after the next release.
   - **The test copy behaves as the beta will (Tony, 27 Oct: "once a build is released to it, it behaves exactly the same
     as the Beta would have"; "Perhaps we should update the database rules and server immediately upon the release to the
     test version"):**
