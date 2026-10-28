@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v38.91` — app. **Worker: v90**, deployed separately and versioned separately
+**Current version:** `v39.06` — app. **Worker: v96**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -811,6 +811,63 @@ one typed into the message.
 release waits for the owner's yes. The community app is by invitation only; "Share this App with family" goes back
 to "Share this App" at the official launch. Open: WhatsApp (CallMeBot was full), the AI models after the launch, the testing
 tools' update (Playwright, Ubuntu 26.04) after launch week, a lighter first screen.
+
+### 1b.14 The testers' first days (v38.97 – v39.06, Worker v91 – v96, 25–28 Oct 2026)
+
+**The test copy behaves as the beta will.** A push to `test` that changes `firestore.rules` publishes them to the test
+project only (`deploy-rules.yml`, `tools/publish-rules.mjs --only=test`); a release to `main` publishes to the family's
+and the beta's (`--not-test`), so an older build never replaces the test copy's newer rules. A push to `test` that
+changes the Worker deploys it (`deploy-worker.yml`) — there is ONE Worker for all three copies, so every server
+change must keep working with the apps already released, and the deploy reads the live version first and never puts
+an older one over it. `tools/environments.json` `test` has the beta's features, diagnostics, store links and
+home-screen settings; it differs only in who it is. Before this, the test project's rules were months behind: the
+household chat and 🔒 secret recipes were refused there (beta reports #32–#34) while the beta had both.
+
+**The owner's phone alerts: Pushover** (Worker v95). ntfy.sh limits senders by address and a Worker sends from
+Cloudflare's shared ones, so its daily quota was gone before ours was sent — even with an account token (v93/v94).
+With the secrets PUSHOVER_TOKEN and PUSHOVER_USER each owner alert's title and first line, addresses masked, go to
+https://api.pushover.net/1/messages.json; "📲 Send me a test alert" says sent / not delivered — why. Privacy Statement
+1.10 names Pushover.
+
+**The first-contact wizard, finished (v38.97 – v39.04).** `?setup=1` shows it on a browser already used (a browser
+keeps one private session for all its private windows, and a browser holding recipes opens on them offline).
+⚙️ → 👑 → 🧑‍🍳 Preview the first-visit setup walks every page and records nothing. `html.setup-first` (an inline
+script before `#loginScreen`) hides the old sign-in card from the first paint; the service worker's first
+`controllerchange` does not reload; `setupCreate` closes only the account page and a waiting device page goes on
+(`_setupDeviceGoOn`); the older device offer never shows over the wizard or the rules. Every window after it — the
+kitchen's welcome, "Name your kitchen", "Your collection is ready", the e-mail confirmation windows, the beta's
+welcome, the tour — is on the same notebook page (`askChoice`/`askConfirm` `notebook: true` → `.ask-card.nb-page`).
+Words in Patrick Hand (Hebrew: Varela Round), only big titles in Caveat — the owner found Caveat hard to read.
+A refused secret save (rules not yet there) returns `secret-not-ready`: nothing moves, the rest keeps saving.
+
+**Every translated language is offered (v39.05 – v39.06).** The first visit asks "the device's own language, or
+English?" (`i18nDeviceLangOffer`: the first language the device lists that is published, unless English comes
+first) — a Hungarian phone is asked [Magyar] [English], never about Hebrew. `I18N_LANGS` is the built-in list, and
+`i18nEnsureLang(code)` adds any other published code at run time, named by the browser (`Intl.DisplayNames`, itself
+and in English; right to left from `I18N_RTL`); it runs wherever languages come from outside (both indexes, the
+first-visit offer, choosing, the saved choice at start-up, export/import, Put back). The first visit also asks the
+central list (2.5 s at most, only when the device's own first language was not found), because the beta gets the
+language files only with a release; `i18nCentralIndex` keeps its read as a promise, so a second caller waits for it.
+`tools/translate-new.mjs` (after each release to `main`) translates in full any built-in language not yet published
+(Portuguese, 2,174 phrases, 28 Oct), at most 2 a run; Publish languages then writes `i18n/<lang>.json` to `main`
+and `test` — **not `beta`**, which gets them with the next release.
+
+**Reports that are not errors.** The phrase collection (`i18nHarvest`) opens the import-error and service-error
+windows with "·" in them; while it runs (`window._i18nHarvesting`) nothing is reported (`insQuiet`). Kept in the
+device's log but never sent (`INS_NOT_SENT`): a bare "Script error." from another site's script, and "Sign-in
+failed — auth/network-request-failed" (a report is only sent after that device signed in after all). The log's
+"Saves without a load" counts recipe writes only — a new kitchen agreeing to the terms is not one.
+
+**The owner's tools when the database is slow (Worker v96).** The two-step switch (`config/security`) is read only
+for a sign-in WITHOUT the authenticator's code (with it, the owner passes either way). `fsFetch` asks a Firestore read
+twice, 5 s each (the household checks too). The last setting read is kept in D1 `owner_prefs` (`two_step:<project>`,
+written on change or once a day) and decides when Firestore cannot be reached: "on" asks for the code, "off" counts
+only if read in the last 30 days, nothing kept shuts the tools — never "off" by mistake.
+
+**State on 28 Oct 2026 (v39.06, Worker v96):** testers since 25 Oct; every release on the owner's yes. Their notes
+and error reports reach the private repository and a Claude session that triages them daily at 19:30 Israel time.
+Open: a server of its own for the test copy (needs the AI keys in GitHub), the language question itself on the
+notebook page, a Hebrew invitation link that opens the app in Hebrew.
 ---
 
 ## 2. File inventory (recreate all of these)
