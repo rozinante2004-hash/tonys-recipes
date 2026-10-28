@@ -1408,6 +1408,14 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
     cleared", $4.56 of $10.00) is still listed: the family database WAS cleared (20 Oct, 0 documents left); the row is
     the server's own record (D1: that copy's AI spending this month and the household's last report), shown as the old
     twin of the beta household with the same id. It is hidden with the deleted ones.
+  - **Released: v39.06 (28 Oct 2026, 23:50 Israel time, on e44e708; Tony: "Please update the reconstruction prompt and
+    Help and then release the latest version to Beta and Family")** — v39.06 with RECONSTRUCTION_PROMPT.md §1b.14 and the
+    Help (12 languages, the first-visit question, the owner's preview). Every job success: Deploy to GitHub Pages, pages
+    build, Deploy the Worker (live v96 = published, kept), Publish languages, Translate new phrases, Self Tests on main
+    and test, Cloudflare Pages for the beta and test. Reports #24–#27 and #29–#31 closed.
+  - **Released: v39.07 (29 Oct 2026, 00:03 Israel time, on 5941e0c; Tony: "Yes, release v39.07").** Every job success:
+    Deploy to GitHub Pages, pages build, Publish languages, Translate new phrases, Self Tests on main and test, Cloudflare
+    Pages for the beta and test.
   - **The test copy behaves as the beta will (Tony, 27 Oct: "once a build is released to it, it behaves exactly the same
     as the Beta would have"; "Perhaps we should update the database rules and server immediately upon the release to the
     test version"):**
