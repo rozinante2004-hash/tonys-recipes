@@ -1,7 +1,7 @@
 {
  "lang": "de",
- "updatedAt": 1793122654018,
- "count": 2510,
+ "updatedAt": 1793146094215,
+ "count": 2511,
  "strings": {
   "\"Add to Home Screen\"": "Zum Home-Bildschirm hinzufügen",
   "\"Open Bring!\"": "Bring! öffnen",
@@ -625,6 +625,7 @@
   "Low-Carb": "Low-Carb",
   "Lunch": "Mittagessen",
   "M": "M",
+  "Magyar": "Magyar",
   "Make it for": "Machen für",
   "Make it its own": "Eigenständig machen",
   "Make the link": "Link erstellen",

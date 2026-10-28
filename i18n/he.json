@@ -1,7 +1,7 @@
 {
  "lang": "he",
- "updatedAt": 1793122654018,
- "count": 3055,
+ "updatedAt": 1793146094215,
+ "count": 3056,
  "strings": {
   "\"Add to Home Screen\"": "הוספה למסך הבית",
   "\"One item away\" filter ({1}f.{2})": "פילטר \"פריט אחד חסר\" ({1}f.{2})",
@@ -805,6 +805,7 @@
   "Low-Carb": "דל פחמימות",
   "Lunch": "צהריים",
   "M": "M",
+  "Magyar": "Magyar",
   "Make it for": "להכין בשביל",
   "Make it its own": "להפוך אותו לעצמאי",
   "Make the link": "יצירת הקישור",

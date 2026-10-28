@@ -1,7 +1,7 @@
 {
  "lang": "ar",
- "updatedAt": 1793122654018,
- "count": 2514,
+ "updatedAt": 1793146094215,
+ "count": 2515,
  "strings": {
   "\"Add to Home Screen\"": "إضافة إلى الشاشة الرئيسية",
   "\"Open Bring!\"": "فتح Bring!",
@@ -626,6 +626,7 @@
   "Low-Carb": "قليل الكربوهيدرات",
   "Lunch": "الغداء",
   "M": "م",
+  "Magyar": "Magyar",
   "Make it for": "اجعلها لـ",
   "Make it its own": "اجعلها وصفة مستقلة",
   "Make the link": "إنشاء الرابط",

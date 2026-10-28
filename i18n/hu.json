@@ -1,7 +1,7 @@
 {
  "lang": "hu",
- "updatedAt": 1793122654018,
- "count": 2262,
+ "updatedAt": 1793146094215,
+ "count": 2263,
  "strings": {
   "\"Add to Home Screen\"": "Hozzáadás a kezdőképernyőhöz",
   "\"Open Bring!\"": "Bring! megnyitása",
@@ -561,6 +561,7 @@
   "Low Sodium": "Alacsony nátriumtartalmú",
   "Low-Carb": "Alacsony szénhidráttartalmú",
   "Lunch": "Ebéd",
+  "Magyar": "Magyar",
   "Make it for": "Elkészíted ekkorra",
   "Make it its own": "Legyen önálló recept",
   "Make the link": "Összekötés",

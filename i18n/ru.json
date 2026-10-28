@@ -1,7 +1,7 @@
 {
  "lang": "ru",
- "updatedAt": 1793122654018,
- "count": 2845,
+ "updatedAt": 1793146094215,
+ "count": 2846,
  "strings": {
   "\"Add to Home Screen\"": "Добавить на главный экран",
   "\"One item away\" filter ({1}f.{2})": "Фильтр «Не хватает одного» ({1}ф.{2})",
@@ -770,6 +770,7 @@
   "Low-Carb": "Низкоуглеводное",
   "Lunch": "Обед",
   "M": "M",
+  "Magyar": "Magyar",
   "Make it for": "Приготовить на",
   "Make it its own": "Выделить в отдельный",
   "Make the link": "Создать ссылку",

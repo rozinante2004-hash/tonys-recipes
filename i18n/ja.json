@@ -1,7 +1,7 @@
 {
  "lang": "ja",
- "updatedAt": 1793122654018,
- "count": 2854,
+ "updatedAt": 1793146094215,
+ "count": 2855,
  "strings": {
   "\"Add to Home Screen\"": "ホーム画面に追加",
   "\"One item away\" filter ({1}f.{2})": "「あと1品」フィルター（{1}f.{2}）",
@@ -771,6 +771,7 @@
   "Low-Carb": "低糖質",
   "Lunch": "昼食",
   "M": "M",
+  "Magyar": "Magyar",
   "Make it for": "作る用途",
   "Make it its own": "独立したレシピにする",
   "Make the link": "リンクを作成",
