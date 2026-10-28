@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.05 -->
+<!-- Tony's Recipes Collection v39.06 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -8278,9 +8278,20 @@ function i18nDeviceLangOffer(deviceLangs, available) {
 async function firstRunLanguageOffer() {
   if (window.APP_CONFIG.dataLayout !== 'households' || window._selfTestRunning) return null;
   try { if (localStorage.getItem(I18N_LANG_KEY) || localStorage.getItem(LANG_OFFERED_KEY)) return null; } catch(e) { return null; }
-  var avail = [];
+  var avail = [], device = navigator.languages || [navigator.language];
   try { var idx = await i18nStaticIndex(); avail = Object.keys((idx && idx.langs) || {}).filter(i18nEnsureLang); } catch(e) {}
-  var code = i18nDeviceLangOffer(navigator.languages || [navigator.language], avail);
+  var code = i18nDeviceLangOffer(device, avail);
+  // v39.06 — and a language published since this copy was released (Tony, 28 Oct: "make the beta offer new languages
+  // immediately"; the beta gets the language files only with a release): the central list, asked only when the device's
+  // own first language is not English and not already found, and waited for 2.5 seconds at most.
+  var first = String(device[0] || '').toLowerCase().split('-')[0].replace(/^iw$/, 'he');
+  if (first && first !== 'en' && code !== first) {
+    try {
+      await Promise.race([i18nCentralIndex(), new Promise(function(r){ setTimeout(r, 2500); })]);
+      Object.keys(_i18nCentralAt).forEach(function(c){ if (avail.indexOf(c) === -1 && i18nEnsureLang(c)) avail.push(c); });
+      code = i18nDeviceLangOffer(device, avail);
+    } catch(e) {}
+  }
   if (!code || document.getElementById('askOverlay')) return null;
   try { localStorage.setItem(LANG_OFFERED_KEY, code); } catch(e) {}
   // v38.90 — z: above the sign-in screen (9999) and the kitchen rules (10050). Under them it waited unseen until after
@@ -8825,7 +8836,10 @@ document.addEventListener('DOMContentLoaded', function(){ try { renderFeedbackBu
 var INS_ERR_KEY = 'mkn_ins_err', INS_USE_KEY = 'mkn_ins_use', INS_DAY_KEY = 'mkn_ins_day';
 function insightsOn() { return typeof featureOn === 'function' && featureOn('insights'); }
 // (window._insUnderTest: the Self Test's own checks of this, which nothing else in a run reaches)
-function insQuiet() { return !insightsOn() || (typeof _selfTestRunning !== 'undefined' && !!_selfTestRunning && !window._insUnderTest); }
+// v39.06 — nor while the app collects its phrases for translation (i18nHarvest): it opens the import-error and
+// service-error windows with a "·" in them, once signed in and once signed out, and each was filed as a real error —
+// reports #24–#27 (27 Oct, "an import failed four times… every error message reached us blank").
+function insQuiet() { return !insightsOn() || !!window._i18nHarvesting || (typeof _selfTestRunning !== 'undefined' && !!_selfTestRunning && !window._insUnderTest); }
 function insRead(k, dflt) { try { var v = JSON.parse(localStorage.getItem(k) || 'null'); return v == null ? dflt : v; } catch(e) { return dflt; } }
 function insWrite(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch(e) {} }
 function insMonth(t) { return new Date(t || Date.now()).toISOString().slice(0, 7); }
@@ -9682,7 +9696,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.05';
+var APP_VERSION = 'v39.06';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -12898,7 +12912,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.05</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.06</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -12986,7 +13000,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.05</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.06</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -15962,6 +15976,7 @@ function i18nCollect() {
 async function i18nHarvest(onScreen) {
   var realToast = window.toast, realUser = window._fbUser, drawn = [];
   window.toast = function(){};
+  window._i18nHarvesting = true;   // v39.06 — the windows it opens are not reported as errors (insQuiet)
   try {
     await i18nHarvestPass(drawn, onScreen);
     // …then again as the OTHER kind of user. Symmetric on purpose: signed in,
@@ -15980,7 +15995,7 @@ async function i18nHarvest(onScreen) {
     } catch(e) { dlog('[i18n] scrape failed', e && e.message); }
     i18nRegisterExtra();
     if (_i18nDict) i18nPatternsFromDict(_i18nDict);   // v38.90 — i18nBuildPatterns started the list afresh
-  } finally { window.toast = realToast; window._fbUser = realUser; }
+  } finally { window.toast = realToast; window._fbUser = realUser; window._i18nHarvesting = false; }
   return drawn;
 }
 async function i18nHarvestPass(drawn, onScreen) {
@@ -16996,20 +17011,25 @@ async function i18nReadCentral(lang) {
     return (d && d.strings && typeof d.strings === 'object') ? d : null;
   } catch(e) { return null; }
 }
-var _i18nCentralIndexed = false;
+var _i18nCentralIndexed = false, _i18nCentralIndexP = null;
 var _i18nCentralAt = {};          // lang -> when the central copy last changed (from its index)
 async function i18nCentralIndex(force) {
-  if (_i18nCentralIndexed && !force) return i18nKnownLangs();
+  // v39.06 — a second caller waits for the read already under way (the first-visit question asked while the start-up
+  // read was still out, was told "done" and found nothing)
+  if (_i18nCentralIndexP && !force) { await _i18nCentralIndexP; return i18nKnownLangs(); }
   _i18nCentralIndexed = true;
-  try {
-    var idx = await i18nCentralGet(i18nCentral() && i18nCentral().index);
-    var langs = (idx && idx.langs) || {};
-    Object.keys(langs).forEach(function(c){
-      if (!i18nEnsureLang(c)) return;
-      i18nNoteKnown(c);
-      _i18nCentralAt[c] = (langs[c] && langs[c].at) || 0;
-    });
-  } catch(e) { dlog('[i18n] the central language list could not be read', e && e.message); }
+  _i18nCentralIndexP = (async function() {
+    try {
+      var idx = await i18nCentralGet(i18nCentral() && i18nCentral().index);
+      var langs = (idx && idx.langs) || {};
+      Object.keys(langs).forEach(function(c){
+        if (!i18nEnsureLang(c)) return;
+        i18nNoteKnown(c);
+        _i18nCentralAt[c] = (langs[c] && langs[c].at) || 0;
+      });
+    } catch(e) { dlog('[i18n] the central language list could not be read', e && e.message); }
+  })();
+  await _i18nCentralIndexP;
   return i18nKnownLangs();
 }
 // ─── THE LANGUAGES AS FILES OF THE APP'S OWN (v36.91) ─────────────────────────

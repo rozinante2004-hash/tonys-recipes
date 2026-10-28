@@ -1900,6 +1900,11 @@ window.SELF_TESTS = [
         window._featureOverride.insights=true; window._insUnderTest=false;
         if(insightError('error','boom','x') !== false) throw new Error('a failure the Self Test staged was reported');
         window._insUnderTest=true; localStorage.removeItem(INS_USE_KEY);
+        // v39.06 — nor the error windows the app opens while it collects its phrases for translation (reports #24–#27)
+        window._i18nHarvesting=true;
+        try{ showImportError('\u00b7'); showServiceError('\u00b7'); }
+        finally{ window._i18nHarvesting=false; ['importErrorModal','serviceErrorOverlay'].forEach(function(id){ var el=document.getElementById(id); if(el) el.remove(); }); }
+        if(localStorage.getItem(INS_ERR_KEY)) throw new Error('the windows drawn for translation were reported as errors: '+localStorage.getItem(INS_ERR_KEY));
         // An error: the site stays, the page and the e-mail go; the same one twice is one line, counted.
         recordError('import', 'Could not read https://www.example.com/recipes/42?id=7 for me@example.com', 'runUrlImport');
         recordError('import', 'Could not read https://www.example.com/recipes/42?id=7 for me@example.com', 'runUrlImport');

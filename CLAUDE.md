@@ -1369,6 +1369,31 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
     forward) was pushed to `beta` at 02:12 as part of the same release; its Cloudflare build succeeded. Between
     releases, a language published from a device shows in 🌐 on the beta at once (central index) but in the
     first-visit question only after the next release.
+  - **Worker v96 (28 Oct, live 23:17, deployed by the push to `test`) — Tony: "The notes could not be read: the
+    server: METER: could not check the owner's two-step setting (The operation was aborted due to timeout)", also after
+    a reload.** The Worker's read of `config/security` (ownerTwoStepOn) went unanswered for 8 s; the same check had
+    passed the evening before (the Pushover test). Not the reports repository's `files` branch (only the hourly
+    forwarding uses it; the Feedback list reads D1). Now: a sign-in made WITH the authenticator code skips the read
+    (it passes on or off); `fsFetch` asks a Firestore read twice, 5 s each (the household checks too); the last setting
+    read is kept in D1 `owner_prefs` (`two_step:<project>`, written on change or once a day) and decides when Firestore
+    cannot be reached — "on" asks for the code, "off" only if read in the last 30 days, nothing kept: 502 as before.
+    Unanswered reads are logged (Cloudflare → Workers → Logs). This sandbox cannot reach the Worker or the copies
+    (the proxy refuses them); Firestore REST it can, but Playwright's browser here cannot.
+  - **v39.06:**
+    - **The first-visit question also asks the central list (Tony, 28 Oct: "Yes, make the beta offer new languages
+      immediately").** Only when the device's first language is not English and not already found in the copy's own
+      i18n/index.json; waited for 2.5 s at most. `i18nCentralIndex` keeps its read as a promise, so a second caller
+      waits for it (before, the question asked while the start-up read was out was told "done" and found nothing).
+      Checked with a stand-in central list: pt-PT without pt in the file → "Português?"; nl-NL (central only) →
+      "Nederlands?"; en-US and he-IL make no extra read; a central list slower than 2.5 s → no question.
+    - **Reports #24–#27 ("an import failed four times… every error message reached us blank") were not errors:** the
+      phrase collection (i18nHarvest — adding a language from a device, Fill gaps, Update all) opens the import-error
+      and service-error windows with "·" in them, once signed in and once signed out (the "2 times", screen
+      progOverlay), and each was filed. `insQuiet()` is now true while `window._i18nHarvesting`; a Self Test checks it.
+    - **#32–#34 (test copy, PERMISSION on a save and on the household chat, 16:55–17:09 on 27 Oct):** all before the
+      first rules publish to the test project (17:10, run 40528217433, "rules from v38.99 for tonys-recipes-test").
+      The test project had had no rules update since before v38.78 (chat) and v38.96 (secret recipes). The beta had
+      both. Nothing since.
   - **The test copy behaves as the beta will (Tony, 27 Oct: "once a build is released to it, it behaves exactly the same
     as the Beta would have"; "Perhaps we should update the database rules and server immediately upon the release to the
     test version"):**
