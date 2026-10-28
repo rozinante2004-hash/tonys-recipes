@@ -1905,6 +1905,10 @@ window.SELF_TESTS = [
         try{ showImportError('\u00b7'); showServiceError('\u00b7'); }
         finally{ window._i18nHarvesting=false; ['importErrorModal','serviceErrorOverlay'].forEach(function(id){ var el=document.getElementById(id); if(el) el.remove(); }); }
         if(localStorage.getItem(INS_ERR_KEY)) throw new Error('the windows drawn for translation were reported as errors: '+localStorage.getItem(INS_ERR_KEY));
+        // v39.06 — nor what holds nothing to act on: another site's bare "Script error.", a sign-in that could not connect
+        insightError('error','Script error. (inside a script from another site \u2014 the browser hides the details)','');
+        syncLog('error','Sign-in failed','auth/network-request-failed \u2014 Firebase: A network AuthError has occurred.');
+        if(localStorage.getItem(INS_ERR_KEY)) throw new Error('an unactionable error was reported: '+localStorage.getItem(INS_ERR_KEY));
         // An error: the site stays, the page and the e-mail go; the same one twice is one line, counted.
         recordError('import', 'Could not read https://www.example.com/recipes/42?id=7 for me@example.com', 'runUrlImport');
         recordError('import', 'Could not read https://www.example.com/recipes/42?id=7 for me@example.com', 'runUrlImport');
@@ -7094,6 +7098,11 @@ window.SELF_TESTS = [
                                {at:now-60000,k:'save',m:'Wrote "Soup"'}], now);
       if(fine.some(function(x){ return x.level==='bad'; }))
         throw new Error('a clean log produced a "bad" finding: '+JSON.stringify(fine.map(function(x){return x.title;})));
+      // v39.06 — a new tester who only agreed to the terms (an empty kitchen, nothing to read) wrote no recipe
+      var fresh=analyseSyncLog([{at:now,k:'save',m:'Agreed to the terms'},{at:now-1000,k:'auth',m:'Signed in'}], now);
+      if(fresh.some(function(x){ return x.title==='Saves without a load'; })) throw new Error('agreeing to the terms counted as saving recipes without a load');
+      var stale=analyseSyncLog([{at:now,k:'save',m:'Wrote "Soup"'}], now);
+      if(!stale.some(function(x){ return x.title==='Saves without a load'; })) throw new Error('a recipe written with no load is no longer noticed');
 
       // Timeouts and errors each get their own finding.
       var t=analyseSyncLog([{at:now,k:'error',m:'Cloud read timed out after 45s'}], now);

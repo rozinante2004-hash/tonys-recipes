@@ -1064,7 +1064,10 @@ function analyseSyncLog(list, now) {
   }
 
   // Saving but never loading, or the reverse.
-  if (by.save.length && !by.load.length) {
+  // v39.06 — recipes written, not every "save": a new tester's log (note #25, 27 Oct) held only "Agreed to the terms"
+  // and an empty kitchen to read, and was told it "may be working from a stale copy of the collection".
+  var recipeSaves = by.save.filter(function(e){ return /^(Wrote "|Collected |Copied the collection|Saved a copy of a linked)/.test(e.m); });
+  if (recipeSaves.length && !by.load.length) {
     out.push({ level:'warn', title:'Saves without a load',
       detail:'This device wrote to the cloud but never read from it in the logged period, so it may be working from a '
            + 'stale copy of the collection.',
@@ -8856,10 +8859,15 @@ function insClean(s, max) {
     .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[e-mail]')
     .slice(0, max);
 }
+// v39.06 — kept in the device's log, but not sent: what holds nothing anyone could act on (Tony, 28 Oct: "so I could
+// remove them from the list, and stop bugging you about them"). A browser's bare "Script error." from another site's
+// script; a sign-in that could not reach Google from this device's connection (a key blocked for everyone would show
+// as nobody signing in at all — and such a report is only ever sent once that device has signed in after all).
+var INS_NOT_SENT = [/^Script error\. \(inside a script from another site/, /^Sign-in failed — auth\/network-request-failed/];
 function insightError(kind, message, where) {
   if (insQuiet()) return false;
   var msg = insClean(message, 500).trim();
-  if (!msg) return false;
+  if (!msg || INS_NOT_SENT.some(function(re){ return re.test(msg); })) return false;
   var k = String(kind || 'error').slice(0, 30), w = insClean(where, 200);
   var q = insRead(INS_ERR_KEY, []);
   if (!Array.isArray(q)) q = [];

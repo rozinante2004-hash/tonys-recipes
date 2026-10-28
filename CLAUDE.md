@@ -1394,6 +1394,13 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
       first rules publish to the test project (17:10, run 40528217433, "rules from v38.99 for tonys-recipes-test").
       The test project had had no rules update since before v38.78 (chat) and v38.96 (secret recipes). The beta had
       both. Nothing since.
+    - **Not sent any more (kept in the device's log): another site's bare "Script error." and "Sign-in failed —
+      auth/network-request-failed"** (`INS_NOT_SENT` in insightError; Tony, 28 Oct: "so I could remove them from the list,
+      and stop bugging you about them"). Neither holds anything to act on; a sign-in report is only ever sent after
+      that device signed in after all, and a blocked key would show as nobody signing in.
+    - **"Saves without a load" counts recipe writes only** (`Wrote "…"`, Collected, Copied the collection, Saved a copy
+      of a linked recipe): note #25's new tester had only "Agreed to the terms" and an empty kitchen.
+    - Tony's Feedback tab after v96: works (28 Oct). Reports repo: #24–#27 fix-ready; #22, #28, #32–#34 closed.
   - **The test copy behaves as the beta will (Tony, 27 Oct: "once a build is released to it, it behaves exactly the same
     as the Beta would have"; "Perhaps we should update the database rules and server immediately upon the release to the
     test version"):**
