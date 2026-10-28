@@ -8,7 +8,12 @@
 // both check that it is him. It never reads anyone's recipes.
 (function () {
   'use strict';
+  // v39.07 — Tony, 29 Oct: "add an option in the Admin's Households page to hide the deleted accounts" — and the family
+  // copy's old households, moved to the beta on 13 Oct, whose database was cleared on 20 Oct (the server keeps their
+  // spending and last report). Remembered on this device.
+  var GONE_KEY = 'mkn_manage_hide_gone';
   var S = { rows: [], sort: 'month', dir: -1, q: '', meter: null, meterError: '', loadError: '', open: null, loading: false,
+            hideGone: (function () { try { return localStorage.getItem(GONE_KEY) === '1'; } catch (e) { return false; } })(),
             tab: 'households', notes: null, notesError: '', noteFilter: 'open', founding: null,
             replies: {}, replying: null, replyDraft: '', replySending: false,
             errors: null, errorsError: '', errFilter: 'open', useCopy: '',   // v38.15
@@ -443,7 +448,7 @@
     'backup': 'Saved a backup', 'update': 'Pressed Update now', 'farm-on': 'Turned the farm back on',
     'farm.visit': 'A visitor came by', 'farm.tap': 'Tapped a visitor', 'farm.grab': 'Picked a visitor up', 'farm.turned-off': 'Farm off (devices)'
   };
-  var LANG_NAMES = { en: 'English', he: 'Hebrew', ar: 'Arabic', ru: 'Russian', fr: 'French', es: 'Spanish', de: 'German', it: 'Italian', pt: 'Portuguese', zh: 'Chinese', ja: 'Japanese' };
+  var LANG_NAMES = { en: 'English', he: 'Hebrew', ar: 'Arabic', ru: 'Russian', fr: 'French', es: 'Spanish', de: 'German', it: 'Italian', pt: 'Portuguese', zh: 'Chinese', ja: 'Japanese', hu: 'Hungarian' };
   function useWord(k) {
     if (USE_WORDS[k]) return USE_WORDS[k];
     var m;
@@ -686,9 +691,10 @@
         }).join('') : '<div class="mg-muted">Nothing written yet.</div>') + '</div>';
   }
 
-  function sorted() {
+  function sorted(all) {
     var q = S.q.trim().toLowerCase();
     var list = S.rows.filter(function (r) {
+      if (!all && S.hideGone && (r.deleted || r.movedOld)) return false;   // v39.07 (the CSV keeps them)
       if (!q) return true;
       return [r.name, r.code, r.owner, r.copy, r.deleted ? 'deleted ' + r.deleted.by : ''].concat(r.members.map(function (m) { return m.email || ''; })).join(' ').toLowerCase().indexOf(q) !== -1;
     });
@@ -733,6 +739,8 @@
             + (famCap() != null ? 'the family’s $' + famCap() + '/month' : 'the family’s is counted, not capped')
           : ' · AI ' + (S.meter.capped ? 'allowance ' + capWords(thisProject()) : 'counted, not capped')) + '</div>' + others + '</div>'
       + '<div class="mg-tools"><input id="mgSearch" type="search" placeholder="Search name, identifier or e-mail" value="' + escA(S.q) + '" oninput="mknManage.search(this.value)">'
+      + (nDel + nOld ? '<label class="mg-hidegone"><input type="checkbox" id="mgHideGone"' + (S.hideGone ? ' checked' : '') + ' onchange="mknManage.hideGone(this.checked)"> Hide '
+          + (nDel && nOld ? 'deleted and moved' : nDel ? 'deleted' : 'moved') + ' (' + (nDel + nOld) + ')</label>' : '')
       + '<button type="button" class="mg-btn" onclick="mknManage.csv()">⬇ CSV</button>'
       + '<button type="button" class="mg-btn" onclick="mknManage.reload()">↻</button></div></div>';
     if (S.loadError) head += '<div class="mg-note" id="mgLoadError">The households could not be read from the database: ' + esc(S.loadError)
@@ -931,7 +939,7 @@
     // each household a card (its cells one under the other, each with its label).
     + '@media (max-width:700px){'
     +   '.mg-tab{padding:7px 10px;}'
-    +   '.mg-top>div:first-child{min-width:0;}.mg-tools{width:100%;}.mg-tools input{flex:1;min-width:0;}'
+    +   '.mg-top>div:first-child{min-width:0;}.mg-tools{width:100%;}.mg-tools input{flex:1;min-width:0;}.mg-tools .mg-hidegone input{flex:none;}'
     +   '.mg-sortbar{display:block;}'
     +   '.mg-scroll.mg-hhwrap{overflow:visible;border:none;background:none;}'
     +   '.mg-table.mg-hh{min-width:0;}.mg-table.mg-hh thead{display:none;}'
@@ -951,7 +959,7 @@
     + '.mg-tab.mg-on{color:var(--heading);border-bottom-color:var(--terracotta-fill);}'
     + '.mg-sort:hover{background:var(--note-bg);}.mg-sort:active{background:var(--border);}'
     + '.mg-badge{display:inline-block;min-width:18px;padding:1px 6px;border-radius:9px;background:var(--terracotta-fill);color:#fff;font-size:11px;text-align:center;}'
-    + '.mg-movedold{opacity:.55;}.mg-deleted{opacity:.62;}.mg-deleted .mg-name{text-decoration:line-through;}.mg-gone{color:var(--danger);font-size:12px;margin-top:2px;}'
+    + '.mg-movedold{opacity:.55;}.mg-hidegone{display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--muted);white-space:nowrap;cursor:pointer;}.mg-tools .mg-hidegone input{min-width:0;width:auto;padding:0;margin:0;border:0;flex:none;}.mg-deleted{opacity:.62;}.mg-deleted .mg-name{text-decoration:line-through;}.mg-gone{color:var(--danger);font-size:12px;margin-top:2px;}'
     + '.mg-link{color:var(--terracotta);font-weight:600;text-decoration:none;}'
     + '.mg-copy{display:inline-block;padding:1px 7px;border-radius:9px;border:1px solid var(--border);font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;}'
     + '.mg-card{border:1px solid var(--border);border-radius:10px;background:var(--card-bg);padding:12px 14px;margin-bottom:10px;}'
@@ -1272,6 +1280,7 @@
       return S.rows.length;
     },
     search: function (v) { S.q = v; render(); var s = document.getElementById('mgSearch'); if (s) { s.focus(); s.setSelectionRange(v.length, v.length); } },
+    hideGone: function (on) { S.hideGone = !!on; try { localStorage.setItem(GONE_KEY, on ? '1' : '0'); } catch (e) {} render(); },
     sortBy: function (k) { if (S.sort === k) S.dir = -S.dir; else { S.sort = k; S.dir = (k === 'name' || k === 'owner') ? 1 : -1; } render(); },
     // v38.84 — the phone's "Sort by" menu: a key and its direction at once ('month:-1')
     sortTo: function (v) { var p = String(v || '').split(':'); if (!p[0]) return; S.sort = p[0]; S.dir = +p[1] < 0 ? -1 : 1; render(); },
@@ -1346,7 +1355,7 @@
       var months = (S.meter && S.meter.months) || [];
       var head = ['Household', 'Identifier', 'Copy', 'Owner', 'Members', 'Member e-mails (terms agreed)'].concat(months.map(function (m) { return 'AI ' + m + ' ($)'; }))
         .concat(['Cap ($)', 'Linked with', 'Shared the app', 'Last active', 'Founded', 'Came through', 'Notes', 'Deleted', 'Left', 'Feature counts (by month)']);
-      var lines = [head].concat(sorted().map(function (r) {
+      var lines = [head].concat(sorted(true).map(function (r) {
         return [r.name, r.code, r.copy, r.owner, r.members.length, r.members.map(function (m) { return (m.email || '\u2014') + ' (' + m.role + (m.termsAt ? ', terms v' + (m.termsVersion || '?') + ' ' + new Date(m.termsAt).toISOString().slice(0, 10) : ', terms not agreed') + ')'; }).join('; ')]
           .concat(months.map(function (m) { var x = r.months.filter(function (y) { return y.month === m; })[0]; return x ? x.usd.toFixed(4) : '0'; }))
           .concat([r.cap == null ? '' : r.cap, r.links.map(function (l) { return l.name; }).join('; '), r.referred,

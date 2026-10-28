@@ -1401,6 +1401,13 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
     - **"Saves without a load" counts recipe writes only** (`Wrote "…"`, Collected, Copied the collection, Saved a copy
       of a linked recipe): note #25's new tester had only "Agreed to the terms" and an empty kitchen.
     - Tony's Feedback tab after v96: works (28 Oct). Reports repo: #24–#27 fix-ready; #22, #28, #32–#34 closed.
+  - **v39.07 — 📊 Households: "Hide deleted and moved (n)"** (Tony, 29 Oct: "Please add an option in the Admin's
+    Households page to hide the deleted accounts"), a checkbox beside the search, kept on the device
+    (`mkn_manage_hide_gone`); the count line still says how many are deleted / moved; ⬇ CSV keeps them all. Tony also
+    asked why "Tony's Kitchen Notes" (FAMILY, MKN-J5DM-F9BX, "📦 Moved to the beta — the old copy, kept until it is
+    cleared", $4.56 of $10.00) is still listed: the family database WAS cleared (20 Oct, 0 documents left); the row is
+    the server's own record (D1: that copy's AI spending this month and the household's last report), shown as the old
+    twin of the beta household with the same id. It is hidden with the deleted ones.
   - **The test copy behaves as the beta will (Tony, 27 Oct: "once a build is released to it, it behaves exactly the same
     as the Beta would have"; "Perhaps we should update the database rules and server immediately upon the release to the
     test version"):**

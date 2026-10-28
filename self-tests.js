@@ -1611,6 +1611,9 @@ window.SELF_TESTS = [
         // 2. The owner's page lists every copy's — in the family app (v37.78).
         window._household={ hid:'hZ', role:'owner' };
         window._allCopiesOverride=true;
+        var hgKept=null; try{ hgKept=localStorage.getItem('mkn_manage_hide_gone'); }catch(e){}
+        if(window.mknManage) mknManage._state.hideGone=false;   // (the owner may have hidden them on this device)
+        try{ localStorage.removeItem('mkn_manage_hide_gone'); }catch(e){}
         var n=await openManagement();
         if(n!==4) throw new Error('rows: '+n+' (a household that never reported must not be listed; the deleted ones must)');
         var dRows=mknManage._state.rows.filter(function(r){ return r.deleted; });
@@ -1620,6 +1623,18 @@ window.SELF_TESTS = [
         var tt=document.getElementById('manageOverlay').textContent;
         if(!/Deleted with its owner\u2019s account \(d@example\.com\)/.test(tt) || !/Deleted by its owner \(l@example\.com\)/.test(tt) || !/2 deleted/.test(tt)) throw new Error('who deleted them is not said');
         if(!/1 left \(deleted their account\)/.test(tt)) throw new Error('a member who deleted their account is not mentioned');
+        // v39.07 — Tony: "an option in the Admin's Households page to hide the deleted accounts" (kept on this device)
+        try{
+          var hg=document.getElementById('mgHideGone');
+          if(!hg || !/Hide deleted \(2\)/.test(hg.parentNode.textContent)) throw new Error('no way to hide the deleted households');
+          mknManage.hideGone(true);
+          if(document.querySelectorAll('#manageOverlay .mg-row.mg-deleted').length || document.querySelectorAll('#manageOverlay .mg-row').length!==2
+             || !/2 deleted/.test(document.getElementById('manageOverlay').textContent) || !document.getElementById('mgHideGone').checked) throw new Error('hiding the deleted households did not hide them, or lost their count');
+          if(localStorage.getItem('mkn_manage_hide_gone')!=='1') throw new Error('the choice is not kept on the device');
+          mknManage.hideGone(false);
+          if(document.querySelectorAll('#manageOverlay .mg-row.mg-deleted').length!==2) throw new Error('the deleted households do not come back');
+        } finally { try{ if(hgKept===null) localStorage.removeItem('mkn_manage_hide_gone'); else localStorage.setItem('mkn_manage_hide_gone', hgKept); }catch(e){} mknManage._state.hideGone=hgKept==='1'; }
+        mknManage._state.hideGone=false;   // (the rest of this test reads the deleted rows)
         mknManage.show('hA');
         if(!/v@example\.com/.test(document.querySelector('#manageOverlay .mg-panel').textContent)) throw new Error('who left is not in the details');
         var gD=mknManage._state.rows.filter(function(r){ return r.hid==='hD'; })[0];
