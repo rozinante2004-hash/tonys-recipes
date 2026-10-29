@@ -1468,7 +1468,7 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
       the link as before. Worker tests: v99 section (≈35 checks).
     - **🚀 Deployments → ✉️ Resend — recipe e-mails**: what it does, the quotas and limits, the warnings, the key;
       links: Sent e-mails, Domain, API keys, Usage, Plan & billing (resend.com/emails, /domains, /api-keys,
-      /settings/usage, /settings/billing — the last two not checked from here), GitHub secrets, Deploy the Worker. The
+      /settings/usage, /settings/billing — Tony checked all five, 29 Oct: "Resend links OK"), GitHub secrets, Deploy the Worker. The
       Cloudflare line says the Worker sends the recipe e-mails. 🩺 Server allowances: "Recipe e-mails" — today of 90
       (15 each), Resend's day and month at the last e-mail. 📤 Share's ✉️ button: "(the recipe and its photo)" (was
       "(copy & paste)").
