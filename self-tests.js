@@ -2301,7 +2301,14 @@ window.SELF_TESTS = [
         if(!row) throw new Error('the household is not listed');
         mknManage.show(row.key);
         var panel=document.querySelector('#manageOverlay .mg-panel');
-        if(!panel || !/What they use/.test(panel.textContent) || !/5 recipes added/.test(panel.textContent) || !/1 Facebook/.test(panel.textContent)) throw new Error('the household’s counts: '+(panel ? panel.textContent.slice(0,300) : 'no panel'));
+        if(!panel || !/What they use/.test(panel.textContent)) throw new Error('the household’s counts: '+(panel ? panel.textContent.slice(0,300) : 'no panel'));
+        // v39.17 — Tony: "put it in a table, for easier readability": sections, a row each, a column a month
+        var ut=panel.querySelector('table.mg-usetab');
+        var cellOf=function(label){ var tr=Array.prototype.filter.call(ut.querySelectorAll('tr'), function(t){ var k=t.querySelector('.mg-trk'); return k && k.textContent===label; })[0];
+          return tr ? tr.querySelectorAll('td')[1].textContent : null; };
+        var secs=Array.prototype.map.call(ut ? ut.querySelectorAll('td.mg-trsec') : [], function(t){ return t.textContent; }).join(' | ');
+        if(!ut || cellOf('from a link')!=='3' || cellOf('Facebook')!=='1' || cellOf('Changed the servings')!=='4' || !/🍲 Recipes added \| 5 added/.test(secs) || !/✨ Features/.test(secs) || /%/.test(ut.textContent))
+          throw new Error('the household’s counts as a table: '+(ut ? secs+' / '+ut.textContent.slice(0,300) : 'no table'));
       } finally {
         window._fbDb=real.db; window._fbUser=real.user; window.toast=real.toast; window.showServiceError=real.err; window.isAppOwner=real.owner; window.fetch=real.fetch; _workerHealth=real.h;
         window.askConfirm=real.ask; window.fbProbeCopy=real.copy; delete window._allCopiesOverride;

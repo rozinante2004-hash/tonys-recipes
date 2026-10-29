@@ -1,4 +1,9 @@
-// Tony's Recipes — Cloudflare Worker v99
+// Tony's Recipes — Cloudflare Worker v100
+// v100: EACH COPY'S OWN HOUSEHOLDS PAGE GETS ITS HOUSEHOLDS' DAILY REPORTS TOO (Tony, 29 Oct 2026, on the test copy's new
+// Recipes column, all "—": "I'm assuming tomorrow I will see a real count"). meter-admin `list` sent the reports (which
+// carry each household's recipe count, its members and links) only with `all` — the family and community copies' "every
+// copy" view; the test copy asks for its own and never got them, so its counts (and its deleted households, kept from
+// the reports) never showed. Now always, for the copies asked about.
 // v99: THE OWNER HEARS WHEN RECIPE E-MAILS RUN SHORT OR FAIL (Tony, 29 Oct 2026: "please make sure I get a warning if
 // quota is exceeded or if any issues arise with this service"). mail-recipe raises a notice (the owner's bar in the
 // app, an e-mail and the phone the first time, then at most once a day — raiseNotice) when: 70% of the app's 90 a day
@@ -455,7 +460,7 @@
 //   AI_MAX_TOKENS   – the longest answer one call may ask for (32000; the
 //                     app's largest, reading several recipes at once, asks 8000).
 
-const WORKER_VERSION = 'v99';
+const WORKER_VERSION = 'v100';
 const VIDEO_MAX_MB_DEFAULT = 50;
 const GEMINI_API = 'https://generativelanguage.googleapis.com';
 const GEMINI_MODEL_DEFAULT = 'gemini-2.5-flash';
@@ -2451,7 +2456,7 @@ async function meterAction(request, env, body) {
       .bind(p).all()).results || [];
     const sp = (await db.prepare('SELECT hid, month, usd, calls FROM ai_spend WHERE project = ?1 AND month >= ?2')
       .bind(p, months[2]).all()).results || [];
-    const reps = body.all ? ((await db.prepare('SELECT hid, summary, at FROM hh_reports WHERE project = ?1').bind(p).all()).results || []) : [];
+    const reps = (await db.prepare('SELECT hid, summary, at FROM hh_reports WHERE project = ?1').bind(p).all()).results || [];   // v100 — with or without `all`
     const byHid = new Map();
     hs.forEach(h => byHid.set(h.hid, Object.assign({}, h)));
     reps.forEach(r => {
@@ -4079,4 +4084,4 @@ export default {
   }
 };
 
-// ── END OF WORKER v99 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
+// ── END OF WORKER v100 ── If this is the last line in the Cloudflare editor, the whole file was pasted.

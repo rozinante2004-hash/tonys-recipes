@@ -1222,6 +1222,8 @@ console.log('\nAI per household (v60):');
     expect('…the counted ones with their months, the reported ones with their members', Math.abs(rowOf('recipes-f379d', 'hF').months[0].usd - 3.0) < 1e-9 /* $2.80 + v66's one Haiku call, $0.20 */ && rowOf('recipes-f379d', 'hF').report.members[0].email === 'f@example.com' && rowOf('my-kitchen-notes-beta', 'hR').name === 'Kitchen A', JSON.stringify(rowOf('recipes-f379d', 'hF')));
     f = await fb({ action: 'meter-admin', op: 'list', idToken: famOwner }, ORIGIN);
     expect('without `all`, only this copy (as before)', f.d.households.every(x => x.project === 'recipes-f379d'), JSON.stringify(f.d.households.map(x => x.project)));
+    expect('v100: …and with its households\' daily reports too (their recipe counts, members, deleted ones)', f.d.households.some(x => x.hid === 'hF' && x.report && x.report.members && x.report.members[0].email === 'f@example.com' && x.reportAt > 0),
+      JSON.stringify(f.d.households.map(x => [x.hid, !!x.report])));
     f = await fb({ action: 'meter-admin', op: 'set-cap', project: 'my-kitchen-notes-beta', hid: 'hR', cap: 7, idToken: famOwner }, ORIGIN);
     expect('the owner sets the beta\'s allowance from the family app', f.status === 200 && db.raw.prepare("SELECT cap FROM ai_households WHERE project = 'my-kitchen-notes-beta' AND hid = 'hR'").get().cap === 7, JSON.stringify(f));
     f = await fb({ action: 'meter-admin', op: 'set-note', project: 'someone-elses-app', hid: 'hR', note: 'x', idToken: famOwner }, ORIGIN);
@@ -2302,7 +2304,7 @@ console.log('\nA recipe e-mailed by the server (v98), the owner warned when it r
     a = await mail({ idToken: t }, Object.assign({}, env, { RESEND_API_KEY: '' }));
     expect('v98: no key on the server: "not set up yet"', a.status === 503 && a.d.needsConfig === true, JSON.stringify(a));
     const h = await (await worker.fetch(post({ action: 'health' }), env)).json();
-    expect('v98: health says e-mail can be sent', h.mail === true && h.version === 'v99', JSON.stringify([h.mail, h.version]));
+    expect('v98: health says e-mail can be sent', h.mail === true && h.version === 'v100', JSON.stringify([h.mail, h.version]));
 
     // v99 — the owner hears of it (Tony: "make sure I get a warning if quota is exceeded or if any issues arise")
     let nt = notice('mail-down');

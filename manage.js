@@ -452,7 +452,11 @@
     'theme.light': 'Light', 'theme.dark': 'Dark', 'extension.yes': 'Has the extension', 'extension.no': 'No extension',
     'edit': 'Edited a recipe', 'favorite': 'Marked a favourite', 'note': 'Sent a note', 'invite': 'Made an invitation link', 'gmail': 'Sent by Gmail',
     'backup': 'Saved a backup', 'update': 'Pressed Update now', 'farm-on': 'Turned the farm back on',
-    'farm.visit': 'A visitor came by', 'farm.tap': 'Tapped a visitor', 'farm.grab': 'Picked a visitor up', 'farm.turned-off': 'Farm off (devices)'
+    'farm.visit': 'A visitor came by', 'farm.tap': 'Tapped a visitor', 'farm.grab': 'Picked a visitor up', 'farm.turned-off': 'Farm off (devices)',
+    // v39.17 — shown as their keys until now
+    'access.usual-colours': 'Usual colours', 'access.red-green': 'Red–green colours',
+    'sound.glass': 'Spoon on a wine glass', 'sound.bell': 'The service bell', 'sound.pot': 'Wooden spoon on a pot', 'sound.muted': 'Muted',
+    'invite-testers': 'Invited testers (the owner)', 'rank.look': 'Looked at the recipe badge'
   };
   var LANG_NAMES = { en: 'English', he: 'Hebrew', ar: 'Arabic', ru: 'Russian', fr: 'French', es: 'Spanish', de: 'German', it: 'Italian', pt: 'Portuguese', zh: 'Chinese', ja: 'Japanese', hu: 'Hungarian' };
   function useWord(k) {
@@ -462,6 +466,7 @@
     if ((m = /^lang\.([a-z-]+)$/.exec(k))) return LANG_NAMES[m[1]] || m[1];
     if ((m = /^farm\.tap-([a-z-]+)$/.exec(k))) return 'Tapped the ' + m[1];
     if ((m = /^farm\.look-([a-z-]+)$/.exec(k))) return 'Look: ' + m[1];
+    if ((m = /^rank\.([a-z-]+)$/.exec(k))) return 'Reached a new rank: ' + m[1];   // v39.17
     return k;
   }
   // { feature: times } for one month → three short lists, biggest first.
@@ -489,9 +494,25 @@
       + (r.reportAt ? ' (counted ' + ago(r.reportAt) + ')' : '') + '</div>' : '';
     if (!months.length) return r.remote || r.copy !== 'family' ? '<div class="mg-h">What they use</div>' + rn + '<div class="mg-muted">Nothing counted yet'
       + ' (counted in the beta and the test copy only).</div>' : (rn ? '<div class="mg-h">Recipes</div>' + rn : '');
-    return '<div class="mg-h">What they use</div>' + rn + months.map(function (m) {
-      return '<div class="mg-usemonth"><div class="mg-muted">' + mon(m) + ' ' + m.slice(0, 4) + '</div>' + useListHtml(r.usage[m]) + '</div>';
-    }).join('');
+    // v39.17 — Tony: "The details are a bit messy and hard to follow … Could you please put it in a table, for easier
+    // readability?" The household's own counts the way 📈 Use shows a copy's: in sections, a row each, a column a month.
+    var c = { months: months, n: r.usage }, used = {}, rows = '';
+    var sec = function (title, cells) {
+      return '<tr><td class="mg-trsec"' + (cells ? '' : ' colspan="' + (months.length + 1) + '"') + '>' + esc(title) + '</td>' + (cells || '') + '</tr>'; };
+    TREND_SECTIONS.forEach(function (x) {
+      var body = x.parts.map(function (p) { return trendRowsHtml(c, p, used, true); }).join('');
+      if (!body) return;
+      // the recipes added: how many in all, each month, on the section's own line
+      var cells = /^🍲/.test(x.title) ? months.map(function (m) {
+        var t = Object.keys(c.n[m] || {}).reduce(function (a, k) { return a + (/^added\./.test(k) ? c.n[m][k] : 0); }, 0);
+        return '<td class="mg-c mg-trsec">' + (t ? t + ' added' : '—') + '</td>'; }).join('') : '';
+      rows += sec(x.title, cells) + body;
+    });
+    var rest = trendRowsHtml(c, { label: null, test: /./ }, used, true);
+    if (rest) rows += sec('✨ Features — times used') + rest;
+    return '<div class="mg-h">What they use</div>' + rn
+      + '<div class="mg-scroll"><table class="mg-table mg-trend mg-usetab"><tr><th class="mg-trk"></th>'
+      + months.map(function (m) { return '<th class="mg-c">' + esc(mon(m) + ' ' + m.slice(0, 4)) + '</th>'; }).join('') + '</tr>' + rows + '</table></div>';
   }
   // ─── v38.30: 📈 TRENDS (Worker v76 `trends`) ──────────────────────────────────
   // Tony: "I'd like to understand trends and foresee needs before they arise." Every copy's counts,
@@ -544,7 +565,7 @@
     Object.keys(out).forEach(function (c) { out[c].months = Object.keys(out[c].n).sort().reverse().slice(0, 12); });
     return out;
   }
-  function trendRowsHtml(c, part, used) {
+  function trendRowsHtml(c, part, used, plain) {
     var keys = {};
     c.months.forEach(function (m) { Object.keys(c.n[m]).forEach(function (k) { if (part.test.test(k) && !used[k]) keys[k] = (keys[k] || 0) + c.n[m][k]; }); });
     var list = Object.keys(keys);
@@ -552,12 +573,12 @@
     list.forEach(function (k) { used[k] = 1; });
     list.sort(part.order ? function (a, b) { return part.order(a) - part.order(b); } : function (a, b) { return keys[b] - keys[a]; });
     var tot = {};
-    if (part.share) c.months.forEach(function (m) { tot[m] = list.reduce(function (t, k) { return t + (c.n[m][k] || 0); }, 0); });
+    if (part.share && !plain) c.months.forEach(function (m) { tot[m] = list.reduce(function (t, k) { return t + (c.n[m][k] || 0); }, 0); });
     return (part.label ? '<tr><td colspan="' + (c.months.length + 1) + '" class="mg-trsub">' + esc(part.label) + '</td></tr>' : '')
       + list.map(function (k) {
         return '<tr><td class="mg-trk">' + esc(useWord(k)) + '</td>' + c.months.map(function (m) {
           var n = c.n[m][k] || 0;
-          return '<td class="mg-c">' + (n ? '<b>' + n + '</b>' + (part.share && tot[m] ? ' <span class="mg-muted">' + Math.round(n / tot[m] * 100) + '%</span>' : '') : '<span class="mg-muted">—</span>') + '</td>';
+          return '<td class="mg-c">' + (n ? '<b>' + n + '</b>' + (part.share && !plain && tot[m] ? ' <span class="mg-muted">' + Math.round(n / tot[m] * 100) + '%</span>' : '') : '<span class="mg-muted">—</span>') + '</td>';
         }).join('') + '</tr>';
       }).join('');
   }
@@ -790,16 +811,16 @@
     // v38.84 — Tony's iPhone: ten columns at least 900 px wide, four of them on the screen, addresses broken letter by letter.
     // On a phone each household is a card (the stylesheet's @media below), every cell with its label, and the headers'
     // sorting is a menu above them. A computer keeps the table.
-    var sortOpts = [['month:-1', 'Spent this month'], ['seen:-1', 'Last active'], ['name:1', 'Household (A–Z)'], ['members:-1', 'Members'], ['recipes:-1', 'Recipes']]
-      .concat(multi ? [['copy:1', 'Copy']] : []).concat([['owner:1', 'Owner (A–Z)'], ['links:-1', 'Linked with'], ['referred:-1', 'Shared the app'], ['cap:-1', 'Cap']]);
+    var sortOpts = [['month:-1', 'AI spent this month'], ['seen:-1', 'Last active'], ['name:1', 'Household (A–Z)'], ['members:-1', 'Members'], ['recipes:-1', 'Recipes']]
+      .concat(multi ? [['copy:1', 'Copy']] : []).concat([['owner:1', 'Owner (A–Z)'], ['links:-1', 'Linked with'], ['referred:-1', 'Shared the app'], ['cap:-1', 'AI cap']]);
     var sortNow = S.sort + ':' + S.dir;
     var sortBar = '<div class="mg-sortbar"><label>Sort by <select onchange="mknManage.sortTo(this.value)">'
       + (sortOpts.some(function (o) { return o[0] === sortNow; }) ? '' : '<option value="' + escA(sortNow) + '" selected>—</option>')
       + sortOpts.map(function (o) { return '<option value="' + o[0] + '"' + (o[0] === sortNow ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('')
       + '</select></label></div>';
     var table = sortBar + '<div class="mg-scroll mg-hhwrap"><table class="mg-table mg-hh"><thead><tr>'
-      + th('name', 'Household') + (multi ? th('copy', 'Copy') : '') + th('owner', 'Owner') + th('members', 'Members') + th('recipes', 'Recipes') + th('month', 'This month')
-      + th('cap', 'Cap') + '<th>' + (months.length ? months.slice(1).map(mon).reverse().join(' · ') : 'Before') + '</th>'
+      + th('name', 'Household') + (multi ? th('copy', 'Copy') : '') + th('owner', 'Owner') + th('members', 'Members') + th('recipes', 'Recipes') + th('month', 'AI this month')
+      + th('cap', 'AI cap') + '<th>' + (months.length ? 'AI in ' + months.slice(1).map(mon).reverse().join(' · ') : 'AI before') + '</th>'   // v39.17 — Tony: "What happens … when we reach November?" (the two months before this one)
       + th('links', 'Linked with') + th('referred', 'Shared the app') + th('seen', 'Last active') + '</tr></thead><tbody>'
       + (list.length ? list.map(function (r) {
           return '<tr class="mg-row' + (S.open === r.key ? ' mg-open' : '') + (r.deleted ? ' mg-deleted' : '') + (r.movedOld ? ' mg-movedold' : '') + '" onclick="mknManage.show(' + jsA(r.key) + ')">'
@@ -812,9 +833,9 @@
             + '<td class="mg-c" data-label="Members">' + r.members.length + '</td>'
             + '<td class="mg-c" data-label="Recipes"' + (r.recipesN && r.reportAt ? ' title="' + escA('Counted by their app ' + ago(r.reportAt)) + '"' : '') + '>'
             + (r.recipesN ? Number(r.recipesN).toLocaleString() : '—') + '</td>'   // v39.17
-            + '<td data-label="This month"><div>' + barHtml(r) + '</div></td>'
-            + '<td class="mg-c" data-label="Cap">' + (r.cap == null ? '—' : money(r.cap) + (r.capSet ? ' ✎' : '')) + '</td>'
-            + '<td class="mg-muted" data-label="Before">' + (r.months.length ? r.months.slice(1).reverse().map(function (m) { return money(m.usd); }).join(' · ') : '—') + '</td>'
+            + '<td data-label="AI this month"><div>' + barHtml(r) + '</div></td>'
+            + '<td class="mg-c" data-label="AI cap">' + (r.cap == null ? '—' : money(r.cap) + (r.capSet ? ' ✎' : '')) + '</td>'
+            + '<td class="mg-muted" data-label="AI before">' + (r.months.length ? r.months.slice(1).reverse().map(function (m) { return money(m.usd); }).join(' · ') : '—') + '</td>'
             + '<td data-label="Linked with">' + (r.links.length ? r.links.map(function (l) { return esc(l.name || l.code); }).join(', ') : '—') + '</td>'
             + '<td class="mg-c" data-label="Shared the app">' + (r.referred || '—') + '</td>'
             + '<td data-label="Last active">' + ago(r.lastSeen) + '</td></tr>';
@@ -842,7 +863,10 @@
   // v38.22 — Tony's household keeps what the family app had once it lives in the
   // community copy, where these are off for everyone else: switched on for ONE
   // household by the owner (rules: only the app's owner writes `features`).
-  var EXTRAS = [['gmail', '📧 Send recipes through Gmail'], ['whatsapp', '💬 WhatsApp groups (search the household’s chats)']];
+  // v39.17 — Tony: "What does it mean and what happens if I check it?" — said in the label: the household's ✉️ Email then
+  // sends from each member's own Gmail (Google asks once for permission; this copy's Gmail Setup), instead of 📨 Send.
+  var EXTRAS = [['gmail', '📧 E-mail recipes from their own Gmail', 'Their ✉️ Email then sends from each member’s own Gmail account (Google asks each of them once for permission, and the e-mail is in their Gmail’s Sent) instead of the app’s 📨 Send. Leave it off: 📨 Send needs nothing from them.'],
+                ['whatsapp', '💬 WhatsApp groups (search the household’s chats)', '']];
   function extrasHtml(r) {
     if (r.remote || r.deleted) return '';
     var f = r.features || {};
@@ -851,7 +875,8 @@
           var copyOn = window.APP_CONFIG && APP_CONFIG.features && APP_CONFIG.features[x[0]] === true;
           return '<label class="mg-li" style="display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center;"><input type="checkbox" data-extra="' + x[0] + '"'
             + (f[x[0]] === true || copyOn ? ' checked' : '') + (copyOn ? ' disabled title="On for everyone in this copy"' : '')
-            + ' onchange="mknManage.setExtra(\'' + x[0] + '\', this.checked)"> ' + esc(x[1]) + (copyOn ? ' <span class="mg-muted">(on for everyone here)</span>' : '') + '</label>';
+            + ' onchange="mknManage.setExtra(\'' + x[0] + '\', this.checked)"> ' + esc(x[1]) + (copyOn ? ' <span class="mg-muted">(on for everyone here)</span>' : '')
+            + (x[2] ? '<span class="mg-muted" style="flex-basis:100%;margin-inline-start:24px;">' + esc(x[2]) + '</span>' : '') + '</label>';
         }).join('');
   }
   function panelHtml() {
@@ -994,6 +1019,7 @@
     + '.mg-usemonth{margin:6px 0 10px;}'
     + '.mg-trend{min-width:0;}.mg-trend th,.mg-trend td{padding:5px 8px;}.mg-trend th.mg-c{text-align:center;}.mg-trk{min-width:150px;width:40%;}'
     + '.mg-trsub{font-weight:700;color:var(--heading);padding-top:10px !important;background:var(--note-bg);}'
+    + '.mg-trsec{font-weight:700;color:var(--heading);padding-top:12px !important;border-top:2px solid var(--border);}'   /* v39.17 */
     + 'a.mg-btn{text-decoration:none;display:inline-flex;align-items:center;}'
     + '#mgNote{width:100%;box-sizing:border-box;padding:8px;border:1px solid var(--border);border-radius:8px;background:var(--card-bg);color:var(--ink);margin-bottom:6px;font:inherit;}';
 

@@ -1437,6 +1437,23 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
   - **Released: v39.09 (29 Oct 2026, 11:17 Israel time, on 0de2dde; Tony: "Yes, release v39.09").** Every job success:
     Deploy to GitHub Pages, pages build, Publish languages, Translate new phrases, Self Tests on main and test,
     Cloudflare Pages for the beta and test.
+  - **v39.18 + Worker v100 — Tony's four questions on the test copy's 📊 Households (29 Oct, with a screenshot: every
+    Recipes cell "—").**
+    1. "I'm assuming tomorrow I will see a real count … Correct?" — Not on the test copy: `list` sent the daily reports
+       (where the count is) only with `all`, which only the family and community copies ask for. Worker v100 sends
+       them always (for the copies asked about), so the test copy's own page shows counts — and its deleted
+       households, kept from the reports. The beta (where Tony looks) had them all along. Worker test: v100.
+    2. "It says … "Aug · Sep". What happens in 2 days, when we reach November?" — the two months before this one (UTC
+       months from the server): "Sep · Oct" in November. The columns now say they are AI: "AI this month", "AI cap",
+       "AI in Aug · Sep" (phone labels and the Sort by menu too).
+    3. "📧 Send recipes through Gmail … What does it mean and what happens if I check it?" — a per-household Extra
+       (v38.22, from the family app): that household's ✉️ Email sends from each member's own Gmail (Google asks each
+       once; this copy's Gmail Setup) instead of the app's 📨 Send. Renamed "📧 E-mail recipes from their own Gmail",
+       with that explanation under it, and "Leave it off".
+    4. "The details are a bit messy … put it in a table" — What they use is a table: a column per month, the 📈 Use
+       sections (plain counts), "🍲 Recipes added" with each month's total, then "✨ Features — times used". Names for
+       keys shown raw until now: access.usual-colours / red-green, sound.glass / bell / pot / muted, invite-testers,
+       rank.look, rank.<name>. Self Test: `manage_errors_and_use` reads the table's cells.
   - **v39.17 — 📊 Households: a Recipes column** (Tony, 29 Oct: "is there a way I could see, as the Admin, how many
     recipes each household keeps?"). The number was already reported (each household's app, once a day, `hhReport`
     → `report.recipes` = `recipes.length` of its own kitchen — linked kitchens' recipes are apart; nothing sent while
