@@ -1434,6 +1434,9 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
     to the video. Now, for YouTube and Facebook with "no recipe found", it logs `import: The page's words hold no recipe —
     now its video`, and `error: URL import failed — no recipe in the page or in its video` only if the video holds none
     either. Self Test (import_facebook_and_video_say_what_works): both, with a page that has words.
+  - **Released: v39.09 (29 Oct 2026, 11:17 Israel time, on 0de2dde; Tony: "Yes, release v39.09").** Every job success:
+    Deploy to GitHub Pages, pages build, Publish languages, Translate new phrases, Self Tests on main and test,
+    Cloudflare Pages for the beta and test.
   - **The test copy behaves as the beta will (Tony, 27 Oct: "once a build is released to it, it behaves exactly the same
     as the Beta would have"; "Perhaps we should update the database rules and server immediately upon the release to the
     test version"):**
