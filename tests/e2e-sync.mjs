@@ -455,6 +455,49 @@ try {
        JSON.stringify(await inPage(N, () => [(document.querySelector('.header .logo') || {}).textContent, document.title])));
     ok('…and sees none of the family\'s recipes', !(await names(N)).includes('E2E seed stew'), JSON.stringify(await names(N)));
 
+    // v39.10 — a recipe sent to a kitchen that has recipes of its own, saved with the pop-up's button: every one it had
+    // stays — on the screen, in the cloud, and after the page is opened again (Tony, 29 Oct, the test copy: "all other
+    // existing recipes in Tester2's DB were deleted and only the new one remained").
+    console.log('A recipe sent to another kitchen');
+    const G = await device('G (gift)', 'gift@example.com', { ready: 'household', welcome: 'own' });
+    const gh = await inPage(G, () => householdOf());
+    // a new kitchen is first offered the tour — one question at a time, so the sent recipe waits for this one
+    if (await until(() => inPage(G, () => /tour/i.test((document.getElementById('askOverlay') || {}).textContent || '')), 10000))
+      await G.page.click('#askOverlay #askCancel');
+    const gIds = await inPage(G, () => {
+      const ids = [1, 2].map(i => { const id = nextId++;
+        recipes.push(normalizeRecipe({ id, name: 'G own ' + i, ingredients: [{ a: '1', n: 'egg' }], steps: ['Boil.'], updatedAt: Date.now() }));
+        return id; });
+      saveData(); renderGrid();
+      return ids;
+    });
+    const gDocs = async () => { const r = await fetch(`http://${EMU.host}:${EMU.firestorePort}/v1/projects/${EMU.projectId}/databases/(default)/documents/households/${gh.hid}/recipes?pageSize=50`,
+      { headers: { Authorization: 'Bearer owner' } }); const j = await r.json(); return (j.documents || []).map(x => JSON.parse((x.fields.r || {}).stringValue || '{}').name); };
+    ok('the new kitchen\'s own two recipes reach the cloud', await until(async () => (await gDocs()).length === 2), JSON.stringify(await gDocs()));
+    const sent = await inPage(A, async (to) => {
+      const r = recipes.find(x => x.name === 'E2E seed stew') || recipes[0];
+      try { return await giftSend(r, { via: 'app', to: to.hid, toCode: to.code }); } catch (e) { return { error: String(e && e.message) }; }
+    }, { hid: gh.hid, code: gh.code });
+    ok('the family sends one of its recipes to that kitchen', sent && sent.id && !sent.error, JSON.stringify(sent));
+    const asked = await until(() => inPage(G, () => { const o = document.getElementById('askOverlay');
+      return !!(o && /A recipe for you/.test(o.textContent) && o.querySelector('#askChoices button[data-i="0"]')); }), 20000);
+    ok('that kitchen is asked (the pop-up)', asked, JSON.stringify(await inPage(G, () => ({ gifts: (_gifts.list || []).length, hid: _gifts.hid, listening: !!_gifts.unsub,
+      asking: _gifts.asking, overlays: ['askOverlay', 'setupWiz', 'termsGate', 'tourOverlay'].filter(id => document.getElementById(id)),
+      ask: (document.getElementById('askOverlay') || {}).textContent, seen: localStorage.getItem('mkn_gift_seen_' + (householdOf() || {}).hid) }))));
+    if (asked) await G.page.click('#askOverlay #askChoices button[data-i="0"]');
+    const want = ['G own 1', 'G own 2', sent && sent.name].sort().join('|');
+    const shown = await until(async () => (await names(G)).slice().sort().join('|') === want);
+    ok('…Save: the sent recipe is added, and the kitchen\'s own two are still there', shown, JSON.stringify(await names(G)));
+    ok('…on the screen too', await until(() => inPage(G, (n) => { renderGrid(); const t = document.getElementById('recipeGrid').textContent;
+      return n.every(x => t.indexOf(x) > -1); }, ['G own 1', 'G own 2', sent && sent.name])));
+    ok('…and in the cloud: all three', await until(async () => (await gDocs()).sort().join('|') === want), JSON.stringify(await gDocs()));
+    const gs = await restDoc('recipeGifts/' + (sent && sent.id));
+    ok('…and the sent recipe is marked saved', !!(gs && 'savedAt' in gs), JSON.stringify(gs && Object.keys(gs)));
+    await G.page.reload({ waitUntil: 'domcontentloaded' });
+    await G.page.waitForFunction(() => window._driveMode && window._fbUser && window._lastSyncOkAt, null, { timeout: 30000 });
+    const after = await until(async () => (await names(G)).slice().sort().join('|') === want);
+    ok('…and opened again, the kitchen still has all three', after, JSON.stringify(await names(G)));
+
     const url = await inPage(A, async () => {
       window.askConfirm = async () => true;                 // v37.13 — a link is Read only, no role to pick
       window.askChoice = async () => null;                  // …and the way to send it: none (copied below)

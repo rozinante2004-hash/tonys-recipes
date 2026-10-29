@@ -1466,6 +1466,15 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
       the same address once a day.
     - **Privacy Statement 1.11** (29 Oct, 11 languages): data rows "Recipes you send" and "Invitation requests", who sees
       a sent recipe, and its 4 weeks. Help: "📨 SEND A RECIPE TO ANOTHER KITCHEN".
+    - **Tester2's examples (29 Oct, test copy):** Tony: after saving a sent recipe, Tester2's other recipes (the five
+      examples, renamed) were gone. Tester2's log on that Firefox: two FULL reads at 14:57 Israel found 0 recipes, the
+      save wrote only the gift (id 10 — the first id), no delete was sent; Sync Health after: 1 on the device, 1 in the
+      cloud. Not explained yet — asked Tony where the examples were added/renamed (another device/container?).
+      Checked meanwhile: e2e households run, "A recipe sent to another kitchen" (a kitchen with 2 recipes of its own,
+      the pop-up's Save → 3 on screen, 3 in the cloud, 3 after reopening; a new kitchen's tour question comes first,
+      the pop-up waits for it). Hardened: `readCloudRecipeDocs`' one-by-one fallback swallowed every error and passed
+      a failed read off as "Read 0 recipes" (ids then marked absent, dropped from the index by the next save) — it now
+      logs and throws (Self Test `cloud_read_failure_not_empty`).
     - **No TTL — a nightly job instead (29 Oct):** Firestore's TTL policies need billing ("Project my-kitchen-notes-beta
       has billing disabled" in Tony's Cloud Shell; the console's list also only offers collections that already exist).
       `.github/workflows/clear-sent-recipes.yml` (03:23 UTC daily, from `main`) runs `tools/clear-sent-recipes.mjs

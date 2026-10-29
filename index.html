@@ -28047,12 +28047,18 @@ async function readCloudRecipeDocs(db, metaIds) {
     return out;
   } catch(e) {
     dlog('[5.4] documentId range query unavailable, falling back to meta.ids:', e && e.message);
-    var ids = metaIds || [];
+    var ids = metaIds || [], failed = 0, why = '';
     for (var i = 0; i < ids.length; i++) {
       try {
         var s = await cloudDoc(recipeDocId(ids[i]), db).get();
         if (s.exists) out.push({ id: s.id, data: s.data() });
-      } catch(e2) {}
+      } catch(e2) { failed++; why = why || (e2 && e2.message) || ''; }
+    }
+    // v39.10 — a read that failed is not an empty kitchen: reported as "Read 0 recipes", the ids it could not read
+    // were then noted as absent, and the next save left them out of the kitchen's index. Now the load fails instead.
+    if (failed) {
+      syncLog('error', 'Could not read ' + failed + ' of ' + ids.length + ' recipe(s) from the cloud', String(why).slice(0, 160));
+      throw new Error('Could not read ' + failed + ' of ' + ids.length + ' recipes from the cloud: ' + why);
     }
     return out;
   }

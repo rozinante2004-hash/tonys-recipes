@@ -4548,6 +4548,21 @@ window.SELF_TESTS = [
       }
     } },
 
+  // v39.10 — a full read that FAILED must not pass for an empty kitchen. The fallback read (one recipe at a time, when
+  // the range query is unavailable) swallowed every error: "Read 0 recipes", the ids it could not read noted as absent,
+  // and the next save left them out of the kitchen's index. A missing document still reads as missing.
+  { id:'cloud_read_failure_not_empty', group:'Sync', name:'A cloud read that fails is an error, never "0 recipes" (v39.10)',
+    test: async()=>{
+      var ok=_fakeFirestore({ recipe_10:{ r:JSON.stringify({ id:10, name:'A' }), updatedAt:1 } });
+      var got=await readCloudRecipeDocs(ok, [10, 11]);
+      if(got.length!==1 || got[0].id!=='recipe_10') throw new Error('a missing recipe should simply be missing: '+JSON.stringify(got));
+      var bad=_fakeFirestore({ recipe_10:{ r:'{}', updatedAt:1 } }, { failReads:true }), threw=false;
+      try { await readCloudRecipeDocs(bad, [10, 11]); } catch(e) { threw=/Could not read 2 of 2/.test(e.message); }
+      if(!threw) throw new Error('a read that failed came back as an empty kitchen');
+      if((await readCloudRecipeDocs(bad, [])).length!==0) throw new Error('nothing listed: nothing to read, and no error');
+      return 'a failed read throws; a missing recipe is just missing';
+    }},
+
   // v39.10 — Tony, 29 Oct 2026: "sending a recipe between registered users … the recipient just needs to click a "Save
   // to my recipes" button and it is immediately added to their list of recipes, without any AI involvement".
   { id:'sent_recipes', group:'Sync', name:'A recipe sent to another kitchen: a copy, saved with one tap; the link; what became of it (v39.10)',
