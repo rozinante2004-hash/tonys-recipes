@@ -4758,12 +4758,12 @@ window.SELF_TESTS = [
 
   // v39.11 — Tony: e-mail had only "my mail app" and Copy; the address typed should fill in the invitation request; the
   // photo did not travel; and 💬 Feedback → ✉️ Send invitation.
-  { id:'email_recipe_link', group:'Sync', name:'E-mailing a recipe: Gmail and Outlook, a one-tap link with the photo, the address carried for an invitation; a long recipe never makes a long address (v39.11–12)',
+  { id:'email_recipe_link', group:'Sync', name:'E-mailing a recipe: Gmail, Outlook or the mail app with the To and Subject, the recipe and its photo copied to paste in — no app link, no long address; a sent recipe’s link carries the address for an invitation (v39.11–14)',
     test: async()=>{
       var id=giftNewId();
       if(giftUrl(id,'Dana@Example.com').indexOf('?recipe='+id+'#for=Dana%40Example.com')<0) throw new Error('the link does not carry the address: '+giftUrl(id,'Dana@Example.com'));
       if(/#/.test(giftUrl(id,'not an address')) || /#/.test(giftUrl(id))) throw new Error('no address, nothing after #');
-      var real={ confirm:window.askConfirm, open:window.open, send:window.giftSend, carries:window.emailCarriesLink, db:window._fbDb, owner:window.isAppOwner,
+      var real={ confirm:window.askConfirm, open:window.open, send:window.giftSend, db:window._fbDb, owner:window.isAppOwner,
         gid:window.gmailClientIdFind, look:_gifts.lookAt, hid:_cloudHid, gmail:window._featureOverride.gmail };
       try {
         // the invitation request: the address it was e-mailed to, already there
@@ -4781,76 +4781,75 @@ window.SELF_TESTS = [
         var ph=await giftPhotoOf({ id:77, name:'No photo here' });
         if(ph!==docs['households/hG/photos/77'].photo) throw new Error('the photo was not taken from the cloud: '+String(ph).slice(0,40));
         window._fbDb=real.db; _cloudHid=real.hid;
-        // the ✉️ Email window, as where Gmail sending is off (the beta): Gmail, Outlook, the mail app; the one-tap link
+        // v39.14 — Tony: "it is a simple sharing of the recipe. It is not an internal user-to-user share. It should contain
+        // the photo and recipe". The ✉️ Email window (where Gmail sending is off, as on the beta) makes no app link: Gmail,
+        // Outlook or the mail app opens with the To and Subject, and the recipe — formatted, its photo inside — is copied.
         window._featureOverride.gmail=false;
-        var r=recipes[0];
-        if(!r){ r=normalizeRecipe(Object.assign(JSON.parse(JSON.stringify(SAMPLE_RECIPES[0])), { id:TEST_ID_MIN+7 })); recipes.push(r); real.tmp=r.id; }
-        var sent=[]; window.emailCarriesLink=function(){ return true; };
-        window.giftSend=async function(rr,o){ sent.push(o.via); return { id:id, url:giftUrl(id), name:rr.name }; };
-        var tab={ location:{ href:'' } }; window.open=function(u){ return u ? null : tab; };
-        showEmailModal(r.id);
+        var sent=[]; window.giftSend=async function(rr,o){ sent.push(o && o.via); return { id:id, name:rr.name }; };
+        var tab={ location:{ href:'' } }, opened=[]; window.open=function(u){ opened.push(u); return u ? null : tab; };
+        var clip={ rich:[], text:[] }, clipWas=Object.getOwnPropertyDescriptor(navigator,'clipboard'); real.clipWas=clipWas;
+        Object.defineProperty(navigator,'clipboard',{ configurable:true, value:{ write:async function(items){ clip.rich.push(items); }, writeText:async function(t){ clip.text.push(String(t)); } } });
+        async function richHtml(n){ var it=clip.rich[n||0] && clip.rich[n||0][0]; return it ? await (await it.getType('text/html')).text() : ''; }
+        var photo='data:image/jpeg;base64,'+'B'.repeat(300);
+        var longR=normalizeRecipe({ id:TEST_ID_MIN+8, name:'החומוס של טוני', photo:photo, ingredients:[{ a:'500 גרם', n:'חומוס יבש' }],
+          steps:[new Array(40).join('משרים את החומוס במים קרים למשך לילה שלם, מבשלים עד ריכוך מלא. ')] });
+        recipes.push(longR); real.tmp2=longR.id;
+        showEmailModal(longR.id);
         var ov=document.getElementById('emailModalOverlay');
         if(!ov || !ov.querySelector('#emailGmailWebBtn') || !ov.querySelector('#emailOutlookBtn') || !ov.querySelector('#emailMailtoBtn'))
           throw new Error('the e-mail window lacks Gmail, Outlook or My mail app');
+        if(!(parseInt(ov.style.zIndex,10)<1300)) throw new Error('the e-mail window is above the questions it asks (z '+ov.style.zIndex+')');
         ov.querySelector('input[type="email"]').value='dana@example.com';
         ov.querySelector('#emailGmailWebBtn').click();
-        for(var w=0;w<40 && !tab.location.href;w++) await wait(50);
-        var u=tab.location.href;
-        if(!/^https:\/\/mail\.google\.com\//.test(u) || u.indexOf(encodeURIComponent('?recipe='+id+'#for=dana%40example.com'))<0 || u.indexOf('to=dana%40example.com')<0)
-          throw new Error('Gmail did not open with the address and the one-tap link: '+u.slice(0,200));
-        tab.location.href=''; ov.querySelector('#emailOutlookBtn').click();
-        for(var w2=0;w2<40 && !tab.location.href;w2++) await wait(50);
-        if(!/outlook\.live\.com/.test(tab.location.href)) throw new Error('Outlook did not open');
-        if(sent.length!==1 || sent[0]!=='email') throw new Error('the link should be made once for the window, as an e-mail: '+JSON.stringify(sent));
-        if(!(parseInt(ov.style.zIndex,10)<1300)) throw new Error('the e-mail window is above the questions it asks (z '+ov.style.zIndex+')');
-        ov.remove();
-        // v39.12 — Tony: Gmail "Bad Request Error 400", Outlook's server too, Yahoo with the recipe in To — a long (Hebrew)
-        // recipe made the web address too long. Now every address stays short: the link, and the text on the clipboard.
-        var clip=[], clipWas=Object.getOwnPropertyDescriptor(navigator,'clipboard');
-        Object.defineProperty(navigator,'clipboard',{ configurable:true, value:{ writeText:async function(t){ clip.push(String(t)); } } });
-        real.clipWas=clipWas;
-        var longR=normalizeRecipe({ id:TEST_ID_MIN+8, name:'החומוס של טוני', ingredients:[{ a:'500 גרם', n:'חומוס יבש' }],
-          steps:[new Array(40).join('משרים את החומוס במים קרים למשך לילה שלם, מבשלים עד ריכוך מלא. ')] });
-        recipes.push(longR); real.tmp2=longR.id;
-        showEmailModal(longR.id); ov=document.getElementById('emailModalOverlay');
-        ov.querySelector('input[type="email"]').value='dana@example.com';
-        tab.location.href=''; ov.querySelector('#emailGmailWebBtn').click();
-        for(var w3=0;w3<40 && !tab.location.href;w3++) await wait(50);
-        u=tab.location.href;
-        if(!u || u.length>EMAIL_URL_MAX) throw new Error('a long recipe still makes a long address: '+u.length+' characters');
-        if(u.indexOf(encodeURIComponent('?recipe='+id))<0) throw new Error('the short e-mail lost its link');
-        if(!clip.length || clip[0].indexOf('משרים את החומוס')<0) throw new Error('the recipe\u2019s text was not copied to paste in');
-        if(!/too long/.test((document.getElementById('emailSay')||{}).textContent||'')) throw new Error('the window does not say why the e-mail is short');
-        tab.location.href=''; ov.querySelector('#emailOutlookBtn').click();
-        for(var w4=0;w4<40 && !tab.location.href;w4++) await wait(50);
-        if(tab.location.href.length>EMAIL_URL_MAX) throw new Error('Outlook: a long address');
-        // My mail app, none opening: the choice comes up ABOVE the e-mail window; Yahoo opens empty, the message copied
-        var mo=window.mailOpened, chose=null, opened2=[];
+        for(var w=0;w<40 && (!clip.rich.length || !/copied/.test((document.getElementById('emailSay')||{}).textContent||''));w++) await wait(50);
+        var u=opened.filter(Boolean)[0]||'';
+        if(!/^https:\/\/mail\.google\.com\//.test(u) || u.indexOf('to=dana%40example.com')<0 || u.indexOf('su='+encodeURIComponent('🍴 החומוס של טוני'))<0) throw new Error('Gmail did not open with the To and Subject: '+u.slice(0,200));
+        if(u.length>EMAIL_URL_MAX || !/&body=$/.test(u)) throw new Error('the recipe went into Gmail’s address again ('+u.length+' characters)');
+        if(sent.length) throw new Error('the e-mail made an app link: '+JSON.stringify(sent));
+        var html=await richHtml(0);
+        if(html.indexOf(photo)<0 || html.indexOf('משרים את החומוס')<0) throw new Error('the copy lacks the photo or the recipe');
+        var plain=clip.rich[0] && clip.rich[0][0] ? await (await clip.rich[0][0].getType('text/plain')).text() : '';
+        if(plain.indexOf('חומוס יבש')<0) throw new Error('the copy has no plain text for mail programs without formatting');
+        if(!/photo are copied/.test(document.getElementById('emailSay').textContent)) throw new Error('the window does not say to paste: '+document.getElementById('emailSay').textContent);
+        opened=[]; ov.querySelector('#emailOutlookBtn').click(); await wait(30);
+        if(!/^https:\/\/outlook\.live\.com\//.test(opened.filter(Boolean)[0]||'') || (opened.filter(Boolean)[0]||'').length>EMAIL_URL_MAX) throw new Error('Outlook: '+JSON.stringify(opened));
+        // My mail app, none opening: the choice above the window; Yahoo opens empty, the copy left as it is
+        var mo=window.mailOpened, choiceZ=null, realChoice=window.askChoice; opened=[];
         window.mailOpened=async function(href){ if(href.length>EMAIL_URL_MAX) throw new Error('mailto: too long ('+href.length+')'); return false; };
-        window.open=function(u2){ if(u2) opened2.push(u2); return u2 ? null : tab; };
-        var choiceZ=null, realChoice=window.askChoice;
-        window.askChoice=async function(m, o, op){ var r0=realChoice(m, o, op); await wait(20); var a=document.getElementById('askOverlay');
-          choiceZ=a ? parseInt(getComputedStyle(a).zIndex,10) : null; chose=o.map(function(x){ return x.value; }); if(a) a.remove(); return 'yahoo'; };
-        try { clip=[]; await ov.querySelector('#emailMailtoBtn').onclick(); }
-        finally { window.mailOpened=mo; window.askChoice=realChoice; }
+        window.askChoice=async function(m, o, op){ realChoice(m, o, op); await wait(20); var a=document.getElementById('askOverlay');
+          choiceZ=a ? parseInt(getComputedStyle(a).zIndex,10) : null; if(a) a.remove(); return 'yahoo'; };
+        clip.text=[];
+        try { await ov.querySelector('#emailMailtoBtn').onclick(); } finally { window.mailOpened=mo; window.askChoice=realChoice; }
         if(!(choiceZ>parseInt(ov.style.zIndex,10))) throw new Error('"Select mail application" opened behind the e-mail window');
-        if(opened2.indexOf('https://compose.mail.yahoo.com/')<0) throw new Error('Yahoo: '+JSON.stringify(opened2));
-        if(!clip.some(function(c){ return c.indexOf('?recipe='+id)>-1; })) throw new Error('Yahoo: the message was not copied');
+        if(opened.indexOf('https://compose.mail.yahoo.com/')<0) throw new Error('Yahoo: '+JSON.stringify(opened));
+        if(clip.text.length) throw new Error('Yahoo copied over the recipe: '+JSON.stringify(clip.text).slice(0,120));
         ov.remove();
+        // a photo kept only in the kitchen's cloud copy reaches the preview and the copy
+        _cloudHid='hG'; window._fbDb={ collection:function(c){ return coll(c); } };
+        docs['households/hG/photos/'+(TEST_ID_MIN+9)]={ photo:photo };
+        var noPh=normalizeRecipe({ id:TEST_ID_MIN+9, name:'Soup', ingredients:[{ a:'1', n:'onion' }], steps:['Simmer.'] });
+        recipes.push(noPh); real.tmp3=noPh.id;
+        showEmailModal(noPh.id); ov=document.getElementById('emailModalOverlay');
+        for(var w2=0;w2<40 && (ov.querySelector('iframe').srcdoc||'').indexOf(photo)<0;w2++) await wait(50);
+        if((ov.querySelector('iframe').srcdoc||'').indexOf(photo)<0) throw new Error('the cloud photo did not reach the preview');
+        clip.rich=[]; ov.querySelector('#emailGmailWebBtn').click(); await wait(30);
+        if((await richHtml(0)).indexOf(photo)<0) throw new Error('the cloud photo did not reach the copy');
+        ov.remove(); window._fbDb=real.db; _cloudHid=real.hid;
         // 💬 Feedback → ✉️ Send invitation: Invite testers with the address in To
         window.isAppOwner=function(){ return true; }; window.gmailClientIdFind=async function(){ return ''; };
         openInviteTesters({ to:'dana@example.com' });
         var to=document.getElementById('invTo');
         if(!to || to.value!=='dana@example.com') throw new Error('Invite testers did not open with the address in To');
         document.getElementById('inviteOverlay').remove();
-        return 'Gmail/Outlook/mail app; one link per window, with the address; the request filled in; the cloud photo; Invite testers filled in';
+        return 'the link carries the address; the request filled in; e-mail: To and Subject only, the recipe and photo copied (the cloud photo too), no app link; Invite testers filled in';
       } finally {
         try { sessionStorage.removeItem('mkn_gift_for'); } catch(e) {}
-        window.askConfirm=real.confirm; window.open=real.open; window.giftSend=real.send; window.emailCarriesLink=real.carries;
+        window.askConfirm=real.confirm; window.open=real.open; window.giftSend=real.send;
         window._fbDb=real.db; window.isAppOwner=real.owner; window.gmailClientIdFind=real.gid; _gifts.lookAt=real.look; _cloudHid=real.hid;
         if(real.gmail===undefined) delete window._featureOverride.gmail; else window._featureOverride.gmail=real.gmail;
         if(real.tmp) recipes=recipes.filter(function(x){ return x.id!==real.tmp; });
         if(real.tmp2) recipes=recipes.filter(function(x){ return x.id!==real.tmp2; });
+        if(real.tmp3) recipes=recipes.filter(function(x){ return x.id!==real.tmp3; });
         if(real.clipWas) try { Object.defineProperty(navigator,'clipboard',real.clipWas); } catch(e) {}
         else if(real.clipWas===undefined && 'clipWas' in real) try { delete navigator.clipboard; } catch(e) {}
         ['emailModalOverlay','inviteOverlay'].forEach(function(x){ var e=document.getElementById(x); if(e) e.remove(); });

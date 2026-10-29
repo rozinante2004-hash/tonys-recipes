@@ -1437,6 +1437,20 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
   - **Released: v39.09 (29 Oct 2026, 11:17 Israel time, on 0de2dde; Tony: "Yes, release v39.09").** Every job success:
     Deploy to GitHub Pages, pages build, Publish languages, Translate new phrases, Self Tests on main and test,
     Cloudflare Pages for the beta and test.
+  - **v39.14 — ✉️ Email is plain sharing again** (Tony, 29 Oct: "I have a feeling you got confused. When sharing a recipe
+    using the "Send by Email", it is a simple sharing of the recipe. It is not an internal user-to-user share. It should
+    contain the photo and recipe, not an internal link that only users can open in the app." Gmail and Outlook opened
+    fine on v39.12–13, but with only the short app-link e-mail). I had read his v39.11 points 1–3 as one feature: point 1
+    (Gmail) was about 📤 Share → ✉️ Email; points 2–3 (address pre-filled, photo kept) about 📨 Send → Via Email.
+    - The e-mail window makes NO sent recipe any more (`emailCarriesLink`, the link text: gone). A web address can carry
+      neither a photo nor a long recipe: Gmail/Outlook/mailto open with To and Subject only (`body=` empty), and the
+      recipe is copied AT THE TAP as a ClipboardItem — text/html = `rHtml` (the preview, photo inside as a data: URL) and
+      text/plain = `rText` (`emailCopyRich`, plain text where ClipboardItem is missing); `#emailSay` says to paste
+      (Ctrl+V / ⌘V / press and hold). 📋 Copy does the same. `mailOrWebmail` with `opts.pasteReady` does not copy over it
+      (Yahoo, Proton, Copy). The photo is fetched when the window opens (`giftPhotoOf`: this device, then the cloud) into
+      the preview and the copy. Checked in a real browser: pasted into an editable box → the formatted recipe with
+      its photo. NOT checked: Gmail's own compose (needs Tony's sign-in).
+    - 📨 Send → Via Email (the app-to-app send) keeps its link, the optional address and `#for=`.
   - **v39.13 — 📤 Recipes I sent: several at once** (Tony, 29 Oct: "select several items, like we have in the Feedback
     page … (Take it back, Resend, Copy the link)"). A tick on each card (`.go-pick`, `giftPick`), Select all (`#goAll`,
     `giftPickAll`, indeterminate when some), and a sticky bar (`#goBar`, `giftBarShow`): ↩️ Take back (n), 📨 Send again
