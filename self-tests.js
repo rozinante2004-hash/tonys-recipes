@@ -1414,6 +1414,52 @@ window.SELF_TESTS = [
       }
     } },
 
+  // v39.16 — Tony, 29 Oct 2026: "present the Identifier on the main screen. Clicking it will copy it to the clipboard and
+  // will indicate so once clicked. It should also have a tool tip saying that this is your personal identifier and that
+  // clicking it will copy it to the clipboard."
+  { id:'identifier_on_main_screen', group:'Sharing', name:'🪪 The identifier on the main screen: a click copies it and says so; its tooltip says what it is (v39.16)',
+    test: async()=>{
+      var el=document.getElementById('idBadge');
+      if(!el || !el.closest('.header-status')) throw new Error('no identifier in the header’s status line');
+      if(!/personal identifier/.test(el.title) || !/click to copy it to the clipboard/.test(el.title)) throw new Error('the tooltip: '+el.title);
+      // the stub is the clipboard's own, writable property, deleted afterwards — so its own writeText (and other tests'
+      // stubs, which assign) work again (a non-writable one left behind broke two later tests' copying)
+      var real={ hh:window._household, user:window._fbUser, own:navigator.clipboard && Object.prototype.hasOwnProperty.call(navigator.clipboard, 'writeText'),
+        write:navigator.clipboard && navigator.clipboard.writeText, confirm:window.askConfirm }, copied=[];
+      var setWrite=function(fn){ try{ Object.defineProperty(navigator.clipboard, 'writeText', { value:fn, configurable:true, writable:true }); }catch(e){ navigator.clipboard.writeText=fn; } };
+      try{
+        window._fbUser={ uid:'uI', email:'i@example.com' };
+        _household={ hid:'hI', role:'viewer', name:'Kitchen I', code:'MKN-ABCD-2345' }; window._household=_household;
+        idBadgeUpdate();
+        if(el.hidden || document.getElementById('idBadgeCode').textContent!=='MKN-ABCD-2345') throw new Error('not shown for a signed-in member: '+el.outerHTML.slice(0,200));
+        if(getComputedStyle(el).display==='none' || el.getBoundingClientRect().width<40) throw new Error('not visible');
+        setWrite(async function(t){ copied.push(t); });
+        await idBadgeCopy();
+        if(copied.join()!=='MKN-ABCD-2345') throw new Error('not copied: '+JSON.stringify(copied));
+        var done=document.getElementById('idBadgeDone');
+        if(done.hidden || !/Copied/.test(done.textContent) || !document.getElementById('idBadgeCode').hidden || !el.classList.contains('id-copied')) throw new Error('it does not say it was copied');
+        await wait(2000);
+        if(!done.hidden || document.getElementById('idBadgeCode').hidden) throw new Error('the identifier does not come back after saying so');
+        // no clipboard here: the identifier opens big, to select
+        setWrite(async function(){ throw new Error('NotAllowedError'); });
+        window.askConfirm=function(){ return new Promise(function(){}); };
+        var shown=false; var realOpen=window.openMyIdentifier;
+        window.openMyIdentifier=function(){ shown=true; return Promise.resolve(null); };
+        try { await idBadgeCopy(); } finally { window.openMyIdentifier=realOpen; }
+        if(!shown) throw new Error('a refused clipboard does not show the identifier instead');
+        // signed out, or a household with no identifier yet: nothing shown
+        window._fbUser=null; idBadgeUpdate();
+        if(!el.hidden) throw new Error('shown while signed out');
+        window._fbUser={ uid:'uI' }; _household.code=''; idBadgeUpdate();
+        if(!el.hidden) throw new Error('shown with no identifier');
+        return 'shown, copied with “Copied!” for a moment, the tooltip says what it is';
+      } finally {
+        try{ if(real.own) setWrite(real.write); else delete navigator.clipboard.writeText; }catch(e){}
+        window.askConfirm=real.confirm; window._fbUser=real.user; _household=real.hh; window._household=real.hh;
+        idBadgeUpdate();
+      }
+    } },
+
   { id:'security_escaping', group:'Security', name:'🔒 What other people write cannot become code: handler arguments, recipe ids and colours, error messages (v37.95 security audit)',
     test: async()=>{
       var evil="x');window.__pwn=1;//\"<b>", hit=null;
@@ -4753,6 +4799,52 @@ window.SELF_TESTS = [
         try{ if(sess===null) sessionStorage.removeItem('mkn_gift'); else sessionStorage.setItem('mkn_gift', sess); }catch(e){}
         var ov=document.getElementById('askOverlay'); if(ov) ov.remove();
         var gov2=document.getElementById('giftsOutOverlay'); if(gov2) gov2.remove(); _gifts.picked={};
+      }
+    } },
+
+  // v39.16 — Tony, 29 Oct 2026: "Can we use the same Resend .com mailing mechanism when sharing between kitchens via email?"
+  { id:'gift_email_by_server', group:'Sync', name:'📨 Send to another kitchen → ✉️ Via Email: the app sends it — its address, a note, nothing for a mail program; your own mail only when the app cannot (v39.16)',
+    test: async()=>{
+      if(typeof giftMailByServer!=='function') throw new Error('giftMailByServer not defined');
+      var rid=TEST_ID_MIN+9631, gid='gTESTtestTESTtest0001';
+      var real={ db:window._fbDb, user:window._fbUser, hh:window._household, choice:window.askChoice, confirm:window.askConfirm, send:window.giftSend, share:window.shareDo, fetch:window.fetch, toast:window.toast };
+      var calls=[], shared=[], said=[], answer=null, ch=[], cf=[];
+      recipes.unshift(normalizeRecipe({ id:rid, name:'Lentil soup', ingredients:[{ a:'1 cup', n:'lentils' }], steps:['Simmer.'] }));
+      try{
+        window._fbDb=window._fbDb || {};
+        window._fbUser={ uid:'uA', email:'a@example.com', emailVerified:true, getIdToken:async function(){ return 'tok'; } };
+        _household={ hid:'hA', name:'Kitchen A', code:'MKN-AAAA-2222', role:'owner' }; window._household=_household;
+        window.giftSend=async function(rr, o){ calls.push(['made', o.via, o.note]); return { id:gid, url:giftUrl(gid), name:rr.name }; };
+        window.shareDo=async function(how, m){ shared.push([how, m]); return how; };
+        window.toast=function(){};
+        window.fetch=async function(u, init){ var b={}; try{ b=JSON.parse(init.body); }catch(e){} if(b.action==='mail-recipe'){ calls.push(['mail', b]); return answer(); } return real.fetch(u, init); };
+        window.askChoice=async function(){ return ch.shift(); };
+        window.askConfirm=async function(o){ said.push(o); return cf.length ? cf.shift() : true; };
+        // 1. their address (needed: an empty one is asked again), a note, and the server sends it
+        ch=['email']; cf=['', true, 'Dana@Example.com', 'Try it!'];
+        answer=function(){ return new Response('{"ok":true,"replyTo":"a@example.com"}', { status:200 }); };
+        var made=await openSendRecipe(rid);
+        var m=(calls.filter(function(c){ return c[0]==='mail'; })[0] || [])[1];
+        if(!made || !m) throw new Error('not sent by the server: '+JSON.stringify(calls));
+        if(m.gift!==gid || m.to!=='Dana@Example.com' || m.hid!=='hA' || m.idToken!=='tok' || m.site!==APP_CONFIG.siteOrigin+APP_CONFIG.sitePath || m.recipe || m.photo)
+          throw new Error('what went to the server (the sent recipe by its id, this copy\u2019s address — nothing else): '+JSON.stringify(m));
+        if(shared.length) throw new Error('a mail program was opened as well: '+JSON.stringify(shared));
+        if(calls[0][0]!=='made' || calls[0][1]!=='email' || calls[0][2]!=='Try it!') throw new Error('the link was not made as an e-mail, with the note: '+JSON.stringify(calls[0]));
+        if(!said.some(function(o){ return o.title==='To whom?'; }) || said[0].title!=='Their e-mail address') throw new Error('an empty address was not asked again: '+JSON.stringify(said.map(function(o){ return o.title; })));
+        // 2. the app cannot send it: said why, and their own mail instead — the same link, with the address
+        calls=[]; said=[]; ch=['email', 'gmail']; cf=['dana@example.com', '', true];
+        answer=function(){ return new Response('{"error":"MAIL: sending e-mail is not set up on this server yet.","needsConfig":true}', { status:503 }); };
+        made=await openSendRecipe(rid);
+        var no=said.filter(function(o){ return o.title==='Not e-mailed'; })[0];
+        if(!no || !/not switched on yet/.test(no.message)) throw new Error('why it was not e-mailed: '+JSON.stringify(said.map(function(o){ return [o.title, o.message]; })));
+        if(shared.length!==1 || shared[0][0]!=='gmail' || shared[0][1].to!=='dana@example.com' || shared[0][1].text.indexOf('?recipe='+gid+'#for=dana%40example.com')<0)
+          throw new Error('their own mail, with the link: '+JSON.stringify(shared));
+        if(calls.filter(function(c){ return c[0]==='made'; }).length!==1) throw new Error('the link should be made once');
+        return 'sent by the server with its id and this app\u2019s address; an address needed; Gmail with the link when the server cannot';
+      } finally {
+        window._fbDb=real.db; window._fbUser=real.user; _household=real.hh; window._household=real.hh; window.askChoice=real.choice; window.askConfirm=real.confirm;
+        window.giftSend=real.send; window.shareDo=real.share; window.fetch=real.fetch; window.toast=real.toast;
+        var i=recipes.findIndex(function(x){ return x.id===rid; }); if(i>-1) recipes.splice(i,1);
       }
     } },
 
@@ -9060,6 +9152,12 @@ window.SELF_TESTS = [
         if(!/cannot be read on the free plan/.test(lines) || /Monitoring Viewer/.test(lines)) throw new Error('Firestore not measured, yet the page does not say why (billing, not a role): '+lines);
         var withFs=serverAllowanceLines({ watch:true, usage:{ at:Date.now(), metrics:{ firestoreReads:{ used:12000, limit:50000, period:'pacific-day' } } }, notices:[] }).join('\n');
         if(!/✓ Firestore reads \(Firebase’s day\): 12,000 of 50,000 \(24%\)/.test(withFs) || /free plan/.test(withFs)) throw new Error('Firestore measured: '+withFs);
+        // v39.16 — the recipe e-mails the server sends through Resend (Worker v99)
+        var withMail=serverAllowanceLines({ watch:true, notices:[], mail:{ set:true, today:64, max:90, perPerson:15, resendDayMax:100, resendMonthMax:3000, resend:{ day:71, month:2205, at:Date.now() } } }).join('\n');
+        if(!/Recipe e-mails \(sent by the server through Resend\):/.test(withMail) || !/⚠️ Today \(the app’s own limit; the day began at [^)]*\): 64 of 90 \(71%\) — 15 a day for each person/.test(withMail)
+          || !/⚠️ Resend’s day \(free plan\): 71 of 100 \(71%\) — at the last e-mail/.test(withMail) || !/⚠️ Resend’s month: 2,205 of 3,000 \(74%\)/.test(withMail)) throw new Error('the recipe e-mails: '+withMail);
+        if(!/Resend’s own count: shown after the next e-mail is sent/.test(serverAllowanceLines({ watch:true, notices:[], mail:{ set:true, today:0, max:90, perPerson:15 } }).join('\n'))) throw new Error('no Resend figures yet, yet it does not say so');
+        if(/Recipe e-mails/.test(serverAllowanceLines({ watch:true, notices:[], mail:{ set:false } }).join('\n'))) throw new Error('recipe e-mails shown on a server that cannot send them');
       } finally {
         window.fetch=realFetch; window._fbUser=realUser;
         Object.keys(_serverNotices).forEach(function(k){ delete _serverNotices[k]; }); Object.assign(_serverNotices, realNotices);

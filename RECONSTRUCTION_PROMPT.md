@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v39.15` — app. **Worker: v98**, deployed separately and versioned separately
+**Current version:** `v39.16` — app. **Worker: v99**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -661,7 +661,8 @@ invitation-only (unless adding to the tester's household)."
   errors, what is running now, Firestore reads as the apps count them, sign-in-link e-mails (today, the most in a
   day, days all 5 went, days someone was turned away), when Firebase's day begins.
 - **📲 WhatsApp alerts** (v38.64–v38.65): `ownerAlert` also sends through CallMeBot when the Worker secrets
-  WHATSAPP_PHONE and WHATSAPP_KEY are set; each of eight kinds on or off (`ALERT_KINDS`, D1 `owner_prefs`); a test alert.
+  WHATSAPP_PHONE and WHATSAPP_KEY are set; each kind on or off (`ALERT_KINDS`, D1 `owner_prefs` — ten by v99: v97 added
+  invitation requests, v99 recipe e-mails); a test alert.
   E-mail always comes.
 
 **The Worker, v78 → v87 (new actions and stores; `tests/worker-cors.mjs` checks each)**
@@ -877,10 +878,34 @@ in the beta's database — Firestore's own TTL needs billing. 📤 Share → ✉
 (v39.15, Worker v98 `mail-recipe` through Resend): their address and 📨 Send — the Worker lays the recipe out itself
 (never HTML from the app), the photo inline, from "<kitchen> via My Kitchen Notes", replies to the sender; 15 a day per
 person; on phones also 📤 Share menu (the photo as a file); 📋 Copy;
-📨 Send → Via Email asks for their address (optional) and puts it after # in the link (`#for=`); the link can hold the recipient's address
+📨 Send to another kitchen → ✉️ Via Email is sent by the server too (v39.16, Worker v99: `mail-recipe` with `gift`
+and `site` — the Worker reads the sent recipe and its photo from Firestore with the sender's sign-in, checks it is
+theirs, a link and not expired, builds the link on one of its own app addresses, and e-mails the photo, the name, the
+note and an "Open the recipe" button); their address is needed; only if the server cannot send it are the sender's own
+mail app, Gmail or Outlook offered, with the link. The link holds the recipient's address
 after # (`#for=`), which fills in their invitation request; 💬 Feedback's invitation requests have ✉️ Send invitation
 (Invite testers with the address in To, in the copy the request came from). Signed out during the closed beta: the recipe, read-only, and "✉️ Ask for
 an invitation" (Worker `invite-ask`: a note to the owner + an alert, rate-limited). Privacy Statement 1.11.
+
+**The recipe e-mails and their warnings (Resend; Worker v98–v99).** Resend sends for the Worker (`POST
+https://api.resend.com/emails`, key RESEND_API_KEY — a GitHub secret passed on by deploy-worker.yml; MAIL_FROM optional,
+default "recipes" at the community domain, assembled in the code). The domain mykitchennotes.community is verified in
+Resend (its DNS records on `send.` and `resend._domainkey`; the root's Email Routing MX untouched). Limits: 15 a day per
+person and 90 a day in all (D1 `counters`, credited only when sent), under Resend's free 100 a day / 3,000 a month
+(received e-mails count too; RESEND_DAILY_QUOTA / RESEND_MONTHLY_QUOTA if the plan changes). The owner is warned (a
+notice for the owner: the app's bar, an e-mail and the phone once, then once a day; alert kind `mail-service`) at 70% of
+the 90, when they are all used, when someone uses all 15, when Resend's own count (headers `x-resend-daily-quota`,
+`x-resend-monthly-quota`, kept in D1 `owner_prefs`) passes 70%, and whenever Resend refuses — a quota (paused until it
+returns), the key, the sending domain, a security hold, anything else — or does not answer; too many at once is retried
+once a second later. Addresses in Resend's words are masked. ⚙️ → 👑 → 🩺 Server allowances shows today's count and
+Resend's day and month; 🚀 Deployments has a "✉️ Resend — recipe e-mails" group (what it is, the quotas, the key, links
+to Resend's Sent e-mails, Domain, API keys, Usage, Plan & billing, the GitHub secrets and the Deploy the Worker run).
+
+**The identifier on the main screen (v39.16).** The household's identifier (🪪 MKN-XXXX-XXXX) sits at the end of the
+header's status line (`#idBadge`), which stays in view when the header slides away on a phone; its tooltip says it is
+your personal identifier and that a click copies it; a click copies it and the chip says "✅ Copied!" for a moment.
+Shown only while signed in to a household that has one; ⚙️ → 🏠 My household → 🪪 Display my personal identifier still
+shows it large, with Copy and Share (and is what a click opens where the clipboard is refused).
 
 **State on 28 Oct 2026 (v39.06, Worker v96):** testers since 25 Oct; every release on the owner's yes. Their notes
 and error reports reach the private repository and a Claude session that triages them daily at 19:30 Israel time.
@@ -2503,7 +2528,7 @@ breach its Terms of Service and get numbers banned. The feature therefore reads 
   security rules** (`updateAccessRules`) that gate `shared/**` by `request.auth.token.email`.
 - **Payments** and **Deployments** modals: static reference cards linking to every console
   (Anthropic billing/keys, Cloudflare Worker edit/settings, Firebase, GitHub, Google Cloud/
-  YouTube quota) and the two helper downloads. Rebuild these as informational panels.
+  YouTube quota, Resend — the recipe e-mails, v39.16) and the two helper downloads. Rebuild these as informational panels.
 - **PWA install** prompts: Android `beforeinstallprompt` banner + iOS "Add to Home Screen" hint,
   each dismissible and remembered.
 - **Version check** (`checkAppVersion`): poll `version.json` (no‑store); when it differs from

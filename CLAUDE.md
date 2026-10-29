@@ -1437,6 +1437,46 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
   - **Released: v39.09 (29 Oct 2026, 11:17 Israel time, on 0de2dde; Tony: "Yes, release v39.09").** Every job success:
     Deploy to GitHub Pages, pages build, Publish languages, Translate new phrases, Self Tests on main and test,
     Cloudflare Pages for the beta and test.
+  - **v39.16 + Worker v99 — warnings for the e-mail service, the kitchen send by e-mail through it, Deployments, and
+    the identifier on the main screen** (Tony, 29 Oct: "Please add the relevant information to the Deployment area, and
+    update the reconstruction prompt. Also, please make sure I get a warning if quota is exceeded or if any issues arise
+    with this service"; then "Can we use the same Resend .com mailing mechanism when sharing between kitchens via
+    email?"; then "Please change the display to present the Identifier on the main screen. Clicking it will copy it to
+    the clipboard and will indicate so once clicked. It should also have a tool tip saying that this is your personal
+    identifier and that clicking it will copy it to the clipboard.").
+    - **Worker v99 alerts** (`mailNotice` → `raiseNotice`, scope 'owner': the owner's bar, an e-mail and the phone the
+      first time, then at most once a day for the same thing; new alert kind `mail-service`, on by default — 10 kinds
+      now): `mail-day` warning at 63 of the app's 90 and paused at 90; `mail-person` someone's 15 reached (names the
+      kitchen, not the person); Resend's own count from its response headers `x-resend-daily-quota` (free plan only) and
+      `x-resend-monthly-quota` — kept in D1 `owner_prefs` 'resend_usage' and warned at 70% (`mail-resend-day`,
+      `mail-resend-month`); Resend refusing (`mailTrouble`, by its error `name`): daily_quota_exceeded /
+      monthly_quota_exceeded → paused (the member told "all its e-mails for today / this month", 429), 401 or a key
+      error → `mail-key`, other 403 (validation_error — the domain) → `mail-domain`, 451 → `mail-blocked`, 5xx or not
+      reached → `mail-down` warning, other 4xx → `mail-refused`; rate_limit_exceeded is tried once more 1.2 s later
+      (`mail-busy` only if that fails too). Addresses in Resend's words are masked (`mailMask`); the key never appears.
+      Quotas default 100/day, 3,000/month (Resend's free plan, received e-mails count too) — RESEND_DAILY_QUOTA /
+      RESEND_MONTHLY_QUOTA (GitHub secrets, passed by deploy-worker.yml) if the plan changes. `allowances` gains `mail`
+      (`mailStats`). Facts from Resend's docs via search (resend.com itself is not reachable from the cloud session).
+    - **📨 Send to another kitchen → ✉️ Via Email, sent by the server**: `mail-recipe` with `gift` (the sent recipe's
+      id) and `site` (`APP_CONFIG.siteOrigin + sitePath`) → `mailGift`: reads `recipeGifts/<id>` and
+      `recipeGiftPhotos/<id>` from Firestore with the sender's token (must be from this `hid`, `to == ''`, not expired),
+      the link built there (`site` must be https, one of `allowedOrigins`, not Bring!, a plain path), the e-mail
+      `mailGiftHtml`/`mailGiftText` (kitchen, photo inline, name, the note quoted, "Open the recipe" button, the link,
+      "keeps until <date>"), subject "A recipe for you: <name>"; the same limits, counts and alerts (`mailOut`, shared
+      with `mail-recipe`). App: Via Email → their address (needed now) → note → `giftMailByServer`; if the server
+      cannot ("not switched on yet", refused…): "Not e-mailed — why", then My default mail app / Gmail / Outlook with
+      the link as before. Worker tests: v99 section (≈35 checks).
+    - **🚀 Deployments → ✉️ Resend — recipe e-mails**: what it does, the quotas and limits, the warnings, the key;
+      links: Sent e-mails, Domain, API keys, Usage, Plan & billing (resend.com/emails, /domains, /api-keys,
+      /settings/usage, /settings/billing — the last two not checked from here), GitHub secrets, Deploy the Worker. The
+      Cloudflare line says the Worker sends the recipe e-mails. 🩺 Server allowances: "Recipe e-mails" — today of 90
+      (15 each), Resend's day and month at the last e-mail. 📤 Share's ✉️ button: "(the recipe and its photo)" (was
+      "(copy & paste)").
+    - **The identifier on the main screen**: `#idBadge` in the header's status line (never slides away), 🪪 MKN-…,
+      tooltip "Your personal identifier — click to copy it to the clipboard. …"; a click copies it and the chip turns
+      green "✅ Copied!" for 1.8 s (same width); no clipboard → `openMyIdentifier()`. Shown only while signed in to a
+      household with a code (`idBadgeUpdate` from `householdBrand` and sign-out). Help and the send window point to it.
+    - Self Tests: `gift_email_by_server`, `identifier_on_main_screen`, the e-mail rows in `firebase_limits_told`.
   - **v39.15 + Worker v98 — the e-mail sent by the server** (Tony, 29 Oct, on v39.14's paste: "Copy/pasting the recipe is
     unacceptable. The users could not be expected to need to remember to paste the recipe. They will end up with an empty
     mail message. We need to find a better way where no pasting is necessary." Asked: server / phone share menu / both →

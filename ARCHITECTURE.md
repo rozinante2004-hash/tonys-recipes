@@ -40,6 +40,7 @@ browser, as `docs/README` below says).
 | **Firebase — test** | Google, project `tonys-recipes-test` (Firestore in `me-west1`) | console: https://console.firebase.google.com/project/tonys-recipes-test | `firestore.rules` | Same, by hand. | Tony |
 | **Sign-in clients** | Google Cloud → APIs & Services → Credentials, one "Web client (auto created by Google Service)" per project | https://console.cloud.google.com/apis/credentials?project=recipes-f379d · …?project=tonys-recipes-test | — | Each lists its copy's `https://<host>/__/auth/handler` under *Authorized redirect URIs* and the host under *Authorized JavaScript origins*. | Tony |
 | **CI** | GitHub Actions in `tonys-recipes` | https://github.com/rozinante2004-hash/tonys-recipes/actions | `.github/workflows/self-tests.yml` | Runs on every push to `main` **and** `test` (§5). | Automatic |
+| **Recipe e-mails — Resend** (v39.15–v39.16) | Resend (resend.com), free plan | dashboard: https://resend.com/emails · domain https://resend.com/domains | the Worker's `mail-recipe` (v98–v99) | The Worker sends through Resend's API with the key `RESEND_API_KEY` (a GitHub secret; deploy-worker.yml passes it on). The domain mykitchennotes.community is verified there (DNS records on `send.` and `resend._domainkey`, set by Resend's Auto configure). 100 a day / 3,000 a month free; the app sends ≤ 90 a day, 15 per person; the owner is warned at 70%, when one runs out and when Resend refuses or is down. | Tony (account, domain, key); automatic after |
 | **Publish languages** (v36.91) | GitHub Actions in `tonys-recipes` | https://github.com/rozinante2004-hash/tonys-recipes/actions/workflows/publish-languages.yml | `.github/workflows/publish-languages.yml`, `tools/publish-languages.mjs` | Every 10 minutes, and "Run workflow": copies the central translations into `i18n/*.json` when they changed (or the app's 🚀 button asked), commits to `main`, brings `test` level, redeploys. Translation files only. | Automatic |
 
 The **🚀 Deployments** entry in ⚙️ (owner only) links to all of these for both
@@ -61,6 +62,7 @@ Named here so they can be found; the values live only where stated.
 | `AI_DAILY_MAX`, `AI_MONTHLY_MAX`, `RATE_LIMIT` | Spending and request limits. |
 | `PIXABAY_API_KEY`, `PEXELS_API_KEY`, `UNSPLASH_ACCESS_KEY`, `YOUTUBE_API_KEY` | Photo search and video descriptions (Openverse needs none). |
 | `GEMINI_API_KEY` (optional), `GEMINI_MODEL`, `VIDEO_DAILY_MAX`, `VIDEO_MAX_MB` | v43/v44 — the recipe said and shown in a YouTube video (`video-recipe`) or in a video file such as a screen-recorded reel (`?action=video-file`, deleted from Google after reading). Keep the key's Google project without billing. |
+| `RESEND_API_KEY`, `MAIL_FROM` (optional), `RESEND_DAILY_QUOTA` / `RESEND_MONTHLY_QUOTA` (optional) | v98/v99 — the recipe e-mails through Resend: the key (Sending access); the sending address (default "recipes" at the community domain); the plan's quotas if not the free 100 a day / 3,000 a month. GitHub secrets, set on the Worker by "Deploy the Worker". |
 | `BRING_API_KEY`, `BRING_USER_UUID`, `BRING_LIST_UUID`, `BRING_COUNTRY`, `BRING_TOKEN`, `BRING_SETTOKEN_SECRET`, KV `BRING_KV` | Bring! — the household's own list, directly (`bringDirect`). Best stored as *Secret* type. KV `BRING_KV` also holds, for 15 minutes, the pages Bring!'s official import reads (v42, feature `bring`, any user, no token). |
 
 **Per-copy app settings** — `#appConfig` in `index.html` (the family's copy)
@@ -132,4 +134,5 @@ root's Pages setting.
 | The Worker | No AI, photo search, URL import or Bring!; recipes, sync and sign-in still work. |
 | Firebase | No sync or sign-in; the app works from the device and catches up later. |
 | Cloudflare Pages | Only the test copy is affected. |
+| Resend | Recipe e-mails are not sent: members are told and can use the share menu or Copy (a recipe), or their own mail (a sent recipe's link). The owner is warned (bar, e-mail, phone) at most once a day. |
 | An employer-managed iPhone blocking github.com | The `whatsapp/` folder cannot be listed there; chats travel through Firestore instead. The Worker is **never** used to get around such a block. |

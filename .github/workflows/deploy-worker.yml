@@ -113,6 +113,8 @@ jobs:
       # (Worker v90; a fine-grained token for that repository only: Contents, Issues, Pull requests).
       # 29 Oct 2026 — and the e-mail service's key (Worker v98: 📤 Share → ✉️ Email sent by the server, through Resend;
       # MAIL_FROM, optional, the sending address on the domain verified there — "recipes" at the community domain if unset).
+      # Worker v99 warns the owner at 70% of Resend's quotas: RESEND_DAILY_QUOTA / RESEND_MONTHLY_QUOTA, optional, only when
+      # the plan is not the free one (100 a day, 3,000 a month).
       - name: WhatsApp, the hourly check, the photo libraries and the reports repository
         if: steps.token.outputs.ok == 'true'
         env:
@@ -128,8 +130,10 @@ jobs:
           PUSHOVER_USER: ${{ secrets.PUSHOVER_USER }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           MAIL_FROM: ${{ secrets.MAIL_FROM }}
+          RESEND_DAILY_QUOTA: ${{ secrets.RESEND_DAILY_QUOTA }}
+          RESEND_MONTHLY_QUOTA: ${{ secrets.RESEND_MONTHLY_QUOTA }}
         run: |
-          for name in WHATSAPP_PHONE WHATSAPP_KEY CF_ANALYTICS_TOKEN PEXELS_API_KEY UNSPLASH_ACCESS_KEY REPORTS_GITHUB_TOKEN NTFY_TOPIC NTFY_TOKEN PUSHOVER_TOKEN PUSHOVER_USER RESEND_API_KEY MAIL_FROM; do
+          for name in WHATSAPP_PHONE WHATSAPP_KEY CF_ANALYTICS_TOKEN PEXELS_API_KEY UNSPLASH_ACCESS_KEY REPORTS_GITHUB_TOKEN NTFY_TOPIC NTFY_TOKEN PUSHOVER_TOKEN PUSHOVER_USER RESEND_API_KEY MAIL_FROM RESEND_DAILY_QUOTA RESEND_MONTHLY_QUOTA; do
             value="${!name}"
             if [ -n "$value" ]; then printf '%s' "$value" | npx --yes wrangler@4 secret put "$name" --config worker/wrangler.jsonc >/dev/null; echo "$name is set"
             else echo "::notice::$name is not set (Settings → Secrets and variables → Actions) — left as it is"; fi

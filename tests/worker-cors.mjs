@@ -1277,6 +1277,14 @@ console.log('\nAI per household (v60):');
     f = await fb({ action: 'meter-admin', op: 'allowances', idToken: famOwner }, ORIGIN);
     expect('v83: the owner\'s 🩺 page reads today\'s count, per copy', f.status === 200 && f.d.appReads && f.d.appReads.byProject['tonys-recipes-test'] === 35800
       && f.d.appReads.limit === 50000 && /^\d{4}-\d\d-\d\d$/.test(f.d.appReads.day), JSON.stringify(f.d && f.d.appReads));
+    expect('v99: …no recipe e-mails on a server without the e-mail key', f.d.mail && f.d.mail.set === false, JSON.stringify(f.d && f.d.mail));
+    db.raw.prepare("INSERT INTO counters (k, n, until) VALUES (?, 7, 0)").run('mail:' + new Date().toISOString().slice(0, 10));
+    db.raw.exec("CREATE TABLE IF NOT EXISTS owner_prefs (k TEXT PRIMARY KEY, v TEXT)");
+    db.raw.prepare("INSERT INTO owner_prefs (k, v) VALUES ('resend_usage', ?) ON CONFLICT (k) DO UPDATE SET v = excluded.v").run(JSON.stringify({ day: 9, month: 310, at: Date.now() - 60e3 }));
+    const fm = await (await worker.fetch(post({ action: 'meter-admin', op: 'allowances', idToken: famOwner }, ORIGIN), Object.assign({}, envM, { RESEND_API_KEY: 're_k' }))).json();
+    expect('v99: …with it: today\'s recipe e-mails of the 90, 15 each, and Resend\'s figures at the last one', fm.mail && fm.mail.set === true && fm.mail.today === 7 && fm.mail.max === 90 && fm.mail.perPerson === 15
+      && fm.mail.resend && fm.mail.resend.day === 9 && fm.mail.resend.month === 310 && fm.mail.resendDayMax === 100 && fm.mail.resendMonthMax === 3000, JSON.stringify(fm.mail));
+    db.raw.exec("DELETE FROM counters WHERE k LIKE 'mail:%'");
     // v87 — the sign-in-link e-mails (Tony: "We are collecting stats about it, right?"): each counted per copy and day.
     f = await fb({ action: 'link-sent', project: 'nowhere' });
     expect('v87: a link is counted only for a copy this server serves', f.status === 400, JSON.stringify(f));
@@ -1585,8 +1593,8 @@ console.log('\nAI per household (v60):');
       && /PUSHOVER_USER/.test(ta.pushoverWhy) && !/uKey456|aTok123/.test(ta.pushoverWhy), JSON.stringify(ta));
     // v85 — each kind of alert on WhatsApp, or not: all on by default, e-mail never affected.
     let ap = await (await worker.fetch(post({ action: 'meter-admin', op: 'alert-prefs', idToken: comOwner, device: 'dev-DDDD4444' }, TEST_ORIGIN), envWa)).json();
-    expect('v85: nine kinds of alert (v97: someone asking for an invitation), all on WhatsApp by default', ap.ok === true && ap.kinds.length === 9 && ap.kinds.every(k => k.on === true) && ap.whatsappSet === true
-      && ap.kinds.map(k => k.key).join() === 'new-device,owner-action,near-limit,limit-reached,ai-service,household-ai,server-errors,usage-check,invite-ask', JSON.stringify(ap));
+    expect('v85: ten kinds of alert (v97: someone asking for an invitation; v99: recipe e-mails), all on WhatsApp by default', ap.ok === true && ap.kinds.length === 10 && ap.kinds.every(k => k.on === true) && ap.whatsappSet === true
+      && ap.kinds.map(k => k.key).join() === 'new-device,owner-action,near-limit,limit-reached,ai-service,household-ai,server-errors,usage-check,invite-ask,mail-service', JSON.stringify(ap));
     const apNo = await worker.fetch(post({ action: 'meter-admin', op: 'alert-prefs', idToken: tA }, TEST_ORIGIN), envWa);
     expect('v85: …only the owner reads or sets them', apNo.status === 403, 'got ' + apNo.status);
     ap = await (await worker.fetch(post({ action: 'meter-admin', op: 'alert-prefs-set', prefs: { 'new-device': false, 'owner-action': true, bogus: false }, idToken: comOwner, device: 'dev-DDDD4444' }, TEST_ORIGIN), envWa)).json();
@@ -2192,7 +2200,7 @@ console.log('\nAsking for an invitation (v97):');
   expect('v97: three a day from one network address, then refused', a.status === 429 && a.d.rateLimited === true, JSON.stringify(a));
 }
 
-console.log('\nA recipe e-mailed by the server (v98):');
+console.log('\nA recipe e-mailed by the server (v98), the owner warned when it runs short or fails, a sent recipe e-mailed (v99):');
 {
   const { DatabaseSync } = await import('node:sqlite');
   const raw = new DatabaseSync(':memory:');
@@ -2209,26 +2217,49 @@ console.log('\nA recipe e-mailed by the server (v98):');
     const head = b64u({ alg: 'RS256', kid: 'm1' }), bd = b64u(c);
     const sig = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', kp.privateKey, new TextEncoder().encode(head + '.' + bd));
     return head + '.' + bd + '.' + Buffer.from(sig).toString('base64url'); };
-  const sentMail = []; let refuseInline = false, serviceDown = false;
+  const sentMail = []; let refuseInline = false, serviceDown = false, answers = [], quotaHeaders = null;
   const fakeFetch = async (url, init) => {
     if (String(url) !== 'https://api.resend.com/emails') throw new Error('unexpected ' + url);
     if (serviceDown) return new Response('{"message":"down"}', { status: 500 });
+    const next = answers.shift();   // v99 — what Resend says next: an error, or its quota headers
+    if (next === 'unreachable') throw new Error('connect ECONNREFUSED');
+    if (next) return new Response(JSON.stringify(next.body), { status: next.status });
     const b = JSON.parse(init.body);
     if (refuseInline && b.attachments && b.attachments.some(a => a.content_id)) return new Response('{"message":"Invalid `content_id`"}', { status: 422 });
     sentMail.push({ auth: init.headers.Authorization, b });
-    return new Response('{"id":"e1"}', { status: 200 });
+    return new Response('{"id":"e1"}', { status: 200, headers: quotaHeaders || {} });
+  };
+  const future = new Date(Date.now() + 20 * 864e5).toISOString(), past = new Date(Date.now() - 864e5).toISOString();
+  const gifts = {
+    gGOODgoodGOODgood0001: { from: 'hM', to: '', name: 'Grandma’s <Soup>', note: 'The one from Friday "with" love', expireAt: future, photo: 'data:image/jpeg;base64,' + Buffer.from('soup jpeg').toString('base64') },
+    gOLDoldOLDoldOLDold01: { from: 'hM', to: '', name: 'Old', note: '', expireAt: past },
+    gOTHERotherOTHERoth01: { from: 'hZ', to: '', name: 'Not ours', note: '', expireAt: future },
+    gAPPappAPPappAPPapp01: { from: 'hM', to: 'hK', name: 'To a kitchen', note: '', expireAt: future }
   };
   const realFetch = globalThis.fetch;
   globalThis.fetch = async (url, init) => {
     url = String(url);
     if (url.startsWith('https://fs.mail/')) {
+      const gm = /\/(recipeGifts|recipeGiftPhotos)\/([A-Za-z0-9]+)$/.exec(url);
+      if (gm) {
+        const g = gifts[gm[2]];
+        if (!g || (init && init.headers && init.headers.Authorization) === 'Bearer x' || Date.parse(g.expireAt) < Date.now()) return new Response('{}', { status: 403 });
+        if (gm[1] === 'recipeGiftPhotos') return g.photo ? new Response(JSON.stringify({ fields: { from: { stringValue: g.from }, data: { stringValue: g.photo } } }), { status: 200 }) : new Response('{}', { status: 404 });
+        return new Response(JSON.stringify({ fields: { from: { stringValue: g.from }, to: { stringValue: g.to }, name: { stringValue: g.name }, note: { stringValue: g.note },
+          expireAt: { timestampValue: g.expireAt } } }), { status: 200 });
+      }
       const m = /households\/([^/]+)(?:\/members\/([^/?]+))?$/.exec(url);
       if (m[2]) return new Response(m[1] === 'hM' && m[2] === 'uM' ? '{"fields":{"role":{"stringValue":"editor"}}}' : '{}', { status: m[1] === 'hM' && m[2] === 'uM' ? 200 : 403 });
       return new Response(JSON.stringify({ fields: { name: { stringValue: 'Tony’s "Kitchen" <Notes>' }, code: { stringValue: 'MKN-MMMM-2222' } } }), { status: 200 });
     }
     return realFetch(url, init);
   };
-  const env = { METER_DB: db, RESEND_API_KEY: 're_test', __testKeys: { m1: Object.assign({ kid: 'm1' }, pub) }, __firestoreBase: 'https://fs.mail', __fetch: fakeFetch };
+  class FakeEmail { constructor(from, to, raw) { this.from = from; this.to = to; this.raw = raw; } }
+  const alerts = [];
+  const env = { METER_DB: db, RESEND_API_KEY: 're_test', __testKeys: { m1: Object.assign({ kid: 'm1' }, pub) }, __firestoreBase: 'https://fs.mail', __fetch: fakeFetch,
+    ALERTS: { send: async m => { alerts.push(m); } }, ALERT_TO: 'owner@example.com', __EmailMessage: FakeEmail };
+  const notice = (what) => db.raw.prepare('SELECT * FROM allowance_notices WHERE what = ?').get(what) || null;
+  const alertSubj = () => alerts.map(m => (/^Subject: (.*)$/m.exec(m.raw) || [])[1] || '');
   const photo = 'data:image/jpeg;base64,' + Buffer.from('a tiny jpeg').toString('base64');
   const recipe = { name: 'החומוס של טוני', rtl: true, meta: ['Dinner', 'Medium'], ingredients: [{ a: '500 g', n: 'chickpeas <script>' }, { a: '', n: '**tahini**' }],
     steps: ['Soak overnight.', 'Cook until **soft**.'], notes: 'Serve warm', source: 'https://example.com/r' };
@@ -2271,7 +2302,95 @@ console.log('\nA recipe e-mailed by the server (v98):');
     a = await mail({ idToken: t }, Object.assign({}, env, { RESEND_API_KEY: '' }));
     expect('v98: no key on the server: "not set up yet"', a.status === 503 && a.d.needsConfig === true, JSON.stringify(a));
     const h = await (await worker.fetch(post({ action: 'health' }), env)).json();
-    expect('v98: health says e-mail can be sent', h.mail === true && h.version === 'v98', JSON.stringify([h.mail, h.version]));
+    expect('v98: health says e-mail can be sent', h.mail === true && h.version === 'v99', JSON.stringify([h.mail, h.version]));
+
+    // v99 — the owner hears of it (Tony: "make sure I get a warning if quota is exceeded or if any issues arise")
+    let nt = notice('mail-down');
+    expect('v99: the service failing: a warning for the owner, and an e-mail', nt && nt.kind === 'warning' && nt.scope === 'owner' && /failing \(500\)/.test(nt.title)
+      && alertSubj().some(x => /warning - The e-mail service \(Resend\) is failing/.test(x)), JSON.stringify([nt, alertSubj()]));
+    nt = notice('mail-person');
+    expect('v99: someone reaching their 15 a day: a warning naming the kitchen, not the person', nt && nt.kind === 'warning' && /Tony’s Kitchen Notes/.test(nt.detail) && !/cook@example/.test(nt.detail), JSON.stringify(nt));
+    db.raw.exec('DELETE FROM counters');
+    let a0 = alerts.length;
+    answers = [{ status: 429, body: { statusCode: 429, name: 'daily_quota_exceeded', message: 'You have reached your daily email quota.' } }];
+    a = await mail({ idToken: t });
+    nt = notice('mail-resend-day');
+    expect('v99: Resend\'s daily quota used up: the member is told kindly, the owner warned (paused), nothing counted', a.status === 429 && a.d.rateLimited === true && /all its e-mails for today/.test(a.d.error)
+      && nt && nt.kind === 'paused' && /daily quota/.test(nt.title) && alerts.length === a0 + 1 && !db.raw.prepare("SELECT 1 FROM counters WHERE k LIKE 'mail:%' AND n > 0").get(), JSON.stringify([a, nt]));
+    answers = [{ status: 429, body: { statusCode: 429, name: 'monthly_quota_exceeded', message: 'You have reached your monthly email quota.' } }];
+    a = await mail({ idToken: t });
+    nt = notice('mail-resend-month');
+    expect('v99: …and the monthly one', a.status === 429 && /this month/.test(a.d.error) && nt && nt.kind === 'paused' && /monthly quota/.test(nt.title), JSON.stringify([a, nt]));
+    answers = [{ status: 403, body: { statusCode: 403, name: 'invalid_api_key', message: 'API key is invalid' } }];
+    a = await mail({ idToken: t });
+    nt = notice('mail-key');
+    expect('v99: the key refused: what to do (a new key, the GitHub secret, re-run the deploy) — never the key', a.status === 502 && nt && nt.kind === 'paused' && nt.self === 0
+      && /RESEND_API_KEY/.test(nt.detail) && /Deploy the Worker/.test(nt.detail) && !/re_test/.test(nt.detail + nt.title + alerts.map(m => m.raw).join()), JSON.stringify(nt));
+    answers = [{ status: 403, body: { statusCode: 403, name: 'validation_error', message: 'The mykitchennotes.community domain is not verified. Please, add and verify your domain.' } }];
+    a = await mail({ idToken: t });
+    nt = notice('mail-domain');
+    expect('v99: the domain no longer verified: said, with where to look', a.status === 502 && nt && nt.kind === 'paused' && /Domains/.test(nt.detail) && /not verified/.test(nt.detail), JSON.stringify(nt));
+    answers = [{ status: 451, body: { statusCode: 451, name: 'security_error', message: 'held' } }];
+    a = await mail({ idToken: t });
+    expect('v99: a security hold: said', a.status === 502 && notice('mail-blocked') && notice('mail-blocked').kind === 'paused', JSON.stringify(notice('mail-blocked')));
+    answers = [{ status: 422, body: { statusCode: 422, name: 'invalid_parameter', message: 'Invalid `to` field: dana@example.com' } }];
+    a = await mail({ idToken: t });
+    nt = notice('mail-refused');
+    expect('v99: anything else refused: a warning — the address in it hidden', a.status === 502 && nt && nt.kind === 'warning' && /\(an address\)/.test(nt.detail) && !/dana@example/.test(nt.detail), JSON.stringify(nt));
+    answers = ['unreachable'];
+    db.raw.exec("DELETE FROM allowance_notices WHERE what = 'mail-down'");
+    a = await mail({ idToken: t, photo: '' });
+    expect('v99: the service not reached at all: a warning too', a.status === 502 && notice('mail-down') && /could not be reached/.test(notice('mail-down').title), JSON.stringify([a, notice('mail-down')]));
+    let s0 = sentMail.length;
+    answers = [{ status: 429, body: { statusCode: 429, name: 'rate_limit_exceeded', message: 'Too many requests.' } }];
+    a = await mail({ idToken: t });
+    expect('v99: too many at once: tried once more a second later, and sent — no warning', a.status === 200 && sentMail.length === s0 + 1 && !notice('mail-busy'), JSON.stringify(a));
+    // Resend's own count, from its headers, warned at 70%; kept for 🩺 Server allowances
+    quotaHeaders = { 'x-resend-daily-quota': '71', 'x-resend-monthly-quota': '2205' };
+    db.raw.exec("DELETE FROM allowance_notices WHERE what IN ('mail-resend-day', 'mail-resend-month')");
+    a = await mail({ idToken: t });
+    const rd = notice('mail-resend-day'), rm = notice('mail-resend-month');
+    expect('v99: Resend\'s count past 70% (day and month): warnings with the figures', a.status === 200 && rd && rd.kind === 'warning' && /71 of 100/.test(rd.detail) && rm && rm.kind === 'warning' && /2,205 of 3,000/.test(rm.detail), JSON.stringify([rd, rm]));
+    quotaHeaders = { 'x-resend-daily-quota': '12', 'x-resend-monthly-quota': '40' };
+    // the app's own day: 70% of 90 warned, all 90 stopped (and said again, being worse)
+    const today = new Date().toISOString().slice(0, 10);
+    db.raw.prepare('INSERT INTO counters (k, n, until) VALUES (?, 62, 0) ON CONFLICT (k) DO UPDATE SET n = 62').run('mail:' + today);
+    a0 = alerts.length;
+    a = await mail({ idToken: t });
+    nt = notice('mail-day');
+    expect('v99: the 63rd of the app\'s 90 today: a warning', a.status === 200 && nt && nt.kind === 'warning' && /63 of the 90/.test(nt.detail) && alerts.length === a0 + 1, JSON.stringify([nt, alerts.length - a0]));
+    db.raw.prepare('UPDATE counters SET n = 90 WHERE k = ?').run('mail:' + today);
+    a = await mail({ idToken: t });
+    nt = notice('mail-day');
+    expect('v99: all 90 sent: refused, and the owner told again (now stopped)', a.status === 429 && nt && nt.kind === 'paused' && alerts.length === a0 + 2 && /paused - Recipe e-mails stopped for today/.test(alertSubj().pop()), JSON.stringify([nt, alertSubj().slice(-2)]));
+    // Resend's last figures, kept for 🩺 Server allowances (read there: see v83/v87 above)
+    const ru = JSON.parse((db.raw.prepare("SELECT v FROM owner_prefs WHERE k = 'resend_usage'").get() || {}).v || 'null');
+    expect('v99: Resend\'s last figures kept for 🩺 Server allowances', ru && ru.day === 12 && ru.month === 40 && ru.at > Date.now() - 60e3, JSON.stringify(ru));
+    db.raw.exec('DELETE FROM counters');
+
+    // v99 — 📨 Send to another kitchen → ✉️ Via Email, by the server
+    s0 = sentMail.length;
+    const gift = (body) => mail(Object.assign({ idToken: t, recipe: { name: 'Not this' }, subject: 'Not this either', photo: '', site: 'https://mykitchennotes.community/' }, body));
+    a = await gift({ gift: 'gGOODgoodGOODgood0001' });
+    const gm = sentMail[s0] && sentMail[s0].b, link = 'https://mykitchennotes.community/?recipe=gGOODgoodGOODgood0001#for=dana%40example.com';
+    expect('v99: a sent recipe e-mailed by the server: its own name in the subject (not the request\'s)', a.status === 200 && gm && gm.subject === 'A recipe for you: Grandma’s <Soup>' && gm.to[0] === 'dana@example.com' && gm.reply_to === 'cook@example.com', JSON.stringify(gm && [gm.subject, gm.to]));
+    expect('v99: …the button and the link: this app\'s address, the address it went to after #', gm && gm.html.indexOf('href="' + link + '"') > -1 && gm.text.indexOf(link) > -1 && /Open the recipe/.test(gm.html), gm && gm.html.slice(0, 200));
+    expect('v99: …its photo (read from the database) inside, its note quoted, every word escaped', gm && gm.attachments && gm.attachments[0].content_id === 'recipe-photo' && gm.attachments[0].content === Buffer.from('soup jpeg').toString('base64')
+      && /Grandma’s &lt;Soup&gt;/.test(gm.html) && /The one from Friday &quot;with&quot; love/.test(gm.html) && !/<Soup>/.test(gm.html) && !/Not this/.test(gm.html + gm.text), gm && gm.html);
+    expect('v99: …from the kitchen, via My Kitchen Notes', gm && /^"Tony’s Kitchen Notes via My Kitchen Notes"/.test(gm.from), gm && gm.from);
+    a = await gift({ gift: 'gOLDoldOLDoldOLDold01' });
+    expect('v99: an expired one: refused', a.status === 403 && sentMail.length === s0 + 1, JSON.stringify(a));
+    a = await gift({ gift: 'gOTHERotherOTHERoth01' });
+    expect('v99: another kitchen\'s: refused', a.status === 403 && sentMail.length === s0 + 1, JSON.stringify(a));
+    a = await gift({ gift: 'gAPPappAPPappAPPapp01' });
+    expect('v99: one sent through the app (not a link): refused', a.status === 403, JSON.stringify(a));
+    a = await gift({ gift: 'nope' });
+    expect('v99: not an id: refused', a.status === 400, JSON.stringify(a));
+    for (const site of ['https://phish.example/', 'javascript:alert(1)//', 'https://mykitchennotes.community/?x=1', 'https://web.getbring.com/', 'http://mykitchennotes.community/', 'https://mykitchennotes.community/a b/'])
+      expect('v99: a link to anywhere but this app refused: ' + site, (await gift({ gift: 'gGOODgoodGOODgood0001', site })).status === 400 && sentMail.length === s0 + 1, site);
+    a = await gift({ gift: 'gGOODgoodGOODgood0001', site: 'https://rozinante2004-hash.github.io/tonys-recipes/' });
+    expect('v99: the family app\'s address, with its path', a.status === 200 && sentMail[s0 + 1].b.text.indexOf('https://rozinante2004-hash.github.io/tonys-recipes/?recipe=gGOODgoodGOODgood0001#for=') > -1, JSON.stringify(a));
+    expect('v99: these count in the same daily limits', db.raw.prepare('SELECT n FROM counters WHERE k = ?').get('mail:' + today).n === 2, '');
   } finally { globalThis.fetch = realFetch; }
 }
 

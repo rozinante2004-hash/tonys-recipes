@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.15 -->
+<!-- Tony's Recipes Collection v39.16 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -4443,6 +4443,20 @@ function serverAllowanceItems(d) {
       { t: 'Days all ' + lim5 + ' were used', v: String(x.full) },
       { t: 'Days someone was turned away', v: String(x.refused) });
   });
+  // v39.16 — the recipe e-mails the server sends through Resend (Worker v99): the app's own day, and Resend's count as
+  // its last answer gave it (received e-mails count there too). The owner is warned at 70% and when one runs out.
+  var ml = d && d.mail;
+  if (ml && ml.set) {
+    var mMax = ml.max || 90, mPct = Math.round(100 * (ml.today || 0) / mMax), rs = ml.resend;
+    out.push({ gap: true }, { h: 'Recipe e-mails (sent by the server through Resend):' },
+      { mark: mark(mPct, mPct >= 100), t: 'Today (the app’s own limit; the day began at ' + hm(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), new Date().getUTCDate())) + ')',
+        v: (ml.today || 0) + ' of ' + mMax + ' (' + mPct + '%) — ' + (ml.perPerson || 15) + ' a day for each person' });
+    if (rs && rs.at) {
+      var rWhen = new Date(rs.at).toLocaleString(undefined, { weekday: 'short', hour: '2-digit', minute: '2-digit' });
+      if (rs.day != null) { var rdP = Math.round(100 * rs.day / (ml.resendDayMax || 100)); out.push({ mark: mark(rdP, rdP >= 100), t: 'Resend’s day (free plan)', v: rs.day + ' of ' + (ml.resendDayMax || 100) + ' (' + rdP + '%) — at the last e-mail, ' + rWhen }); }
+      if (rs.month != null) { var rmP = Math.round(100 * rs.month / (ml.resendMonthMax || 3000)); out.push({ mark: mark(rmP, rmP >= 100), t: 'Resend’s month', v: rs.month.toLocaleString() + ' of ' + (ml.resendMonthMax || 3000).toLocaleString() + ' (' + rmP + '%) — at the last e-mail, ' + rWhen }); }
+    } else out.push({ t: 'Resend’s own count', v: 'shown after the next e-mail is sent' });
+  }
   // v38.67 — Google lets Cloud Monitoring be read only with billing on (20 Oct: "This API method requires billing to be enabled")
   if (!m.firestoreReads) out.push({ gap: true }, { p: 'Firebase’s own count cannot be read on the free plan (Google asks for billing to be switched on for that). The apps count their own reads instead (above): you are warned at 70%, and if the allowance runs out the app that meets it says so and you are e-mailed.' });
   out.push({ gap: true }, { p: 'Firebase’s day begins at midnight in California: ' + hm(nextPacificMidnight(Date.now())) + ' your time.' });
@@ -7150,17 +7164,18 @@ async function openSendRecipe(rid) {
     if (step === 1) {
       how = await askChoice('“' + r.name + '” — a copy, with its photo, that they save to their recipes with one tap. It keeps for 4 weeks.', [
           { value: 'app', primary: true, label: '\u{1F4E8} Via My Kitchen Notes (recommended)', title: 'To another kitchen, by its identifier (MKN-…): it pops up in their app' },
-          { value: 'email', label: '✉️ Via Email', title: 'An e-mail with a link to the recipe: your mail app, Gmail or Outlook' },
+          { value: 'email', label: '✉️ Via Email', title: 'The app e-mails them its photo and a button to save it — no mail program needed' },
           { value: 'wa', label: '\u{1F4AC} Via WhatsApp', title: 'A WhatsApp message with a link to the recipe' }]
         .concat(navigator.share ? [{ value: 'share', label: '\u{1F4E4} Via another app', title: 'Your phone’s share menu, with a link to the recipe' }] : [])
         .concat([{ value: 'copy', label: '\u{1F517} Copy the link', title: 'Copies a message with a link to the recipe, to paste wherever you like' }]),
         { icon: '\u{1F4E4}', title: 'Send this recipe', cancelLabel: 'Cancel' });
       if (!how || how === ASK_BACK) return made;
-      step = how === 'app' ? 2 : how === 'email' ? 3 : 4; continue;
+      mailHow = '';
+      step = how === 'app' ? 2 : how === 'email' ? 6 : 4; continue;   // v39.16 — by e-mail: the address, then the app sends it
     }
     if (step === 2) {
       var a = await askConfirm({ icon: '\u{1F4E8}', title: 'To which kitchen?', backLabel: '‹ Back',
-        message: 'Type their kitchen’s identifier (MKN-…). They find it in ⚙️ → \u{1F3E0} My household → \u{1FAAA} Display my personal identifier.',
+        message: 'Type their kitchen’s identifier (MKN-…). They find it at the top of their main screen (\u{1FAAA} MKN-…) — a click copies it.',
         input: code, placeholder: 'MKN-XXXX-XXXX', okLabel: 'Next ›' });
       if (a === ASK_BACK) { step = 1; continue; }
       if (typeof a !== 'string' || !a.trim()) return made;
@@ -7168,24 +7183,23 @@ async function openSendRecipe(rid) {
       if (!tg || !tg.code) { await askConfirm({ icon: '\u{1F4E8}', title: 'Not an identifier', message: 'A kitchen’s identifier looks like MKN-XXXX-XXXX.', okLabel: 'OK' }); code = a.trim(); continue; }
       code = tg.code; step = 4; continue;
     }
-    if (step === 3) {
-      mailHow = await askChoice('Send it by e-mail, with:', [
+    if (step === 3) {                                             // v39.16 — only when the app could not send it: their own mail
+      mailHow = await askChoice('Send the link from your own mail, with:', [
         { value: 'mail', label: '✉️ My default mail app' }, { value: 'gmail', label: 'Gmail' }, { value: 'outlook', label: 'Outlook' }],
-        { icon: '✉️', title: 'Via Email', backLabel: '‹ Back', cancelLabel: 'Cancel' });
-      if (mailHow === ASK_BACK) { step = 1; continue; }
-      if (!mailHow) return made;
-      step = 6; continue;
+        { icon: '✉️', title: 'Via Email', cancelLabel: 'Cancel' });
+      if (!mailHow || mailHow === ASK_BACK) return made;
+      step = 5; continue;
     }
-    if (step === 6) {                                             // v39.11 — whom to: the To filled in, and their invitation request
-      var em = await askConfirm({ icon: '✉️', title: 'Their e-mail address (optional)', backLabel: '‹ Back',
-        message: 'Fills in the To. If they have no kitchen yet, asking for an invitation from the recipe then needs no typing.',
+    if (step === 6) {                                             // v39.11 — whom to; v39.16 — needed now: the app sends it
+      var em = await askConfirm({ icon: '✉️', title: 'Their e-mail address', backLabel: '‹ Back',
+        message: 'The app e-mails them the recipe’s photo and a button to open it and save it — from your kitchen’s name, their reply coming to you. If they have no kitchen yet, they can ask for an invitation without typing their address again.',
         input: toMail, inputType: 'email', placeholder: 'name@example.com', okLabel: 'Next ›' });
-      if (em === ASK_BACK) { step = 3; continue; }
+      if (em === ASK_BACK) { step = 1; continue; }
       if (typeof em !== 'string') return made;
       em = em.trim();
-      if (em && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(em)) { toMail = em; await askConfirm({ icon: '✉️', title: 'Not an e-mail address', message: 'Type their address, or leave it empty.', okLabel: 'OK' }); continue; }
+      if (!/^[^\s@<>"',;:]+@[^\s@<>"',;:]+\.[^\s@<>"',;:]{2,}$/.test(em)) { toMail = em; await askConfirm({ icon: '✉️', title: em ? 'Not an e-mail address' : 'To whom?', message: 'Type their e-mail address — one address.', okLabel: 'OK' }); continue; }
       toMail = em;
-      step = made ? 5 : 4; continue;
+      step = 4; continue;
     }
     if (step === 4) {
       var n = await askConfirm({ icon: '\u{1F4AC}', title: 'Add a note? (optional)', backLabel: '‹ Back',
@@ -7214,6 +7228,12 @@ async function openSendRecipe(rid) {
       try { made = await giftSend(r, { via: how === 'email' ? 'email' : how === 'wa' ? 'whatsapp' : 'link', note: note }); }
       catch(e) { await askConfirm({ icon: '\u{1F4E8}', title: 'Not sent', message: giftErrText(e), okLabel: 'OK' }); return null; }
     }
+    if (how === 'email' && !mailHow) {                            // v39.16 — sent by the server, like ✉️ Email (Worker v99)
+      var sent = await giftMailByServer(made, toMail);
+      if (sent.ok) { toast('✉️ E-mailed to ' + toMail + ', with its photo and a button to save it. ⋯ More → \u{1F4E4} Recipes I sent shows when it is saved.', 9000, openGiftsOut); return made; }
+      await askConfirm({ icon: '✉️', title: 'Not e-mailed', message: 'The app could not send the e-mail: ' + sent.why + '\n\nThe link is ready — you can send it from your own mail instead.', okLabel: 'Next ›' });
+      step = 3; continue;
+    }
     var kname = _household.name || 'My kitchen', mailTo = how === 'email' ? toMail : '';
     var text = kname + ' sent you a recipe for “' + made.name + '” from My Kitchen Notes'
       + (note.trim() ? ': “' + note.trim() + '”' : '.')
@@ -7225,6 +7245,25 @@ async function openSendRecipe(rid) {
   }
   return made;
 }
+// v39.16 — 📨 Send to another kitchen → ✉️ Via Email, sent by the server (Tony, 29 Oct: "Can we use the same Resend .com
+// mailing mechanism when sharing between kitchens via email?"). The server reads the sent recipe itself (its name,
+// note and photo) and builds the link on this copy's own address; the same 15 a day per person and 90 in all.
+async function giftMailByServer(made, to) {
+  if (!window._fbUser || !_household || typeof _fbUser.getIdToken !== 'function') return { ok: false, why: 'you are not signed in' };
+  try {
+    var resp = await fetch(WORKER_ENDPOINT, { method: 'POST', headers: workerHeaders(), signal: AbortSignal.timeout(40000),
+      body: workerBody({ action: 'mail-recipe', idToken: await _fbUser.getIdToken(), hid: _household.hid, to: to, gift: made.id,
+        site: APP_CONFIG.siteOrigin + APP_CONFIG.sitePath }) });
+    var d = {}; try { d = await resp.json(); } catch(e) {}
+    if (resp.ok && d.ok) {
+      syncLog('save', 'E-mailed a sent recipe', { name: made.name });
+      if (typeof insightCount === 'function') try { insightCount('recipe-mailed'); } catch(e) {}
+      return { ok: true };
+    }
+    return { ok: false, why: d.needsConfig ? 'e-mailing from the app is not switched on yet.' : String(d.error || ('the server answered ' + resp.status)).replace(/^MAIL:\s*/, '') };
+  } catch(e) { return { ok: false, why: String((e && e.message) || e) }; }
+}
+window.giftMailByServer = giftMailByServer;
 function giftErrText(e) {
   var m = (e && e.message) || String(e);
   if (e && e.code === 'permission-denied') return 'The server refused it. If your kitchen was renamed on another device, reload the app and try again.';
@@ -7963,6 +8002,7 @@ window.householdAnswerAsk = householdAnswerAsk;
 // household is called) instead of the family's title. Names are data: never
 // translated.
 function householdBrand() {
+  idBadgeUpdate();   // v39.16
   if (!_household || !_household.name) return;
   var el = document.querySelector('.header .logo');
   var n = _household.name, m = /^(.*?)(Kitchen Notes|Recipes)(.*)$/.exec(n);
@@ -7987,6 +8027,32 @@ function kitchenFileStem() {
   return String(kitchenTitle()).replace(/['\u2019"]/g, '').replace(/[\\/:*?<>|]+/g, ' ').trim().replace(/\s+/g, '_').slice(0, 60) || 'Recipes';
 }
 window.kitchenFileStem = kitchenFileStem;
+// v39.16 — the identifier on the main screen (Tony: "Clicking it will copy it to the clipboard and will indicate so
+// once clicked", with a tooltip saying what it is). Shown while signed in to a household that has one.
+function idBadgeUpdate() {
+  var el = document.getElementById('idBadge'), code = (window._fbUser && _household && _household.code) || '';
+  if (!el) return '';
+  if (code) document.getElementById('idBadgeCode').textContent = code;
+  el.hidden = !code;
+  return code;
+}
+var _idBadgeTimer = null;
+function idBadgeCopy() {
+  var el = document.getElementById('idBadge'), code = (_household && _household.code) || '';
+  if (!el || !code) return Promise.resolve(false);
+  var done = function(ok) {
+    if (!ok) { openMyIdentifier(); return false; }                 // no clipboard here: the identifier, big, to select
+    var c = document.getElementById('idBadgeCode'), d = document.getElementById('idBadgeDone');
+    if (!el.classList.contains('id-copied')) el.style.minWidth = el.getBoundingClientRect().width + 'px';   // the same size while it says so
+    c.hidden = true; d.hidden = false; el.classList.add('id-copied');
+    clearTimeout(_idBadgeTimer);
+    _idBadgeTimer = setTimeout(function(){ c.hidden = false; d.hidden = true; el.classList.remove('id-copied'); el.style.minWidth = ''; }, 1800);
+    return true;
+  };
+  try { return navigator.clipboard.writeText(code).then(function(){ return done(true); }, function(){ return done(false); }); }
+  catch(e) { return Promise.resolve(done(false)); }
+}
+window.idBadgeUpdate = idBadgeUpdate; window.idBadgeCopy = idBadgeCopy;
 function householdCanManage() { return !!(_household && (_household.role === 'owner' || _household.role === 'admin')); }
 function householdRenderBar() {
   var bar = document.getElementById('householdBar');
@@ -10470,7 +10536,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.15';
+var APP_VERSION = 'v39.16';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -11627,6 +11693,15 @@ body.banner-shown #envRibbon.env-beta { padding-top: 2px; }
 .rb-ladder li.rb-later { color: var(--muted); opacity: .6; }
 .rb-bar { height: 8px; border-radius: 4px; background: var(--border); overflow: hidden; margin-top: 6px; }
 .rb-bar > i { display: block; height: 100%; background: linear-gradient(90deg, var(--gold), var(--terracotta-fill)); }
+/* v39.16 — the household's identifier, on the main screen: a click copies it, and the chip says so */
+.id-badge { flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; gap: 5px; padding: 3px 9px; border-radius: 12px; cursor: pointer;
+  background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.3); color: #FAF7F2;
+  font: 600 11px/1.4 ui-monospace, Menlo, Consolas, monospace; letter-spacing: .5px; white-space: nowrap; -webkit-tap-highlight-color: transparent; }
+.id-badge[hidden] { display: none; }
+.id-badge:hover { background: rgba(255,255,255,0.22); }
+.id-badge:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.id-badge .id-done { font-family: 'DM Sans', 'Heebo', sans-serif; letter-spacing: 0; }
+.id-badge.id-copied { background: rgba(46,125,50,0.85); border-color: rgba(255,255,255,0.55); }
 .header-actions { display: flex; gap: 6px; align-items: center; flex-wrap: nowrap; }
 .header-actions .btn { height: 36px; display: inline-flex; align-items: center; justify-content: center; padding: 0 13px; }
 @media (max-width: 600px) {
@@ -13788,7 +13863,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.15</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.16</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -13876,7 +13951,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.15</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.16</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -14081,6 +14156,12 @@ body.banner-shown .header {
   <div class="header-status" style="padding:0 1.5rem 8px;display:flex;align-items:center;gap:8px;">
     <div id="saveStatusDot" style="width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,0.25);flex-shrink:0;transition:background 0.3s;"></div>
     <span id="saveStatusBar" style="font-size:11px;color:rgba(255,255,255,0.72);flex:1;">Sign in to sync across devices</span>
+    <!-- v39.16 — Tony, 29 Oct 2026: "present the Identifier on the main screen. Clicking it will copy it to the clipboard
+         and will indicate so once clicked. It should also have a tool tip saying that this is your personal identifier
+         and that clicking it will copy it to the clipboard." In this row because it never slides away, phone or not. -->
+    <button type="button" id="idBadge" class="id-badge" hidden onclick="idBadgeCopy()"
+            title="Your personal identifier — click to copy it to the clipboard. Give it to people you know, so they can link their kitchen with yours or send you a recipe."
+            aria-label="Your personal identifier — click to copy it to the clipboard"><span aria-hidden="true">🪪</span><span id="idBadgeCode" data-no-i18n dir="ltr"></span><span id="idBadgeDone" class="id-done" hidden>✅ Copied!</span></button>
     <!-- v37.08 — "Reset" moved to ⚙️ (Tony: one tap from erasing this device
          does not belong in the header). -->
   </div>
@@ -31031,6 +31112,7 @@ function signOutNow() {
   if (_firestoreUnsubscribe) { _firestoreUnsubscribe(); _firestoreUnsubscribe = null; }
   if (window._fbAuth) window._fbAuth.signOut().catch(function(){});
   window._fbUser = null; window._driveMode = false;
+  if (typeof idBadgeUpdate === 'function') idBadgeUpdate();   // v39.16 — no identifier on show once signed out
   var banner = document.getElementById('refreshBanner');
   if (banner) banner.style.display = 'none';
   document.getElementById('signOutBtn').style.display = 'none';
@@ -32970,13 +33052,13 @@ var HELP_SYSTEM_PROMPT = [
   "- A new person is asked whether to start their own collection or join one they were invited to (paste the link).",
   "- DURING THE BETA, MY KITCHEN NOTES IS BY INVITATION ONLY: a new kitchen can be started only by someone the app's owner invited, signed in with the very address the invitation was sent to (forwarding the invitation lets nobody else in). Invited at another address? Sign out and sign in with that one.",
   "- To cook together with family or friends, invite them to YOUR kitchen: the 📲 share icon next to the language picker (or ⚙️ → 🏠 My household → 🔗 Invitation link…) makes a link that works for 14 days and lets them in with 👁 Read only; give them more once they have joined. Only the kitchen's owner and its managers can invite. Someone can also be added by e-mail in 👥 Family Access, or ask to join with your kitchen's identifier.",
-  "- LINK WITH ANOTHER HOUSEHOLD: ⋯ More → 🤝 Connect with another household (the owner, or someone with full access). Type that household's identifier (MKN-…; yours is in ⚙️ → 🏠 My household → 🪪 Display my personal identifier) or the e-mail address of anyone in it. Its owner or an admin is asked at once if the app is open (otherwise the next time they open it): Accept, Reject or Remind me later — with the note that came with it. By e-mail address the request also goes through the app — it pops up for that person if they use My Kitchen Notes, or waits until they join with that address (the app never says whether an address has an account); you may also tell them yourself: Via Email (your default mail app, Gmail or Outlook — if no mail app opens, choose your e-mail on the web), Via WhatsApp, or Copy message to Clipboard. The message has a link that opens the request in their app, to accept it. Every step has ‹ Back, with what you typed kept. A refusal is never shown to the sender.",
+  "- LINK WITH ANOTHER HOUSEHOLD: ⋯ More → 🤝 Connect with another household (the owner, or someone with full access). Type that household's identifier (MKN-…; yours is at the top of the main screen — 🪪 MKN-…, a click copies it — and in ⚙️ → 🏠 My household → 🪪 Display my personal identifier) or the e-mail address of anyone in it. Its owner or an admin is asked at once if the app is open (otherwise the next time they open it): Accept, Reject or Remind me later — with the note that came with it. By e-mail address the request also goes through the app — it pops up for that person if they use My Kitchen Notes, or waits until they join with that address (the app never says whether an address has an account); you may also tell them yourself: Via Email (your default mail app, Gmail or Outlook — if no mail app opens, choose your e-mail on the web), Via WhatsApp, or Copy message to Clipboard. The message has a link that opens the request in their app, to accept it. Every step has ‹ Back, with what you typed kept. A refusal is never shown to the sender.",
   "- A REQUEST SENT TO YOUR E-MAIL ADDRESS shows in 📬 Link requests only once that address is CONFIRMED (an account made with e-mail and a password must confirm it from the e-mail sent to it). Not confirmed yet? The Link requests page says so (\"is NOT confirmed yet\"), sends the confirmation e-mail again, and notices by itself, when opened, that it has been confirmed.",
   "- Once linked, each household sees the other's recipes, read-only — and live: a change in their kitchen shows in yours within seconds, the changed card glowing for a moment: after its own in the main list, under that household's name, on a faint blue (hover one: 'A recipe from …'). 🏠 Kitchens ▾ in the filter bar chooses whose recipes show — tick one, several or all. 📥 Save a copy to my recipes makes one your own. Links do not chain: a third household linked to theirs is not seen. Links are listed, and removed, in ⚙️ → 🏠 My household → 👥 Family Access. ⚙️ → 🏠 My household → 🤝 Link requests through the app: blocked stops requests by identifier; requests by e-mail always arrive.",
   "- 📬 LINK REQUESTS: ⚙️ → 🏠 My household → 📬 Link requests — the number in brackets beside it is how many wait for an answer. Every request in one place: Waiting (Accept / Reject / 🚫 Block), Sent by your household (Withdraw), Linked now (Revoke access), and earlier answers. A request may carry a note, and the two households can write to each other there — the latest message shows, highlighted, with ↩ Reply; earlier ones are under 💬 Conversation. Only the household's name is shown, never a person's. Reject is for now: if they ask again — by identifier or by e-mail — their request is back under Waiting. 🚫 Block is for good, until you Unblock it under the earlier answers; they are never told, and on their side it reads “waiting”. A new message or request arrives while the app is open: a red dot (and a short notice with Open) within seconds, no reload needed. A red dot on ⚙️ leads to anything new. The switch there decides whether other households may ask through the app at all.",
   "- 👪 CHAT WITH FAMILY MEMBERS (the people in YOUR household only): ⋯ More → 👪 Chat with family members — or 💬 Chat beside a person in 👥 Family Access (someone added by address who has not signed in yet says ⏳ hasn’t signed in yet: their 💬 Chat comes once they do). 📣 Everyone in <your kitchen> is the room for announcements: everyone in the household reads it. Or choose one person: only the two of you read that conversation. Everyone in the household can write, readers too. Messages arrive live: a short notice with Open, and a red dot on ⋯ More until you have read them. Nothing is changed or deleted afterwards; deleting the household deletes them.",
   "- 🧑‍🍳 FIRST VISIT: a one-time setup on a notebook page — your account (your e-mail and a password you make up; or 'I already have an account', or Continue offline), this device's Save button (the iPhone shortcut, the Android app in the Share menu, or the computer's browser extension — each new device asks this once; later from ⚙️ Settings), the kitchen rules, then a quick tour.",
-  "- 📨 SEND A RECIPE TO ANOTHER KITCHEN: open the recipe → 📤 Share → 📨 Send to another kitchen. Via My Kitchen Notes: type their kitchen's identifier (MKN-…) — it pops up in their app, with a sound, and waits in ⋯ More → 📨 Recipes sent to me. Or Via Email, Via WhatsApp, or Copy the link: anyone with the link can open it, even without an account. It is a copy of the recipe as it is now — photo, bold words, notes and all; not your cooking log, ratings or the heart — with a note from you if you like. They tap 📥 Save to my recipes and it is theirs, no AI involved. It keeps for 4 weeks. ⋯ More → 📤 Recipes I sent shows whether it was saved, copies a link again, sends it again, and takes one back — tick several (or Select all) to do it for all of them at once: ↩️ Take back, 📨 Send again (to a kitchen: it pops up in their app again for 4 more weeks, the earlier one taken back; a link: new links, good for 4 more weeks, in one message — the earlier ones keep working until they expire), 🔗 Copy the links. A kitchen that gets unwanted recipes can 🚫 Block the sender (the owner or an admin). During the closed beta, someone without an account who opens the link sees the recipe and can ask for an invitation — with their address already filled in when you typed it (Via Email asks for it, optional).",
+  "- 📨 SEND A RECIPE TO ANOTHER KITCHEN: open the recipe → 📤 Share → 📨 Send to another kitchen. Via My Kitchen Notes: type their kitchen's identifier (MKN-…) — it pops up in their app, with a sound, and waits in ⋯ More → 📨 Recipes sent to me. Or ✉️ Via Email (type their address: the app e-mails them its photo, your note and a button to save it — no mail program needed; your own mail is offered only if the app cannot send it), Via WhatsApp, or Copy the link: anyone with the link can open it, even without an account. It is a copy of the recipe as it is now — photo, bold words, notes and all; not your cooking log, ratings or the heart — with a note from you if you like. They tap 📥 Save to my recipes and it is theirs, no AI involved. It keeps for 4 weeks. ⋯ More → 📤 Recipes I sent shows whether it was saved, copies a link again, sends it again, and takes one back — tick several (or Select all) to do it for all of them at once: ↩️ Take back, 📨 Send again (to a kitchen: it pops up in their app again for 4 more weeks, the earlier one taken back; a link: new links, good for 4 more weeks, in one message — the earlier ones keep working until they expire), 🔗 Copy the links. A kitchen that gets unwanted recipes can 🚫 Block the sender (the owner or an admin). During the closed beta, someone without an account who opens the link sees the recipe and can ask for an invitation — with their address already filled in when it came by e-mail.",
   "- ✉️ E-MAIL A RECIPE (📤 Share → ✉️ Email): type their address and press 📨 Send — the app e-mails the recipe, laid out with its photo, from your kitchen's name via My Kitchen Notes; their reply comes to your own address. Nothing to paste, and no mail program needed (signed in, your address confirmed; up to 15 e-mails a day). On a phone, 📤 Share menu hands the photo and the recipe to the mail app you pick. 📋 Copy copies it, photo and all, to paste anywhere else. (To send a recipe that another kitchen saves with one tap, use 📨 Send to another kitchen.)",
   "- 🔒 SECRET RECIPES: in the editor, tick 🔒 Secret — the recipe (and its photo) is then kept where only your own kitchen can read it; the kitchens you link with do not see it, nor know it exists. Untick it to share it again. A 🔒 shows on its card.",
   "- 🔄 RELOAD A LINKED KITCHEN: beside a linked kitchen's name in your recipe list, 🔄 Reload reads its recipes and photos again from the start — for when something looks missing or out of date.",
@@ -33021,7 +33103,7 @@ var HELP_SYSTEM_PROMPT = [
   "- 📊 Households → 💬 Feedback and ⚠️ Errors (the owner's): tick several (or Select all shown), then 👀 Seen (n), ✅ Done (n) or 🗑 Delete selected (n) for all of them at once. 👀 Seen = read, off the ⚙️ red dot, still under 'Not done yet'; ✅ Done = also off that list (still under All). Deleting several asks once and sends one alert",
   "- ✉️ Invite testers: the tester invitation in English or עברית, with this copy's link; the wording can be changed (this device keeps it; 'The original words' brings it back). Paste the addresses; 📧 Send with Gmail sends each person their own e-mail, from the app's address when the owner's Gmail may send as it. Also ✉️ Mail app, 💬 WhatsApp and 📋 Copy. The first Gmail send needs the Gmail API switched on for the copy's Google Cloud project, and Google's permission",
   "- The beta is by invitation only when 📊 Households says so: every address in To (however the invitation goes) may then start a kitchen, signed in with that address; the window says how many are invited. Only a fingerprint of each address is kept, never the address. The invitation asks testers to sign in with that address, not to forward it, and to invite family from inside the app",
-  "- 🩺 Server allowances: a table of every free allowance — Cloudflare's day (Worker requests, KV, D1, server errors), Pages builds this month per copy, what is running now, Firestore reads as the apps count them, and sign-in-link e-mails (today, the most in a day, days all 5 went, days someone was turned away). ⚠️ near the limit, ⛔ stopped",
+  "- 🩺 Server allowances: a table of every free allowance — Cloudflare's day (Worker requests, KV, D1, server errors), Pages builds this month per copy, what is running now, Firestore reads as the apps count them, sign-in-link e-mails (today, the most in a day, days all 5 went, days someone was turned away), and recipe e-mails (today of the app's 90, and Resend's own day and month). ⚠️ near the limit, ⛔ stopped",
   "- 🔐 Two-step sign-in: an authenticator app's 6-digit code on top of the Google sign-in, for the owner's tools",
   "- The owner's log panel and its pop-up offer 📋 Copy log (everyone else's send the report to the owner)",
   "",
@@ -38431,7 +38513,7 @@ window.onHeaderScroll = onHeaderScroll;
       <!-- Cloudflare -->
       <div style="margin-bottom:6px;">
         <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:0.8px;text-transform:uppercase;">☁️ Cloudflare Workers</div>
-        <div style="font-size:12px;color:var(--muted);margin-top:2px;">Secure API proxy — routes all AI calls, photo search, URL imports, Bring! and YouTube through a server so API keys stay private</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:2px;">Secure API proxy — routes all AI calls, photo search, URL imports, Bring! and YouTube through a server so API keys stay private, and sends the recipe e-mails (through Resend, below)</div>
       </div>
       <div style="display:flex;flex-direction:column;gap:4px;">
         <!-- v36.68 — the whole file, checked, on the clipboard. Tony's first paste
@@ -38440,6 +38522,25 @@ window.onHeaderScroll = onHeaderScroll;
         <a href="#" data-cfg-href="https://dash.cloudflare.com/{cloudflareAccountId}/workers/services/edit/{workerName}/production" target="_blank" rel="noopener noreferrer" class="deploy-link">✏️ Edit Worker code <span class="deploy-hint" data-no-i18n data-cfg-text="{workerName}"></span></a>
         <a href="#" data-cfg-href="https://dash.cloudflare.com/{cloudflareAccountId}/workers/services/view/{workerName}/production/settings" target="_blank" rel="noopener noreferrer" class="deploy-link">⚙️ Worker settings & secrets <span class="deploy-hint">API keys, KV bindings</span></a>
         <a href="#" data-cfg-href="https://dash.cloudflare.com/{cloudflareAccountId}/workers" target="_blank" rel="noopener noreferrer" class="deploy-link">📊 Workers dashboard <span class="deploy-hint">Usage & analytics</span></a>
+      </div>
+
+      <div style="height:1px;background:var(--border);margin:12px 0;"></div>
+
+      <!-- v39.16 — Resend: the recipe e-mails the server sends (Worker v98, v99). Tony, 29 Oct 2026: "Please add the
+           relevant information to the Deployment area". Set up that day: the domain verified there, the key a GitHub
+           secret, passed on by "Deploy the Worker". -->
+      <div style="margin-bottom:6px;">
+        <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:0.8px;text-transform:uppercase;">✉️ Resend — recipe e-mails</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:2px;">Sends the e-mails the app sends for its members: 📤 Share → ✉️ Email → 📨 Send, and 📨 Send to another kitchen → ✉️ Via Email. They come from “the kitchen’s name via My Kitchen Notes” at the community domain, and replies go to the member who sent them. The free plan sends 100 a day and 3,000 a month (e-mails received count too); the app sends at most 90 a day, 15 for each person. You are warned at 70%, when a quota runs out, and whenever Resend refuses or does not answer (📲 Phone alerts → Recipe e-mails); 🩺 Server allowances shows the counts. The key is the GitHub secret <strong>RESEND_API_KEY</strong> — after changing it, re-run “Deploy the Worker”.</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px;">
+        <a href="https://resend.com/emails" target="_blank" rel="noopener noreferrer" class="deploy-link">📬 Sent e-mails <span class="deploy-hint">each one: delivered, bounced, or marked as spam</span></a>
+        <a href="https://resend.com/domains" target="_blank" rel="noopener noreferrer" class="deploy-link">🌐 Domain <span class="deploy-hint">mykitchennotes.community — should say Verified</span></a>
+        <a href="https://resend.com/api-keys" target="_blank" rel="noopener noreferrer" class="deploy-link">🔑 API keys <span class="deploy-hint">secret: RESEND_API_KEY · Sending access</span></a>
+        <a href="https://resend.com/settings/usage" target="_blank" rel="noopener noreferrer" class="deploy-link">📊 Usage <span class="deploy-hint">100 a day, 3,000 a month on the free plan</span></a>
+        <a href="https://resend.com/settings/billing" target="_blank" rel="noopener noreferrer" class="deploy-link">💳 Plan &amp; billing <span class="deploy-hint">a paid plan lifts the daily quota</span></a>
+        <a href="#" data-cfg-href="https://github.com/{githubRepo}/settings/secrets/actions" target="_blank" rel="noopener noreferrer" class="deploy-link">🔐 GitHub secrets <span class="deploy-hint">RESEND_API_KEY; MAIL_FROM (optional, the sending address)</span></a>
+        <a href="#" data-cfg-href="https://github.com/{githubRepo}/actions/workflows/deploy-worker.yml" target="_blank" rel="noopener noreferrer" class="deploy-link">▶️ Deploy the Worker <span class="deploy-hint">run it again after changing a secret</span></a>
       </div>
 
       <div style="height:1px;background:var(--border);margin:12px 0;"></div>
@@ -38523,7 +38624,7 @@ window.onHeaderScroll = onHeaderScroll;
       </button>
       <button id="shareMailBtn" style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:#2A6099;color:white;border:none;border-radius:10px;cursor:pointer;font-size:14px;font-weight:600;font-family:'DM Sans','Heebo',sans-serif;width:100%;">
         <span style="font-size:20px;">✉️</span> Send by Email
-        <span style="font-size:11px;opacity:0.8;">(copy & paste)</span>
+        <span style="font-size:11px;opacity:0.8;">(the recipe and its photo)</span>
       </button>
       <button id="sharePageBtn" style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:#2E7D32;color:white;border:none;border-radius:10px;cursor:pointer;font-size:14px;font-weight:600;font-family:'DM Sans','Heebo',sans-serif;width:100%;">
         <span style="font-size:20px;">🌐</span> Save as a web page

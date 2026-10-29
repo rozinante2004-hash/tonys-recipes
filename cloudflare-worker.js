@@ -1,4 +1,17 @@
-// Tony's Recipes — Cloudflare Worker v98
+// Tony's Recipes — Cloudflare Worker v99
+// v99: THE OWNER HEARS WHEN RECIPE E-MAILS RUN SHORT OR FAIL (Tony, 29 Oct 2026: "please make sure I get a warning if
+// quota is exceeded or if any issues arise with this service"). mail-recipe raises a notice (the owner's bar in the
+// app, an e-mail and the phone the first time, then at most once a day — raiseNotice) when: 70% of the app's 90 a day
+// is reached, and when all 90 are; someone reaches their 15; Resend's own count (its x-resend-daily-quota and
+// x-resend-monthly-quota headers: 100 a day, 3,000 a month on the free plan, received e-mails included) passes 70%;
+// Resend refuses — its quota (paused until it comes back), the key, the sending domain, a security hold, anything
+// else — or does not answer. Too many at once (rate_limit_exceeded) is tried once more a second later. A new alert
+// kind 'mail-service' (on by default). meter-admin `allowances` gains `mail`: today's count and Resend's last figures.
+// And 📨 Send to another kitchen → ✉️ Via Email goes the same way (Tony, 29 Oct 2026: "Can we use the same Resend .com
+// mailing mechanism when sharing between kitchens via email?"): mail-recipe with `gift` (a sent recipe's id) and `site`
+// (the app's address) e-mails its photo, name and note with a button to the one-tap link. The gift and its photo are
+// read from Firestore with the sender's own sign-in — it must be their kitchen's, a link, not expired — and the link
+// is built here, on one of this server's own app addresses; the same limits and alerts.
 // v98: A RECIPE E-MAILED BY THE SERVER (Tony, 29 Oct 2026: "Copy/pasting the recipe is unacceptable … We need to find a
 // better way where no pasting is necessary"). `mail-recipe`: signed in, the address confirmed, a member of the kitchen;
 // the e-mail laid out here from the recipe's fields (never HTML from the app), its photo inline, from "<kitchen> via My
@@ -442,7 +455,7 @@
 //   AI_MAX_TOKENS   – the longest answer one call may ask for (32000; the
 //                     app's largest, reading several recipes at once, asks 8000).
 
-const WORKER_VERSION = 'v98';
+const WORKER_VERSION = 'v99';
 const VIDEO_MAX_MB_DEFAULT = 50;
 const GEMINI_API = 'https://generativelanguage.googleapis.com';
 const GEMINI_MODEL_DEFAULT = 'gemini-2.5-flash';
@@ -2037,7 +2050,8 @@ const ALERT_KINDS = [
   ['household-ai', 'A household reached its AI allowance'],
   ['server-errors', 'The server answering with errors'],
   ['usage-check', 'The hourly usage check cannot read the figures'],
-  ['invite-ask', 'Someone asks for an invitation (from a sent recipe\u2019s link)']   // v97
+  ['invite-ask', 'Someone asks for an invitation (from a sent recipe\u2019s link)'],   // v97
+  ['mail-service', 'Recipe e-mails: the e-mail service (Resend) refused or failed, or a quota is near or at its limit']   // v99
 ];
 function alertKindOf(n) {
   const w = String((n && n.what) || '');
@@ -2045,6 +2059,7 @@ function alertKindOf(n) {
   if (/^usage:watch/.test(w)) return 'usage-check';
   if (/^(anthropic|gemini)/.test(w)) return 'ai-service';
   if (/^household-ai/.test(w)) return 'household-ai';
+  if (/^mail-/.test(w)) return 'mail-service';   // v99
   return n && n.kind === 'paused' ? 'limit-reached' : 'near-limit';
 }
 async function whatsappOff(env) {
@@ -2382,7 +2397,7 @@ async function meterAction(request, env, body) {
   }
   if (body.op === 'allowances') {
     return jsonResp({ ok: true, usage: await usageSnapshot(env), notices: await serverNotices(env, { owner: true }), watch: !!env.USAGE_KEY,
-                      appReads: await appReadsToday(env), links: await linkStats(env) });   // v83, v87
+                      appReads: await appReadsToday(env), links: await linkStats(env), mail: await mailStats(env) });   // v83, v87, v99
   }
   if (body.op === 'trends') {
     await signalsTable(db);
@@ -2654,6 +2669,8 @@ async function mailRecipe(request, env, body) {
   let hh;
   try { hh = await meterMembership(claims, hid, body.idToken, env); } catch (e) { return jsonResp({ error: 'MAIL: ' + e.message }, 502); }
   if (!hh.member) return jsonResp({ error: 'MAIL: you are not in that kitchen.' }, 403);
+  // v99 — a recipe sent to another kitchen, by e-mail: its link, photo, name and note
+  if (body.gift !== undefined) return await mailGift(request, env, body, claims, hid, hh, to);
   const r = body.recipe && typeof body.recipe === 'object' ? body.recipe : {};
   const rec = {
     name: str(r.name, 200).trim(),
@@ -2668,29 +2685,202 @@ async function mailRecipe(request, env, body) {
   if (pm) img = { type: pm[1], ext: pm[2] === 'jpeg' ? 'jpg' : pm[2], b64: pm[3] };
   // a photo the recipe has from the web (a photo library's address): shown from there
   const remote = !img && /^https:\/\/[^\s"'<>()\\]{8,600}$/.test(str(body.photoUrl, 601)) ? str(body.photoUrl, 600) : '';
+  const kitchen = String(hh.name || '').replace(/["\\<>\r\n]/g, '').trim().slice(0, 60);
+  const subject = str(body.subject, 200).replace(/[\r\n]+/g, ' ').trim() || rec.name;
+  return await mailOut(env, claims, kitchen, to, subject, (inline) => mailRecipeHtml(rec, kitchen, img && inline ? 'cid:recipe-photo' : remote), mailRecipeText(rec, kitchen), img);
+}
+// v99 — the sending, the limits and the alerts, for a recipe and for a sent recipe's link alike
+async function mailOut(env, claims, kitchen, to, subject, htmlFor, text, img) {
   const day = new Date().toISOString().slice(0, 10);
   const mine = await ceilingCount(env, 'mail:' + day + ':' + claims.sub, 86400, 1);
   const all = await ceilingCount(env, 'mail:' + day, 86400, 1);
-  if (mine.used >= MAIL_PER_USER_DAY) return jsonResp({ error: 'MAIL: that is today\u2019s ' + MAIL_PER_USER_DAY + ' e-mails from you \u2014 tomorrow there are more.', rateLimited: true }, 429);
-  if (all.used >= MAIL_ALL_DAY) return jsonResp({ error: 'MAIL: the app has sent all its e-mails for today \u2014 try again tomorrow.', rateLimited: true }, 429);
-  const kitchen = String(hh.name || '').replace(/["\\<>\r\n]/g, '').trim().slice(0, 60);
+  if (mine.used >= MAIL_PER_USER_DAY) {
+    await mailNotice(env, { what: 'mail-person', kind: 'warning', until: nextUtcMidnight(Date.now()),   // v99 — one person, many e-mails: worth a look
+      title: 'Someone sent all ' + MAIL_PER_USER_DAY + ' of their recipe e-mails for today',
+      detail: 'A member of ' + (kitchen || 'a kitchen') + ' (' + claims.aud + ') reached the ' + MAIL_PER_USER_DAY + ' a day each person may send; more are refused until 00:00 UTC. Usually nothing to do \u2014 unless it looks like someone sending unwanted e-mail.' });
+    return jsonResp({ error: 'MAIL: that is today\u2019s ' + MAIL_PER_USER_DAY + ' e-mails from you \u2014 tomorrow there are more.', rateLimited: true }, 429);
+  }
+  if (all.used >= MAIL_ALL_DAY) {
+    await mailNotice(env, { what: 'mail-day', kind: 'paused', self: true, until: nextUtcMidnight(Date.now()),   // v99
+      title: 'Recipe e-mails stopped for today: all ' + MAIL_ALL_DAY + ' were sent',
+      detail: 'The app sends at most ' + MAIL_ALL_DAY + ' a day (MAIL_ALL_DAY in the Worker), under Resend\'s free 100. Members can still share by the phone\'s share menu or Copy.' });
+    return jsonResp({ error: 'MAIL: the app has sent all its e-mails for today \u2014 try again tomorrow.', rateLimited: true }, 429);
+  }
   const from = '"' + (kitchen ? kitchen + ' via ' : '') + 'My Kitchen Notes" <' + (env.MAIL_FROM || MAIL_FROM_DEFAULT) + '>';
-  const subject = str(body.subject, 200).replace(/[\r\n]+/g, ' ').trim() || rec.name;
   const send = async (inline) => {
-    const payload = { from, to: [to], subject, reply_to: claims.email, html: mailRecipeHtml(rec, kitchen, img && inline ? 'cid:recipe-photo' : remote), text: mailRecipeText(rec, kitchen) };
+    const payload = { from, to: [to], subject, reply_to: claims.email, html: htmlFor(inline), text };
     if (img) payload.attachments = [Object.assign({ filename: 'photo.' + img.ext, content: img.b64 }, inline ? { content_id: 'recipe-photo' } : {})];
     return (env.__fetch || fetch)(RESEND_URL, { method: 'POST', headers: { Authorization: 'Bearer ' + env.RESEND_API_KEY, 'Content-Type': 'application/json' },
       body: JSON.stringify(payload), signal: AbortSignal.timeout(25000) });
   };
-  let res;
+  let res, inline = true;
   try {
-    res = await send(true);
+    res = await send(inline);
     // A service that will not take the photo inline: once more, the photo attached beside the e-mail instead.
-    if (!res.ok && img && (res.status === 400 || res.status === 422)) { const t = await res.clone().text(); if (/content_?id/i.test(t)) res = await send(false); }
-  } catch (e) { return jsonResp({ error: 'MAIL: the e-mail service could not be reached (' + e.message + ').' }, 502); }
-  if (!res.ok) { let t = ''; try { t = (await res.text()).slice(0, 200); } catch (e) {} return jsonResp({ error: 'MAIL: the e-mail service refused it (' + res.status + '): ' + t }, 502); }
+    if (!res.ok && img && (res.status === 400 || res.status === 422)) { const t = await res.clone().text(); if (/content_?id/i.test(t)) res = await send(inline = false); }
+    // v99 — more at once than the service takes in a second: once more, a moment later
+    if (res.status === 429 && /rate_limit/i.test(await res.clone().text())) { await new Promise(r => setTimeout(r, 1200)); res = await send(inline); }
+  } catch (e) {
+    await mailTrouble(env, 0, String((e && e.message) || e));
+    return jsonResp({ error: 'MAIL: the e-mail service could not be reached (' + e.message + ').' }, 502);
+  }
+  if (!res.ok) {
+    let t = ''; try { t = (await res.text()).slice(0, 400); } catch (e) {}
+    const q = await mailTrouble(env, res.status, t);
+    if (q.quota) return jsonResp({ error: 'MAIL: the app has sent all its e-mails for ' + (q.quota === 'month' ? 'this month' : 'today') + ' \u2014 try again ' + (q.quota === 'month' ? 'next month' : 'tomorrow') + '.', rateLimited: true }, 429);
+    return jsonResp({ error: 'MAIL: the e-mail service refused it (' + res.status + '): ' + t.slice(0, 200) }, 502);
+  }
   await mine.credit(); await all.credit();
+  await mailUsage(env, res, all.used + 1);
   return jsonResp({ ok: true, replyTo: claims.email });
+}
+// v99 — 📨 Send to another kitchen → ✉️ Via Email. Everything in the e-mail comes from the sent recipe as kept in
+// Firestore (read with the sender's sign-in: the rules let anyone holding its id read it while it lasts), never from
+// the request; the link is this copy's own address, which must be one of this server's app addresses.
+async function mailGift(request, env, body, claims, hid, hh, to) {
+  const id = String(body.gift || '');
+  if (!/^[A-Za-z0-9]{20,40}$/.test(id)) return jsonResp({ error: 'MAIL: which sent recipe?' }, 400);
+  let site;
+  try { site = new URL(String(body.site || '').slice(0, 300)); } catch (e) { site = null; }
+  const okSite = site && site.protocol === 'https:' && !site.search && !site.hash && /^\/[A-Za-z0-9._\/-]{0,80}$/.test(site.pathname)
+    && site.hostname !== 'web.getbring.com' && allowedOrigins(env).includes(site.origin);
+  if (!okSite) return jsonResp({ error: 'MAIL: the link must lead to this app.' }, 400);
+  const base = (env.__firestoreBase || 'https://firestore.googleapis.com') + '/v1/projects/' + encodeURIComponent(claims.aud) + '/databases/(default)/documents/';
+  const h = { Authorization: 'Bearer ' + body.idToken };
+  let g, p;
+  try { [g, p] = await Promise.all([fsFetch(base + 'recipeGifts/' + id, h), fsFetch(base + 'recipeGiftPhotos/' + id, h)]); }
+  catch (e) { return jsonResp({ error: 'MAIL: the sent recipe could not be read (' + e.message + ').' }, 502); }
+  let f = {};
+  try { if (g.ok) f = ((await g.json()) || {}).fields || {}; } catch (e) {}
+  const exp = Date.parse((f.expireAt && f.expireAt.timestampValue) || '') || 0;
+  if (!g.ok || fsValue(f.from) !== hid || fsValue(f.to) !== '' || !(exp > Date.now()))
+    return jsonResp({ error: 'MAIL: that is not a recipe your kitchen sent by a link (or it has expired).' }, 403);
+  let img = null, remote = '';
+  try {
+    const ph = p.ok ? String(fsValue((((await p.json()) || {}).fields || {}).data) || '') : '';
+    const pm = /^data:(image\/(jpeg|png|webp|gif));base64,([A-Za-z0-9+/=]+)$/.exec(ph.slice(0, 1400000));
+    if (pm) img = { type: pm[1], ext: pm[2] === 'jpeg' ? 'jpg' : pm[2], b64: pm[3] };
+    else if (/^https:\/\/[^\s"'<>()\\]{8,600}$/.test(ph)) remote = ph;
+  } catch (e) {}
+  const gift = { name: String(fsValue(f.name) || 'A recipe').slice(0, 200), note: String(fsValue(f.note) || '').slice(0, 500),
+    link: site.origin + site.pathname + '?recipe=' + id + '#for=' + encodeURIComponent(to), until: exp };
+  const kitchen = String(hh.name || '').replace(/["\\<>\r\n]/g, '').trim().slice(0, 60);
+  return await mailOut(env, claims, kitchen, to, 'A recipe for you: ' + gift.name,
+    (inline) => mailGiftHtml(gift, kitchen, img && inline ? 'cid:recipe-photo' : remote), mailGiftText(gift, kitchen), img);
+}
+function mailGiftUntil(t) {
+  try { return new Date(t).toLocaleDateString('en-GB', { timeZone: 'Asia/Jerusalem', day: 'numeric', month: 'long', year: 'numeric' }); } catch (e) { return ''; }
+}
+function mailGiftHtml(gift, kitchen, photo) {
+  const font = "font-family:Arial,Helvetica,sans-serif;", who = kitchen || 'A kitchen';
+  return '<!doctype html><html><body style="margin:0;padding:16px;background:#FAF7F2;">'
+    + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;margin:0 auto;background:#fff;border-radius:12px;overflow:hidden;">'
+    + '<tr><td style="' + font + 'padding:14px 18px;font-size:14px;color:#5C3D2E;" dir="auto">' + htmlEsc(who) + ' sent you a recipe from My Kitchen Notes</td></tr>'
+    + (photo ? '<tr><td><a href="' + htmlEsc(gift.link) + '"><img src="' + htmlEsc(photo) + '" alt="' + htmlEsc(gift.name) + '" width="600" style="display:block;width:100%;max-width:600px;height:auto;border:0;"></a></td></tr>' : '')
+    + '<tr><td style="background:#5C3D2E;padding:18px 20px;"><div style="' + font + 'font-size:24px;font-weight:bold;color:#fff;" dir="auto">' + htmlEsc(gift.name) + '</div></td></tr>'
+    + '<tr><td style="padding:18px;">'
+    + (gift.note ? '<div style="' + font + 'font-size:15px;color:#2B2622;line-height:1.55;border-inline-start:3px solid #C1440E;padding:4px 12px;margin-bottom:16px;" dir="auto">\u201c' + htmlEsc(gift.note) + '\u201d<div style="font-size:13px;color:#7A6F66;margin-top:4px;">\u2014 ' + htmlEsc(who) + '</div></div>' : '')
+    + '<div style="text-align:center;margin:8px 0 14px;"><a href="' + htmlEsc(gift.link) + '" style="' + font + 'display:inline-block;background:#C1440E;color:#fff;text-decoration:none;font-weight:bold;font-size:16px;padding:13px 26px;border-radius:10px;">Open the recipe</a></div>'
+    + '<div style="' + font + 'font-size:13px;color:#7A6F66;line-height:1.55;text-align:center;">See it, and save it to your recipes with one tap. The link keeps until ' + htmlEsc(mailGiftUntil(gift.until)) + '.</div>'
+    + '<div style="' + font + 'font-size:12px;color:#7A6F66;margin-top:12px;text-align:center;word-break:break-all;">' + htmlEsc(gift.link) + '</div>'
+    + '</td></tr>'
+    + '<tr><td style="' + font + 'background:#5C3D2E;color:#E9DCCD;font-size:12px;text-align:center;padding:12px;">Shared from <a href="https://mykitchennotes.community" style="color:#F2C14E;text-decoration:none;font-weight:bold;">My Kitchen Notes</a></td></tr>'
+    + '</table></body></html>';
+}
+function mailGiftText(gift, kitchen) {
+  const who = kitchen || 'A kitchen';
+  return [who + ' sent you a recipe for \u201c' + gift.name + '\u201d from My Kitchen Notes' + (gift.note ? ': \u201c' + gift.note + '\u201d' : '.'), '',
+    'Open it to see it, and save it to your recipes with one tap (the link keeps until ' + mailGiftUntil(gift.until) + '):', gift.link, '',
+    '\u2014 Shared from My Kitchen Notes \u00b7 https://mykitchennotes.community'].join('\n');
+}
+// v99 — the owner hears when recipe e-mails run short or fail (Tony, 29 Oct 2026: "please make sure I get a warning if
+// quota is exceeded or if any issues arise with this service"). A notice for the owner only (members are told when they
+// press Send): the bar in the owner's app, an e-mail and the phone the first time, then at most once a day for the same
+// thing (raiseNotice). Never a recipient's address in it.
+const MAIL_AFFECTS = 'sending a recipe by e-mail (Share, Email, Send)';
+function mailMask(s) { return String(s || '').replace(/[^\s@<>"'`,;:()]+@[^\s@<>"'`,;:()]+/g, '(an address)').slice(0, 200); }
+async function mailNotice(env, n) {
+  try { await raiseNotice(env, Object.assign({ scope: 'owner', self: true, affects: MAIL_AFFECTS }, n)); } catch (e) {}
+}
+// Resend's quotas: 100 a day and 3,000 a month on the free plan (received e-mails count too); RESEND_DAILY_QUOTA and
+// RESEND_MONTHLY_QUOTA when the plan changes.
+function resendQuotas(env) {
+  return { day: parseInt(env.RESEND_DAILY_QUOTA || '', 10) || 100, month: parseInt(env.RESEND_MONTHLY_QUOTA || '', 10) || 3000 };
+}
+// Resend's errors are { statusCode, name, message }: daily_quota_exceeded and monthly_quota_exceeded (429),
+// rate_limit_exceeded (429), invalid_api_key (403), missing_api_key / restricted_api_key (401), validation_error (403 —
+// e.g. a sending domain not verified there), security_error (451), application_error / internal_server_error (500).
+// status 0: not reached at all. Answers { quota: 'day' | 'month' | '' }.
+async function mailTrouble(env, status, said) {
+  let name = '', msg = String(said || '');
+  try { const j = JSON.parse(said); name = String(j.name || ''); msg = String(j.message || said); } catch (e) {}
+  msg = mailMask(msg);
+  const now = Date.now(), q = resendQuotas(env), says = 'Resend said: ' + (msg || '(nothing)') + (name ? ' [' + name + ']' : '') + '. ';
+  let n, quota = '';
+  if (status === 429 && /daily_quota/i.test(name + msg)) {
+    quota = 'day';
+    n = { what: 'mail-resend-day', kind: 'paused', until: now + 24 * 3600e3, title: 'Resend\'s daily quota of e-mails is used up',
+      detail: says + 'On the free plan that is ' + q.day + ' a day (e-mails received count too). It comes back within 24 hours; for more, choose a paid plan in Resend (Settings, Billing).' };
+  } else if (status === 429 && /monthly_quota/i.test(name + msg)) {
+    quota = 'month';
+    n = { what: 'mail-resend-month', kind: 'paused', until: nextUtcMonth(now), title: 'Resend\'s monthly quota of e-mails is used up',
+      detail: says + 'On the free plan that is ' + q.month.toLocaleString('en-US') + ' a month (e-mails received count too). It comes back with Resend\'s next month; to send before that, choose a paid plan in Resend (Settings, Billing).' };
+  } else if (status === 401 || (status === 403 && /api_key|api key/i.test(name + ' ' + msg))) {
+    n = { what: 'mail-key', kind: 'paused', self: false, until: now + 3 * 3600e3, title: 'Resend refused the server\'s key (RESEND_API_KEY)',
+      detail: says + 'Make a new API key in Resend (API Keys, Sending access), put it in the GitHub secret RESEND_API_KEY, then re-run "Deploy the Worker" in GitHub Actions.' };
+  } else if (status === 403) {
+    n = { what: 'mail-domain', kind: 'paused', self: false, until: now + 3 * 3600e3, title: 'Resend refused the sending address (is the domain still verified?)',
+      detail: says + 'In Resend, Domains: mykitchennotes.community should say Verified. If its DNS records were changed, press Auto configure there again.' };
+  } else if (status === 451) {
+    n = { what: 'mail-blocked', kind: 'paused', self: false, until: now + 6 * 3600e3, title: 'Resend is holding back e-mails (a security hold)',
+      detail: says + 'Write to Resend\'s support from its dashboard (Help).' };
+  } else if (status === 429) {
+    n = { what: 'mail-busy', kind: 'warning', until: now + 3600e3, title: 'Resend turned an e-mail away: too many at once',
+      detail: says + 'The server tried once more a second later and was refused again. One is nothing to worry about; if it repeats, tell Claude.' };
+  } else if (!status || status >= 500) {
+    n = { what: 'mail-down', kind: 'warning', until: now + 3600e3, title: 'The e-mail service (Resend) ' + (status ? 'is failing (' + status + ')' : 'could not be reached'),
+      detail: (status ? says : 'The server could not reach Resend: ' + mailMask(said) + '. ') + 'This usually passes by itself. If it goes on for hours, look at Resend\'s dashboard.' };
+  } else {
+    n = { what: 'mail-refused', kind: 'warning', until: now + 6 * 3600e3, title: 'Resend refused a recipe e-mail (' + status + ')',
+      detail: says + 'If this repeats, the e-mail the server builds needs fixing: tell Claude.' };
+  }
+  await mailNotice(env, n);
+  return { quota };
+}
+// After an e-mail went: the app's own day (70% of MAIL_ALL_DAY), and Resend's own count from its headers
+// (x-resend-daily-quota, free plan only; x-resend-monthly-quota) — kept for 🩺 Server allowances, warned at 70%.
+async function mailUsage(env, res, todayApp) {
+  const now = Date.now(), q = resendQuotas(env);
+  const num = (h) => { const v = parseInt((res.headers && res.headers.get(h)) || '', 10); return isFinite(v) ? v : null; };
+  const rd = num('x-resend-daily-quota'), rm = num('x-resend-monthly-quota');
+  if ((rd !== null || rm !== null) && env.METER_DB) {
+    try {
+      await tableOnce(env.METER_DB, 'owner_prefs', 'CREATE TABLE IF NOT EXISTS owner_prefs (k TEXT PRIMARY KEY, v TEXT)');
+      await env.METER_DB.prepare("INSERT INTO owner_prefs (k, v) VALUES ('resend_usage', ?1) ON CONFLICT (k) DO UPDATE SET v = excluded.v")
+        .bind(JSON.stringify({ day: rd, month: rm, at: now })).run();
+    } catch (e) {}
+  }
+  if (todayApp >= Math.ceil(MAIL_ALL_DAY * 0.7) && todayApp < MAIL_ALL_DAY)
+    await mailNotice(env, { what: 'mail-day', kind: 'warning', until: nextUtcMidnight(now), title: 'Recipe e-mails: 70% of today\'s ' + MAIL_ALL_DAY + ' are sent',
+      detail: todayApp + ' of the ' + MAIL_ALL_DAY + ' the app sends a day (MAIL_ALL_DAY in the Worker). At ' + MAIL_ALL_DAY + ' they stop until 00:00 UTC.' });
+  if (rd !== null && rd >= Math.ceil(q.day * 0.7))
+    await mailNotice(env, { what: 'mail-resend-day', kind: 'warning', until: nextUtcMidnight(now), title: 'Resend\'s daily quota is 70% used',
+      detail: rd + ' of ' + q.day + ' e-mails today by Resend\'s count (e-mails received count too). When it is used up, recipe e-mails stop for up to 24 hours.' });
+  if (rm !== null && rm >= Math.ceil(q.month * 0.7))
+    await mailNotice(env, { what: 'mail-resend-month', kind: 'warning', until: nextUtcMonth(now), title: 'Resend\'s monthly quota is 70% used',
+      detail: rm.toLocaleString('en-US') + ' of ' + q.month.toLocaleString('en-US') + ' e-mails this month by Resend\'s count (e-mails received count too). When it is used up, recipe e-mails stop until Resend\'s next month, or a paid plan.' });
+}
+// For 🩺 Server allowances: today's recipe e-mails (the app's own count), and Resend's at the last e-mail sent.
+async function mailStats(env) {
+  if (!env.RESEND_API_KEY || !env.METER_DB) return { set: false };
+  const q = resendQuotas(env), out = { set: true, today: 0, max: MAIL_ALL_DAY, perPerson: MAIL_PER_USER_DAY, resendDayMax: q.day, resendMonthMax: q.month, resend: null };
+  try { out.today = (await ceilingCount(env, 'mail:' + new Date().toISOString().slice(0, 10), 86400, 1)).used; } catch (e) {}
+  try {
+    await tableOnce(env.METER_DB, 'owner_prefs', 'CREATE TABLE IF NOT EXISTS owner_prefs (k TEXT PRIMARY KEY, v TEXT)');
+    const row = await env.METER_DB.prepare("SELECT v FROM owner_prefs WHERE k = 'resend_usage'").first();
+    if (row) out.resend = JSON.parse(row.v || 'null');
+  } catch (e) {}
+  return out;
 }
 // The recipe, for an e-mail: tables and inline styles (what mail programs keep), every word escaped, **bold** kept.
 function mailBold(s) { return htmlEsc(s).replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>').replace(/\n/g, '<br>'); }
@@ -3889,4 +4079,4 @@ export default {
   }
 };
 
-// ── END OF WORKER v98 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
+// ── END OF WORKER v99 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
