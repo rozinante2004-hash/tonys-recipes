@@ -907,6 +907,14 @@ your personal identifier and that a click copies it; a click copies it and the c
 Shown only while signed in to a household that has one; ⚙️ → 🏠 My household → 🪪 Display my personal identifier still
 shows it large, with Copy and Share (and is what a click opens where the clipboard is refused).
 
+**The phone's share menu (v39.16).** "Via another app" / "Another app…" / the ✉️ Email window's 📤 Share menu are
+offered on phones and tablets only (`shareMenuHere()`: `navigator.share` and not a computer — iPhone and iPad, iPadOS
+reporting itself as a Mac included, Android, "Mobile"), as 📲 Share via… always was: on a computer the browser's menu
+is rarely what anyone wants, and there it did nothing. `shareMenu` behind every `shareDo('share')`: a link is made first
+(a database write, with the photo), so the tap may have expired — the browser's NotAllowedError asks for one more tap
+("📤 Open the share menu") and tries again; the menu closed by the person is "Not sent" (the link kept, in 📤 Recipes I
+sent); any other failure copies the message and says so. Never swallowed silently.
+
 **State on 28 Oct 2026 (v39.06, Worker v96):** testers since 25 Oct; every release on the owner's yes. Their notes
 and error reports reach the private repository and a Claude session that triages them daily at 19:30 Israel time.
 Open: a server of its own for the test copy (needs the AI keys in GitHub), the language question itself on the

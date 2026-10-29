@@ -1792,7 +1792,7 @@ function shareSelected() {
   // or an insecure context — and both used to reject unhandled, so the user got
   // silence and the console got an unhandled rejection. Never claim a copy that
   // did not happen.
-  if (navigator.share) {
+  if (shareMenuHere()) {                                          // v39.16 — phones and tablets
     navigator.share({ title: kitchenTitle(), text: text })   // v38.64 — the kitchen's name
       .catch(function(){ /* cancelling a share is not an error */ });
   } else if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -5332,7 +5332,7 @@ async function openConnectHousehold() {
       title: 'Use this when the owner of ' + em + ' is already a member of My Kitchen Notes: it pops up in their app. If they are not a member yet, it waits until they join with this address — tell them below as well.' },
       { value: 'email', label: '\u2709\uFE0F Via Email', title: 'Sends it through the app, and opens an e-mail to tell them too: your mail app, Gmail or Outlook' },
       { value: 'wa', label: '\u{1F4AC} Via WhatsApp', title: 'Sends it through the app, and opens WhatsApp to tell them too' }]
-      .concat(navigator.share ? [{ value: 'share', label: '\u{1F4E4} Via another app', title: 'Sends it through the app, and opens your phone\u2019s share menu to tell them too' }] : [])
+      .concat(shareMenuHere() ? [{ value: 'share', label: '\u{1F4E4} Via another app', title: 'Sends it through the app, and opens your phone\u2019s share menu to tell them too' }] : [])
       .concat([{ value: 'copy', label: '\u{1F4CB} Copy message to Clipboard', title: 'Sends it through the app, and copies a message (with the link to accept it) to paste wherever you like' }]);
     var how = await askChoice('To ' + em + '.\n\nThrough the app, it pops up for them if they are a member, or waits until they join with that address. Or tell them yourself as well:',
       opts3, { icon: '\u{1F4E8}', title: 'Send the request', backLabel: '‹ Back', cancelLabel: 'Cancel — send nothing' });
@@ -7166,7 +7166,7 @@ async function openSendRecipe(rid) {
           { value: 'app', primary: true, label: '\u{1F4E8} Via My Kitchen Notes (recommended)', title: 'To another kitchen, by its identifier (MKN-…): it pops up in their app' },
           { value: 'email', label: '✉️ Via Email', title: 'The app e-mails them its photo and a button to save it — no mail program needed' },
           { value: 'wa', label: '\u{1F4AC} Via WhatsApp', title: 'A WhatsApp message with a link to the recipe' }]
-        .concat(navigator.share ? [{ value: 'share', label: '\u{1F4E4} Via another app', title: 'Your phone’s share menu, with a link to the recipe' }] : [])
+        .concat(shareMenuHere() ? [{ value: 'share', label: '\u{1F4E4} Via another app', title: 'Your phone’s share menu, with a link to the recipe' }] : [])
         .concat([{ value: 'copy', label: '\u{1F517} Copy the link', title: 'Copies a message with a link to the recipe, to paste wherever you like' }]),
         { icon: '\u{1F4E4}', title: 'Send this recipe', cancelLabel: 'Cancel' });
       if (!how || how === ASK_BACK) return made;
@@ -7240,7 +7240,8 @@ async function openSendRecipe(rid) {
       + '\n\nOpen it to see it, and save it to your recipes with one tap (the link keeps for 4 weeks):\n' + giftUrl(made.id, mailTo);
     var did = await shareDo(how === 'email' ? mailHow : how, { to: mailTo, subject: 'A recipe for you: ' + made.name, text: text, copyText: text });
     if (did === ASK_BACK) { step = 3; continue; }                 // no mail program: the e-mail choices again (sent once)
-    if (how !== 'copy') toast('\u{1F517} The link is on its way. ⋯ More → \u{1F4E4} Recipes I sent shows who saved it.', 8000, openGiftsOut);
+    if (!did) { toast('Not sent. The link is kept: ⋯ More → \u{1F4E4} Recipes I sent copies it or sends it again.', 8000, openGiftsOut); return made; }   // v39.16
+    if (how !== 'copy' && did !== 'copy') toast('\u{1F517} The link is on its way. ⋯ More → \u{1F4E4} Recipes I sent shows who saved it.', 8000, openGiftsOut);
     return made;
   }
   return made;
@@ -8775,7 +8776,7 @@ window.mailOrWebmail = mailOrWebmail; window.mailOpened = mailOpened;
 function shareOptions(opts) {
   var options = [{ value: 'gmail', label: '✉️ Gmail' }, { value: 'outlook', label: '✉️ Outlook' },
                  { value: 'mail', label: '✉️ My mail app' }, { value: 'wa', label: '\u{1F4AC} WhatsApp' }];
-  if (navigator.share) options.push({ value: 'share', label: '\u{1F4E4} Another app…' });
+  if (shareMenuHere()) options.push({ value: 'share', label: '\u{1F4E4} Another app…' });
   options.push({ value: 'copy', label: opts.copyLabel || '\u{1F4CB} Copy the message' });
   if (opts.omit) options = options.filter(function(o){ return opts.omit.indexOf(o.value) === -1; });   // v37.47
   return options;
@@ -8786,7 +8787,7 @@ async function shareDo(how, opts) {
   if (how === 'mail') return await mailOrWebmail(opts, t);
   if (how === 'gmail' || how === 'outlook') { var f = shareFit(opts, how); window.open(f.url, '_blank', 'noopener'); await shareFitSay(f); }
   else if (how === 'wa') window.open(t.wa, '_blank', 'noopener');
-  else if (how === 'share') { try { await navigator.share({ title: opts.subject || '', text: opts.text }); } catch(e) {} }
+  else if (how === 'share') return await shareMenu(opts);   // v39.16
   else if (how === 'copy') {
     var ct = opts.copyText || opts.text;
     try { await navigator.clipboard.writeText(ct); toast('\u{1F4CB} Copied — paste it wherever you like', 6000); }
@@ -8794,7 +8795,37 @@ async function shareDo(how, opts) {
   }
   return how || null;
 }
-window.shareOptions = shareOptions; window.shareDo = shareDo;
+// v39.16 — the phone's share menu, offered on phones and tablets only (Tony: "On my iPhone it indeed appears to open
+// share options. Nothing happens on the PC. Perhaps it should not appear on a PC at all?") — as 📲 Share via… always was.
+function shareMenuHere() { return !!navigator.share && !extIsComputer(); }
+window.shareMenuHere = shareMenuHere;
+// v39.16 — Tony: "What does the following flow do Send to another kitchen --> via another app? It does not seem to do
+// anything." The phone's share menu opens only straight after a tap. There the link is made first (a database write,
+// with the photo), the tap had expired, the browser refused (NotAllowedError) — and the refusal was swallowed. Now:
+// refused for want of a tap → one more tap ("📤 Open the share menu"); closed by the person → nothing more; any other
+// failure → the message is copied instead, and said so. Answers 'share', 'copy' or null (not sent).
+async function shareMenu(opts) {
+  var data = { title: opts.subject || '', text: opts.text };
+  for (var i = 0; i < 2; i++) {
+    try { await navigator.share(data); return 'share'; }
+    catch(e) {
+      var n = e && e.name;
+      if (n === 'AbortError') return null;                        // they closed the menu
+      if (n === 'NotAllowedError' && i === 0) {
+        var go = await askConfirm({ icon: '\u{1F4E4}', title: 'Ready to send', message: 'Press the button and choose the app to send it with.',
+          okLabel: '\u{1F4E4} Open the share menu', cancelLabel: 'Cancel' });
+        if (go !== true) return null;
+        continue;                                                 // this tap opens it
+      }
+      break;
+    }
+  }
+  var ct = opts.copyText || opts.text;
+  try { await navigator.clipboard.writeText(ct); toast('\u{1F4CB} The share menu would not open here — the message is copied instead: paste it in any app.', 9000); }
+  catch(e) { await askConfirm({ icon: '\u{1F4CB}', title: 'The message', message: ct, okLabel: 'OK' }); }
+  return 'copy';
+}
+window.shareOptions = shareOptions; window.shareDo = shareDo; window.shareMenu = shareMenu;
 async function shareMessage(opts) {
   var options = shareOptions(opts);
   for (var round = 0; round < 10; round++) {
@@ -10954,9 +10985,10 @@ function showEmailModal(id) {
     return emailFileFrom(photoData);
   }).then(function(f){
     photoFile = f;
-    // the share menu only where it can take the picture (a phone; Windows and Mac too) — a share without it is no better than Copy
+    // the share menu only where it can take the picture — a share without it is no better than Copy; on a phone or a
+    // tablet only (v39.16: a computer's share menu is not what anyone looks for there)
     var b = document.getElementById('emailShareMenuBtn');
-    try { if (b && navigator.share && navigator.canShare && (f ? navigator.canShare({ files: [f], text: 'x' }) : false)) b.style.display = ''; } catch(e) {}
+    try { if (b && shareMenuHere() && navigator.canShare && (f ? navigator.canShare({ files: [f], text: 'x' }) : false)) b.style.display = ''; } catch(e) {}
   }).catch(function(){});
   // (decoded here: the page's own rules do not let it fetch a data: address)
   function emailFileFrom(p) {
@@ -33058,7 +33090,7 @@ var HELP_SYSTEM_PROMPT = [
   "- 📬 LINK REQUESTS: ⚙️ → 🏠 My household → 📬 Link requests — the number in brackets beside it is how many wait for an answer. Every request in one place: Waiting (Accept / Reject / 🚫 Block), Sent by your household (Withdraw), Linked now (Revoke access), and earlier answers. A request may carry a note, and the two households can write to each other there — the latest message shows, highlighted, with ↩ Reply; earlier ones are under 💬 Conversation. Only the household's name is shown, never a person's. Reject is for now: if they ask again — by identifier or by e-mail — their request is back under Waiting. 🚫 Block is for good, until you Unblock it under the earlier answers; they are never told, and on their side it reads “waiting”. A new message or request arrives while the app is open: a red dot (and a short notice with Open) within seconds, no reload needed. A red dot on ⚙️ leads to anything new. The switch there decides whether other households may ask through the app at all.",
   "- 👪 CHAT WITH FAMILY MEMBERS (the people in YOUR household only): ⋯ More → 👪 Chat with family members — or 💬 Chat beside a person in 👥 Family Access (someone added by address who has not signed in yet says ⏳ hasn’t signed in yet: their 💬 Chat comes once they do). 📣 Everyone in <your kitchen> is the room for announcements: everyone in the household reads it. Or choose one person: only the two of you read that conversation. Everyone in the household can write, readers too. Messages arrive live: a short notice with Open, and a red dot on ⋯ More until you have read them. Nothing is changed or deleted afterwards; deleting the household deletes them.",
   "- 🧑‍🍳 FIRST VISIT: a one-time setup on a notebook page — your account (your e-mail and a password you make up; or 'I already have an account', or Continue offline), this device's Save button (the iPhone shortcut, the Android app in the Share menu, or the computer's browser extension — each new device asks this once; later from ⚙️ Settings), the kitchen rules, then a quick tour.",
-  "- 📨 SEND A RECIPE TO ANOTHER KITCHEN: open the recipe → 📤 Share → 📨 Send to another kitchen. Via My Kitchen Notes: type their kitchen's identifier (MKN-…) — it pops up in their app, with a sound, and waits in ⋯ More → 📨 Recipes sent to me. Or ✉️ Via Email (type their address: the app e-mails them its photo, your note and a button to save it — no mail program needed; your own mail is offered only if the app cannot send it), Via WhatsApp, or Copy the link: anyone with the link can open it, even without an account. It is a copy of the recipe as it is now — photo, bold words, notes and all; not your cooking log, ratings or the heart — with a note from you if you like. They tap 📥 Save to my recipes and it is theirs, no AI involved. It keeps for 4 weeks. ⋯ More → 📤 Recipes I sent shows whether it was saved, copies a link again, sends it again, and takes one back — tick several (or Select all) to do it for all of them at once: ↩️ Take back, 📨 Send again (to a kitchen: it pops up in their app again for 4 more weeks, the earlier one taken back; a link: new links, good for 4 more weeks, in one message — the earlier ones keep working until they expire), 🔗 Copy the links. A kitchen that gets unwanted recipes can 🚫 Block the sender (the owner or an admin). During the closed beta, someone without an account who opens the link sees the recipe and can ask for an invitation — with their address already filled in when it came by e-mail.",
+  "- 📨 SEND A RECIPE TO ANOTHER KITCHEN: open the recipe → 📤 Share → 📨 Send to another kitchen. Via My Kitchen Notes: type their kitchen's identifier (MKN-…) — it pops up in their app, with a sound, and waits in ⋯ More → 📨 Recipes sent to me. Or ✉️ Via Email (type their address: the app e-mails them its photo, your note and a button to save it — no mail program needed; your own mail is offered only if the app cannot send it), Via WhatsApp, 📤 Via another app (on a phone or a tablet: its share menu, with the link — if the phone asks for one more tap, press 📤 Open the share menu), or Copy the link: anyone with the link can open it, even without an account. It is a copy of the recipe as it is now — photo, bold words, notes and all; not your cooking log, ratings or the heart — with a note from you if you like. They tap 📥 Save to my recipes and it is theirs, no AI involved. It keeps for 4 weeks. ⋯ More → 📤 Recipes I sent shows whether it was saved, copies a link again, sends it again, and takes one back — tick several (or Select all) to do it for all of them at once: ↩️ Take back, 📨 Send again (to a kitchen: it pops up in their app again for 4 more weeks, the earlier one taken back; a link: new links, good for 4 more weeks, in one message — the earlier ones keep working until they expire), 🔗 Copy the links. A kitchen that gets unwanted recipes can 🚫 Block the sender (the owner or an admin). During the closed beta, someone without an account who opens the link sees the recipe and can ask for an invitation — with their address already filled in when it came by e-mail.",
   "- ✉️ E-MAIL A RECIPE (📤 Share → ✉️ Email): type their address and press 📨 Send — the app e-mails the recipe, laid out with its photo, from your kitchen's name via My Kitchen Notes; their reply comes to your own address. Nothing to paste, and no mail program needed (signed in, your address confirmed; up to 15 e-mails a day). On a phone, 📤 Share menu hands the photo and the recipe to the mail app you pick. 📋 Copy copies it, photo and all, to paste anywhere else. (To send a recipe that another kitchen saves with one tap, use 📨 Send to another kitchen.)",
   "- 🔒 SECRET RECIPES: in the editor, tick 🔒 Secret — the recipe (and its photo) is then kept where only your own kitchen can read it; the kitchens you link with do not see it, nor know it exists. Untick it to share it again. A 🔒 shows on its card.",
   "- 🔄 RELOAD A LINKED KITCHEN: beside a linked kitchen's name in your recipe list, 🔄 Reload reads its recipes and photos again from the start — for when something looks missing or out of date.",
@@ -33066,6 +33098,7 @@ var HELP_SYSTEM_PROMPT = [
   "- ♿ ACCESSIBILITY: ⚙️ → ♿ Accessibility, on this device: 🎨 Colours for red–green colour blindness (the most common colour blindness, where reds and greens look alike, brownish): wherever a colour says something, green becomes blue and red becomes a deep orange — all right / a problem, the sync dot, Easy and Hard, the Self Test's results, delete buttons — and a notification dot turns blue inside its ring; and the recipe photos are colour-corrected, so a red tomato and a green pepper no longer look alike (they look a little different to everyone else). For the whole phone, an iPhone has its own: Settings → Accessibility → Display & Text Size → Color Filters → Red/Green Filter; Android: Settings → Accessibility → Color correction. 🟡 A yellow ring round the notification dots (on unless turned off) so a new message or request catches the eye, on ⋯ More and in ⚙️. 🌗 Theme: light, dark, or as the device. 🔔 the sound when something arrives, and 🎵 which sound.",
   "- 👉 NOTICES THAT TAKE YOU THERE: a notice at the bottom of the screen with a › at its end is a button — tap or click it (or Enter) to go where it points: a new message opens its chat; a kitchen linked or accepted shows only that kitchen's recipes; a recipe saved, imported, copied, translated or added opens it; a note from a tester opens 👑 → 📊 Households → 💬 Feedback; someone asking to add recipes, or joining, opens 👥 Family Access; a link request sent opens 📬 Link requests; a backup opens 💾 Backups; a failed sync or the AI allowance opens Sync Health; an error opens the log. The place it leads to is marked with a yellow ring for a moment. Such a notice stays up at least 6 seconds; a notice about what is already on the screen has no › and goes nowhere. On a notice with a button (Open, ↩︎ Undo, Back up now) the button does its own thing — tapping the words of an Undo notice never undoes.",
   "- 🔔 A SOUND WHEN SOMETHING ARRIVES: a message (from a linked kitchen, from your family, an answer to your note) taps twice; a request to link kitchens taps three times. Choose the sound — 🥂 Spoon on a wine glass, 🛎️ The kitchen’s service bell, 🥄 Wooden spoon on a pot, each with ▶ to hear it — in ⚙️ → ♿ Accessibility → 🎵 The sound; untick 🔔 Sound for messages and requests to mute it. On this device only. Browsers keep a page silent until it has been touched once since opening, so a message that arrives before that is not heard. On a phone it plays at the media volume; an iPhone on silent (the switch on its side) plays no sound.",
+  "- 🪪 YOUR IDENTIFIER: at the top of the main screen, at the end of the line under the buttons — 🪪 MKN-XXXX-XXXX. Click (or tap) it to copy it: it says ✅ Copied! for a moment; then paste it to whoever wants to link their kitchen with yours or send you a recipe. Rest the mouse on it to see what it is. ⚙️ → 🏠 My household → 🪪 Display my personal identifier shows it large, with Copy and Share. It names your household, not you — no e-mail address.",
   "- A household's identifier works only within the same copy of the app: the family's copy and My Kitchen Notes keep their households apart.",
   "",
   "=== SAVING RECIPES FROM OTHER APPS ===",
@@ -33098,7 +33131,7 @@ var HELP_SYSTEM_PROMPT = [
   "- Every item in ⚙️ explains itself when you point at it.",
   "",
   "=== FOR THE APP'S OWNER ===",
-  "- ⚙️ → 👑 App owner is shown only to the app's owner: 📊 Households, 🩺 Server allowances, 📲 Phone alerts (which alerts also ring on the phone in the Pushover app, each on or off, and a test), ✉️ Invite testers, 💳 Payments, 🚀 Deployments, 🔑 Check the app's key, 🔐 Two-step sign-in for the owner, 🧑‍🍳 Preview the first-visit setup (every page of it, nothing recorded), 📧 Gmail Setup, 🛒 Bring!",
+  "- ⚙️ → 👑 App owner is shown only to the app's owner: 📊 Households, 🩺 Server allowances, 📲 Phone alerts (which alerts also ring on the phone in the Pushover app, each on or off, and a test — among them the recipe e-mails: Resend refusing or not answering, a quota at 70% or used up), ✉️ Invite testers, 💳 Payments, 🚀 Deployments (a link to every console — Resend, which sends the recipe e-mails, too: its sent e-mails, domain, key, usage and plan), 🔑 Check the app's key, 🔐 Two-step sign-in for the owner, 🧑‍🍳 Preview the first-visit setup (every page of it, nothing recorded), 📧 Gmail Setup, 🛒 Bring!",
   "- 📊 Households → 💬 Feedback (the owner's): a request for an invitation has ✉️ Send invitation — ✉️ Invite testers opens with that address in To (a request from another copy opens that copy's app, where its invitations belong).",
   "- 📊 Households → 💬 Feedback and ⚠️ Errors (the owner's): tick several (or Select all shown), then 👀 Seen (n), ✅ Done (n) or 🗑 Delete selected (n) for all of them at once. 👀 Seen = read, off the ⚙️ red dot, still under 'Not done yet'; ✅ Done = also off that list (still under All). Deleting several asks once and sends one alert",
   "- ✉️ Invite testers: the tester invitation in English or עברית, with this copy's link; the wording can be changed (this device keeps it; 'The original words' brings it back). Paste the addresses; 📧 Send with Gmail sends each person their own e-mail, from the app's address when the owner's Gmail may send as it. Also ✉️ Mail app, 💬 WhatsApp and 📋 Copy. The first Gmail send needs the Gmail API switched on for the copy's Google Cloud project, and Google's permission",

@@ -1476,7 +1476,19 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
       tooltip "Your personal identifier — click to copy it to the clipboard. …"; a click copies it and the chip turns
       green "✅ Copied!" for 1.8 s (same width); no clipboard → `openMyIdentifier()`. Shown only while signed in to a
       household with a code (`idBadgeUpdate` from `householdBrand` and sign-out). Help and the send window point to it.
-    - Self Tests: `gift_email_by_server`, `identifier_on_main_screen`, the e-mail rows in `firebase_limits_told`.
+    - **📤 Via another app: phones and tablets only, and a refused share menu no longer silent** (Tony, 29 Oct: "What
+      does the following flow do Send to another kitchen --> via another app? It does not seem to do anything." Then:
+      "On my iPhone it indeed appears to open share options. Nothing happens on the PC. Perhaps it should not appear on
+      a PC at all?"). `shareMenuHere()` = `navigator.share` && not a computer (`!extIsComputer()` — iPhone/iPad incl.
+      iPadOS-as-Mac, Android, "Mobile"), as 📲 Share via… always was: used by Send to another kitchen, the link request
+      window, `shareOptions` (Another app…), the ✉️ Email window's 📤 Share menu and `shareSelected`. And `shareMenu`
+      (every `shareDo('share')`): the link is made first (a Firestore write, the photo too), so on a slow connection the
+      tap may have expired — NotAllowedError → "Ready to send — 📤 Open the share menu" (a fresh tap), then again;
+      AbortError (closed) → null, and the send window says "Not sent. The link is kept …"; any other failure → the
+      message copied, said so. (Linux Chromium in the cloud has no Web Share: tested with stubs.)
+    - Self Tests: `gift_email_by_server`, `identifier_on_main_screen`, `share_menu_after_the_link_is_made`, the e-mail
+      rows in `firebase_limits_told`; `email_recipe_link` checks the share menu is not offered on a computer.
+    - CI on 677a683 (v39.16 before the share fix): Deploy the Worker (live v99), Self Tests, Cloudflare Pages — success.
   - **v39.15 + Worker v98 — the e-mail sent by the server** (Tony, 29 Oct, on v39.14's paste: "Copy/pasting the recipe is
     unacceptable. The users could not be expected to need to remember to paste the recipe. They will end up with an empty
     mail message. We need to find a better way where no pasting is necessary." Asked: server / phone share menu / both →

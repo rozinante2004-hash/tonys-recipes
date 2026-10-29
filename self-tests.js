@@ -4802,6 +4802,68 @@ window.SELF_TESTS = [
       }
     } },
 
+  // v39.16 — Tony, 29 Oct 2026: "What does the following flow do Send to another kitchen --> via another app? It does not
+  // seem to do anything." The link is made first, the tap expires, the browser refuses the share menu — and that was
+  // swallowed.
+  { id:'share_menu_after_the_link_is_made', group:'Sync', name:'📨 Send to another kitchen → 📤 Via another app: on phones and tablets only; a share menu refused for want of a tap asks for one more tap; closed is nothing; anything else copies the message (v39.16)',
+    test: async()=>{
+      if(typeof shareMenu!=='function') throw new Error('shareMenu not defined');
+      var rid=TEST_ID_MIN+9641, gid='gSHAREshareSHAREsh001';
+      var hadShare=Object.prototype.hasOwnProperty.call(navigator, 'share'), realShare=navigator.share;
+      var ownWrite=navigator.clipboard && Object.prototype.hasOwnProperty.call(navigator.clipboard, 'writeText'), realWrite=navigator.clipboard && navigator.clipboard.writeText;
+      var setWrite=function(fn){ try{ Object.defineProperty(navigator.clipboard, 'writeText', { value:fn, configurable:true, writable:true }); }catch(e){ navigator.clipboard.writeText=fn; } };
+      var real={ db:window._fbDb, user:window._fbUser, hh:window._household, choice:window.askChoice, confirm:window.askConfirm, send:window.giftSend, toast:window.toast, here:window.shareMenuHere };
+      var shared=[], said=[], toasts=[], copied=[], answers=[], ch=[], cf=[], offered=[];
+      var refuse=function(name){ return Object.assign(new Error(name), { name:name }); };
+      recipes.unshift(normalizeRecipe({ id:rid, name:'Shakshuka', ingredients:[{ a:'4', n:'eggs' }], steps:['Cook.'] }));
+      try{
+        navigator.share=async function(d){ var a=answers.shift(); if(a) throw refuse(a); shared.push(d); };
+        setWrite(async function(t){ copied.push(t); });
+        window.askChoice=async function(m, o){ offered.push((o||[]).map(function(x){ return x.value; })); return ch.shift(); };
+        window.askConfirm=async function(o){ said.push(o); return cf.length ? cf.shift() : true; };
+        window.toast=function(m){ toasts.push(String(m)); };
+        // Tony: "On my iPhone it indeed appears to open share options. Nothing happens on the PC. Perhaps it should not
+        // appear on a PC at all?" — offered on a phone or a tablet only
+        window._fbDb=window._fbDb || {};
+        window._fbUser={ uid:'uA', email:'a@example.com', emailVerified:true };
+        _household={ hid:'hA', name:'Kitchen A', code:'MKN-AAAA-2222', role:'owner' }; window._household=_household;
+        window.shareMenuHere=function(){ return false; }; ch=[null];
+        await openSendRecipe(rid);
+        if(offered[0].indexOf('share')>-1 || shareOptions({}).some(function(x){ return x.value==='share'; })) throw new Error('“Via another app” offered on a computer: '+JSON.stringify(offered[0]));
+        window.shareMenuHere=function(){ return true; }; ch=[null];
+        await openSendRecipe(rid);
+        if(offered[1].indexOf('share')<0) throw new Error('“Via another app” not offered on a phone: '+JSON.stringify(offered[1]));
+        // the whole way: the link made, the share menu refused (the tap expired), one more tap, and it opens
+        window._fbDb=window._fbDb || {};
+        window._fbUser={ uid:'uA', email:'a@example.com', emailVerified:true };
+        _household={ hid:'hA', name:'Kitchen A', code:'MKN-AAAA-2222', role:'owner' }; window._household=_household;
+        window.giftSend=async function(rr, o){ return { id:gid, url:giftUrl(gid), name:rr.name }; };
+        ch=['share']; cf=['', true]; answers=['NotAllowedError'];
+        var made=await openSendRecipe(rid);
+        var tap=said.filter(function(o){ return /Open the share menu/.test(o.okLabel||''); })[0];
+        if(!made || !tap) throw new Error('no second tap asked for: '+JSON.stringify(said.map(function(o){ return o.title; })));
+        if(shared.length!==1 || shared[0].text.indexOf('?recipe='+gid)<0 || !/Kitchen A sent you a recipe for “Shakshuka”/.test(shared[0].text)) throw new Error('the share menu did not open with the link: '+JSON.stringify(shared));
+        if(!toasts.some(function(t){ return /on its way/.test(t); })) throw new Error('not said: '+JSON.stringify(toasts));
+        // closed by the person: nothing more, and said so in the send window
+        shared=[]; said=[]; toasts=[]; ch=['share']; cf=['']; answers=['AbortError'];
+        await openSendRecipe(rid);
+        if(shared.length || said.some(function(o){ return /Open the share menu/.test(o.okLabel||''); }) || !toasts.some(function(t){ return /Not sent/.test(t); })) throw new Error('a closed menu: '+JSON.stringify([shared, toasts]));
+        // the second tap declined: nothing
+        answers=['NotAllowedError']; cf=[false];
+        if(await shareMenu({ subject:'S', text:'T' })!==null || shared.length) throw new Error('a declined tap still shared');
+        // any other failure: the message copied instead, and said so
+        toasts=[]; answers=['DataError'];
+        if(await shareMenu({ subject:'S', text:'The message' })!=='copy' || copied.pop()!=='The message' || !toasts.some(function(t){ return /copied instead/.test(t); })) throw new Error('not copied instead: '+JSON.stringify(toasts));
+        return 'refused → one more tap → the menu opens with the link; closed → not sent, said; other failures → copied';
+      } finally {
+        if(hadShare) navigator.share=realShare; else { try{ delete navigator.share; }catch(e){} }
+        try{ if(ownWrite) setWrite(realWrite); else delete navigator.clipboard.writeText; }catch(e){}
+        window._fbDb=real.db; window._fbUser=real.user; _household=real.hh; window._household=real.hh; window.askChoice=real.choice; window.askConfirm=real.confirm;
+        window.giftSend=real.send; window.toast=real.toast; window.shareMenuHere=real.here;
+        var i=recipes.findIndex(function(x){ return x.id===rid; }); if(i>-1) recipes.splice(i,1);
+      }
+    } },
+
   // v39.16 — Tony, 29 Oct 2026: "Can we use the same Resend .com mailing mechanism when sharing between kitchens via email?"
   { id:'gift_email_by_server', group:'Sync', name:'📨 Send to another kitchen → ✉️ Via Email: the app sends it — its address, a note, nothing for a mail program; your own mail only when the app cannot (v39.16)',
     test: async()=>{
@@ -4920,9 +4982,16 @@ window.SELF_TESTS = [
         var it=clip.rich[0] && clip.rich[0][0], html=it ? await (await it.getType('text/html')).text() : '';
         if(html.indexOf(photo)<0 || html.indexOf('משרים את החומוס')<0) throw new Error('📋 Copy lacks the photo or the recipe');
         ov.remove();
-        // 📤 Share menu, where the device shares pictures: the photo as a file, the recipe as the text
-        var shareWas={ s:navigator.share, c:navigator.canShare }, shared=[]; real.shareWas=shareWas;
+        // 📤 Share menu, where the device shares pictures: the photo as a file, the recipe as the text — on a phone or a
+        // tablet only (v39.16): on a computer it is not offered
+        var shareWas={ s:navigator.share, c:navigator.canShare, here:window.shareMenuHere }, shared=[]; real.shareWas=shareWas;
         navigator.share=async function(o){ shared.push(o); }; navigator.canShare=function(o){ return !!(o && o.files && o.files.length); };
+        window.shareMenuHere=function(){ return false; };
+        showEmailModal(longR.id); ov=document.getElementById('emailModalOverlay');
+        await wait(600);
+        if(ov.querySelector('#emailShareMenuBtn').style.display!=='none') throw new Error('the share menu is offered on a computer');
+        ov.remove();
+        window.shareMenuHere=function(){ return true; };
         showEmailModal(longR.id); ov=document.getElementById('emailModalOverlay');
         for(var w2=0;w2<60 && ov.querySelector('#emailShareMenuBtn').style.display==='none';w2++) await wait(50);
         if(ov.querySelector('#emailShareMenuBtn').style.display==='none') throw new Error('the share menu is not offered where the device shares pictures');
@@ -4960,7 +5029,7 @@ window.SELF_TESTS = [
         if(real.tmp3) recipes=recipes.filter(function(x){ return x.id!==real.tmp3; });
         if(real.fetch) window.fetch=real.fetch;
         if('hhWas' in real){ window._household=_household=real.hhWas; window._fbUser=real.userWas; }
-        if(real.shareWas){ navigator.share=real.shareWas.s; navigator.canShare=real.shareWas.c; }
+        if(real.shareWas){ navigator.share=real.shareWas.s; navigator.canShare=real.shareWas.c; window.shareMenuHere=real.shareWas.here; }
         if(real.clipWas) try { Object.defineProperty(navigator,'clipboard',real.clipWas); } catch(e) {}
         else if(real.clipWas===undefined && 'clipWas' in real) try { delete navigator.clipboard; } catch(e) {}
         ['emailModalOverlay','inviteOverlay'].forEach(function(x){ var e=document.getElementById(x); if(e) e.remove(); });
