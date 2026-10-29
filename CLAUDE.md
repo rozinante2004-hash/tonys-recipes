@@ -1437,6 +1437,14 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
   - **Released: v39.09 (29 Oct 2026, 11:17 Israel time, on 0de2dde; Tony: "Yes, release v39.09").** Every job success:
     Deploy to GitHub Pages, pages build, Publish languages, Translate new phrases, Self Tests on main and test,
     Cloudflare Pages for the beta and test.
+  - **v39.13 — 📤 Recipes I sent: several at once** (Tony, 29 Oct: "select several items, like we have in the Feedback
+    page … (Take it back, Resend, Copy the link)"). A tick on each card (`.go-pick`, `giftPick`), Select all (`#goAll`,
+    `giftPickAll`, indeterminate when some), and a sticky bar (`#goBar`, `giftBarShow`): ↩️ Take back (n), 📨 Send again
+    (n), 🔗 Copy the links (n — links only; "No link to copy" when only kitchens are ticked). `giftOutBulk`. Send again
+    (`giftResend`, also per card): to a kitchen → a fresh `giftSend` from the gift's own copy and photo, same note, then
+    the earlier one deleted (no two waiting); a link → a new link (4 more weeks), all new links in ONE message
+    (`shareMessage`), the earlier links left working until they expire (others may hold them). No rules change.
+    Self Test `sent_recipes` step 8.
   - **v39.12 — what Tony found trying v39.11 (29 Oct, Chrome on Linux): Gmail "Bad Request Error 400", Outlook's
     server (Akamai) "Bad Request", Yahoo put the recipe in the recipients; "Select mail application" opened BEHIND the
     e-mail window; Chrome's "Save password? saved@x.example" during the Self Test; 3 × "Could not listen to the family

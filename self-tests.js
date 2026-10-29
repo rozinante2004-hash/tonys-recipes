@@ -4612,7 +4612,7 @@ window.SELF_TESTS = [
 
   // v39.10 — Tony, 29 Oct 2026: "sending a recipe between registered users … the recipient just needs to click a "Save
   // to my recipes" button and it is immediately added to their list of recipes, without any AI involvement".
-  { id:'sent_recipes', group:'Sync', name:'A recipe sent to another kitchen: a copy, saved with one tap; the link; what became of it (v39.10)',
+  { id:'sent_recipes', group:'Sync', name:'A recipe sent to another kitchen: a copy, saved with one tap; the link; what became of it; several at once — take back, send again, copy the links (v39.10, v39.13)',
     test: async()=>{
       ['openSendRecipe','openGiftsIn','openGiftsOut','giftSend','giftSave','giftPayload','giftReceived','giftFromUrl','giftSweep','giftStatus','giftNewId'].forEach(function(f){
         if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
@@ -4714,6 +4714,37 @@ window.SELF_TESTS = [
         // 7. A blocked kitchen's recipes do not wait.
         _linkState.log={ hA:{ status:'blocked' } };
         if(giftWaiting({ id:'x', d:{ from:'hA', to:'hB', expireAt:firebase.firestore.Timestamp.fromMillis(Date.now()+864e5) } })) throw new Error('a blocked kitchen’s recipe still waits');
+        _linkState.log={};
+        // 8. v39.13 — Tony: "select several items … Take it back, Resend, Copy the link" for all the selected.
+        var src=recipes.filter(function(x){ return x.id===rid; })[0];
+        var a1=await giftSend(src, { via:'app', to:'hB', toCode:'MKN-BBBB-2222', note:'Again!' });
+        var l1=await giftSend(src, { via:'whatsapp' }), l2=await giftSend(src, { via:'email' });
+        await openGiftsOut();
+        if(!document.getElementById('goBar') || document.querySelectorAll('#goBody .go-pick').length!==3) throw new Error('📤 Recipes I sent has no ticks or no bar');
+        if(!document.getElementById('goBulkBack').disabled) throw new Error('nothing ticked, yet the bar can act');
+        giftPickAll(true);
+        if(giftPicked().length!==3 || !/\(3\)/.test(document.getElementById('goBulkBack').textContent) || !/\(2\)/.test(document.getElementById('goBulkCopy').textContent))
+          throw new Error('Select all, and the counts: '+document.getElementById('goBar').textContent);
+        // Copy the links: the two links, not the one sent in the app
+        var clipped=[], clipWas=Object.getOwnPropertyDescriptor(navigator,'clipboard');
+        Object.defineProperty(navigator,'clipboard',{ configurable:true, value:{ writeText:async function(t){ clipped.push(String(t)); } } });
+        try { await giftOutBulk('copy'); } finally { if(clipWas) Object.defineProperty(navigator,'clipboard',clipWas); else delete navigator.clipboard; }
+        if(clipped.length!==1 || clipped[0].indexOf(giftUrl(l1.id))<0 || clipped[0].indexOf(giftUrl(l2.id))<0 || clipped[0].indexOf(giftUrl(a1.id))>-1)
+          throw new Error('Copy the links: '+JSON.stringify(clipped));
+        // Send again: the one to a kitchen comes anew (the earlier taken back); the links get new links, in one message
+        var shareWas=window.shareMessage, msgs=[]; window.shareMessage=async function(o){ msgs.push(o); return 'copy'; };
+        cf=[true];
+        try { if(await giftOutBulk('resend')!==3) throw new Error('not all three sent again'); } finally { window.shareMessage=shareWas; }
+        if(store['recipeGifts/'+a1.id]) throw new Error('the earlier one to the kitchen was not taken back');
+        var toB=Object.keys(store).filter(function(k){ return /^recipeGifts\//.test(k) && store[k].to==='hB'; });
+        if(toB.length!==1 || store[toB[0]].note!=='Again!' || store[toB[0]].photo!==true || !store['recipeGiftPhotos/'+toB[0].split('/')[1]]) throw new Error('sent again to the kitchen: '+JSON.stringify(toB));
+        if(!store['recipeGifts/'+l1.id] || !store['recipeGifts/'+l2.id]) throw new Error('the earlier links stopped working');
+        if(msgs.length!==1 || !/2 recipes/.test(msgs[0].text) || (msgs[0].text.match(/\?recipe=/g)||[]).length!==2 || msgs[0].text.indexOf(giftUrl(l1.id))>-1) throw new Error('the new links, in one message: '+JSON.stringify(msgs).slice(0,300));
+        if((_gifts.sent||[]).length!==5 || giftPicked().length) throw new Error('the list after sending again: '+(_gifts.sent||[]).length+' listed, '+giftPicked().length+' still ticked');
+        // Take back all ticked, after one question
+        giftPickAll(true); cf=[true];
+        if(await giftOutBulk('withdraw')!==5 || Object.keys(store).some(function(k){ return /^recipeGift/.test(k); })) throw new Error('taking all back: '+JSON.stringify(Object.keys(store)));
+        var gov=document.getElementById('giftsOutOverlay'); if(gov) gov.remove();
       } finally {
         window._fbDb=real.db; window._fbUser=real.user; _household=real.hh; window._household=real.hh; window._giftUnderTest=false;
         recipes=real.recipes; nextId=real.next; window.askChoice=real.choice; window.askConfirm=real.confirm; window.shareDo=real.share; _linkState.log=real.log;
@@ -4721,6 +4752,7 @@ window.SELF_TESTS = [
         Object.keys(real.keys).forEach(function(k){ try{ if(real.keys[k]===null) localStorage.removeItem(k); else localStorage.setItem(k, real.keys[k]); }catch(e){} });
         try{ if(sess===null) sessionStorage.removeItem('mkn_gift'); else sessionStorage.setItem('mkn_gift', sess); }catch(e){}
         var ov=document.getElementById('askOverlay'); if(ov) ov.remove();
+        var gov2=document.getElementById('giftsOutOverlay'); if(gov2) gov2.remove(); _gifts.picked={};
       }
     } },
 

@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.12 -->
+<!-- Tony's Recipes Collection v39.13 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -7578,25 +7578,64 @@ function giftStatus(d) {
   return n ? '✅ Saved by ' + n + (n === 1 ? ' kitchen' : ' kitchens') + ' — the link keeps until ' + giftDay(d.expireAt)
            : '⏳ Not saved yet — the link keeps until ' + giftDay(d.expireAt);
 }
+// v39.13 — Tony: "select several items, like we have in the Feedback page, and add the relevant options to be applied on
+// all the selected items (Take it back, Resend, Copy the link)". A tick on each, Select all, and the three for all ticked.
 function giftRenderOut() {
   var body = document.getElementById('goBody');
   if (!body) return;
   var all = _gifts.sent || [], how = { email: 'a link, by e-mail', whatsapp: 'a link, on WhatsApp', link: 'a link' };
+  var picked = _gifts.picked = _gifts.picked || {};
+  Object.keys(picked).forEach(function(id){ if (!all.some(function(g){ return g.id === id; })) delete picked[id]; });
   var btn = 'padding:6px 11px;border-radius:8px;font-size:12.5px;font-weight:600;cursor:pointer;min-height:32px;font-family:inherit;';
+  var ghost = btn + 'background:var(--card-bg);color:var(--heading);border:1px solid var(--border);';
   var h = '<div style="font-size:12.5px;color:var(--muted);line-height:1.5;margin:4px 0 12px;">What your kitchen sent in the last 4 weeks, and what became of it. Taken back, or 4 weeks old, a recipe is gone from here and from their list — what they saved stays theirs.</div>';
+  if (all.length) h += '<div id="goBar" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;position:sticky;top:-1px;z-index:2;background:inherit;padding:6px 0 8px;margin-bottom:6px;border-bottom:1px solid var(--border);">'
+    + '<label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;cursor:pointer;margin-inline-end:4px;"><input type="checkbox" id="goAll" onchange="giftPickAll(this.checked)"> <span>Select all</span></label>'
+    + '<button type="button" id="goBulkBack" style="' + ghost + '" onclick="giftOutBulk(\'withdraw\')">↩️ <span>Take back</span> <span data-no-i18n class="go-n"></span></button>'
+    + '<button type="button" id="goBulkAgain" style="' + ghost + '" onclick="giftOutBulk(\'resend\')">\u{1F4E8} <span>Send again</span> <span data-no-i18n class="go-n"></span></button>'
+    + '<button type="button" id="goBulkCopy" style="' + ghost + '" onclick="giftOutBulk(\'copy\')">\u{1F517} <span>Copy the links</span> <span data-no-i18n class="go-n"></span></button></div>';
   h += all.length ? all.map(function(g, i){
       var d = g.d;
-      return '<div style="border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px;">'
-        + '<b dir="auto" data-no-i18n>' + escH(d.name) + '</b>'
+      return '<div class="go-card" data-id="' + escA(g.id) + '" style="border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px;">'
+        + '<div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start;"><b dir="auto" data-no-i18n>' + escH(d.name) + '</b>'
+        + '<label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--muted);cursor:pointer;white-space:nowrap;"><input type="checkbox" class="go-pick"' + (picked[g.id] ? ' checked' : '')
+        + ' onchange="giftPick(' + i + ', this.checked)" aria-label="Select this one (for Take back, Send again or Copy the links, for all selected)"> <span>Select</span></label></div>'
         + '<div style="font-size:12px;color:var(--muted);margin-top:2px;"><span>to</span> ' + (d.to ? '<span data-no-i18n style="font-family:ui-monospace,Menlo,monospace;">' + escH(d.toCode || '') + '</span>' : '<span>' + escH(how[d.via] || 'a link') + '</span>')
         + ' · <span>sent</span> <span data-no-i18n>' + escH(giftDay(d.at)) + '</span></div>'
         + '<div style="font-size:12.5px;margin-top:4px;">' + escH(giftStatus(d)) + '</div>'
         + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">'
-        +   (d.to ? '' : '<button type="button" style="' + btn + 'background:var(--card-bg);color:var(--heading);border:1px solid var(--border);" onclick="giftOutAct(' + i + ',\'copy\')">\u{1F517} Copy the link</button>')
-        +   '<button type="button" style="' + btn + 'background:var(--card-bg);color:var(--heading);border:1px solid var(--border);" onclick="giftOutAct(' + i + ',\'withdraw\')">↩️ Take it back</button>'
+        +   (d.to ? '' : '<button type="button" style="' + ghost + '" onclick="giftOutAct(' + i + ',\'copy\')">\u{1F517} Copy the link</button>')
+        +   '<button type="button" style="' + ghost + '" onclick="giftOutAct(' + i + ',\'resend\')">\u{1F4E8} Send again</button>'
+        +   '<button type="button" style="' + ghost + '" onclick="giftOutAct(' + i + ',\'withdraw\')">↩️ Take it back</button>'
         + '</div></div>';
     }).join('') : '<div style="font-size:13px;color:var(--muted);padding:2px 0 8px;">Nothing sent in the last 4 weeks. To send one: open a recipe → \u{1F4E4} Share → \u{1F4E8} Send to another kitchen.</div>';
   body.innerHTML = h;
+  giftBarShow();
+}
+function giftPicked() { var p = _gifts.picked || {}; return (_gifts.sent || []).filter(function(g){ return p[g.id]; }); }
+// The bar: how many are ticked, on each of its buttons; nothing ticked, nothing to press.
+function giftBarShow() {
+  var n = giftPicked().length, all = (_gifts.sent || []).length, links = giftPicked().filter(function(g){ return !g.d.to; }).length;
+  Array.prototype.forEach.call(document.querySelectorAll('#goBar .go-n'), function(x){ x.textContent = n ? '(' + n + ')' : ''; });
+  var copyN = document.querySelector('#goBulkCopy .go-n'); if (copyN) copyN.textContent = links ? '(' + links + ')' : '';
+  ['goBulkBack', 'goBulkAgain'].forEach(function(id){ var b = document.getElementById(id); if (b) { b.disabled = !n; b.style.opacity = n ? '' : '.5'; } });
+  var c = document.getElementById('goBulkCopy'); if (c) { c.disabled = !links; c.style.opacity = links ? '' : '.5'; c.title = n && !links ? 'Only one sent as a link has a link to copy' : ''; }
+  var a = document.getElementById('goAll'); if (a) { a.checked = !!all && n === all; a.indeterminate = !!n && n < all; }
+  Array.prototype.forEach.call(document.querySelectorAll('#goBody .go-card'), function(card){
+    card.style.background = (_gifts.picked || {})[card.getAttribute('data-id')] ? 'var(--note-bg)' : ''; });
+  return n;
+}
+function giftPick(i, on) {
+  var g = (_gifts.sent || [])[i]; if (!g) return 0;
+  _gifts.picked = _gifts.picked || {};
+  if (on) _gifts.picked[g.id] = 1; else delete _gifts.picked[g.id];
+  return giftBarShow();
+}
+function giftPickAll(on) {
+  _gifts.picked = {};
+  if (on) (_gifts.sent || []).forEach(function(g){ _gifts.picked[g.id] = 1; });
+  Array.prototype.forEach.call(document.querySelectorAll('#goBody .go-pick'), function(x){ x.checked = !!on; });
+  return giftBarShow();
 }
 async function giftOutAct(i, what) {
   var g = (_gifts.sent || [])[i];
@@ -7606,12 +7645,72 @@ async function giftOutAct(i, what) {
     catch(e) { await askConfirm({ icon: '\u{1F517}', title: 'The link', message: giftUrl(g.id), okLabel: 'OK' }); }
     return 'copied';
   }
+  if (what === 'resend') return await giftResend([g]);
   if (await askConfirm({ icon: '↩️', title: 'Take back “' + g.d.name + '”?', message: 'It goes from their list, and the link stops working. A copy they already saved stays theirs.', okLabel: 'Take it back', cancelLabel: 'Cancel' }) !== true) return false;
   try { await giftDelete(g); } catch(e) { toast('Could not take it back: ' + (e && e.message), 7000); return false; }
   _gifts.sent = (_gifts.sent || []).filter(function(x){ return x.id !== g.id; });
   syncLog('save', 'Took back a sent recipe', { name: g.d.name });
   giftRenderOut();
   return 'withdrawn';
+}
+// The three, for every one ticked.
+async function giftOutBulk(what) {
+  var list = giftPicked();
+  if (!list.length) return false;
+  if (what === 'copy') {
+    var links = list.filter(function(g){ return !g.d.to; }), skipped = list.length - links.length;
+    if (!links.length) { await askConfirm({ icon: '\u{1F517}', title: 'No link to copy', message: 'These went to kitchens in the app — only a recipe sent as a link has one.', okLabel: 'OK' }); return false; }
+    var text = links.map(function(g){ return g.d.name + ': ' + giftUrl(g.id); }).join('\n');
+    try { await navigator.clipboard.writeText(text); toast('\u{1F4CB} ' + links.length + (links.length === 1 ? ' link' : ' links') + ' copied' + (skipped ? ' — ' + skipped + ' sent in the app had none' : ''), 6000); }
+    catch(e) { await askConfirm({ icon: '\u{1F517}', title: 'The links', message: text, okLabel: 'OK' }); }
+    return 'copied';
+  }
+  if (what === 'resend') return await giftResend(list);
+  var n = list.length;
+  if (await askConfirm({ icon: '↩️', title: 'Take back ' + n + (n === 1 ? ' recipe' : ' recipes') + '?',
+      message: 'They go from their lists, and their links stop working. Copies already saved stay theirs.', okLabel: 'Take them back', cancelLabel: 'Cancel' }) !== true) return false;
+  var gone = 0, failed = '';
+  for (var i = 0; i < list.length; i++) {
+    try { await giftDelete(list[i]); gone++; _gifts.sent = (_gifts.sent || []).filter(function(x){ return x.id !== list[i].id; }); delete _gifts.picked[list[i].id]; }
+    catch(e) { failed = failed || ((e && e.message) || String(e)); }
+  }
+  if (gone) syncLog('save', 'Took back ' + gone + ' sent recipe(s)', '');
+  giftRenderOut();
+  toast(failed ? 'Took back ' + gone + ' of ' + n + ' — ' + failed : '↩️ Took back ' + gone + (gone === 1 ? ' recipe' : ' recipes'), 7000);
+  return gone;
+}
+// Send again: to a kitchen in the app, a fresh copy pops up in their app for 4 more weeks, and the earlier one is taken
+// back (no two of the same waiting); as a link, a new link for 4 more weeks, sent the way chosen — several in one
+// message — while the earlier links keep working until they expire (others may have them).
+async function giftResend(list) {
+  var n = list.length, toKitchens = list.filter(function(g){ return !!g.d.to; }).length, links = n - toKitchens;
+  if (await askConfirm({ icon: '\u{1F4E8}', title: n === 1 ? 'Send “' + list[0].d.name + '” again?' : 'Send ' + n + ' recipes again?',
+      message: (toKitchens ? 'To a kitchen in the app: it pops up in their app again, for 4 more weeks; the earlier one is taken back.' : '')
+        + (toKitchens && links ? '\n\n' : '') + (links ? 'Sent as a link: a new link, good for 4 more weeks — you choose how to send it. The earlier link keeps working until it expires.' : ''),
+      okLabel: 'Send again', cancelLabel: 'Cancel' }) !== true) return false;
+  var made = [], failed = '', again = 0;
+  for (var i = 0; i < list.length; i++) {
+    var g = list[i], d = g.d || {};
+    try {
+      var r = Object.assign(JSON.parse(JSON.stringify(d.recipe || {})), { name: d.name, photo: await giftPhoto(g) });
+      if (d.to) { await giftSend(r, { via: 'app', to: d.to, toCode: d.toCode || '', note: d.note || '' }); try { await giftDelete(g); } catch(e2) {} again++; }
+      else { made.push(await giftSend(r, { via: d.via || 'link', note: d.note || '' })); again++; }
+    } catch(e) { failed = failed || giftErrText(e); }
+  }
+  _gifts.picked = {};
+  _gifts.sent = (await giftSentList()).filter(function(x){ return giftLive(x.d); });
+  giftRenderOut();
+  if (made.length) {
+    var kname = (_household && _household.name) || 'My kitchen', text = made.length === 1
+      ? kname + ' sent you a recipe for “' + made[0].name + '” from My Kitchen Notes.\n\nOpen it to see it, and save it to your recipes with one tap (the link keeps for 4 weeks):\n' + giftUrl(made[0].id)
+      : kname + ' sent you ' + made.length + ' recipes from My Kitchen Notes. Open each to see it, and save it to your recipes with one tap (the links keep for 4 weeks):\n\n'
+        + made.map(function(m){ return '• ' + m.name + ':\n' + giftUrl(m.id); }).join('\n\n');
+    await shareMessage({ title: made.length === 1 ? 'Send the new link' : 'Send the ' + made.length + ' new links', icon: '\u{1F4E8}',
+      intro: 'The new ' + (made.length === 1 ? 'link is' : 'links are') + ' ready. How do you want to send ' + (made.length === 1 ? 'it' : 'them') + '?',
+      subject: made.length === 1 ? 'A recipe for you: ' + made[0].name : made.length + ' recipes for you', text: text, copyText: text, cancelLabel: 'Not now' });
+  }
+  toast(failed ? 'Sent ' + again + ' of ' + n + ' again — ' + failed : '\u{1F4E8} Sent again: ' + again + (again === 1 ? ' recipe' : ' recipes'), 7000);
+  return again;
 }
 async function giftDelete(g) {
   var b = hhDb().batch();
@@ -7638,6 +7737,7 @@ window.openSendRecipe = openSendRecipe; window.openGiftsIn = openGiftsIn; window
 window.giftAct = giftAct; window.giftOutAct = giftOutAct; window.giftSaveViewing = giftSaveViewing;
 window.giftAskInvitation = giftAskInvitation; window.giftSignInInstead = giftSignInInstead;
 window.giftSend = giftSend; window.giftSave = giftSave; window.giftPayload = giftPayload; window.giftReceived = giftReceived;
+window.giftOutBulk = giftOutBulk; window.giftResend = giftResend; window.giftPick = giftPick; window.giftPickAll = giftPickAll; window.giftPicked = giftPicked;
 window.giftFromUrl = giftFromUrl; window.giftSignedOutMaybe = giftSignedOutMaybe; window.giftLiveStart = giftLiveStart;
 window.giftSweep = giftSweep; window.giftStatus = giftStatus; window.giftNewId = giftNewId;
 window.hhLinksHtml = hhLinksHtml;
@@ -10368,7 +10468,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.12';
+var APP_VERSION = 'v39.13';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -13662,7 +13762,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.12</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.13</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -13750,7 +13850,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.12</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.13</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -32850,7 +32950,7 @@ var HELP_SYSTEM_PROMPT = [
   "- 📬 LINK REQUESTS: ⚙️ → 🏠 My household → 📬 Link requests — the number in brackets beside it is how many wait for an answer. Every request in one place: Waiting (Accept / Reject / 🚫 Block), Sent by your household (Withdraw), Linked now (Revoke access), and earlier answers. A request may carry a note, and the two households can write to each other there — the latest message shows, highlighted, with ↩ Reply; earlier ones are under 💬 Conversation. Only the household's name is shown, never a person's. Reject is for now: if they ask again — by identifier or by e-mail — their request is back under Waiting. 🚫 Block is for good, until you Unblock it under the earlier answers; they are never told, and on their side it reads “waiting”. A new message or request arrives while the app is open: a red dot (and a short notice with Open) within seconds, no reload needed. A red dot on ⚙️ leads to anything new. The switch there decides whether other households may ask through the app at all.",
   "- 👪 CHAT WITH FAMILY MEMBERS (the people in YOUR household only): ⋯ More → 👪 Chat with family members — or 💬 Chat beside a person in 👥 Family Access (someone added by address who has not signed in yet says ⏳ hasn’t signed in yet: their 💬 Chat comes once they do). 📣 Everyone in <your kitchen> is the room for announcements: everyone in the household reads it. Or choose one person: only the two of you read that conversation. Everyone in the household can write, readers too. Messages arrive live: a short notice with Open, and a red dot on ⋯ More until you have read them. Nothing is changed or deleted afterwards; deleting the household deletes them.",
   "- 🧑‍🍳 FIRST VISIT: a one-time setup on a notebook page — your account (your e-mail and a password you make up; or 'I already have an account', or Continue offline), this device's Save button (the iPhone shortcut, the Android app in the Share menu, or the computer's browser extension — each new device asks this once; later from ⚙️ Settings), the kitchen rules, then a quick tour.",
-  "- 📨 SEND A RECIPE TO ANOTHER KITCHEN: open the recipe → 📤 Share → 📨 Send to another kitchen. Via My Kitchen Notes: type their kitchen's identifier (MKN-…) — it pops up in their app, with a sound, and waits in ⋯ More → 📨 Recipes sent to me. Or Via Email, Via WhatsApp, or Copy the link: anyone with the link can open it, even without an account. It is a copy of the recipe as it is now — photo, bold words, notes and all; not your cooking log, ratings or the heart — with a note from you if you like. They tap 📥 Save to my recipes and it is theirs, no AI involved. It keeps for 4 weeks. ⋯ More → 📤 Recipes I sent shows whether it was saved, copies a link again, and takes one back. A kitchen that gets unwanted recipes can 🚫 Block the sender (the owner or an admin). During the closed beta, someone without an account who opens the link sees the recipe and can ask for an invitation — with their address already filled in when you typed it (Via Email asks for it, optional).",
+  "- 📨 SEND A RECIPE TO ANOTHER KITCHEN: open the recipe → 📤 Share → 📨 Send to another kitchen. Via My Kitchen Notes: type their kitchen's identifier (MKN-…) — it pops up in their app, with a sound, and waits in ⋯ More → 📨 Recipes sent to me. Or Via Email, Via WhatsApp, or Copy the link: anyone with the link can open it, even without an account. It is a copy of the recipe as it is now — photo, bold words, notes and all; not your cooking log, ratings or the heart — with a note from you if you like. They tap 📥 Save to my recipes and it is theirs, no AI involved. It keeps for 4 weeks. ⋯ More → 📤 Recipes I sent shows whether it was saved, copies a link again, sends it again, and takes one back — tick several (or Select all) to do it for all of them at once: ↩️ Take back, 📨 Send again (to a kitchen: it pops up in their app again for 4 more weeks, the earlier one taken back; a link: new links, good for 4 more weeks, in one message — the earlier ones keep working until they expire), 🔗 Copy the links. A kitchen that gets unwanted recipes can 🚫 Block the sender (the owner or an admin). During the closed beta, someone without an account who opens the link sees the recipe and can ask for an invitation — with their address already filled in when you typed it (Via Email asks for it, optional).",
   "- ✉️ E-MAIL A RECIPE (📤 Share → ✉️ Email): send it with ✉️ Gmail or ✉️ Outlook on the web, or ✉️ My mail app (if none opens, it offers Gmail, Outlook, Yahoo or Proton — Yahoo and Proton open an empty e-mail with the message copied to paste in), or 📋 Copy Text. Signed in, the e-mail also carries a link that saves the recipe to their recipes with one tap, photo and all (it keeps for 4 weeks, and shows in ⋯ More → 📤 Recipes I sent). A long recipe does not fit into a web e-mail's address: the e-mail then carries just its link (the whole recipe, photo and all), and the recipe's text is copied to paste in if you like.",
   "- 🔒 SECRET RECIPES: in the editor, tick 🔒 Secret — the recipe (and its photo) is then kept where only your own kitchen can read it; the kitchens you link with do not see it, nor know it exists. Untick it to share it again. A 🔒 shows on its card.",
   "- 🔄 RELOAD A LINKED KITCHEN: beside a linked kitchen's name in your recipe list, 🔄 Reload reads its recipes and photos again from the start — for when something looks missing or out of date.",
