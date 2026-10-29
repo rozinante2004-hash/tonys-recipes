@@ -1437,7 +1437,16 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
   - **Released: v39.09 (29 Oct 2026, 11:17 Israel time, on 0de2dde; Tony: "Yes, release v39.09").** Every job success:
     Deploy to GitHub Pages, pages build, Publish languages, Translate new phrases, Self Tests on main and test,
     Cloudflare Pages for the beta and test.
-  - **v39.16 + Worker v99 — warnings for the e-mail service, the kitchen send by e-mail through it, Deployments, and
+  - **Released: v39.16 (29 Oct 2026, 22:28 Israel time, on 2ec0bb7; Tony: "Yes, release v39.16")** — everything since
+    v39.09: v39.10–v39.16 (recipes sent to another kitchen, 📤 Recipes I sent with several at once, e-mails sent by the
+    server for a recipe and for a sent recipe's link, invitation requests and ✉️ Send invitation, the owner's e-mail
+    warnings, Resend in 🚀 Deployments, the identifier on the main screen, the share menu on phones and tablets only)
+    and Worker v99 (live since the test pushes; all copies share it). Every job success: Deploy to GitHub Pages (and
+    again for the translations, 1149709), pages build, Deploy the Worker (live v99 = published), **Publish the
+    database rules — recipes-f379d and my-kitchen-notes-beta (the recipeGifts / recipeGiftPhotos rules now live in
+    both)**, Translate new phrases, Publish languages, Self Tests on main and test, Cloudflare Pages for the beta and
+    test. "Clear expired sent recipes" is active on `main`: first run 03:23 UTC (05:23 Israel time) on 30 Oct.
+ the kitchen send by e-mail through it, Deployments, and
     the identifier on the main screen** (Tony, 29 Oct: "Please add the relevant information to the Deployment area, and
     update the reconstruction prompt. Also, please make sure I get a warning if quota is exceeded or if any issues arise
     with this service"; then "Can we use the same Resend .com mailing mechanism when sharing between kitchens via
