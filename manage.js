@@ -420,7 +420,7 @@
     'scale': 'Changed the servings', 'units': 'Switched units', 'cooked': 'Marked as cooked', 'timer': 'Started a timer',
     'voice': 'Voice control', 'pantry': 'Opened the pantry', 'suggest': 'Asked for suggestions', 'translate': 'Translated a recipe',
     'print': 'Printed', 'word': 'Exported to Word', 'share': 'Shared a recipe', 'bring': 'Sent to Bring!', 'help': 'Asked the help assistant',
-    'photo-search': 'Searched for a photo', 'farm': 'Tapped a farm visitor', 'farm-off': 'Turned the farm off', 'share-app': 'Shared the app',
+    'photo-search': 'Searched for a photo', 'farm': 'Visits with a farm visitor tapped', 'farm-off': 'Turned the farm off', 'share-app': 'Shared the app',
     'cvd-on': 'Turned on the red–green colours', 'cvd-off': 'Turned off the red–green colours',   // v38.83
     'toast-go': 'Clicked a notice to go where it points',   // v38.86
     'link-request': 'Asked to link with a household', 'recipe-sent': 'Sent a recipe to another kitchen',   // v39.10
@@ -452,7 +452,7 @@
     'theme.light': 'Light', 'theme.dark': 'Dark', 'extension.yes': 'Has the extension', 'extension.no': 'No extension',
     'edit': 'Edited a recipe', 'favorite': 'Marked a favourite', 'note': 'Sent a note', 'invite': 'Made an invitation link', 'gmail': 'Sent by Gmail',
     'backup': 'Saved a backup', 'update': 'Pressed Update now', 'farm-on': 'Turned the farm back on',
-    'farm.visit': 'A visitor came by', 'farm.tap': 'Tapped a visitor', 'farm.grab': 'Picked a visitor up', 'farm.turned-off': 'Farm off (devices)',
+    'farm.visit': 'A visitor came by', 'farm.tap': 'Taps on a visitor (each one)', 'farm.grab': 'Picked a visitor up', 'farm.turned-off': 'Farm off (devices)',
     // v39.17 — shown as their keys until now
     'access.usual-colours': 'Usual colours', 'access.red-green': 'Red–green colours',
     'sound.glass': 'Spoon on a wine glass', 'sound.bell': 'The service bell', 'sound.pot': 'Wooden spoon on a pot', 'sound.muted': 'Muted',
@@ -496,7 +496,7 @@
       + ' (counted in the beta and the test copy only).</div>' : (rn ? '<div class="mg-h">Recipes</div>' + rn : '');
     // v39.17 — Tony: "The details are a bit messy and hard to follow … Could you please put it in a table, for easier
     // readability?" The household's own counts the way 📈 Use shows a copy's: in sections, a row each, a column a month.
-    var c = { months: months, n: r.usage }, used = {}, rows = '';
+    var c = { months: months, n: r.usage }, used = {}, parts = [];
     var sec = function (title, cells) {
       return '<tr><td class="mg-trsec"' + (cells ? '' : ' colspan="' + (months.length + 1) + '"') + '>' + esc(title) + '</td>' + (cells || '') + '</tr>'; };
     TREND_SECTIONS.forEach(function (x) {
@@ -506,13 +506,19 @@
       var cells = /^🍲/.test(x.title) ? months.map(function (m) {
         var t = Object.keys(c.n[m] || {}).reduce(function (a, k) { return a + (/^added\./.test(k) ? c.n[m][k] : 0); }, 0);
         return '<td class="mg-c mg-trsec">' + (t ? t + ' added' : '—') + '</td>'; }).join('') : '';
-      rows += sec(x.title, cells) + body;
+      parts.push(sec(x.title, cells) + body);
     });
     var rest = trendRowsHtml(c, { label: null, test: /./ }, used, true);
-    if (rest) rows += sec('✨ Features — times used') + rest;
-    return '<div class="mg-h">What they use</div>' + rn
-      + '<div class="mg-scroll"><table class="mg-table mg-trend mg-usetab"><tr><th class="mg-trk"></th>'
-      + months.map(function (m) { return '<th class="mg-c">' + esc(mon(m) + ' ' + m.slice(0, 4)) + '</th>'; }).join('') + '</tr>' + rows + '</table></div>';
+    if (rest) parts.push(sec('✨ Features — times used') + rest);
+    // v39.18 — Tony: "the table it too wide … the eyes have to travel a long distance between the title and its value
+    // … turn it into 2 narrower tables, side by side": the sections in two columns, about as long as each other (one
+    // under the other on a narrow screen)
+    var size = function (h) { return (h.match(/<tr/g) || []).length; }, total = parts.reduce(function (t, h) { return t + size(h); }, 0);
+    var cols = [[], []], filled = 0;
+    parts.forEach(function (h) { var n = size(h); cols[cols[1].length || (filled && filled + n / 2 > total / 2) ? 1 : 0].push(h); if (!cols[1].length) filled += n; });
+    var head = '<tr><th class="mg-trk"></th>' + months.map(function (m) { return '<th class="mg-c">' + esc(mon(m) + ' ' + m.slice(0, 4)) + '</th>'; }).join('') + '</tr>';
+    return '<div class="mg-h">What they use</div>' + rn + '<div class="mg-usegrid">' + cols.filter(function (x) { return x.length; }).map(function (x) {
+      return '<div class="mg-scroll"><table class="mg-table mg-trend mg-usetab">' + head + x.join('') + '</table></div>'; }).join('') + '</div>';
   }
   // ─── v38.30: 📈 TRENDS (Worker v76 `trends`) ──────────────────────────────────
   // Tony: "I'd like to understand trends and foresee needs before they arise." Every copy's counts,
@@ -1020,6 +1026,8 @@
     + '.mg-trend{min-width:0;}.mg-trend th,.mg-trend td{padding:5px 8px;}.mg-trend th.mg-c{text-align:center;}.mg-trk{min-width:150px;width:40%;}'
     + '.mg-trsub{font-weight:700;color:var(--heading);padding-top:10px !important;background:var(--note-bg);}'
     + '.mg-trsec{font-weight:700;color:var(--heading);padding-top:12px !important;border-top:2px solid var(--border);}'   /* v39.17 */
+    + '.mg-usegrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px 20px;align-items:start;max-width:1100px;}'   /* v39.18 */
+    + '.mg-usetab .mg-trk{width:auto;min-width:0;}.mg-usetab td.mg-c,.mg-usetab th.mg-c{width:76px;white-space:nowrap;}'
     + 'a.mg-btn{text-decoration:none;display:inline-flex;align-items:center;}'
     + '#mgNote{width:100%;box-sizing:border-box;padding:8px;border:1px solid var(--border);border-radius:8px;background:var(--card-bg);color:var(--ink);margin-bottom:6px;font:inherit;}';
 

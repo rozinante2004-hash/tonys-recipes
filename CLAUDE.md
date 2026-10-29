@@ -1437,6 +1437,14 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
   - **Released: v39.09 (29 Oct 2026, 11:17 Israel time, on 0de2dde; Tony: "Yes, release v39.09").** Every job success:
     Deploy to GitHub Pages, pages build, Publish languages, Translate new phrases, Self Tests on main and test,
     Cloudflare Pages for the beta and test.
+  - **v39.19 — two narrower tables, and the two farm counts told apart** (Tony, 29 Oct: "Why do we have both "Tapped
+    a farm visitor" and "Tapped a visitor" in the table? Aren't they the same?" and "the table it too wide … the eyes
+    have to travel a long distance between the title and its value … turn it into 2 narrower tables, side by side …
+    When done, please release it to the beta and family app."). Not the same: `farmOuch` counts `farm` once per visit
+    (`insightCount('farm', 'farm')` — the once-flag), the tap handler `farm.tap` every tap; now "Visits with a farm
+    visitor tapped" and "Taps on a visitor (each one)". What they use: the sections split into two tables about as
+    long as each other (`.mg-usegrid`: grid, auto-fit minmax(300px), max 1100 px; month columns 76 px), stacked on a
+    phone. Self Test `manage_errors_and_use`: two tables, the farm labels.
   - **v39.18 + Worker v100 — Tony's four questions on the test copy's 📊 Households (29 Oct, with a screenshot: every
     Recipes cell "—").**
     1. "I'm assuming tomorrow I will see a real count … Correct?" — Not on the test copy: `list` sent the daily reports

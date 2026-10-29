@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v39.18` — app. **Worker: v100**, deployed separately and versioned separately
+**Current version:** `v39.19` — app. **Worker: v100**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -262,9 +262,11 @@ hidden / refuses / silent / privacy text.
     date counted, and in the details for every household), AI this month against its AI cap, "AI in <the two
     months before>", links, referrals, last active; search, sort, CSV. The Worker's `list` sends each listed copy's
     daily reports with or without `all` (v100 — the test copy's own page had none, so no counts); the details'
-    **What they use** is a table (v39.18): a column per month (newest first), the 📈 Use sections (`TREND_SECTIONS`,
-    plain counts, no shares; "🍲 Recipes added" with each month's total), then "✨ Features — times used"; every key
-    has a name (`USE_WORDS`, `useWord`). Extras: "📧 E-mail recipes from their own Gmail" (said what it does: that
+    **What they use** is two narrow tables side by side (v39.18–v39.19; `.mg-usegrid`, one under the other below
+    ~640 px): a column per month (newest first), the 📈 Use sections (`TREND_SECTIONS`, plain counts, no shares;
+    "🍲 Recipes added" with each month's total), then "✨ Features — times used", the sections split so the two
+    columns are about as long; every key has a name (`USE_WORDS`, `useWord`) — `farm` (once a visit: "Visits with a
+    farm visitor tapped") and `farm.tap` (every tap: "Taps on a visitor (each one)") are told apart. Extras: "📧 E-mail recipes from their own Gmail" (said what it does: that
     household's ✉️ Email sends from each member's own Gmail instead of 📨 Send) and WhatsApp groups; a details panel (allowance: Save /
     Pause AI / default; private notes; "What they use"; **Extras for this household**; 🗑 Delete this
     household — typed name; deleted ones stay listed, struck through, with who/how). Header: "New

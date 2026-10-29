@@ -2262,7 +2262,7 @@ window.SELF_TESTS = [
               households:[
                 { project:OTHER, hid:'hB', name:'Beta Kitchen', code:'MKN-B', capped:true, capNow:2, months:[{ month:month, usd:0.5, calls:3 }],
                   report:{ name:'Beta Kitchen', members:[{ email:'beta@example.com', role:'owner' }], links:[] },
-                  usage:(function(){ var o={}; o[month]={ 'added.link':3, 'added.extension':2, 'from.facebook':1, 'scale':4, 'open':9 }; return o; })() },
+                  usage:(function(){ var o={}; o[month]={ 'added.link':3, 'added.extension':2, 'from.facebook':1, 'scale':4, 'open':9, 'farm':1, 'farm.tap':3 }; return o; })() },
                 { project:OTHER, hid:'hB2', name:'Second Kitchen', code:'MKN-C', capped:true, capNow:2, months:[{ month:month, usd:0, calls:0 }],
                   report:{ name:'Second Kitchen', members:[{ email:'two@example.com', role:'owner' }], links:[] },
                   usage:(function(){ var o={}; o[month]={ 'added.link':1, 'print':2 }; return o; })() } ] }), { status:200 });
@@ -2303,12 +2303,15 @@ window.SELF_TESTS = [
         var panel=document.querySelector('#manageOverlay .mg-panel');
         if(!panel || !/What they use/.test(panel.textContent)) throw new Error('the household’s counts: '+(panel ? panel.textContent.slice(0,300) : 'no panel'));
         // v39.17 — Tony: "put it in a table, for easier readability": sections, a row each, a column a month
-        var ut=panel.querySelector('table.mg-usetab');
+        // v39.18 — "2 narrower tables, side by side"
+        var tabs=panel.querySelectorAll('.mg-usegrid table.mg-usetab'), ut=panel.querySelector('.mg-usegrid');
         var cellOf=function(label){ var tr=Array.prototype.filter.call(ut.querySelectorAll('tr'), function(t){ var k=t.querySelector('.mg-trk'); return k && k.textContent===label; })[0];
           return tr ? tr.querySelectorAll('td')[1].textContent : null; };
         var secs=Array.prototype.map.call(ut ? ut.querySelectorAll('td.mg-trsec') : [], function(t){ return t.textContent; }).join(' | ');
-        if(!ut || cellOf('from a link')!=='3' || cellOf('Facebook')!=='1' || cellOf('Changed the servings')!=='4' || !/🍲 Recipes added \| 5 added/.test(secs) || !/✨ Features/.test(secs) || /%/.test(ut.textContent))
-          throw new Error('the household’s counts as a table: '+(ut ? secs+' / '+ut.textContent.slice(0,300) : 'no table'));
+        if(!ut || tabs.length!==2 || cellOf('from a link')!=='3' || cellOf('Facebook')!=='1' || cellOf('Changed the servings')!=='4' || !/🍲 Recipes added \| 5 added/.test(secs) || !/✨ Features/.test(secs) || /%/.test(ut.textContent))
+          throw new Error('the household’s counts as two tables: '+(ut ? tabs.length+' tables / '+secs+' / '+ut.textContent.slice(0,300) : 'no table'));
+        // Tony: "Why do we have both "Tapped a farm visitor" and "Tapped a visitor"" — once a visit, and each tap: said so
+        if(cellOf('Visits with a farm visitor tapped')!=='1' || cellOf('Taps on a visitor (each one)')!=='3') throw new Error('the two farm counts are not told apart: '+ut.textContent.slice(0,400));
       } finally {
         window._fbDb=real.db; window._fbUser=real.user; window.toast=real.toast; window.showServiceError=real.err; window.isAppOwner=real.owner; window.fetch=real.fetch; _workerHealth=real.h;
         window.askConfirm=real.ask; window.fbProbeCopy=real.copy; delete window._allCopiesOverride;
