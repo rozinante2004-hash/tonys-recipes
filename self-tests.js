@@ -4726,7 +4726,7 @@ window.SELF_TESTS = [
 
   // v39.11 — Tony: e-mail had only "my mail app" and Copy; the address typed should fill in the invitation request; the
   // photo did not travel; and 💬 Feedback → ✉️ Send invitation.
-  { id:'email_recipe_link', group:'Sync', name:'E-mailing a recipe: Gmail and Outlook, a one-tap link with the photo, the address carried for an invitation (v39.11)',
+  { id:'email_recipe_link', group:'Sync', name:'E-mailing a recipe: Gmail and Outlook, a one-tap link with the photo, the address carried for an invitation; a long recipe never makes a long address (v39.11–12)',
     test: async()=>{
       var id=giftNewId();
       if(giftUrl(id,'Dana@Example.com').indexOf('?recipe='+id+'#for=Dana%40Example.com')<0) throw new Error('the link does not carry the address: '+giftUrl(id,'Dana@Example.com'));
@@ -4770,6 +4770,40 @@ window.SELF_TESTS = [
         for(var w2=0;w2<40 && !tab.location.href;w2++) await wait(50);
         if(!/outlook\.live\.com/.test(tab.location.href)) throw new Error('Outlook did not open');
         if(sent.length!==1 || sent[0]!=='email') throw new Error('the link should be made once for the window, as an e-mail: '+JSON.stringify(sent));
+        if(!(parseInt(ov.style.zIndex,10)<1300)) throw new Error('the e-mail window is above the questions it asks (z '+ov.style.zIndex+')');
+        ov.remove();
+        // v39.12 — Tony: Gmail "Bad Request Error 400", Outlook's server too, Yahoo with the recipe in To — a long (Hebrew)
+        // recipe made the web address too long. Now every address stays short: the link, and the text on the clipboard.
+        var clip=[], clipWas=Object.getOwnPropertyDescriptor(navigator,'clipboard');
+        Object.defineProperty(navigator,'clipboard',{ configurable:true, value:{ writeText:async function(t){ clip.push(String(t)); } } });
+        real.clipWas=clipWas;
+        var longR=normalizeRecipe({ id:TEST_ID_MIN+8, name:'החומוס של טוני', ingredients:[{ a:'500 גרם', n:'חומוס יבש' }],
+          steps:[new Array(40).join('משרים את החומוס במים קרים למשך לילה שלם, מבשלים עד ריכוך מלא. ')] });
+        recipes.push(longR); real.tmp2=longR.id;
+        showEmailModal(longR.id); ov=document.getElementById('emailModalOverlay');
+        ov.querySelector('input[type="email"]').value='dana@example.com';
+        tab.location.href=''; ov.querySelector('#emailGmailWebBtn').click();
+        for(var w3=0;w3<40 && !tab.location.href;w3++) await wait(50);
+        u=tab.location.href;
+        if(!u || u.length>EMAIL_URL_MAX) throw new Error('a long recipe still makes a long address: '+u.length+' characters');
+        if(u.indexOf(encodeURIComponent('?recipe='+id))<0) throw new Error('the short e-mail lost its link');
+        if(!clip.length || clip[0].indexOf('משרים את החומוס')<0) throw new Error('the recipe\u2019s text was not copied to paste in');
+        if(!/too long/.test((document.getElementById('emailSay')||{}).textContent||'')) throw new Error('the window does not say why the e-mail is short');
+        tab.location.href=''; ov.querySelector('#emailOutlookBtn').click();
+        for(var w4=0;w4<40 && !tab.location.href;w4++) await wait(50);
+        if(tab.location.href.length>EMAIL_URL_MAX) throw new Error('Outlook: a long address');
+        // My mail app, none opening: the choice comes up ABOVE the e-mail window; Yahoo opens empty, the message copied
+        var mo=window.mailOpened, chose=null, opened2=[];
+        window.mailOpened=async function(href){ if(href.length>EMAIL_URL_MAX) throw new Error('mailto: too long ('+href.length+')'); return false; };
+        window.open=function(u2){ if(u2) opened2.push(u2); return u2 ? null : tab; };
+        var choiceZ=null, realChoice=window.askChoice;
+        window.askChoice=async function(m, o, op){ var r0=realChoice(m, o, op); await wait(20); var a=document.getElementById('askOverlay');
+          choiceZ=a ? parseInt(getComputedStyle(a).zIndex,10) : null; chose=o.map(function(x){ return x.value; }); if(a) a.remove(); return 'yahoo'; };
+        try { clip=[]; await ov.querySelector('#emailMailtoBtn').onclick(); }
+        finally { window.mailOpened=mo; window.askChoice=realChoice; }
+        if(!(choiceZ>parseInt(ov.style.zIndex,10))) throw new Error('"Select mail application" opened behind the e-mail window');
+        if(opened2.indexOf('https://compose.mail.yahoo.com/')<0) throw new Error('Yahoo: '+JSON.stringify(opened2));
+        if(!clip.some(function(c){ return c.indexOf('?recipe='+id)>-1; })) throw new Error('Yahoo: the message was not copied');
         ov.remove();
         // 💬 Feedback → ✉️ Send invitation: Invite testers with the address in To
         window.isAppOwner=function(){ return true; }; window.gmailClientIdFind=async function(){ return ''; };
@@ -4784,6 +4818,9 @@ window.SELF_TESTS = [
         window._fbDb=real.db; window.isAppOwner=real.owner; window.gmailClientIdFind=real.gid; _gifts.lookAt=real.look; _cloudHid=real.hid;
         if(real.gmail===undefined) delete window._featureOverride.gmail; else window._featureOverride.gmail=real.gmail;
         if(real.tmp) recipes=recipes.filter(function(x){ return x.id!==real.tmp; });
+        if(real.tmp2) recipes=recipes.filter(function(x){ return x.id!==real.tmp2; });
+        if(real.clipWas) try { Object.defineProperty(navigator,'clipboard',real.clipWas); } catch(e) {}
+        else if(real.clipWas===undefined && 'clipWas' in real) try { delete navigator.clipboard; } catch(e) {}
         ['emailModalOverlay','inviteOverlay'].forEach(function(x){ var e=document.getElementById(x); if(e) e.remove(); });
       }
     }},
@@ -9279,6 +9316,7 @@ window.SELF_TESTS = [
         try{
           window._signInOverride.password=true;                    // (the family copy signs in with Google only)
           setupAccount(true);
+          document.getElementById('swPass').type='text';             // v39.12 — a password box filled, then gone: Chrome's "Save password?"
           document.getElementById('swEmail').value='new@example.com'; document.getElementById('swPass').value='longenough1';
           window.emailSignIn=async function(){                     // the sign-in runs while the account is being made
             window.setupDeviceKind=function(){ return 'ext'; }; window.extStoreUrl=function(){ return 'https://example.com/store'; };
@@ -10695,6 +10733,9 @@ window.SELF_TESTS = [
           var ls=document.getElementById('loginScreen'), fm=document.getElementById('emailSignInForm'), lsWas=ls && ls.style.display, fmWas=fm && fm.style.display;
           window.emailSignIn=function(m){ signed.push(m); return Promise.resolve(null); };
           if(ls) ls.style.display='flex'; if(fm) fm.style.display='block';   // (only a shown box takes the cursor)
+          // v39.12 — Tony, the Self Test in his Chrome: "Save password? saved@x.example". A password box filled and then
+          // hidden reads to Chrome as a sign-in; while the test types, the box is an ordinary one.
+          var pwType=pw.type; pw.type='text';
           try{
             var key=function(el){ var ev=new KeyboardEvent('keydown', { key:'Enter', bubbles:true, cancelable:true }); el.dispatchEvent(ev); return ev.defaultPrevented; };
             pw.value=''; em2.value='t@x.example';
@@ -10718,7 +10759,7 @@ window.SELF_TESTS = [
               await new Promise(function(r){ setTimeout(r, 30); });
               if(em2.value!=='saved@x.example' || pw.value!=='pw-saved') throw new Error('the saved account did not fill the form: '+em2.value);
             } finally { window._rememberOfferUnderTest=false; try{ Object.defineProperty(navigator, 'credentials', { configurable:true, value:credWas }); }catch(e){} }
-          } finally { window.emailSignIn=realSign; pw.value=''; em2.value=''; if(ls) ls.style.display=lsWas; if(fm) fm.style.display=fmWas; }
+          } finally { window.emailSignIn=realSign; pw.value=''; em2.value=''; pw.type=pwType; if(ls) ls.style.display=lsWas; if(fm) fm.style.display=fmWas; }
         }
         var c=String(completeEmailLinkSignIn), l=String(emailSendLink);
         if(c.indexOf('rememberApply')===-1 || l.indexOf('mkn_link_remember')===-1) throw new Error('the e-mailed link does not follow the choice');

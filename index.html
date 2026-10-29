@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.11 -->
+<!-- Tony's Recipes Collection v39.12 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -6056,7 +6056,12 @@ function famLiveStart(force) {
       _fam.parts[qi] = part;
       first = false;
       famArrived(fresh);
-    }, function(e){ syncLog('error', 'Could not listen to the family chat', String(e && (e.code || e.message)).slice(0, 120)); }));
+    }, function(e){
+      // v39.12 — refused as the account signs out (three at once, one per question): not a fault, and not logged as one
+      var u = window._fbAuth && window._fbAuth.currentUser;
+      if (_fam.hid !== hid || !u || u.uid !== me || !window._fbUser) return;
+      syncLog('error', 'Could not listen to the family chat', String(e && (e.code || e.message)).slice(0, 120));
+    }));
   });
   return true;
 }
@@ -8560,19 +8565,38 @@ function mailOpened(href, waitMs) {
     }, waitMs || 1600);
   });
 }
+// v39.12 — a message too long for a web address (mailto: on Windows stops near 2,000 characters; Gmail and Outlook
+// answered "Bad Request" to a Hebrew recipe): the e-mail opens with its To and subject, the message copied to paste in.
+// The copy starts before anything opens — a new tab takes the focus, and the clipboard wants it.
+function shareFit(opts, how) {
+  var t = shareTargets(opts);
+  if (!t[how] || t[how].length <= EMAIL_URL_MAX) return { url: t[how], copied: null };
+  var copied;
+  try { copied = navigator.clipboard.writeText(opts.copyText || opts.text || '').then(function(){ return true; }, function(){ return false; }); }
+  catch(e) { copied = Promise.resolve(false); }
+  return { url: shareTargets(Object.assign({}, opts, { text: '' }))[how], copied: copied };
+}
+async function shareFitSay(f) {
+  if (!f || !f.copied) return false;
+  var ok = await f.copied;
+  toast(ok ? '\u{1F4CB} The message is long, so it is copied \u2014 paste it into the e-mail' : 'The message is too long for the e-mail link \u2014 copy it, then paste it in', 9000);
+  return ok;
+}
 async function mailOrWebmail(opts, t) {
-  if (await mailOpened(t.mail)) return 'mail';
+  var fm = shareFit(opts, 'mail');
+  if (await mailOpened(fm.url)) { await shareFitSay(fm); return 'mail'; }
   var pick = await askChoice('No mail program opened on this device. Write it in your e-mail on the web instead \u2014 it opens ready to send:',
     [{ value: 'gmail', label: '\u2709\uFE0F Gmail' }, { value: 'outlook', label: '\u2709\uFE0F Outlook.com / Hotmail' },
-     { value: 'yahoo', label: '\u2709\uFE0F Yahoo Mail' }, { value: 'proton', label: '\u2709\uFE0F Proton Mail (the message is copied \u2014 paste it)' },
+     { value: 'yahoo', label: '\u2709\uFE0F Yahoo Mail (the message is copied \u2014 paste it)' }, { value: 'proton', label: '\u2709\uFE0F Proton Mail (the message is copied \u2014 paste it)' },
      { value: 'copy', label: '\u{1F4CB} Copy the message' }],
     { icon: '\u2709\uFE0F', title: 'Select mail application', backLabel: '\u2039 Back', cancelLabel: 'Close' });
   if (pick === ASK_BACK) return ASK_BACK;
-  if (pick === 'proton') {
+  // v39.12 — Yahoo too (Tony: it "tried putting the entire recipe in the recipients list"): copied, then pasted
+  if (pick === 'proton' || pick === 'yahoo') {
     try { await navigator.clipboard.writeText((opts.subject ? opts.subject + '\n\n' : '') + (opts.text || '')); } catch(e) {}
-    window.open(t.proton, '_blank', 'noopener');
-    toast('\u{1F4CB} The message is copied \u2014 in Proton Mail press New message, then paste it' + (opts.to ? ' (to ' + opts.to + ')' : ''), 9000);
-  } else if (pick === 'gmail' || pick === 'outlook' || pick === 'yahoo') window.open(t[pick], '_blank', 'noopener');
+    window.open(pick === 'yahoo' ? 'https://compose.mail.yahoo.com/' : t.proton, '_blank', 'noopener');
+    toast('\u{1F4CB} The message is copied \u2014 ' + (pick === 'yahoo' ? 'paste it into the new e-mail' : 'in Proton Mail press New message, then paste it') + (opts.to ? ' (to ' + opts.to + ')' : ''), 9000);
+  } else if (pick === 'gmail' || pick === 'outlook') { var fw = shareFit(opts, pick); window.open(fw.url, '_blank', 'noopener'); await shareFitSay(fw); }
   else if (pick === 'copy') {
     try { await navigator.clipboard.writeText(opts.copyText || opts.text); toast('\u{1F4CB} Copied \u2014 paste it wherever you like', 6000); }
     catch(e) { await askConfirm({ icon: '\u{1F4CB}', title: 'The message', message: opts.copyText || opts.text, okLabel: 'OK' }); }
@@ -8592,7 +8616,7 @@ function shareOptions(opts) {
 async function shareDo(how, opts) {
   var t = shareTargets(opts);
   if (how === 'mail') return await mailOrWebmail(opts, t);
-  if (how === 'gmail' || how === 'outlook') window.open(t[how], '_blank', 'noopener');
+  if (how === 'gmail' || how === 'outlook') { var f = shareFit(opts, how); window.open(f.url, '_blank', 'noopener'); await shareFitSay(f); }
   else if (how === 'wa') window.open(t.wa, '_blank', 'noopener');
   else if (how === 'share') { try { await navigator.share({ title: opts.subject || '', text: opts.text }); } catch(e) {} }
   else if (how === 'copy') {
@@ -10344,7 +10368,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.11';
+var APP_VERSION = 'v39.12';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -10607,7 +10631,8 @@ function showEmailModal(id) {
 
   var overlay = document.createElement('div');
   overlay.id = 'emailModalOverlay';
-  overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:99999;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;';
+  // v39.12 — under the questions it asks (1300: "Select mail application" opened behind it), over the Share window
+  overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:1200;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;';
 
   var card = document.createElement('div');
   card.style.cssText = 'background:white;border-radius:14px;padding:20px;max-width:560px;width:100%;font-family:DM Sans,Heebo,sans-serif;max-height:90vh;display:flex;flex-direction:column;gap:12px;';
@@ -10726,19 +10751,39 @@ function showEmailModal(id) {
   // And the e-mail carries a link that saves the recipe with one tap, photo and all ("it does not keep the original
   // photo") — a sent recipe, made once for this window (⋯ More → 📤 Recipes I sent), its link holding the To address
   // so an invitation request from it needs no typing.
+  // v39.12 — Tony, the first try: "Bad Request Error 400" from Gmail, Outlook's server refused it too, and Yahoo put the
+  // recipe in the To. The whole recipe went into the web address, and a Hebrew one grows six-fold there. An address
+  // over EMAIL_URL_MAX now carries a short e-mail — the one-tap link, which shows the whole recipe with its photo — and
+  // the recipe's text goes to the clipboard to paste in (copied at the tap, before a new tab takes the focus).
   if (!featureOn('gmail')) {
     btnRow.style.flexWrap = 'wrap';
     var emailOpts = function(text) {
       return { to: toInput.value.trim(), subject: subjectInput.value.trim() || r.name, text: text, copyText: text };
     };
+    var emailGo = async function(which, tab) {
+      var long = shareTargets(emailOpts(plainText))[which].length > EMAIL_URL_MAX - 400;
+      var copied = long ? emailCopyNow(plainText) : null;              // first: the new tab takes the focus
+      var w = tab ? (function(){ try { return window.open('', '_blank'); } catch(e) { return null; } })() : null;
+      var link = await emailLink(), text;
+      if (!long) text = emailFullText(link);
+      else text = link ? emailShortText(link) : '';
+      var o = emailOpts(text), url = shareTargets(o)[which];
+      if (long) {
+        var ok = await copied;
+        emailSay(link ? 'The recipe is too long to go into the e-mail as text, so the e-mail carries its link — the whole recipe, photo and all.'
+                        + (ok ? ' Its text is copied too: paste it into the e-mail if you like.' : ' For its text as well, press 📋 Copy Text and paste it in.')
+                      : (ok ? 'The recipe is too long to go into the e-mail by itself — it is copied: paste it into the e-mail.'
+                            : 'The recipe is too long to go into the e-mail by itself — press 📋 Copy Text, then paste it into the e-mail.'));
+      }
+      return { o: o, url: url, w: w };
+    };
     var webBtn = function(id, label, which) {
       var b = document.createElement('button');
       b.id = id; b.style.cssText = gmailBtn.style.cssText + 'flex:1 1 auto;min-width:96px;'; b.textContent = label;
       b.onclick = async function() {
-        var w = null; try { w = window.open('', '_blank'); } catch(e) {}   // now, while the tap counts; filled in below
-        var url = shareTargets(emailOpts(await emailText()))[which];
-        if (w) { try { w.opener = null; w.location.href = url; return; } catch(e) {} }
-        window.open(url, '_blank', 'noopener');
+        var c = await emailGo(which, true);
+        if (c.w) { try { c.w.opener = null; c.w.location.href = c.url; return; } catch(e) {} }
+        window.open(c.url, '_blank', 'noopener');
       };
       return b;
     };
@@ -10749,24 +10794,38 @@ function showEmailModal(id) {
     mailBtn.style.cssText = gmailBtn.style.cssText + 'flex:1 1 auto;min-width:96px;';
     mailBtn.textContent = '✉️ My mail app';
     mailBtn.onclick = async function() {
-      var o = emailOpts(await emailText());
-      await mailOrWebmail(o, shareTargets(o));
+      var c = await emailGo('mail', false);
+      await mailOrWebmail(c.o, shareTargets(c.o));
     };
     btnRow.appendChild(mailBtn);
     copyBtn.onclick = async function(){
-      var t = await emailText();
+      var t = emailFullText(await emailLink());
       try { await navigator.clipboard.writeText(t); copyBtn.textContent = '✅ Copied!'; setTimeout(function(){ copyBtn.textContent = '📋 Copy Text'; }, 2000); }
       catch(e) { await askConfirm({ icon: '\u{1F4CB}', title: 'The e-mail', message: t, okLabel: 'OK' }); }
     };
     copyBtn.style.cssText += 'flex:1 1 auto;min-width:96px;';
   }
   var giftMade = null;
-  async function emailText() {
+  async function emailLink() {
     if (!giftMade && emailCarriesLink()) {
       try { giftMade = await giftSend(r, { via: 'email', note: '' }); } catch(e) { dlog('[email] no one-tap link:', e && e.message); }
     }
-    return (giftMade ? 'Save it to your recipes with one tap, photo and all (the link keeps for 4 weeks):\n' + giftUrl(giftMade.id, toInput.value.trim()) + '\n\n' : '') + plainText;
+    return giftMade ? giftUrl(giftMade.id, toInput.value.trim()) : '';
   }
+  function emailFullText(link) {
+    return (link ? 'Save it to your recipes with one tap, photo and all (the link keeps for 4 weeks):\n' + link + '\n\n' : '') + plainText;
+  }
+  function emailShortText(link) {
+    return ((_household && _household.name) || 'A kitchen') + ' sent you a recipe for “' + r.name + '” from My Kitchen Notes.\n\n'
+      + 'See it — photo and all — and save it to your recipes with one tap (the link keeps for 4 weeks):\n' + link;
+  }
+  function emailCopyNow(t) {
+    try { return navigator.clipboard.writeText(t).then(function(){ return true; }, function(){ return false; }); } catch(e) { return Promise.resolve(false); }
+  }
+  var sayBox = document.createElement('div');
+  sayBox.id = 'emailSay'; sayBox.setAttribute('aria-live', 'polite');
+  sayBox.style.cssText = 'font-size:12.5px;line-height:1.5;color:var(--ink);display:none;background:var(--note-bg);border-radius:8px;padding:8px 10px;';
+  function emailSay(m) { sayBox.textContent = m; sayBox.style.display = m ? '' : 'none'; }
   btnRow.appendChild(copyBtn);
   btnRow.appendChild(closeBtn);
 
@@ -10776,11 +10835,15 @@ function showEmailModal(id) {
   card.appendChild(previewWrap);
   card.appendChild(hint);
   card.appendChild(btnRow);
+  card.appendChild(sayBox);
   overlay.appendChild(card);
   overlay.onclick = function(e){ if(e.target===overlay) overlay.remove(); };
   document.body.appendChild(overlay);
 }
 window.showEmailModal = showEmailModal;
+// v39.12 — the longest web address an e-mail is opened with (mailto: on Windows stops near 2,000; Gmail and Outlook
+// answered "Bad Request" to a Hebrew recipe's).
+var EMAIL_URL_MAX = 1900;
 // v39.11 — an e-mailed recipe carries the one-tap link where kitchens can send recipes (signed in, household layout).
 function emailCarriesLink() {
   return typeof giftSend === 'function' && APP_CONFIG.dataLayout === 'households' && !!(_household && window._fbUser && hhDb());
@@ -13599,7 +13662,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.11</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.12</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -13687,7 +13750,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.11</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.12</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -32788,7 +32851,7 @@ var HELP_SYSTEM_PROMPT = [
   "- 👪 CHAT WITH FAMILY MEMBERS (the people in YOUR household only): ⋯ More → 👪 Chat with family members — or 💬 Chat beside a person in 👥 Family Access (someone added by address who has not signed in yet says ⏳ hasn’t signed in yet: their 💬 Chat comes once they do). 📣 Everyone in <your kitchen> is the room for announcements: everyone in the household reads it. Or choose one person: only the two of you read that conversation. Everyone in the household can write, readers too. Messages arrive live: a short notice with Open, and a red dot on ⋯ More until you have read them. Nothing is changed or deleted afterwards; deleting the household deletes them.",
   "- 🧑‍🍳 FIRST VISIT: a one-time setup on a notebook page — your account (your e-mail and a password you make up; or 'I already have an account', or Continue offline), this device's Save button (the iPhone shortcut, the Android app in the Share menu, or the computer's browser extension — each new device asks this once; later from ⚙️ Settings), the kitchen rules, then a quick tour.",
   "- 📨 SEND A RECIPE TO ANOTHER KITCHEN: open the recipe → 📤 Share → 📨 Send to another kitchen. Via My Kitchen Notes: type their kitchen's identifier (MKN-…) — it pops up in their app, with a sound, and waits in ⋯ More → 📨 Recipes sent to me. Or Via Email, Via WhatsApp, or Copy the link: anyone with the link can open it, even without an account. It is a copy of the recipe as it is now — photo, bold words, notes and all; not your cooking log, ratings or the heart — with a note from you if you like. They tap 📥 Save to my recipes and it is theirs, no AI involved. It keeps for 4 weeks. ⋯ More → 📤 Recipes I sent shows whether it was saved, copies a link again, and takes one back. A kitchen that gets unwanted recipes can 🚫 Block the sender (the owner or an admin). During the closed beta, someone without an account who opens the link sees the recipe and can ask for an invitation — with their address already filled in when you typed it (Via Email asks for it, optional).",
-  "- ✉️ E-MAIL A RECIPE (📤 Share → ✉️ Email): send it with ✉️ Gmail or ✉️ Outlook on the web, or ✉️ My mail app (if none opens, it offers Gmail, Outlook, Yahoo or Proton), or 📋 Copy Text. Signed in, the e-mail also carries a link that saves the recipe to their recipes with one tap, photo and all (it keeps for 4 weeks, and shows in ⋯ More → 📤 Recipes I sent).",
+  "- ✉️ E-MAIL A RECIPE (📤 Share → ✉️ Email): send it with ✉️ Gmail or ✉️ Outlook on the web, or ✉️ My mail app (if none opens, it offers Gmail, Outlook, Yahoo or Proton — Yahoo and Proton open an empty e-mail with the message copied to paste in), or 📋 Copy Text. Signed in, the e-mail also carries a link that saves the recipe to their recipes with one tap, photo and all (it keeps for 4 weeks, and shows in ⋯ More → 📤 Recipes I sent). A long recipe does not fit into a web e-mail's address: the e-mail then carries just its link (the whole recipe, photo and all), and the recipe's text is copied to paste in if you like.",
   "- 🔒 SECRET RECIPES: in the editor, tick 🔒 Secret — the recipe (and its photo) is then kept where only your own kitchen can read it; the kitchens you link with do not see it, nor know it exists. Untick it to share it again. A 🔒 shows on its card.",
   "- 🔄 RELOAD A LINKED KITCHEN: beside a linked kitchen's name in your recipe list, 🔄 Reload reads its recipes and photos again from the start — for when something looks missing or out of date.",
   "- 💬 CHATS WITH LINKED KITCHENS: ⋯ More → 💬 Chats with linked kitchens — or 💬 Chat beside a linked kitchen's name in your recipe list, or in 👥 Family Access. Every conversation, newest first, with what is new; open one to read it all and write (Enter sends, Shift+Enter starts a new line). The same conversations are also on 📬 Link requests. A red dot on ⋯ More and on ⚙️ says something new arrived.",

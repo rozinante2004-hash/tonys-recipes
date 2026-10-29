@@ -1437,6 +1437,25 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
   - **Released: v39.09 (29 Oct 2026, 11:17 Israel time, on 0de2dde; Tony: "Yes, release v39.09").** Every job success:
     Deploy to GitHub Pages, pages build, Publish languages, Translate new phrases, Self Tests on main and test,
     Cloudflare Pages for the beta and test.
+  - **v39.12 — what Tony found trying v39.11 (29 Oct, Chrome on Linux): Gmail "Bad Request Error 400", Outlook's
+    server (Akamai) "Bad Request", Yahoo put the recipe in the recipients; "Select mail application" opened BEHIND the
+    e-mail window; Chrome's "Save password? saved@x.example" during the Self Test; 3 × "Could not listen to the family
+    chat" (permission-denied) at a sign-out flagged the log BAD.** Tony: "It could have been very embarrassing to release
+    such results to the public". My v39.11 test had stubbed `window.open` and never measured the address.
+    - The whole recipe went into the compose address (a Hebrew one six-fold when encoded). `EMAIL_URL_MAX` = 1900:
+      the e-mail window's `emailGo` sends the full text only while it fits; otherwise a short e-mail (the kitchen, the
+      recipe's name, the one-tap link) and the recipe's text copied to the clipboard — copied AT THE TAP, before the new
+      tab takes the focus — with a line in the window (`#emailSay`) saying so. `shareFit`/`shareFitSay` do the same for
+      `shareDo` (Gmail/Outlook) and `mailOrWebmail` (mailto: too; Windows stops near 2,000). Yahoo opens an empty
+      compose with the message copied (like Proton). Checked in a real browser: a 2,544-character Hebrew recipe → a
+      672-character Gmail address, the text on the clipboard.
+    - The e-mail window z 99999 → 1200 (under the questions at 1300, over the recipe and Share windows at 200; toasts at
+      999 would be under it, hence the line in the window).
+    - The Self Tests filled the real sign-in form's password box (and the wizard's) and then hid it: Chrome reads that
+      as a sign-in. The boxes are `type="text"` while the tests type.
+    - The family chat's listeners refused as the account signs out are not logged (`_fbAuth.currentUser` gone or another).
+    - `email_recipe_link` now runs a long Hebrew recipe through Gmail, Outlook and My mail app → Yahoo, and checks every
+      address, the clipboard, the line, and that the choice opens above the window.
   - **v39.11 — e-mail and invitations (Tony, 29 Oct: "only 2 options - Share in my mail app and Copy text … add another
     option to send by Gmail"; "pre-fill-in the email address … You should already have it from the share mail"; "it does
     not keep the original photo"; Feedback: a button that opens Invite testers with the address filled in).**
