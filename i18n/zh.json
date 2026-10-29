@@ -1,7 +1,7 @@
 {
  "lang": "zh",
- "updatedAt": 1793146094215,
- "count": 2542,
+ "updatedAt": 1793233075325,
+ "count": 2544,
  "strings": {
   "\"Add to Home Screen\"": "添加到主屏幕",
   "\"Open Bring!\"": "打开 Bring!",
@@ -1204,6 +1204,7 @@
   "The app's running costs and billing (the app's owner only).": "应用的运行成本和账单（仅限应用所有者）。",
   "The app's version, updates, privacy and terms.": "应用的版本、更新、隐私与条款。",
   "The app’s own server": "应用自己的服务器",
+  "The app’s owner account stays": "应用所有者账号会保留",
   "The authenticator is set up": "验证码 App 已设置完成",
   "The authenticator was removed.": "验证码 App 已移除。",
   "The backup also holds {1} language{2}: {3}. Each replaces this copy’s translation of the same language, for everyone signed in here.": "此备份还包含{1}种语言{2}：{3}。每种语言都会替换此副本中对应语言的翻译，对所有在此登录的人生效。",
@@ -1294,6 +1295,7 @@
   "This device's photo store could not be read, so there is no safe way to confirm which recipes are missing a photo. Nothing was changed.": "无法读取本设备的照片存储，因此无法确认哪些菜谱缺少照片。未做任何更改。",
   "This device's photo store could not be read, so there is no safe way to tell which recipes are missing a photo. Nothing was changed. Reload and try again.": "无法读取本设备的照片存储，因此无法确认哪些菜谱缺少照片。未做任何更改。请重新加载后再试一次。",
   "This is for the app’s owner.": "此内容仅供应用拥有者查看。",
+  "This is the app’s owner account, so the app never deletes it.": "这是应用所有者账号，应用不会删除它。",
   "This kitchen is invitation-only — a bit like grandma’s. 🙂 Got an invitation link? Come right in. If not, My Kitchen Notes gives you a kitchen of your own: free, and the very same app.": "这间厨房只接受邀请——有点像奶奶家一样。🙂 有邀请链接吗？直接进来吧。没有的话，My Kitchen Notes 可以为你开一间专属厨房：免费，同样的应用。",
   "This looks like it includes {1}. Everyone in both households will see it. Send it anyway?": "这看起来包含{1}。两个家庭的所有成员都会看到。仍要发送吗？",
   "This needs a connection.": "这需要联网。",

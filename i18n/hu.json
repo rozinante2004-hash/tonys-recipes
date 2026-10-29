@@ -1,7 +1,7 @@
 {
  "lang": "hu",
- "updatedAt": 1793146094215,
- "count": 2263,
+ "updatedAt": 1793233075325,
+ "count": 2265,
  "strings": {
   "\"Add to Home Screen\"": "Hozzáadás a kezdőképernyőhöz",
   "\"Open Bring!\"": "Bring! megnyitása",
@@ -1079,6 +1079,7 @@
   "The app's running costs and billing (the app's owner only).": "Az app üzemeltetési költségei és számlázása (csak az app tulajdonosának).",
   "The app's version, updates, privacy and terms.": "Az app verziója, frissítései, adatvédelem és felhasználási feltételek.",
   "The app’s own server": "Az app saját szervere",
+  "The app’s owner account stays": "Az alkalmazás tulajdonosi fiókja megmarad",
   "The authenticator is set up": "A hitelesítő be van állítva",
   "The authenticator was removed.": "A hitelesítő eltávolítva.",
   "The backup also holds {1} language{2}: {3}. Each replaces this copy’s translation of the same language, for everyone signed in here.": "A biztonsági mentés {1} nyelvet is tartalmaz: {3}. Mindegyik lecseréli az adott nyelv fordítását ebben a példányban, mindenkinél, aki itt van bejelentkezve.{2}",
@@ -1159,6 +1160,7 @@
   "This device's photo store could not be read, so there is no safe way to confirm which recipes are missing a photo. Nothing was changed.": "A készülék fotótára nem olvasható, így nem állapítható meg biztonságosan, mely receptekről hiányzik a fotó. Semmi sem változott.",
   "This device's photo store could not be read, so there is no safe way to tell which recipes are missing a photo. Nothing was changed. Reload and try again.": "A készülék fotótára nem olvasható, így nem állapítható meg biztonságosan, mely receptekről hiányzik a fotó. Semmi sem változott. Tölts be újra, és próbáld meg ismét.",
   "This is for the app’s owner.": "Ez az alkalmazás tulajdonosának szól.",
+  "This is the app’s owner account, so the app never deletes it.": "Ez az alkalmazás tulajdonosi fiókja, ezért soha nem törlődik.",
   "This kitchen is invitation-only — a bit like grandma’s. 🙂 Got an invitation link? Come right in. If not, My Kitchen Notes gives you a kitchen of your own: free, and the very same app.": "Ebbe a konyhába csak meghívóval lehet bejutni — kicsit, mint nagymamáéba. 🙂 Van meghívólinked? Gyere csak be. Ha nincs, a My Kitchen Notes ad neked egy saját konyhát: ingyen, és ugyanazzal az alkalmazással.",
   "This looks like it includes {1}. Everyone in both households will see it. Send it anyway?": "Úgy tűnik, ez tartalmazza: {1}. Mindkét háztartás tagjai látni fogják. Mégis elküldöd?",
   "This needs a connection.": "Ehhez internetkapcsolat kell.",

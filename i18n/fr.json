@@ -1,7 +1,7 @@
 {
  "lang": "fr",
- "updatedAt": 1793146094215,
- "count": 2513,
+ "updatedAt": 1793233075325,
+ "count": 2515,
  "strings": {
   "\"Add to Home Screen\"": "Ajouter à l'écran d'accueil",
   "\"Open Bring!\"": "Ouvrir Bring!",
@@ -1198,6 +1198,7 @@
   "The app's running costs and billing (the app's owner only).": "Les coûts de fonctionnement et la facturation de l'application (réservé au propriétaire).",
   "The app's version, updates, privacy and terms.": "Version de l'app, mises à jour, confidentialité et conditions.",
   "The app’s own server": "Le serveur de l'app",
+  "The app’s owner account stays": "Le compte propriétaire de l'app reste",
   "The authenticator is set up": "L'authentificateur est configuré",
   "The authenticator was removed.": "L'authentificateur a été supprimé.",
   "The backup also holds {1} language{2}: {3}. Each replaces this copy’s translation of the same language, for everyone signed in here.": "La sauvegarde contient aussi {1} langue{2} : {3}. Chacune remplace la traduction correspondante dans cette copie, pour tous ceux connectés ici.",
@@ -1288,6 +1289,7 @@
   "This device's photo store could not be read, so there is no safe way to confirm which recipes are missing a photo. Nothing was changed.": "Le stockage photo de cet appareil n'a pas pu être lu, impossible donc de confirmer quelles recettes n'ont pas de photo en toute sécurité. Rien n'a été modifié.",
   "This device's photo store could not be read, so there is no safe way to tell which recipes are missing a photo. Nothing was changed. Reload and try again.": "Le stockage photo de cet appareil n'a pas pu être lu, impossible donc de savoir quelles recettes n'ont pas de photo en toute sécurité. Rien n'a été modifié. Rechargez et réessayez.",
   "This is for the app’s owner.": "Réservé au propriétaire de l'app.",
+  "This is the app’s owner account, so the app never deletes it.": "C'est le compte propriétaire de l'app, donc l'app ne le supprime jamais.",
   "This kitchen is invitation-only — a bit like grandma’s. 🙂 Got an invitation link? Come right in. If not, My Kitchen Notes gives you a kitchen of your own: free, and the very same app.": "Cette cuisine est sur invitation seulement — un peu comme chez mamie. 🙂 Tu as un lien d'invitation ? Entre directement. Sinon, My Kitchen Notes te donne ta propre cuisine : gratuite, et la même appli.",
   "This looks like it includes {1}. Everyone in both households will see it. Send it anyway?": "On dirait que ça inclut {1}. Tout le monde dans les deux foyers le verra. L'envoyer quand même ?",
   "This needs a connection.": "Une connexion est nécessaire.",

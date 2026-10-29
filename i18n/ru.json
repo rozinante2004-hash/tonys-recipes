@@ -1,7 +1,7 @@
 {
  "lang": "ru",
- "updatedAt": 1793146094215,
- "count": 2846,
+ "updatedAt": 1793233075325,
+ "count": 2848,
  "strings": {
   "\"Add to Home Screen\"": "Добавить на главный экран",
   "\"One item away\" filter ({1}f.{2})": "Фильтр «Не хватает одного» ({1}ф.{2})",
@@ -1430,6 +1430,7 @@
   "The app's running costs and billing (the app's owner only).": "Расходы на работу приложения и оплата (только для владельца приложения).",
   "The app's version, updates, privacy and terms.": "Версия приложения, обновления, конфиденциальность и условия использования.",
   "The app’s own server": "Собственный сервер приложения",
+  "The app’s owner account stays": "Аккаунт владельца приложения остаётся",
   "The authenticator is set up": "Аутентификатор настроен",
   "The authenticator was removed.": "Аутентификатор удалён.",
   "The backup also holds {1} language{2}: {3}. Each replaces this copy’s translation of the same language, for everyone signed in here.": "В резервной копии также есть {1} язык{2}: {3}. Каждый заменит перевод этого языка в этой копии для всех, кто здесь вошёл.",
@@ -1542,6 +1543,7 @@
   "This device's photo store could not be read, so there is no safe way to confirm which recipes are missing a photo. Nothing was changed.": "Не удалось прочитать хранилище фото на этом устройстве, поэтому нет надёжного способа определить, каким рецептам не хватает фото. Ничего не изменено.",
   "This device's photo store could not be read, so there is no safe way to tell which recipes are missing a photo. Nothing was changed. Reload and try again.": "Не удалось прочитать хранилище фото на этом устройстве, поэтому нет надёжного способа определить, каким рецептам не хватает фото. Ничего не изменено. Перезагрузите страницу и попробуйте снова.",
   "This is for the app’s owner.": "Это для владельца приложения.",
+  "This is the app’s owner account, so the app never deletes it.": "Это аккаунт владельца приложения, поэтому он никогда не удаляется.",
   "This kitchen is invitation-only — a bit like grandma’s. 🙂 Got an invitation link? Come right in. If not, My Kitchen Notes gives you a kitchen of your own: free, and the very same app.": "В эту кухню попадают только по приглашению — почти как к бабушке. 🙂 Есть ссылка-приглашение? Заходите. Если нет — в «Моих кулинарных заметках» можно завести свою кухню: бесплатно и то же самое приложение.",
   "This looks like it includes {1}. Everyone in both households will see it. Send it anyway?": "Похоже, это содержит {1}. Это увидят в обеих семьях. Отправить всё равно?",
   "This needs a connection.": "Нужно подключение к интернету.",

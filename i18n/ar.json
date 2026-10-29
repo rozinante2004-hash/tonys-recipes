@@ -1,7 +1,7 @@
 {
  "lang": "ar",
- "updatedAt": 1793146094215,
- "count": 2515,
+ "updatedAt": 1793233075325,
+ "count": 2517,
  "strings": {
   "\"Add to Home Screen\"": "إضافة إلى الشاشة الرئيسية",
   "\"Open Bring!\"": "فتح Bring!",
@@ -1199,6 +1199,7 @@
   "The app's running costs and billing (the app's owner only).": "تكاليف تشغيل التطبيق والفواتير (لمالك التطبيق فقط).",
   "The app's version, updates, privacy and terms.": "إصدار التطبيق، والتحديثات، والخصوصية، والشروط.",
   "The app’s own server": "خادم التطبيق نفسه",
+  "The app’s owner account stays": "حساب مالك التطبيق يبقى",
   "The authenticator is set up": "تطبيق المصادقة مُفعّل",
   "The authenticator was removed.": "تمت إزالة تطبيق المصادقة.",
   "The backup also holds {1} language{2}: {3}. Each replaces this copy’s translation of the same language, for everyone signed in here.": "تحتوي النسخة الاحتياطية أيضًا على {1} لغة{2}: {3}. كل لغة تستبدل ترجمة هذه النسخة لنفس اللغة، لكل من سجّل الدخول هنا.",
@@ -1289,6 +1290,7 @@
   "This device's photo store could not be read, so there is no safe way to confirm which recipes are missing a photo. Nothing was changed.": "تعذّرت قراءة مخزن الصور على هذا الجهاز، لذا لا توجد طريقة موثوقة لمعرفة الوصفات التي تنقصها صورة. لم يتغيّر شيء.",
   "This device's photo store could not be read, so there is no safe way to tell which recipes are missing a photo. Nothing was changed. Reload and try again.": "تعذّرت قراءة مخزن الصور على هذا الجهاز، لذا لا توجد طريقة موثوقة لمعرفة الوصفات التي تنقصها صورة. لم يتغيّر شيء. أعد التحميل وحاول مجددًا.",
   "This is for the app’s owner.": "هذا خاص بمالك التطبيق.",
+  "This is the app’s owner account, so the app never deletes it.": "هذا حساب مالك التطبيق، لذا لا يحذفه التطبيق أبدًا.",
   "This kitchen is invitation-only — a bit like grandma’s. 🙂 Got an invitation link? Come right in. If not, My Kitchen Notes gives you a kitchen of your own: free, and the very same app.": "هذا المطبخ بالدعوة فقط — تمامًا مثل مطبخ جدتك. 🙂 لديك رابط دعوة؟ تفضل بالدخول. إن لم يكن لديك، يمنحك My Kitchen Notes مطبخك الخاص: مجانًا، وبنفس التطبيق تمامًا.",
   "This looks like it includes {1}. Everyone in both households will see it. Send it anyway?": "يبدو أن هذا يتضمن {1}. سيراه الجميع في كلتا الأسرتين. إرساله رغم ذلك؟",
   "This needs a connection.": "هذا يحتاج إلى اتصال بالإنترنت.",

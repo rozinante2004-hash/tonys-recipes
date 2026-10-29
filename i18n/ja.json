@@ -1,7 +1,7 @@
 {
  "lang": "ja",
- "updatedAt": 1793146094215,
- "count": 2855,
+ "updatedAt": 1793233075325,
+ "count": 2857,
  "strings": {
   "\"Add to Home Screen\"": "ホーム画面に追加",
   "\"One item away\" filter ({1}f.{2})": "「あと1品」フィルター（{1}f.{2}）",
@@ -1431,6 +1431,7 @@
   "The app's running costs and billing (the app's owner only).": "アプリの運用コストと請求（アプリの所有者のみ）。",
   "The app's version, updates, privacy and terms.": "アプリのバージョン、アップデート、プライバシーと規約について。",
   "The app’s own server": "アプリ自身のサーバー",
+  "The app’s owner account stays": "所有者アカウントは残ります",
   "The authenticator is set up": "認証アプリの設定が完了しました",
   "The authenticator was removed.": "認証アプリを削除しました。",
   "The backup also holds {1} language{2}: {3}. Each replaces this copy’s translation of the same language, for everyone signed in here.": "バックアップには{1}言語{2}も含まれています：{3}。それぞれが、ここにサインインしている全員のこのコピーの同じ言語の翻訳を置き換えます。",
@@ -1544,6 +1545,7 @@
   "This device's photo store could not be read, so there is no safe way to confirm which recipes are missing a photo. Nothing was changed.": "この端末の写真データを読み込めなかったため、どのレシピに写真がないか確認できません。変更は行われていません。",
   "This device's photo store could not be read, so there is no safe way to tell which recipes are missing a photo. Nothing was changed. Reload and try again.": "この端末の写真データを読み込めなかったため、どのレシピに写真がないか確認できません。変更は行われていません。再読み込みしてやり直してください。",
   "This is for the app’s owner.": "これはアプリ管理者向けです。",
+  "This is the app’s owner account, so the app never deletes it.": "これはアプリの所有者アカウントなので、削除されることはありません。",
   "This kitchen is invitation-only — a bit like grandma’s. 🙂 Got an invitation link? Come right in. If not, My Kitchen Notes gives you a kitchen of your own: free, and the very same app.": "このキッチンは招待制です。おばあちゃんの家みたいなものです 🙂 招待リンクがあれば、どうぞ入ってください。なければ、My Kitchen Notesで自分のキッチンを無料で持てます。アプリは同じです。",
   "This looks like it includes {1}. Everyone in both households will see it. Send it anyway?": "{1}が含まれているようです。両方の家族全員に見られます。それでも送信しますか?",
   "This needs a connection.": "接続が必要です。",
