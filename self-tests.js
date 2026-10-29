@@ -4506,6 +4506,20 @@ window.SELF_TESTS = [
         if(!last||last.id!=='deleteAccountItem'||last.getAttribute('data-layout-only')!=='households') throw new Error('"Delete my account" is not the last item of the ⚙️ menu');
         if(parseInt(getComputedStyle(last).fontWeight,10)<700) throw new Error('"Delete my account" is not bold');
         if(drop.querySelector('[onclick*="accountDownload"]')) throw new Error('"Download all my data" is back in ⚙️ — it is the same file as 💾 Backups');
+        // v39.08 — Tony: "The Admin account is the only account that should never be deleted" — not on his menu, and refused.
+        var realOA=window.isOwnerAddress, toldOwner=null, delCalled=false;
+        try{
+          window.isOwnerAddress=function(e){ return e==='me@example.com'; };
+          window._fbAuth={ currentUser:{ uid:'me', email:'me@example.com', emailVerified:true, delete:function(){ delCalled=true; } } };
+          window.householdMemberships=async function(){ throw new Error('it went on to the households'); };
+          window.askConfirm=async function(o){ toldOwner=o; return true; };
+          if(await accountDelete({ yes:true })!==null || delCalled || !toldOwner || !/owner account stays/.test(toldOwner.title)) throw new Error('the owner\u2019s account could be deleted: '+JSON.stringify(toldOwner));
+          window._fbUser={ uid:'me', email:'me@example.com', emailVerified:true }; applyOwnerOnlyItems();
+          var delIt=document.getElementById('deleteAccountItem'), hiddenForOwner=delIt.style.display==='none';
+          window._fbUser=real.user; applyOwnerOnlyItems();
+          if(!hiddenForOwner) throw new Error('"Delete my account" is on the owner\u2019s ⚙️ menu');
+          if(delIt.style.display==='none' && !isAppOwner()) throw new Error('"Delete my account" stays hidden from everyone else');
+        } finally { window.isOwnerAddress=realOA; window._fbUser=real.user; applyOwnerOnlyItems(); }
       } finally {
         window._household=real.hh; _household=real.hh; _householdList=real.list; _cloudHid=real.hid; _cloudLayout=real.layout;
         window.askChoice=real.choice; window.askConfirm=real.confirm; window._fbAuth=real.auth; window._fbUser=real.user; window._fbDb=real.db;

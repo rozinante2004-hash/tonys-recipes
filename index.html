@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.07 -->
+<!-- Tony's Recipes Collection v39.08 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -7682,10 +7682,22 @@ async function householdDelete(opts) {
 // All of it, as a file: the recipes, photos and languages (the backup), plus
 // who is in the household and in what role.
 async function accountDownload() { return backupSave(); }
+// v39.08 — Tony, 29 Oct: "Please remove the "Delete my account" option from the Admin's Setting menu. I'm afraid I may
+// click it by mistake … The Admin account is the only account that should never be deleted." The app's owner accounts
+// (the main one and the spare) are never deleted from the app — not from the menu (hidden, data-not-owner), and not by
+// any other way in (a sign-in coming back to finish a deletion, the console).
+function accountIsAppOwner(user) {
+  try { return !!(user && user.email && user.emailVerified !== false && isOwnerAddress(user.email)); } catch(e) { return false; }
+}
 async function accountDelete(opts) {
   opts = opts || {};
   var user = window._fbAuth && window._fbAuth.currentUser;
   if (!user || cloudLayout() !== 'households') return null;
+  if (accountIsAppOwner(user)) {
+    await askConfirm({ icon: '\u{1F451}', title: 'The app\u2019s owner account stays',
+      message: 'This is the app\u2019s owner account, so the app never deletes it.', okLabel: 'OK' });
+    return null;
+  }
   if (householdUnsent()) { toast('There are changes on this device not yet sent — sync first.', 8000); return null; }
   var mine = await householdMemberships(user), alone = [], blocked = [], leave = [];
   for (var i = 0; i < mine.length; i++) {
@@ -7859,15 +7871,15 @@ window.accountReauthenticate = accountReauthenticate;
 function accountMenu() {
   if (cloudLayout() !== 'households' || !window._fbUser) return;
   askChoice(String(window._fbUser.email || ''), [
-    { value: 'download', label: '⬇️ Download all my data' },
-    { value: 'delete', label: '\u{1F5D1} Delete my account…' }
-  ], { icon: '\u{1F464}', title: 'Your account' }).then(function(v){
+    { value: 'download', label: '⬇️ Download all my data' }
+  ].concat(accountIsAppOwner(window._fbAuth && window._fbAuth.currentUser) ? [] : [{ value: 'delete', label: '\u{1F5D1} Delete my account…' }]),   // v39.08
+    { icon: '\u{1F464}', title: 'Your account' }).then(function(v){
     if (v === 'download') accountDownload();
     else if (v === 'delete') accountDelete();
   });
 }
 window.householdTransfer = householdTransfer; window.householdDelete = householdDelete; window.householdWipe = householdWipe;
-window.accountDelete = accountDelete; window.accountDownload = accountDownload; window.accountMenu = accountMenu;
+window.accountDelete = accountDelete; window.accountDownload = accountDownload; window.accountMenu = accountMenu; window.accountIsAppOwner = accountIsAppOwner;
 window.householdMembersOf = householdMembersOf;
 window.householdEnter = householdEnter; window.householdUse = householdUse; window.householdOf = householdOf;
 window.householdRename = householdRename; window.householdInvite = householdInvite; window.householdLeave = householdLeave;
@@ -9704,7 +9716,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.07';
+var APP_VERSION = 'v39.08';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -12920,7 +12932,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.07</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.08</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -13008,7 +13020,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.07</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.08</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -13138,8 +13150,9 @@ body.banner-shown .header {
             </div>
           </div>
           <!-- v37.05 — Tony: not hidden in a dialog; the last item, bold and red. -->
-          <div data-layout-only="households" style="height:1px;background:var(--border);margin:4px 0;"></div>
-          <button class="drop-item" title="Deletes your account, and the households you own alone with all their recipes. Cannot be undone. A household shared with others must be handed over first." id="deleteAccountItem" data-layout-only="households" onclick="closeDrop('settingsDrop');accountDelete()"
+          <!-- v39.08 — not on the app owner's menu (data-not-owner): his account is never deleted from the app. -->
+          <div data-layout-only="households" data-not-owner style="height:1px;background:var(--border);margin:4px 0;"></div>
+          <button class="drop-item" title="Deletes your account, and the households you own alone with all their recipes. Cannot be undone. A household shared with others must be handed over first." id="deleteAccountItem" data-layout-only="households" data-not-owner onclick="closeDrop('settingsDrop');accountDelete()"
                   style="font-weight:700;color:var(--danger);">🗑 Delete my account…</button>
         </div>
       </div>
@@ -18138,6 +18151,7 @@ window.toggleUnitPref = toggleUnitPref; window.unitPref = unitPref;
 function applyOwnerOnlyItems() {
   var mine = isAppOwner();
   document.querySelectorAll('[data-owner-only]').forEach(function(el){ el.style.display = mine ? '' : 'none'; });
+  document.querySelectorAll('[data-not-owner]').forEach(function(el){ el.style.display = mine ? 'none' : ''; });   // v39.08
   envRibbonUpdate();
   if (typeof logNudgeLabel === 'function') logNudgeLabel();   // v38.43
 }
@@ -32118,7 +32132,7 @@ var HELP_SYSTEM_PROMPT = [
   "- Google sign-in always shows Google's list of accounts, so you choose which one — even when the phone already knows another account. If a code from an authenticator app is asked for an account you did not mean, press 'Use another account' and sign in again.",
   "- 'Sign out' (in the header, next to the sync status) also removes this device's copy of the recipes — unless some changes have not reached the cloud yet; they come back when you sign in. Another account signing in on the same device never sees, or receives, the first account's recipes; recipes made on the device before signing in are added only if you choose 'Add them'.",
   "- An address used with a password must be CONFIRMED from the e-mail sent to it; until then, places kept for that address do not open (invitation links still work). ⚙️ → ✉️ Confirm my e-mail address sends it again.",
-  "- ⚙️ → 💾 Backups and photos → 💾 Backups saves a file with everything (every recipe and photo). ⚙️ → 🗑 Delete my account… (the last item) deletes the account and the households you own alone.",
+  "- ⚙️ → 💾 Backups and photos → 💾 Backups saves a file with everything (every recipe and photo). ⚙️ → 🗑 Delete my account… (the last item) deletes the account and the households you own alone. The app's owner has no such item: the owner's account is never deleted from the app.",
   "- ⚙️ → 🔧 Troubleshooting → 🧽 Reset this device… erases only this device's copy; nothing in the cloud is deleted.",
   "- ⚙️ Settings is in sections — 🎨 How it looks, ♿ Accessibility, 🏠 My household, 📥 Saving recipes from other apps, 💾 Backups and photos, 💬 Help and feedback, 🔧 Troubleshooting (and 👑 App owner, for the app's owner). Tap a section to open it. 🗑 Delete my account… is the last item, on its own. 🔒 What leaves this device (who receives what) is at the bottom of the ? window.",
   "- Every item in ⚙️ explains itself when you point at it.",

@@ -1416,6 +1416,14 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
   - **Released: v39.07 (29 Oct 2026, 00:03 Israel time, on 5941e0c; Tony: "Yes, release v39.07").** Every job success:
     Deploy to GitHub Pages, pages build, Publish languages, Translate new phrases, Self Tests on main and test, Cloudflare
     Pages for the beta and test.
+  - **v39.08 — the owner's account is never deleted from the app** (Tony, 29 Oct: "Please remove the "Delete my account"
+    option from the Admin's Setting menu. I'm afraid I may click it by mistake … The Admin account is the only account
+    that should never be deleted"). ⚙️ → 🗑 Delete my account… and its divider carry `data-not-owner` (hidden by
+    `applyOwnerOnlyItems` for the owner); `accountMenu` leaves it out; `accountDelete` refuses an owner account
+    (`accountIsAppOwner`: a confirmed address whose fingerprint is in ownerKeys — the main account and the spare) with
+    "The app's owner account stays", whatever way it is reached (also the sign-in that comes back to finish a deletion).
+    Help says so. Self Test in the account-deletion test. Tony's yes came with the request ("Please release it to beta
+    and family once ready and approved").
   - **The test copy behaves as the beta will (Tony, 27 Oct: "once a build is released to it, it behaves exactly the same
     as the Beta would have"; "Perhaps we should update the database rules and server immediately upon the release to the
     test version"):**
