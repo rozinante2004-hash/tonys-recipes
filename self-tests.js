@@ -2516,6 +2516,53 @@ window.SELF_TESTS = [
       }
     } },
 
+  // v39.11 — Tony: "When getting an invitation request, in the Feedback tab, please add a button next to each … Clicking
+  // it will open the "Invite testers" page, with the relevant email already filled in."
+  { id:'feedback_send_invitation', group:'Sharing', name:'💬 Feedback: a request for an invitation has ✉️ Send invitation — Invite testers with the address in To, in the copy it came from (v39.11)',
+    test: async()=>{
+      if(!feedbackInboxHere()) return;          // the notes are read in the family app only
+      var here=APP_CONFIG.firebase.projectId, there=here==='tonys-recipes-test' ? 'my-kitchen-notes-beta' : 'tonys-recipes-test';
+      var real={ db:window._fbDb, user:window._fbUser, toast:window.toast, err:window.showServiceError, owner:window.isAppOwner, fetch:window.fetch, h:_workerHealth,
+                 last:_fbLastNew, inv:window.openInviteTesters, open:window.open };
+      var keptNew=null; try{ keptNew=localStorage.getItem(FB_NEW_KEY); }catch(e){}
+      var invited=[], opened=[];
+      try{
+        window.toast=function(){}; window.showServiceError=function(){};
+        window.isAppOwner=function(){ return true; }; _workerHealth=null;
+        window._fbUser={ uid:'uOwner', email:'owner@example.com', getIdToken:async function(){ return 'tok'; } };
+        window._fbDb={ collection:function(c){
+            if(c==='feedback') return { orderBy:function(){ return { limit:function(){ return { get:async function(){ return { forEach:function(){} }; } }; } }; } };
+            return { get:async function(){ return { size:0, forEach:function(){} }; } }; },
+          collectionGroup:function(){ return { get:async function(){ return { size:0, forEach:function(){} }; } }; } };
+        var at=Date.now()-3600e3, ask='✉️ Asks for an invitation — they opened a recipe sent by K (“Soup”).';
+        window.fetch=async function(u, init){
+          var b={}; try{ b=JSON.parse(init.body); }catch(e){}
+          if(b.op==='notes') return new Response(JSON.stringify({ notes:[
+              { id:71, project:here, uid:'', email:'here@example.com', text:ask, at:at, status:'new' },
+              { id:72, project:there, uid:'', email:'there@example.com', text:ask, at:at-1, status:'new' },
+              { id:73, project:here, uid:'uX', email:'tester@example.com', text:'The import is slow', at:at-2, status:'new' } ], replies:[] }), { status:200 });
+          return new Response('{"error":"METER: not set up"}', { status:503 });
+        };
+        window.openInviteTesters=function(pre){ invited.push(pre && pre.to); return true; };
+        window.open=function(u){ opened.push(String(u)); return null; };
+        await openManagement(); await mknManage._notes(); mknManage.tabTo('feedback');
+        function btnIn(id){ var c=document.getElementById('mgNote-'+id); return c && Array.prototype.filter.call(c.querySelectorAll('button'), function(x){ return /Send invitation/.test(x.textContent); })[0]; }
+        if(!btnIn('s71') || !btnIn('s72')) throw new Error('a request for an invitation has no ✉️ Send invitation');
+        if(btnIn('s73')) throw new Error('offered on an ordinary note');
+        btnIn('s71').click();
+        if(invited.length!==1 || invited[0]!=='here@example.com') throw new Error('Invite testers did not open with the address: '+JSON.stringify(invited));
+        btnIn('s72').click();
+        if(opened.length!==1 || opened[0].indexOf('#invite=there%40example.com')<0 || /\?manage/.test(opened[0])) throw new Error('a request from the other copy should open that copy with the address after #: '+JSON.stringify(opened));
+        return 'this copy: Invite testers filled in; the other copy: opened there';
+      } finally {
+        window._fbDb=real.db; window._fbUser=real.user; window.toast=real.toast; window.showServiceError=real.err; window.isAppOwner=real.owner; window.fetch=real.fetch; _workerHealth=real.h;
+        window.openInviteTesters=real.inv; window.open=real.open;
+        if(window.mknManage) mknManage.close();
+        _fbLastNew=real.last; try{ if(keptNew===null) localStorage.removeItem(FB_NEW_KEY); else localStorage.setItem(FB_NEW_KEY, keptNew); }catch(e){}
+        feedbackKnown(null);
+      }
+    } },
+
   { id:'feedback_answer_arrives', group:'Sharing', name:'📨 An answer to my note comes up in my app like a link request — OK, Write back, Remind me later — with red dots on the way to it until read; nobody named (v38.00)',
     test: async()=>{
       var real={ user:window._fbUser, auth:window._fbAuth, fetch:window.fetch, h:_workerHealth, ask:window.askConfirm, toast:window.toast, form:window.openFeedbackForm,
@@ -4676,6 +4723,70 @@ window.SELF_TESTS = [
         var ov=document.getElementById('askOverlay'); if(ov) ov.remove();
       }
     } },
+
+  // v39.11 — Tony: e-mail had only "my mail app" and Copy; the address typed should fill in the invitation request; the
+  // photo did not travel; and 💬 Feedback → ✉️ Send invitation.
+  { id:'email_recipe_link', group:'Sync', name:'E-mailing a recipe: Gmail and Outlook, a one-tap link with the photo, the address carried for an invitation (v39.11)',
+    test: async()=>{
+      var id=giftNewId();
+      if(giftUrl(id,'Dana@Example.com').indexOf('?recipe='+id+'#for=Dana%40Example.com')<0) throw new Error('the link does not carry the address: '+giftUrl(id,'Dana@Example.com'));
+      if(/#/.test(giftUrl(id,'not an address')) || /#/.test(giftUrl(id))) throw new Error('no address, nothing after #');
+      var real={ confirm:window.askConfirm, open:window.open, send:window.giftSend, carries:window.emailCarriesLink, db:window._fbDb, owner:window.isAppOwner,
+        gid:window.gmailClientIdFind, look:_gifts.lookAt, hid:_cloudHid, gmail:window._featureOverride.gmail };
+      try {
+        // the invitation request: the address it was e-mailed to, already there
+        sessionStorage.setItem('mkn_gift_for','dana@example.com'); var asked=null;
+        window.askConfirm=async function(o){ asked=o; return null; };
+        _gifts.lookAt={ id:id, d:{ fromName:'K', name:'Soup' } };
+        await giftAskInvitation();
+        if(!asked || asked.input!=='dana@example.com') throw new Error('the request did not start with the address: '+JSON.stringify(asked && asked.input));
+        // the photo: from the kitchen's cloud copy when this device has none
+        _cloudHid='hG';
+        var docs={ 'households/hG/photos/77':{ photo:'data:image/jpeg;base64,'+'A'.repeat(400) } };
+        function coll(path){ return { doc:function(d){ var pth=path+'/'+d; return { collection:function(c){ return coll(pth+'/'+c); },
+          get:async function(){ return { exists:!!docs[pth], data:function(){ return docs[pth]; } }; } }; } }; }
+        window._fbDb={ collection:function(c){ return coll(c); } };
+        var ph=await giftPhotoOf({ id:77, name:'No photo here' });
+        if(ph!==docs['households/hG/photos/77'].photo) throw new Error('the photo was not taken from the cloud: '+String(ph).slice(0,40));
+        window._fbDb=real.db; _cloudHid=real.hid;
+        // the ✉️ Email window, as where Gmail sending is off (the beta): Gmail, Outlook, the mail app; the one-tap link
+        window._featureOverride.gmail=false;
+        var r=recipes[0];
+        if(!r){ r=normalizeRecipe(Object.assign(JSON.parse(JSON.stringify(SAMPLE_RECIPES[0])), { id:TEST_ID_MIN+7 })); recipes.push(r); real.tmp=r.id; }
+        var sent=[]; window.emailCarriesLink=function(){ return true; };
+        window.giftSend=async function(rr,o){ sent.push(o.via); return { id:id, url:giftUrl(id), name:rr.name }; };
+        var tab={ location:{ href:'' } }; window.open=function(u){ return u ? null : tab; };
+        showEmailModal(r.id);
+        var ov=document.getElementById('emailModalOverlay');
+        if(!ov || !ov.querySelector('#emailGmailWebBtn') || !ov.querySelector('#emailOutlookBtn') || !ov.querySelector('#emailMailtoBtn'))
+          throw new Error('the e-mail window lacks Gmail, Outlook or My mail app');
+        ov.querySelector('input[type="email"]').value='dana@example.com';
+        ov.querySelector('#emailGmailWebBtn').click();
+        for(var w=0;w<40 && !tab.location.href;w++) await wait(50);
+        var u=tab.location.href;
+        if(!/^https:\/\/mail\.google\.com\//.test(u) || u.indexOf(encodeURIComponent('?recipe='+id+'#for=dana%40example.com'))<0 || u.indexOf('to=dana%40example.com')<0)
+          throw new Error('Gmail did not open with the address and the one-tap link: '+u.slice(0,200));
+        tab.location.href=''; ov.querySelector('#emailOutlookBtn').click();
+        for(var w2=0;w2<40 && !tab.location.href;w2++) await wait(50);
+        if(!/outlook\.live\.com/.test(tab.location.href)) throw new Error('Outlook did not open');
+        if(sent.length!==1 || sent[0]!=='email') throw new Error('the link should be made once for the window, as an e-mail: '+JSON.stringify(sent));
+        ov.remove();
+        // 💬 Feedback → ✉️ Send invitation: Invite testers with the address in To
+        window.isAppOwner=function(){ return true; }; window.gmailClientIdFind=async function(){ return ''; };
+        openInviteTesters({ to:'dana@example.com' });
+        var to=document.getElementById('invTo');
+        if(!to || to.value!=='dana@example.com') throw new Error('Invite testers did not open with the address in To');
+        document.getElementById('inviteOverlay').remove();
+        return 'Gmail/Outlook/mail app; one link per window, with the address; the request filled in; the cloud photo; Invite testers filled in';
+      } finally {
+        try { sessionStorage.removeItem('mkn_gift_for'); } catch(e) {}
+        window.askConfirm=real.confirm; window.open=real.open; window.giftSend=real.send; window.emailCarriesLink=real.carries;
+        window._fbDb=real.db; window.isAppOwner=real.owner; window.gmailClientIdFind=real.gid; _gifts.lookAt=real.look; _cloudHid=real.hid;
+        if(real.gmail===undefined) delete window._featureOverride.gmail; else window._featureOverride.gmail=real.gmail;
+        if(real.tmp) recipes=recipes.filter(function(x){ return x.id!==real.tmp; });
+        ['emailModalOverlay','inviteOverlay'].forEach(function(x){ var e=document.getElementById(x); if(e) e.remove(); });
+      }
+    }},
 
   { id:'wpo_first_visit', group:'UI', name:'A first visit: welcome, an empty collection that teaches, a tour (v37.00)',
     test: async()=>{

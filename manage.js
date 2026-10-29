@@ -297,6 +297,8 @@
             + '<a class="mg-btn" href="mailto:' + escA(n.email) + '?subject=' + subj + '&body=' + body + '" title="Opens the e-mail app this computer is set to use">📨 E-mail app</a>' : '')
         // v38.00 — Tony: "Reply in App … received exactly as a join request, with the red dot and all."
         + (canReplyInApp(n) && S.replying !== n.key ? '<button type="button" class="mg-btn" onclick="mknManage.replyOpen(' + kj + ')" title="Your answer comes up in their app, like a link request, with a red dot until they read it">📲 Reply in app</button>' : '')
+        // v39.11 — Tony: a request for an invitation gets a button that opens ✉️ Invite testers with the address in To
+        + (isInviteAsk(n) ? '<button type="button" class="mg-btn" onclick="mknManage.inviteFor(' + kj + ')" title="Opens ✉️ Invite testers with this address filled in — in the copy the request came from">✉️ Send invitation</button>' : '')
         + (n.status !== 'seen' ? '<button type="button" class="mg-btn" onclick="mknManage.mark(' + kj + ',\'seen\')">👀 Seen</button>' : '')
         + (n.status !== 'done' ? '<button type="button" class="mg-btn" onclick="mknManage.mark(' + kj + ',\'done\')">✅ Done</button>' : '')
         + '<button type="button" class="mg-btn mg-danger" onclick="mknManage.delNote(' + kj + ')">🗑</button></div>'
@@ -305,6 +307,8 @@
   }
   // v38.00 — a note from the inbox, with its writer known, can be answered in their app.
   function canReplyInApp(n) { return n.src === 'server' && !!n.uid && !!n.project; }
+  // v39.11 — a request for an invitation (Worker v97 invite-ask: no account, the address, a fixed opening)
+  function isInviteAsk(n) { return n.src === 'server' && !n.uid && !!n.email && /^\u2709\uFE0F Asks for an invitation/.test(String(n.text || '')); }
   function repliesHtml(n) {
     var list = n.src === 'server' ? (S.replies[n.id] || []) : [];
     return list.map(function (x) {
@@ -1176,6 +1180,16 @@
         else await window._fbDb.collection('feedback').doc(n.id).delete();
       } catch (e) { showServiceError('Could not remove the note: ' + e.message); return false; }
       S.notes = (S.notes || []).filter(function (x) { return x.key !== key; }); render(); syncDot(); return true;
+    },
+    // v39.11 — ✉️ Send invitation: Invite testers here, with the address in To; a request from another copy opens that
+    // copy (a tester's invitation belongs to the copy it is for), the address after # so no server sees it.
+    inviteFor: function (key) {
+      var n = noteBy(key); if (!n || !n.email) return false;
+      if (!n.project || n.project === thisProject()) return typeof openInviteTesters === 'function' ? openInviteTesters({ to: n.email }) : false;
+      var u = copyUrl(n.project).replace(/\?manage$/, '');
+      if (!u) { toast('Open ✉️ Invite testers in the ' + copyOf(n.project) + ' copy — the request came from there.'); return false; }
+      window.open(u + '#invite=' + encodeURIComponent(n.email), '_blank', 'noopener');
+      return 'other';
     },
     copyLog: function (key) { var n = noteBy(key); if (n && typeof fbProbeCopy === 'function') fbProbeCopy(n.log, 'The log'); },
     // v38.89 — the ticked notes marked seen or done at once (Worker v89); notes in a copy's own database, one batch

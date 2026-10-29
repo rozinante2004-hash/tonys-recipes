@@ -1437,6 +1437,24 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
   - **Released: v39.09 (29 Oct 2026, 11:17 Israel time, on 0de2dde; Tony: "Yes, release v39.09").** Every job success:
     Deploy to GitHub Pages, pages build, Publish languages, Translate new phrases, Self Tests on main and test,
     Cloudflare Pages for the beta and test.
+  - **v39.11 — e-mail and invitations (Tony, 29 Oct: "only 2 options - Share in my mail app and Copy text … add another
+    option to send by Gmail"; "pre-fill-in the email address … You should already have it from the share mail"; "it does
+    not keep the original photo"; Feedback: a button that opens Invite testers with the address filled in).**
+    - 📤 Share → ✉️ Email (`showEmailModal`, where the household's Gmail sending is off): ✉️ Gmail, ✉️ Outlook (web compose,
+      the tab opened at the tap and filled in after — a popup opened after an await is blocked), ✉️ My mail app
+      (`mailOrWebmail`: none opened → Gmail/Outlook/Yahoo/Proton), 📋 Copy Text. Signed in (`emailCarriesLink`), the e-mail
+      starts with a one-tap link — a sent recipe made ONCE per window (`giftSend` via 'email'), so the photo comes with it.
+      The Gmail-API path (households with Gmail on) is unchanged (its tap must reach Google's window directly).
+    - `giftUrl(id, to)` adds `#for=<address>` (after #: never reaches a server); `captureGift` keeps it in sessionStorage
+      `mkn_gift_for` and strips it; `giftAskInvitation` starts with it. 📨 Send → Via Email asks for their address (step 6,
+      optional): fills the To and the link.
+    - `giftPhotoOf`: no copy on this device → the kitchen's own `photos/<id>` (or `secretPhotos`); over 900,000 characters
+      → shrunk (`resizeImageForVision` 1000/0.8, then 700/0.7) instead of left out.
+    - 💬 Feedback: a request for an invitation (`isInviteAsk`: from the server, no uid, an address, "✉️ Asks for an
+      invitation") has ✉️ Send invitation (`mknManage.inviteFor`): this copy → `openInviteTesters({ to })` (z 1300 over
+      📊 Households); another copy → that copy's site with `#invite=<address>` (`captureInvite` → `_inviteOnSignIn` →
+      Invite testers once the owner is signed in), since a tester's invitation belongs to the copy it is for.
+    - Self Tests `email_recipe_link`, `feedback_send_invitation`. Help: "✉️ E-MAIL A RECIPE", the Feedback line.
   - **v39.10 + Worker v97 — 📨 SEND A RECIPE TO ANOTHER KITCHEN** (Tony, 29 Oct: "sending a recipe between registered
     users … the recipient just needs to click a "Save to my recipes" button … without any AI involvement"; his answers:
     1a anyone with the identifier may send, with 🚫 Block; 2a a link can be saved by many, 4 weeks; 3b during the beta a

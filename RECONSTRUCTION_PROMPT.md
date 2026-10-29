@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v39.10` — app. **Worker: v97**, deployed separately and versioned separately
+**Current version:** `v39.11` — app. **Worker: v97**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -872,7 +872,10 @@ listener on `to`, the request chime, a red dot, one pop-up at a time: Save / Loo
 link by e-mail, WhatsApp or copied (`?recipe=<id>`, saved by any number of kitchens). Save makes a new recipe — no AI.
 ⋯ More → 📨 Recipes sent to me and 📤 Recipes I sent (saved / not saved / waiting; copy the link; take it back). The
 sending kitchen's app deletes its expired ones, and a nightly job (clear-sent-recipes.yml) deletes every expired one
-in the beta's database — Firestore's own TTL needs billing. Signed out during the closed beta: the recipe, read-only, and "✉️ Ask for
+in the beta's database — Firestore's own TTL needs billing. v39.11: 📤 Share → ✉️ Email also offers Gmail and Outlook
+on the web and carries a one-tap link (a sent recipe, so the photo comes too); the link can hold the recipient's address
+after # (`#for=`), which fills in their invitation request; 💬 Feedback's invitation requests have ✉️ Send invitation
+(Invite testers with the address in To, in the copy the request came from). Signed out during the closed beta: the recipe, read-only, and "✉️ Ask for
 an invitation" (Worker `invite-ask`: a note to the owner + an alert, rate-limited). Privacy Statement 1.11.
 
 **State on 28 Oct 2026 (v39.06, Worker v96):** testers since 25 Oct; every release on the owner's yes. Their notes
