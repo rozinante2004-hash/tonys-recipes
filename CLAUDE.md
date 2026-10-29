@@ -1437,6 +1437,15 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
   - **Released: v39.09 (29 Oct 2026, 11:17 Israel time, on 0de2dde; Tony: "Yes, release v39.09").** Every job success:
     Deploy to GitHub Pages, pages build, Publish languages, Translate new phrases, Self Tests on main and test,
     Cloudflare Pages for the beta and test.
+  - **v39.17 — 📊 Households: a Recipes column** (Tony, 29 Oct: "is there a way I could see, as the Admin, how many
+    recipes each household keeps?"). The number was already reported (each household's app, once a day, `hhReport`
+    → `report.recipes` = `recipes.length` of its own kitchen — linked kitchens' recipes are apart; nothing sent while
+    the device's list is empty), but shown only as a line in a household's details, and not at all for the family's
+    (no usage counts there). Now: a sortable **Recipes** column after Members (phone cards: data-label; Sort by menu
+    "Recipes"), its tooltip "Counted by their app today / n days ago" (`reportAt`, now also for this copy's own
+    rows), "—" when none reported; ⬇ CSV gains "Recipes" and "Recipes counted"; the details panel says "**n** recipes
+    in the collection (counted …)" for every household. Self Test: `management_all_copies` (the cells, the tooltip,
+    sorting biggest first, the details line). Help: a 📊 Households line.
   - **Released: v39.16 (29 Oct 2026, 22:28 Israel time, on 2ec0bb7; Tony: "Yes, release v39.16")** — everything since
     v39.09: v39.10–v39.16 (recipes sent to another kitchen, 📤 Recipes I sent with several at once, e-mails sent by the
     server for a recipe and for a sent recipe's link, invitation requests and ✉️ Send invitation, the owner's e-mail

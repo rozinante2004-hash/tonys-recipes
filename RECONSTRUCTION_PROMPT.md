@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v39.16` — app. **Worker: v99**, deployed separately and versioned separately
+**Current version:** `v39.17` — app. **Worker: v99**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -257,7 +257,9 @@ hidden / refuses / silent / privacy text.
   `mknManage.open()`), full screen, the owner only. Tabs:
   - **Households** — every household in this copy, and (in the family and community copies,
     `allCopiesHere`) the other copies' from their daily reports to the Worker: name + identifier,
-    owner, members (role, last opened, terms agreed), this month's AI against its allowance, the two
+    owner, members (role, last opened, terms agreed), **Recipes** (v39.17: how many it keeps — the number its
+    own app sends in the daily report, `report.recipes`; the cell's tooltip says when; sortable, in the CSV with the
+    date counted, and in the details for every household), this month's AI against its allowance, the two
     months before, links, referrals, last active; search, sort, CSV; a details panel (allowance: Save /
     Pause AI / default; private notes; "What they use"; **Extras for this household**; 🗑 Delete this
     household — typed name; deleted ones stay listed, struck through, with who/how). Header: "New

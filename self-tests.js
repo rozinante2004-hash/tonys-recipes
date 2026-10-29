@@ -1650,13 +1650,13 @@ window.SELF_TESTS = [
           if(b.action==='meter-admin' && b.op==='list') return new Response(JSON.stringify({ project:here, capped:false, month:month, months:[month,'2026-09','2026-08'], defaults:{ cap:2, firstMonth:4 },
             households:[ { project:here, capped:false, hid:'hA', name:'Kitchen A', capNow:null, months:[{ month:month, usd:0.5, calls:2 }] },
               { project:other, capped:true, hid:'hR', name:'Beta Kitchen', code:'MKN-RRRR-5555', capNow:4, cap:null, note:'', reportAt:now-3600e3, months:[{ month:month, usd:1.25, calls:5 },{ month:'2026-09', usd:0, calls:0 },{ month:'2026-08', usd:0, calls:0 }],
-                report:{ name:'Beta Kitchen', code:'MKN-RRRR-5555', members:[{ uid:'uR', email:'r@example.com', role:'owner', lastSeen:now-7200e3 }], links:[{ hid:'hS', name:'Sister', code:'MKN-SSSS-6666' }] } },
+                report:{ name:'Beta Kitchen', code:'MKN-RRRR-5555', recipes:1370, members:[{ uid:'uR', email:'r@example.com', role:'owner', lastSeen:now-7200e3 }], links:[{ hid:'hS', name:'Sister', code:'MKN-SSSS-6666' }] } },
               { project:other, capped:true, hid:'hGone', name:'Never reported', capNow:2, months:[] },
               // v37.72 — deleted ones stay listed, marked; and who left.
               { project:other, capped:true, hid:'hD', capNow:2, months:[], report:{ name:'Gone Kitchen', code:'MKN-DDDD-8888', deletedAt:now-864e5, deletedBy:'d@example.com', deletedHow:'account',
                   members:[{ uid:'uD', email:'d@example.com', role:'owner' }], links:[] } },
               { project:here, capped:false, hid:'hL', capNow:null, months:[], report:{ name:'Local Gone', code:'MKN-LLLL-9999', deletedAt:now-2*864e5, deletedBy:'l@example.com', deletedHow:'household', members:[], links:[] } },
-              ].map(function(h){ if(h.hid==='hA') h.report={ name:'Kitchen A', members:[], links:[], left:[{ email:'v@example.com', at:now-3600e3, how:'account' }] }; return h; }) }), { status:200 });
+              ].map(function(h){ if(h.hid==='hA'){ h.report={ name:'Kitchen A', recipes:12, members:[], links:[], left:[{ email:'v@example.com', at:now-3600e3, how:'account' }] }; h.reportAt=now-3600e3; } return h; }) }), { status:200 });
           if(b.action==='meter-admin') return new Response('{"ok":true}', { status:200 });
           return real.fetch.apply(window, arguments);
         };
@@ -1689,6 +1689,18 @@ window.SELF_TESTS = [
         var tt=document.getElementById('manageOverlay').textContent;
         if(!/Deleted with its owner\u2019s account \(d@example\.com\)/.test(tt) || !/Deleted by its owner \(l@example\.com\)/.test(tt) || !/2 deleted/.test(tt)) throw new Error('who deleted them is not said');
         if(!/1 left \(deleted their account\)/.test(tt)) throw new Error('a member who deleted their account is not mentioned');
+        // v39.17 — Tony: "is there a way I could see, as the Admin, how many recipes each household keeps?"
+        var rcell=function(name){ var tr=Array.prototype.filter.call(document.querySelectorAll('#manageOverlay .mg-row'), function(t){ return t.querySelector('.mg-name').textContent===name; })[0];
+          return tr && tr.querySelector('td[data-label="Recipes"]'); };
+        if(!rcell('Beta Kitchen') || rcell('Beta Kitchen').textContent!==(1370).toLocaleString() || rcell('Kitchen A').textContent!=='12' || rcell('Gone Kitchen').textContent!=='—')
+          throw new Error('the Recipes column: '+[rcell('Beta Kitchen'), rcell('Kitchen A'), rcell('Gone Kitchen')].map(function(c){ return c && c.textContent; }).join(' / '));
+        if(!/today/.test(rcell('Kitchen A').title||'')) throw new Error('when it was counted is not said: '+rcell('Kitchen A').title);
+        mknManage.sortBy('recipes');
+        var firstLive=Array.prototype.filter.call(document.querySelectorAll('#manageOverlay .mg-row'), function(t){ return !t.classList.contains('mg-deleted'); })[0];
+        if(!firstLive || firstLive.querySelector('.mg-name').textContent!=='Beta Kitchen') throw new Error('sorting by Recipes does not put the biggest first');
+        mknManage.show(mknManage._state.rows.filter(function(r){ return r.name==='Kitchen A'; })[0].key);
+        if(!/12 recipes in the collection \(counted today\)/.test(document.getElementById('manageOverlay').textContent)) throw new Error('the household’s details do not say how many recipes');
+        mknManage.show(null); mknManage.sortBy('month');
         // v39.07 — Tony: "an option in the Admin's Households page to hide the deleted accounts" (kept on this device)
         try{
           var hg=document.getElementById('mgHideGone');

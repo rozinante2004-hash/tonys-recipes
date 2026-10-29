@@ -174,6 +174,7 @@
       r.note = (m && m.note) || '';
       r.usage = (m && m.usage) || null;           // v38.15 — { 'YYYY-MM': { feature: times } } (Worker v69)
       r.recipesN = (m && m.report && m.report.recipes) || 0;   // v38.30 — how many recipes (Worker v76)
+      if (!r.reportAt && m && m.reportAt) r.reportAt = m.reportAt;   // v39.17 — when that was counted (this copy's rows too)
       if (m && m.last_seen > r.lastSeen) r.lastSeen = m.last_seen;
       return r;
     });
@@ -482,9 +483,13 @@
   }
   function usePanelHtml(r) {
     var months = Object.keys(r.usage || {}).sort().reverse();
-    if (!months.length) return r.remote || r.copy !== 'family' ? '<div class="mg-h">What they use</div><div class="mg-muted">Nothing counted yet'
-      + ' (counted in the beta and the test copy only).</div>' : '';
-    return '<div class="mg-h">What they use</div>' + (r.recipesN ? '<div class="mg-muted">' + r.recipesN + ' recipe' + (r.recipesN === 1 ? '' : 's') + ' in the collection</div>' : '') + months.map(function (m) {
+    // v39.17 — how many recipes, for every household (Tony: "is there a way I could see, as the Admin, how many recipes
+    // each household keeps?"), with when its app counted them
+    var rn = r.recipesN ? '<div class="mg-muted"><b>' + Number(r.recipesN).toLocaleString() + '</b> recipe' + (r.recipesN === 1 ? '' : 's') + ' in the collection'
+      + (r.reportAt ? ' (counted ' + ago(r.reportAt) + ')' : '') + '</div>' : '';
+    if (!months.length) return r.remote || r.copy !== 'family' ? '<div class="mg-h">What they use</div>' + rn + '<div class="mg-muted">Nothing counted yet'
+      + ' (counted in the beta and the test copy only).</div>' : (rn ? '<div class="mg-h">Recipes</div>' + rn : '');
+    return '<div class="mg-h">What they use</div>' + rn + months.map(function (m) {
       return '<div class="mg-usemonth"><div class="mg-muted">' + mon(m) + ' ' + m.slice(0, 4) + '</div>' + useListHtml(r.usage[m]) + '</div>';
     }).join('');
   }
@@ -706,7 +711,8 @@
     var key = { name: function (r) { return r.name.toLowerCase(); }, copy: function (r) { return r.copy; }, owner: function (r) { return r.owner; },
                 members: function (r) { return r.members.length; }, month: function (r) { return r.month; },
                 cap: function (r) { return r.cap == null ? 1e9 : r.cap; }, links: function (r) { return r.links.length; },
-                referred: function (r) { return r.referred; }, seen: function (r) { return r.lastSeen; } }[S.sort] || function (r) { return r.month; };
+                referred: function (r) { return r.referred; }, seen: function (r) { return r.lastSeen; },
+                recipes: function (r) { return r.recipesN || 0; } }[S.sort] || function (r) { return r.month; };   // v39.17
     return list.sort(function (a, b) {
       if (!!a.deleted !== !!b.deleted) return a.deleted ? 1 : -1;     // v37.72 — the deleted ones last
       var x = key(a), y = key(b); return (x < y ? -1 : x > y ? 1 : 0) * S.dir; });
@@ -784,7 +790,7 @@
     // v38.84 — Tony's iPhone: ten columns at least 900 px wide, four of them on the screen, addresses broken letter by letter.
     // On a phone each household is a card (the stylesheet's @media below), every cell with its label, and the headers'
     // sorting is a menu above them. A computer keeps the table.
-    var sortOpts = [['month:-1', 'Spent this month'], ['seen:-1', 'Last active'], ['name:1', 'Household (A–Z)'], ['members:-1', 'Members']]
+    var sortOpts = [['month:-1', 'Spent this month'], ['seen:-1', 'Last active'], ['name:1', 'Household (A–Z)'], ['members:-1', 'Members'], ['recipes:-1', 'Recipes']]
       .concat(multi ? [['copy:1', 'Copy']] : []).concat([['owner:1', 'Owner (A–Z)'], ['links:-1', 'Linked with'], ['referred:-1', 'Shared the app'], ['cap:-1', 'Cap']]);
     var sortNow = S.sort + ':' + S.dir;
     var sortBar = '<div class="mg-sortbar"><label>Sort by <select onchange="mknManage.sortTo(this.value)">'
@@ -792,7 +798,7 @@
       + sortOpts.map(function (o) { return '<option value="' + o[0] + '"' + (o[0] === sortNow ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('')
       + '</select></label></div>';
     var table = sortBar + '<div class="mg-scroll mg-hhwrap"><table class="mg-table mg-hh"><thead><tr>'
-      + th('name', 'Household') + (multi ? th('copy', 'Copy') : '') + th('owner', 'Owner') + th('members', 'Members') + th('month', 'This month')
+      + th('name', 'Household') + (multi ? th('copy', 'Copy') : '') + th('owner', 'Owner') + th('members', 'Members') + th('recipes', 'Recipes') + th('month', 'This month')
       + th('cap', 'Cap') + '<th>' + (months.length ? months.slice(1).map(mon).reverse().join(' · ') : 'Before') + '</th>'
       + th('links', 'Linked with') + th('referred', 'Shared the app') + th('seen', 'Last active') + '</tr></thead><tbody>'
       + (list.length ? list.map(function (r) {
@@ -804,13 +810,15 @@
             + (multi ? '<td data-label="Copy"><span class="mg-copy">' + esc(r.copy) + '</span></td>' : '')
             + '<td class="mg-email" data-label="Owner">' + esc(r.owner || '—') + '</td>'
             + '<td class="mg-c" data-label="Members">' + r.members.length + '</td>'
+            + '<td class="mg-c" data-label="Recipes"' + (r.recipesN && r.reportAt ? ' title="' + escA('Counted by their app ' + ago(r.reportAt)) + '"' : '') + '>'
+            + (r.recipesN ? Number(r.recipesN).toLocaleString() : '—') + '</td>'   // v39.17
             + '<td data-label="This month"><div>' + barHtml(r) + '</div></td>'
             + '<td class="mg-c" data-label="Cap">' + (r.cap == null ? '—' : money(r.cap) + (r.capSet ? ' ✎' : '')) + '</td>'
             + '<td class="mg-muted" data-label="Before">' + (r.months.length ? r.months.slice(1).reverse().map(function (m) { return money(m.usd); }).join(' · ') : '—') + '</td>'
             + '<td data-label="Linked with">' + (r.links.length ? r.links.map(function (l) { return esc(l.name || l.code); }).join(', ') : '—') + '</td>'
             + '<td class="mg-c" data-label="Shared the app">' + (r.referred || '—') + '</td>'
             + '<td data-label="Last active">' + ago(r.lastSeen) + '</td></tr>';
-        }).join('') : '<tr><td colspan="' + (multi ? 10 : 9) + '" class="mg-empty">No household matches.</td></tr>')
+        }).join('') : '<tr><td colspan="' + (multi ? 11 : 10) + '" class="mg-empty">No household matches.</td></tr>')
       + '</tbody></table></div>';
     body.innerHTML = head + table + panelHtml();
   }
@@ -1368,10 +1376,10 @@
     },
     csv: function () {
       var months = (S.meter && S.meter.months) || [];
-      var head = ['Household', 'Identifier', 'Copy', 'Owner', 'Members', 'Member e-mails (terms agreed)'].concat(months.map(function (m) { return 'AI ' + m + ' ($)'; }))
+      var head = ['Household', 'Identifier', 'Copy', 'Owner', 'Members', 'Recipes', 'Recipes counted', 'Member e-mails (terms agreed)'].concat(months.map(function (m) { return 'AI ' + m + ' ($)'; }))
         .concat(['Cap ($)', 'Linked with', 'Shared the app', 'Last active', 'Founded', 'Came through', 'Notes', 'Deleted', 'Left', 'Feature counts (by month)']);
       var lines = [head].concat(sorted(true).map(function (r) {
-        return [r.name, r.code, r.copy, r.owner, r.members.length, r.members.map(function (m) { return (m.email || '\u2014') + ' (' + m.role + (m.termsAt ? ', terms v' + (m.termsVersion || '?') + ' ' + new Date(m.termsAt).toISOString().slice(0, 10) : ', terms not agreed') + ')'; }).join('; ')]
+        return [r.name, r.code, r.copy, r.owner, r.members.length, r.recipesN || '', r.recipesN && r.reportAt ? new Date(r.reportAt).toISOString().slice(0, 10) : '', r.members.map(function (m) { return (m.email || '\u2014') + ' (' + m.role + (m.termsAt ? ', terms v' + (m.termsVersion || '?') + ' ' + new Date(m.termsAt).toISOString().slice(0, 10) : ', terms not agreed') + ')'; }).join('; ')]
           .concat(months.map(function (m) { var x = r.months.filter(function (y) { return y.month === m; })[0]; return x ? x.usd.toFixed(4) : '0'; }))
           .concat([r.cap == null ? '' : r.cap, r.links.map(function (l) { return l.name; }).join('; '), r.referred,
                    r.lastSeen ? new Date(r.lastSeen).toISOString().slice(0, 10) : '', r.createdAt ? new Date(r.createdAt).toISOString().slice(0, 10) : '',
