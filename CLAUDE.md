@@ -1469,7 +1469,10 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
     - **Tester2's examples (29 Oct, test copy):** Tony: after saving a sent recipe, Tester2's other recipes (the five
       examples, renamed) were gone. Tester2's log on that Firefox: two FULL reads at 14:57 Israel found 0 recipes, the
       save wrote only the gift (id 10 — the first id), no delete was sent; Sync Health after: 1 on the device, 1 in the
-      cloud. Not explained yet — asked Tony where the examples were added/renamed (another device/container?).
+      cloud. Explained (Tony, 29 Oct): on the test copy Tester2's kitchen showed the empty-kitchen guide ("Add your
+      first recipe" + 4 ways + "Or look around with 5 example recipes"), not recipes; the renamed examples are most
+      likely in Tester2's BETA kitchen (a separate database, still v39.09). Admin was in Chrome, Tester2 in Firefox.
+      Nothing was lost.
       Checked meanwhile: e2e households run, "A recipe sent to another kitchen" (a kitchen with 2 recipes of its own,
       the pop-up's Save → 3 on screen, 3 in the cloud, 3 after reopening; a new kitchen's tour question comes first,
       the pop-up waits for it). Hardened: `readCloudRecipeDocs`' one-by-one fallback swallowed every error and passed
