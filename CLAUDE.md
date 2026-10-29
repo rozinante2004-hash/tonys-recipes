@@ -1437,6 +1437,37 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
   - **Released: v39.09 (29 Oct 2026, 11:17 Israel time, on 0de2dde; Tony: "Yes, release v39.09").** Every job success:
     Deploy to GitHub Pages, pages build, Publish languages, Translate new phrases, Self Tests on main and test,
     Cloudflare Pages for the beta and test.
+  - **v39.10 + Worker v97 — 📨 SEND A RECIPE TO ANOTHER KITCHEN** (Tony, 29 Oct: "sending a recipe between registered
+    users … the recipient just needs to click a "Save to my recipes" button … without any AI involvement"; his answers:
+    1a anyone with the identifier may send, with 🚫 Block; 2a a link can be saved by many, 4 weeks; 3b during the beta a
+    signed-out visitor sees the recipe + "Closed beta" + ✉️ Ask for an invitation (to switch to "the link is an
+    invitation" at launch); 4a everything shown on the recipe travels, not the cooking log/ratings/heart/history/secret
+    mark; 📤 Recipes I sent: yes. He asked whether a link to the original would avoid expiry: no — the rules cannot check
+    a secret link on a kitchen's own recipes (ids are short numbers), the permission would need expiring anyway, and a
+    copy is what was sent. He said "Go ahead").
+    - **Data:** `recipeGifts/<24 random chars>` = { from, fromName, fromCode, to ('' for a link), toCode, by, via
+      (app|email|whatsapp|link), name, recipe (giftPayload), photo (bool), note, at (server time), expireAt (≤ 29 days),
+      saved {} } and `recipeGiftPhotos/<id>` = { from, data, expireAt }. Rules: get by id for anyone (signed out too)
+      while not expired; list only `where('to'|'from','==',myKitchen)`; create by a member of `from` under its current
+      name and code, `to` checked against its code; the kitchen sent to (editor+) sets savedAt or declinedAt once; a
+      link's saver adds `saved.<their kitchen>` with `lastSaver`; only the sending kitchen deletes. 39 emulator checks.
+    - **App:** recipe → 📤 Share → 📨 Send to another kitchen (`openSendRecipe`: Via My Kitchen Notes by identifier,
+      Via Email ▸ mail/Gmail/Outlook, Via WhatsApp, another app, Copy the link; a note; ‹ Back on each step). Receiving:
+      a listener on `where('to','==',hid)` (`giftLiveStart`, in `linkLiveStart`) → the request chime, a red dot on ⋯ More
+      and 📨 Recipes sent to me (n), and one pop-up at a time (Save / Look at it first / Not now / 🚫 Block). `?recipe=<id>`
+      is kept in sessionStorage (`mkn_gift`) and asked after the kitchen opens (`giftFromUrl`); signed out,
+      `giftSignedOutMaybe` shows it read-only in the linked view (z 10150) with the closed-beta box. Save = a new recipe
+      (new id/uid, the photo from `recipeGiftPhotos`, "📨 <kitchen> · <date>" added to notes; "You have one called that"
+      asks first). Blocking writes `requestLog/<from>` = blocked (same list as link requests); a blocked kitchen's
+      recipes are hidden, never refused (it is not told). The sending kitchen's app deletes its own expired ones once a
+      day (`giftSweep`); deleting a household deletes what it sent. Self Test `sent_recipes`.
+    - **Worker v97 `invite-ask`** (no sign-in): the address → a note in 💬 Feedback (text without the address, so the
+      reports repository never gets it) + owner alert kind `invite-ask`; 3 a day per network address, 30 a day in all,
+      the same address once a day.
+    - **Privacy Statement 1.11** (29 Oct, 11 languages): data rows "Recipes you send" and "Invitation requests", who sees
+      a sent recipe, and its 4 weeks. Help: "📨 SEND A RECIPE TO ANOTHER KITCHEN".
+    - **Tony's optional step (a backstop; the app already clears what it sent):** Firestore's TTL policy, collection
+      groups `recipeGifts` and `recipeGiftPhotos`, field `expireAt`, in my-kitchen-notes-beta (and tonys-recipes-test).
   - **The test copy behaves as the beta will (Tony, 27 Oct: "once a build is released to it, it behaves exactly the same
     as the Beta would have"; "Perhaps we should update the database rules and server immediately upon the release to the
     test version"):**

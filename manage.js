@@ -418,10 +418,10 @@
     'photo-search': 'Searched for a photo', 'farm': 'Tapped a farm visitor', 'farm-off': 'Turned the farm off', 'share-app': 'Shared the app',
     'cvd-on': 'Turned on the red–green colours', 'cvd-off': 'Turned off the red–green colours',   // v38.83
     'toast-go': 'Clicked a notice to go where it points',   // v38.86
-    'link-request': 'Asked to link with a household',
+    'link-request': 'Asked to link with a household', 'recipe-sent': 'Sent a recipe to another kitchen',   // v39.10
     'added.typed': 'typed in', 'added.link': 'from a link', 'added.extension': 'from the browser extension', 'added.shared': 'shared to the app (phone)',
     'added.photo': 'from a photo', 'added.screenshots': 'from screenshots', 'added.text': 'from pasted text', 'added.video-file': 'from a video file',
-    'added.whatsapp': 'from WhatsApp', 'added.linked': 'copied from a linked household', 'added.suggestion': 'an AI suggestion',
+    'added.whatsapp': 'from WhatsApp', 'added.linked': 'copied from a linked household', 'added.sent': 'sent by another kitchen', 'added.suggestion': 'an AI suggestion',
     'added.translation': 'a translated copy', 'added.video-bookmark': 'a video bookmark', 'added.import': 'imported',
     'from.web': 'a website', 'from.facebook': 'Facebook', 'from.instagram': 'Instagram', 'from.tiktok': 'TikTok', 'from.youtube': 'YouTube',
     // v38.30 — more to learn from

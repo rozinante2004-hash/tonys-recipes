@@ -1,4 +1,9 @@
-// Tony's Recipes — Cloudflare Worker v96
+// Tony's Recipes — Cloudflare Worker v97
+// v97: "CLOSED BETA — ASK FOR AN INVITATION" (Tony, 29 Oct 2026, for a sent recipe's link opened by someone without an
+// account: "an "Closed Beta. Ask for an Invitation" button, asking for their email address, to be sent to Admin").
+// `invite-ask` (no sign-in): the address, as a note in 📊 Households → 💬 Feedback (and on to the reports repository,
+// without the address), and an owner alert. Bounded, having no sign-in to check: 3 a day from one network address, 30
+// a day in all; the same address again within a day is kept once.
 // v96: THE OWNER'S TOOLS WHEN THE DATABASE IS SLOW (Tony, 28 Oct 2026: "The notes could not be read: the server: METER:
 // could not check the owner's two-step setting (The operation was aborted due to timeout) — try again", and the same
 // after a reload). The Worker's read of config/security went unanswered for 8 seconds. Now: (1) a sign-in made WITH the
@@ -433,7 +438,7 @@
 //   AI_MAX_TOKENS   – the longest answer one call may ask for (32000; the
 //                     app's largest, reading several recipes at once, asks 8000).
 
-const WORKER_VERSION = 'v96';
+const WORKER_VERSION = 'v97';
 const VIDEO_MAX_MB_DEFAULT = 50;
 const GEMINI_API = 'https://generativelanguage.googleapis.com';
 const GEMINI_MODEL_DEFAULT = 'gemini-2.5-flash';
@@ -1733,6 +1738,11 @@ async function handleRequest(request, env, ctx) {
       return fr;
     }
     if (body.action === 'feedback-replies') return await feedbackReplies(request, env, body);   // v68
+    if (body.action === 'invite-ask') {   // v97 — a sent recipe's link, opened by someone without an account
+      const ir = await inviteAsk(request, env, body);
+      if (ir.status === 200) reportsLater(env, ctx);
+      return ir;
+    }
     if (body.action === 'household-report') return await householdReport(request, env, body);   // v62
     if (body.action === 'app-signals') {   // v69; v90 — a new error report on to the reports repository
       const sr = await appSignals(request, env, body);
@@ -2020,7 +2030,8 @@ const ALERT_KINDS = [
   ['ai-service', 'The AI service refused (out of credit, its key, or Gemini\u2019s daily quota)'],
   ['household-ai', 'A household reached its AI allowance'],
   ['server-errors', 'The server answering with errors'],
-  ['usage-check', 'The hourly usage check cannot read the figures']
+  ['usage-check', 'The hourly usage check cannot read the figures'],
+  ['invite-ask', 'Someone asks for an invitation (from a sent recipe\u2019s link)']   // v97
 ];
 function alertKindOf(n) {
   const w = String((n && n.what) || '');
@@ -2580,6 +2591,36 @@ async function feedbackSend(request, env, body) {
     .bind(claims.aud, claims.sub, str(claims.email, 200), str(n.name, 120), str(n.hid, 64), str(n.household, 120), text, shot,
           str(n.log, 200000), str(n.version, 20), str(n.env, 20), str(n.device, 300), str(n.lang, 10), Date.now()).run();
   return jsonResp({ ok: true, id: (r && r.meta && r.meta.last_row_id) || null });
+}
+// v97 — "Closed beta — Ask for an invitation": see the heading.
+async function inviteAsk(request, env, body) {
+  if (!env.METER_DB) return jsonResp({ error: 'INVITE: not set up on this Worker (METER_DB).', needsConfig: true }, 503);
+  const str = (v, max) => String(v == null ? '' : v).slice(0, max);
+  const email = str(body.email, 200).trim().toLowerCase();
+  if (!/^[^\s@<>"']+@[^\s@<>"']+\.[^\s@<>"']{2,}$/.test(email)) return jsonResp({ error: 'INVITE: that is not an e-mail address.' }, 400);
+  const project = str(body.project, 60);
+  if (!csvList(env.METER_PROJECTS, METER_PROJECTS_DEFAULT).includes(project)) return jsonResp({ error: 'INVITE: not a copy this server serves.' }, 400);
+  const ip = request.headers.get('CF-Connecting-IP') || 'unknown', day = new Date().toISOString().slice(0, 10);
+  const perIp = await ceilingCount(env, 'invite-ask:' + day + ':' + ip, 86400, 1);
+  const all = await ceilingCount(env, 'invite-ask:' + day, 86400, 1);
+  if (perIp.used >= 3 || all.used >= 30) return jsonResp({ error: 'INVITE: too many requests today — try again tomorrow.', rateLimited: true }, 429);
+  const db = await meterDb(env);
+  await feedbackTable(db);
+  const dup = await db.prepare("SELECT id FROM feedback WHERE email = ?1 AND uid = '' AND at > ?2").bind(email, Date.now() - 864e5).first();
+  if (dup) return jsonResp({ ok: true, already: true });
+  const from = str(body.from, 120), recipe = str(body.recipe, 200);
+  const text = '\u2709\uFE0F Asks for an invitation' + (from || recipe ? ' \u2014 they opened a recipe sent by ' + (from || 'a kitchen')
+    + (recipe ? ' (\u201c' + recipe + '\u201d)' : '') : '') + '.';
+  await db.prepare("INSERT INTO feedback (project, uid, email, name, hid, household, text, shot, log, version, env, device, lang, at, status) "
+    + "VALUES (?1, '', ?2, '', '', '', ?3, '', '', ?4, ?5, ?6, ?7, ?8, 'new')")
+    .bind(project, email, text, str(body.version, 20), str(body.env, 20), str(body.device, 300), str(body.lang, 10), Date.now()).run();
+  await perIp.credit(); await all.credit();
+  try {
+    await ownerAlert(env, 'My Kitchen Notes: someone asks for an invitation', [text, 'Address: ' + email, 'Copy: ' + project,
+      'When: ' + ilTime(Date.now()) + ' (Israel time)', '',
+      'In the app: \u2699\uFE0F \u2192 \u{1F451} App owner \u2192 \u{1F4CA} Households \u2192 \u{1F4AC} Feedback. Invite them with \u2709\uFE0F Invite testers.'].join('\n'), { kind: 'invite-ask' });
+  } catch (e) {}
+  return jsonResp({ ok: true });
 }
 // The owner's side, through meter-admin: notes (newest 300, every copy),
 // note-status, note-delete, notes-new (how many are new).
@@ -3741,4 +3782,4 @@ export default {
   }
 };
 
-// ── END OF WORKER v96 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
+// ── END OF WORKER v97 ── If this is the last line in the Cloudflare editor, the whole file was pasted.

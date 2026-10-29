@@ -97,6 +97,7 @@ service cloud.firestore {
     //   linkTalk/{a}_{b}/messages/{id}      two households talking about a link (v37.81)
     //   households/{hid}/talk/{id}          the household talking among itself: to everyone, or one person (v38.78)
     //   households/{hid}/talkIds/{id}       the same ids, nothing else — for deleting the household (v38.78)
+    //   recipeGifts/{id}, recipeGiftPhotos/{id}   a recipe sent to another kitchen or by a link, 4 weeks (v39.10)
     //   i18n/{lang}                         interface translations, for EVERY household
     //   users/{uid}/…                       each person's own, and nobody else's
     //
@@ -561,6 +562,72 @@ service cloud.firestore {
         && request.resource.data.at is int
         && talkRelated(pair, request.resource.data.from);
       allow update, delete: if false;
+    }
+
+    // v39.10 — SENT RECIPES (Tony, 29 Oct 2026: "sending a recipe between registered users … the recipient just needs
+    // to click a "Save to my recipes" button and it is immediately added to their list of recipes, without any AI
+    // involvement"). `recipeGifts/<id>` is a copy of one recipe as it was sent, kept for at most 4 weeks (`expireAt`:
+    // the database's TTL policy, and the sending kitchen's app, remove it after). Its id is long and random and is the
+    // key: whoever has the link may read it — signed out too, so the link can show what was sent — but nobody may list
+    // them, apart from a kitchen its own sent and received ones. Written by anyone in the sending kitchen, signed with
+    // the kitchen's name and identifier (never a person's). `to` is the kitchen it was sent to in the app, by its
+    // identifier (`toCode`), or '' for a link sent by e-mail, WhatsApp or copied. The kitchen it was sent to marks it
+    // saved or declined, once; whoever saves a link adds their kitchen to `saved`. The sending kitchen withdraws it.
+    // `recipeGiftPhotos/<id>` is its photo, kept apart so that a list never carries the pictures.
+    function giftPath(id) { return /databases/$(database)/documents/recipeGifts/$(id); }
+    function giftExpiryOk(e) { return e is timestamp && e > request.time && e <= request.time + duration.value(29, 'd'); }
+    match /recipeGifts/{id} {
+      allow get: if id.size() >= 20 && resource.data.expireAt > request.time;
+      allow list: if signedIn() && (memberOf(resource.data.get('from', '')) || memberOf(resource.data.get('to', '')));
+      allow create: if signedIn() && id.matches('^[A-Za-z0-9]{20,40}$')
+        && request.resource.data.keys().hasOnly(['from', 'fromName', 'fromCode', 'to', 'toCode', 'by', 'via', 'name',
+                                                 'recipe', 'photo', 'note', 'at', 'expireAt', 'saved'])
+        && request.resource.data.from is string && isMember(request.resource.data.from)
+        && request.resource.data.by == request.auth.uid
+        && request.resource.data.fromName == get(hh(request.resource.data.from)).data.get('name', '')
+        && request.resource.data.fromCode == get(hh(request.resource.data.from)).data.get('code', '')
+        && request.resource.data.to is string && request.resource.data.toCode is string
+        && ((request.resource.data.via == 'app' && request.resource.data.to != ''
+             && request.resource.data.to != request.resource.data.from && exists(hh(request.resource.data.to))
+             && request.resource.data.toCode == get(hh(request.resource.data.to)).data.get('code', ''))
+            || (request.resource.data.via in ['email', 'whatsapp', 'link']
+                && request.resource.data.to == '' && request.resource.data.toCode == ''))
+        && request.resource.data.name is string && request.resource.data.name.size() > 0
+        && request.resource.data.name.size() <= 200
+        && request.resource.data.recipe is map
+        && request.resource.data.photo is bool
+        && request.resource.data.note is string && request.resource.data.note.size() <= 500
+        && request.resource.data.at == request.time
+        && giftExpiryOk(request.resource.data.expireAt)
+        && request.resource.data.saved == {};
+      allow update: if signedIn() && resource.data.expireAt > request.time && (
+          // the kitchen it was sent to (someone who may add recipes there): saved, or declined — once
+          (resource.data.to != '' && atLeast(resource.data.to, 'editor')
+            && !('savedAt' in resource.data) && !('declinedAt' in resource.data)
+            && ((request.resource.data.diff(resource.data).affectedKeys() == ['savedAt'].toSet()
+                 && request.resource.data.savedAt == request.time)
+              || (request.resource.data.diff(resource.data).affectedKeys() == ['declinedAt'].toSet()
+                 && request.resource.data.declinedAt == request.time)))
+          // a link: whoever saves it adds their own kitchen to `saved`, and nothing else
+          || (resource.data.to == ''
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['saved', 'lastSaver'])
+            && request.resource.data.lastSaver is string && atLeast(request.resource.data.lastSaver, 'editor')
+            && request.resource.data.saved.diff(resource.data.saved).affectedKeys().hasOnly([request.resource.data.lastSaver])
+            && request.resource.data.saved[request.resource.data.lastSaver] == request.time
+            && request.resource.data.saved.size() <= 300));
+      allow delete: if signedIn() && (memberOf(resource.data.get('from', '')) || appAdmin());
+    }
+    match /recipeGiftPhotos/{id} {
+      allow get: if id.size() >= 20 && resource.data.expireAt > request.time;
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['from', 'data', 'expireAt'])
+        && existsAfter(giftPath(id))
+        && getAfter(giftPath(id)).data.from == request.resource.data.from
+        && getAfter(giftPath(id)).data.by == request.auth.uid
+        && getAfter(giftPath(id)).data.photo == true
+        && request.resource.data.expireAt == getAfter(giftPath(id)).data.expireAt
+        && request.resource.data.data is string && request.resource.data.data.size() <= 950000;
+      allow delete: if signedIn() && (memberOf(resource.data.get('from', '')) || appAdmin());
     }
 
     // A member finding their own memberships across households — the app asks

@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.09 -->
+<!-- Tony's Recipes Collection v39.10 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -6213,7 +6213,8 @@ var PATH_DOTS = {
   feedback: ['.set-group[data-group="owner"] > .set-head', '#settingsDrop [onclick*="openManagement"]'],
   replies:  ['.set-group[data-group="help"] > .set-head', '#fbRepliesItem'],     // v38.00 — an answer to my note
   chats:    ['[onclick="toggleDrop(\'moreDrop\')"]', '#kitchenChatsItem'],       // v38.50 — a new message, by this way too
-  family:   ['[onclick="toggleDrop(\'moreDrop\')"]', '#familyChatItem']          // v38.78 — a message in the household
+  family:   ['[onclick="toggleDrop(\'moreDrop\')"]', '#familyChatItem'],         // v38.78 — a message in the household
+  gifts:    ['[onclick="toggleDrop(\'moreDrop\')"]', '#giftsInItem']            // v39.10 — a recipe sent to this kitchen
 };
 function pathDots(counts) {
   Object.keys(counts || {}).forEach(function(k){ _pathDots[k] = Math.max(0, +counts[k] || 0); });
@@ -6395,6 +6396,7 @@ window.chimeRefreshSettings = chimeRefreshSettings; window.CHIME_SOUNDS = CHIME_
 var _live = { hid: '', unsubs: [], talk: {}, mine: {} };
 function linkLiveStop() {
   if (typeof famLiveStop === 'function') famLiveStop();           // v38.78
+  if (typeof giftLiveStop === 'function') giftLiveStop();         // v39.10 — recipes sent to this kitchen
   _live.unsubs.forEach(function(u){ try { u(); } catch(e) {} });
   Object.keys(_live.talk).forEach(function(k){ try { _live.talk[k](); } catch(e) {} });
   Object.keys(_live.recipes || {}).forEach(function(k){ try { _live.recipes[k](); } catch(e) {} if (_linkCache[k]) _linkCache[k].live = false; });   // v38.52
@@ -6422,6 +6424,7 @@ function linkLiveStart(force) {
   linkLiveTalk();
   linkLiveRecipes();                                              // v38.52 — their recipes, live
   famLiveStart(force);                                            // v38.78 — the household's own chat
+  giftLiveStart();                                                // v39.10 — recipes sent to this kitchen
   return true;
 }
 // v38.52 — Tony: "Tester1 has updated its recipes, but Admin, who is joined to their kitchen cannot see the changes
@@ -7018,6 +7021,573 @@ window.hhLoadLinks = hhLoadLinks; window.hhSendLinkRequest = hhSendLinkRequest; 
 window.hhCheckLinkRequests = hhCheckLinkRequests; window.hhAnswerLinkRequest = hhAnswerLinkRequest; window.hhAcceptLink = hhAcceptLink;
 window.hhRemoveLink = hhRemoveLink; window.hhWithdrawLinkRequest = hhWithdrawLinkRequest; window.hhLinkTarget = hhLinkTarget;
 window.openLinkedRecipe = openLinkedRecipe; window.saveLinkedCopy = saveLinkedCopy;
+
+// ─── SENT RECIPES (v39.10) ───────────────────────────────────────────────────
+// Tony, 29 Oct 2026: "sending a recipe between registered users … the recipient just needs to click a "Save to my
+// recipes" button and it is immediately added to their list of recipes, without any AI involvement … the recipe
+// itself … will temporarily reside on the server (to be removed once the recipient has accepted and the recipe was
+// added to their list, or after 1 month …)". A COPY of the recipe as it was sent, not a link to the original (his
+// question): the database cannot check a secret link on a kitchen's own recipes (their numbers are short, so opening
+// one to "whoever has the link" opens it to anyone who tries), and a copy is what was sent even if the original
+// changes. `recipeGifts/<long random id>` — the id is the key: firestore.rules lets whoever has it read it, signed out
+// too, and nobody list them but the two kitchens — and its photo in `recipeGiftPhotos/<id>`. Kept 4 weeks (`expireAt`:
+// the database's TTL policy, and the sending kitchen's app, clear them after). Sent through the app to a kitchen by
+// its identifier (it pops up there with the kitchen's sound and waits in ⋯ More → 📨 Recipes sent to me), or as a
+// link by e-mail, WhatsApp or copied (anyone with the link may save it). ⋯ More → 📤 Recipes I sent says what became
+// of each, and withdraws one. During the closed beta, someone without an account who opens the link sees the recipe
+// and may ask the app's owner for an invitation (Tony: "Closed Beta. Ask for an Invitation").
+var GIFT_DAYS = 28, GIFT_MS = GIFT_DAYS * 864e5;
+var GIFT_KEY = 'mkn_gift';                    // sessionStorage: the …?recipe=<id> this visit came with
+var GIFT_SEEN_KEY = 'mkn_gift_seen_';         // + kitchen: the ones already shown on this device
+var GIFT_LINKS_KEY = 'mkn_gift_links';        // links opened on this device: [{ id, at, saved }]
+var GIFT_SWEEP_KEY = 'mkn_gift_sweep_';       // + kitchen: when this device last cleared its kitchen's expired ones
+var _gifts = { hid: '', list: [], unsub: null, asking: false, viewing: null };
+(function captureGift() {
+  try {
+    var m = /[?&]recipe=([A-Za-z0-9]{20,40})(?=&|$)/.exec(location.search);
+    if (!m) return;
+    sessionStorage.setItem(GIFT_KEY, m[1]);
+    history.replaceState(null, '', location.pathname + location.search.replace(/([?&])recipe=[^&]*&?/, '$1').replace(/[?&]$/, '') + location.hash);
+  } catch(e) {}
+})();
+function giftNewId() {
+  var abc = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789', out = '', b = new Uint8Array(24);
+  crypto.getRandomValues(b);
+  for (var i = 0; i < b.length; i++) out += abc[b[i] % abc.length];
+  return out;
+}
+function giftUrl(id) { return APP_CONFIG.siteOrigin + APP_CONFIG.sitePath + '?recipe=' + id; }
+function giftMs(t) { return t && typeof t.toMillis === 'function' ? t.toMillis() : (+t || 0); }
+function giftDay(t) { var ms = giftMs(t); return ms ? new Date(ms).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : ''; }
+function giftLive(d) { return giftMs(d && d.expireAt) > Date.now(); }
+// What travels: everything the recipe shows (Tony's answer 4) — not the cooking log, ratings, the heart, old versions,
+// the secret mark or who in the kitchen added it.
+function giftPayload(r) {
+  var c = JSON.parse(JSON.stringify(r || {}));
+  ['id', 'uid', 'fav', 'photo', 'originalPhoto', 'hp', 'history', 'cookLog', 'lastCooked', 'cookCount', 'secret', 'updatedAt',
+   'by', 'addedBy'].forEach(function(k){ delete c[k]; });
+  Object.keys(c).forEach(function(k){ if (k.charAt(0) === '_') delete c[k]; });
+  if (Array.isArray(c.parts)) c.parts.forEach(function(p){
+    ['uid', 'fav', 'cookCount', 'lastCooked', 'cookLog', 'history'].forEach(function(k){ delete p[k]; });
+  });
+  return c;
+}
+async function giftPhotoOf(r) {
+  var p = (r && r.photo) || '';
+  if (!p && r && r._ph) { try { var row = await idbGet(r.id); p = (row && row.photo) || ''; } catch(e) {} }
+  if (!/^data:image\//i.test(p) && !/^https?:\/\//i.test(p)) return '';
+  return p.length <= 900000 ? p : '';
+}
+async function giftSend(r, o) {
+  var db = hhDb(), me = _household;
+  var id = giftNewId(), photo = await giftPhotoOf(r);
+  var recipe = giftPayload(r);
+  if (JSON.stringify(recipe).length > 700000) throw new Error('This recipe is too long to send.');
+  var exp = firebase.firestore.Timestamp.fromMillis(Date.now() + GIFT_MS);
+  var g = { from: me.hid, fromName: me.name || '', fromCode: me.code || '', to: o.to || '', toCode: o.toCode || '',
+            by: _fbUser.uid, via: o.via, name: String(r.name || 'A recipe').slice(0, 200), recipe: recipe, photo: !!photo,
+            note: String(o.note || '').trim().slice(0, 500), at: firebase.firestore.FieldValue.serverTimestamp(), expireAt: exp, saved: {} };
+  var b = db.batch();
+  b.set(db.collection('recipeGifts').doc(id), g);
+  if (photo) b.set(db.collection('recipeGiftPhotos').doc(id), { from: me.hid, data: photo, expireAt: exp });
+  await b.commit();
+  syncLog('save', 'Sent a recipe', { name: g.name, via: o.via });
+  if (typeof insightCount === 'function') insightCount('recipe-sent');
+  return { id: id, url: giftUrl(id), name: g.name };
+}
+// ⋯ the recipe's 📤 Share → 📨 Send to another kitchen. Each step has ‹ Back, with what was typed kept; nothing is sent
+// before the last one. By identifier it goes through the app; the other ways send a link — made once, however often
+// the way to tell them is changed.
+async function openSendRecipe(rid) {
+  var r = findRecipeRef(rid);
+  if (!r) return null;
+  if (!_household || !window._fbUser || !hhDb()) { toast('Sign in first — then you can send a recipe to another kitchen.', 6000); return null; }
+  if (r.secret && await askConfirm({ icon: '\u{1F512}', title: 'Send a secret recipe?',
+      message: '“' + r.name + '” is 🔒 secret — only your own kitchen sees it. Send a copy of it all the same?',
+      okLabel: 'Send a copy', cancelLabel: 'Cancel' }) !== true) return null;
+  var step = 1, how = '', mailHow = '', code = '', note = '', made = null;
+  for (var guard = 0; guard < 40; guard++) {
+    if (step === 1) {
+      how = await askChoice('“' + r.name + '” — a copy, with its photo, that they save to their recipes with one tap. It keeps for 4 weeks.', [
+          { value: 'app', primary: true, label: '\u{1F4E8} Via My Kitchen Notes (recommended)', title: 'To another kitchen, by its identifier (MKN-…): it pops up in their app' },
+          { value: 'email', label: '✉️ Via Email', title: 'An e-mail with a link to the recipe: your mail app, Gmail or Outlook' },
+          { value: 'wa', label: '\u{1F4AC} Via WhatsApp', title: 'A WhatsApp message with a link to the recipe' }]
+        .concat(navigator.share ? [{ value: 'share', label: '\u{1F4E4} Via another app', title: 'Your phone’s share menu, with a link to the recipe' }] : [])
+        .concat([{ value: 'copy', label: '\u{1F517} Copy the link', title: 'Copies a message with a link to the recipe, to paste wherever you like' }]),
+        { icon: '\u{1F4E4}', title: 'Send this recipe', cancelLabel: 'Cancel' });
+      if (!how || how === ASK_BACK) return made;
+      step = how === 'app' ? 2 : how === 'email' ? 3 : 4; continue;
+    }
+    if (step === 2) {
+      var a = await askConfirm({ icon: '\u{1F4E8}', title: 'To which kitchen?', backLabel: '‹ Back',
+        message: 'Type their kitchen’s identifier (MKN-…). They find it in ⚙️ → \u{1F3E0} My household → \u{1FAAA} Display my personal identifier.',
+        input: code, placeholder: 'MKN-XXXX-XXXX', okLabel: 'Next ›' });
+      if (a === ASK_BACK) { step = 1; continue; }
+      if (typeof a !== 'string' || !a.trim()) return made;
+      var tg = hhLinkTarget(a);
+      if (!tg || !tg.code) { await askConfirm({ icon: '\u{1F4E8}', title: 'Not an identifier', message: 'A kitchen’s identifier looks like MKN-XXXX-XXXX.', okLabel: 'OK' }); code = a.trim(); continue; }
+      code = tg.code; step = 4; continue;
+    }
+    if (step === 3) {
+      mailHow = await askChoice('Send it by e-mail, with:', [
+        { value: 'mail', label: '✉️ My default mail app' }, { value: 'gmail', label: 'Gmail' }, { value: 'outlook', label: 'Outlook' }],
+        { icon: '✉️', title: 'Via Email', backLabel: '‹ Back', cancelLabel: 'Cancel' });
+      if (mailHow === ASK_BACK) { step = 1; continue; }
+      if (!mailHow) return made;
+      step = made ? 5 : 4; continue;
+    }
+    if (step === 4) {
+      var n = await askConfirm({ icon: '\u{1F4AC}', title: 'Add a note? (optional)', backLabel: '‹ Back',
+        message: 'A few words with the recipe — signed with your kitchen’s name.',
+        input: note, placeholder: 'e.g. The one I made on Friday!', okLabel: 'Send' });
+      if (n === ASK_BACK) { step = how === 'app' ? 2 : how === 'email' ? 3 : 1; continue; }
+      if (typeof n !== 'string') return made;
+      note = n;
+      if (!await talkPrivacyOk(note)) continue;
+      step = 5; continue;
+    }
+    // step 5: send
+    if (how === 'app') {
+      var c = null;
+      try { c = await hhDb().collection('codes').doc(code).get(); }
+      catch(e) { await askConfirm({ icon: '\u{1F4E8}', title: 'Not sent', message: 'Could not look it up: ' + (e && e.message), okLabel: 'OK' }); step = 2; continue; }
+      var to = c && c.exists ? (c.data() || {}).hid : '';
+      if (!to) { await askConfirm({ icon: '\u{1F4E8}', title: 'Not sent', message: hhCodeNotHereMsg(code), okLabel: 'OK' }); step = 2; continue; }
+      if (to === _household.hid) { await askConfirm({ icon: '\u{1F4E8}', title: 'Not sent', message: 'That is your own kitchen’s identifier.', okLabel: 'OK' }); step = 2; continue; }
+      try { made = await giftSend(r, { via: 'app', to: to, toCode: code, note: note }); }
+      catch(e) { await askConfirm({ icon: '\u{1F4E8}', title: 'Not sent', message: giftErrText(e), okLabel: 'OK' }); return null; }
+      toast('\u{1F4E8} Sent to ' + code + ' — it pops up in their app. They have 4 weeks to save it.', 8000, openGiftsOut);
+      return made;
+    }
+    if (!made) {
+      try { made = await giftSend(r, { via: how === 'email' ? 'email' : how === 'wa' ? 'whatsapp' : 'link', note: note }); }
+      catch(e) { await askConfirm({ icon: '\u{1F4E8}', title: 'Not sent', message: giftErrText(e), okLabel: 'OK' }); return null; }
+    }
+    var kname = _household.name || 'My kitchen';
+    var text = kname + ' sent you a recipe for “' + made.name + '” from My Kitchen Notes'
+      + (note.trim() ? ': “' + note.trim() + '”' : '.')
+      + '\n\nOpen it to see it, and save it to your recipes with one tap (the link keeps for 4 weeks):\n' + made.url;
+    var did = await shareDo(how === 'email' ? mailHow : how, { to: '', subject: 'A recipe for you: ' + made.name, text: text, copyText: text });
+    if (did === ASK_BACK) { step = 3; continue; }                 // no mail program: the e-mail choices again (sent once)
+    if (how !== 'copy') toast('\u{1F517} The link is on its way. ⋯ More → \u{1F4E4} Recipes I sent shows who saved it.', 8000, openGiftsOut);
+    return made;
+  }
+  return made;
+}
+function giftErrText(e) {
+  var m = (e && e.message) || String(e);
+  if (e && e.code === 'permission-denied') return 'The server refused it. If your kitchen was renamed on another device, reload the app and try again.';
+  return m;
+}
+// ── Receiving ─────────────────────────────────────────────────────────────────
+function giftSeen() { try { return JSON.parse(localStorage.getItem(GIFT_SEEN_KEY + _gifts.hid) || '[]') || []; } catch(e) { return []; } }
+function giftMarkSeen(id) {
+  var s = giftSeen(); if (s.indexOf(id) !== -1) return;
+  s.push(id); try { localStorage.setItem(GIFT_SEEN_KEY + _gifts.hid, JSON.stringify(s.slice(-200))); } catch(e) {}
+}
+function giftLinks() { try { var v = JSON.parse(localStorage.getItem(GIFT_LINKS_KEY) || '[]'); return Array.isArray(v) ? v : []; } catch(e) { return []; } }
+function giftRememberLink(id, saved) {
+  var l = giftLinks().filter(function(x){ return x && x.id !== id && Date.now() - (x.at || 0) < GIFT_MS; });
+  l.push({ id: id, at: Date.now(), saved: !!saved });
+  try { localStorage.setItem(GIFT_LINKS_KEY, JSON.stringify(l.slice(-100))); } catch(e) {}
+}
+function giftBlocked(d) { return ((_linkState && _linkState.log && _linkState.log[d.from]) || {}).status === 'blocked'; }
+function giftWaiting(g) {
+  var d = g.d || {};
+  return giftLive(d) && !d.savedAt && !d.declinedAt && !giftBlocked(d)
+    && !(d.to === '' && _household && d.saved && d.saved[_household.hid]);
+}
+function giftLiveStop() { if (_gifts.unsub) { try { _gifts.unsub(); } catch(e) {} } _gifts.unsub = null; _gifts.hid = ''; _gifts.list = []; }
+function giftLiveStart() {
+  var db = hhDb();
+  if (!_household || !db || !window._fbUser) return false;
+  if (_gifts.unsub && _gifts.hid === _household.hid) return true;
+  giftLiveStop();
+  var hid = _gifts.hid = _household.hid;
+  try {
+    var q = db.collection('recipeGifts').where('to', '==', hid);
+    if (typeof q.onSnapshot === 'function') _gifts.unsub = q.onSnapshot(function(snap){ if (_gifts.hid === hid) giftReceived(snap); }, function(){});
+  } catch(e) {}
+  setTimeout(giftSweep, 20000);
+  return true;
+}
+function giftReceived(snap) {
+  var list = [];
+  snap.forEach(function(d){ list.push({ id: d.id, d: d.data() || {} }); });
+  _gifts.list = list;
+  giftDots();
+  var seen = giftSeen(), fresh = list.filter(function(g){ return giftWaiting(g) && seen.indexOf(g.id) === -1; });
+  if (fresh.length) { if (typeof chimePlay === 'function') chimePlay('request'); giftAskNext(); }
+  return fresh.length;
+}
+function giftDots() {
+  var waiting = _gifts.list.filter(giftWaiting), seen = giftSeen();
+  var count = document.getElementById('giftsInCount');
+  if (count) count.textContent = waiting.length ? ' (' + waiting.length + ')' : '';
+  pathDots({ gifts: waiting.filter(function(g){ return seen.indexOf(g.id) === -1; }).length });
+  return waiting.length;
+}
+// One at a time, and never over another question.
+async function giftAskNext() {
+  if (_gifts.asking) return;
+  _gifts.asking = true;
+  try {
+    for (var n = 0; n < 20; n++) {
+      for (var w = 0; w < 600 && (document.getElementById('askOverlay') || document.getElementById('setupWiz') || document.getElementById('termsGate')); w++) await wait(500);
+      var seen = giftSeen(), g = _gifts.list.filter(function(x){ return giftWaiting(x) && seen.indexOf(x.id) === -1; })[0];
+      if (!g) break;
+      giftMarkSeen(g.id); giftDots();
+      await giftAsk(g);
+    }
+  } finally { _gifts.asking = false; }
+}
+async function giftAsk(g) {
+  var d = g.d || {};
+  var mineSaved = d.to === '' && _household && d.saved && d.saved[_household.hid];
+  var opts = [{ value: 'save', primary: true, label: '\u{1F4E5} Save to my recipes' }, { value: 'look', label: '\u{1F440} Look at it first' }];
+  if (d.to && d.to === (_household && _household.hid) && householdCanManage()) opts.push({ value: 'block', label: '\u{1F6AB} Block this kitchen' });
+  var a = await askChoice((d.fromName || 'A kitchen') + ' has sent you a recipe for “' + d.name + '”.'
+      + (d.note ? '\n\n\u{1F4AC} “' + d.note + '”' : '')
+      + (mineSaved ? '\n\nYour kitchen saved it already, on ' + giftDay(mineSaved) + '.' : '\n\nWould you like to save it to your collection?')
+      + '\n\nIt waits in ⋯ More → \u{1F4E8} Recipes sent to me until ' + giftDay(d.expireAt) + '.',
+    opts, { icon: '\u{1F4E8}', title: 'A recipe for you', cancelLabel: 'Not now' });
+  if (a === 'save') return await giftSave(g);
+  if (a === 'look') return await giftLook(g);
+  if (a === 'block') return await giftBlock(g);
+  return 'later';
+}
+async function giftGet(id) {
+  try {
+    var s = await hhDb().collection('recipeGifts').doc(id).get();
+    return s.exists ? { id: id, d: s.data() || {} } : null;
+  } catch(e) { return null; }                                     // expired or withdrawn: the rules say no
+}
+async function giftPhoto(g) {
+  if (!g || !g.d || !g.d.photo) return '';
+  try { var s = await hhDb().collection('recipeGiftPhotos').doc(g.id).get(); return s.exists ? ((s.data() || {}).data || '') : ''; }
+  catch(e) { return ''; }
+}
+// Saved: a new recipe of this kitchen's own — a new number and identity, nothing of the sender's but the recipe.
+async function giftSave(g) {
+  if (!_household || !window._fbUser) { toast('Sign in first.', 5000); return false; }
+  if (_household.role === 'viewer') { toast('You only read in your household — ask its owner to let you add recipes.', 7000); return false; }
+  var d = g.d || {};
+  if (!giftLive(d)) { toast('This recipe has expired — ask them to send it again.', 7000); return false; }
+  var name = String((d.recipe && d.recipe.name) || d.name || 'A recipe');
+  if (recipes.some(function(x){ return x && x.name === name; })
+      && await askConfirm({ icon: '\u{1F4E5}', title: 'You have one called that', message: 'Your recipes already include “' + name + '”. Save this one as well?',
+           okLabel: 'Save it as well', cancelLabel: 'Cancel' }) !== true) return false;
+  var photo = await giftPhoto(g);
+  var c = JSON.parse(JSON.stringify(d.recipe || {}));
+  c.name = name; c.id = nextId++; c.uid = newUid(); c.fav = false; c.photo = photo; c.updatedAt = Date.now();
+  if (Array.isArray(c.parts)) c.parts.forEach(function(p){ p.uid = newUid(); p.fav = false; });
+  c.notes = (c.notes ? c.notes + '\n\n' : '') + '\u{1F4E8} ' + (d.fromName || '') + ' · ' + new Date().toLocaleDateString();
+  var made = normalizeRecipe(c);
+  recipes.unshift(made);
+  if (typeof insightAdded === 'function') insightAdded(made, 'sent');
+  saveData(); renderGrid();
+  try {
+    var ref = hhDb().collection('recipeGifts').doc(g.id), ts = firebase.firestore.FieldValue.serverTimestamp();
+    if (d.to && d.to === _household.hid) await ref.update({ savedAt: ts });
+    else { var up = { lastSaver: _household.hid }; up['saved.' + _household.hid] = ts; await ref.update(up); }
+  } catch(e) { dlog('[gift] could not mark it saved', e && e.message); }
+  if (!d.to) giftRememberLink(g.id, true);
+  d.savedAt = d.savedAt || Date.now();
+  giftDots();
+  if (document.getElementById('linkedViewOverlay') && _gifts.viewing === g.id) closeM('linkedViewOverlay');
+  _gifts.viewing = null;
+  syncLog('save', 'Saved a recipe sent by another kitchen', { name: made.name, id: made.id });
+  toast('\u{1F4E5} Saved to your recipes: “' + made.name + '”', 6000, function(){ goRecipe(made.id); });
+  giftRenderIn();
+  return made.id;
+}
+async function giftDecline(g) {
+  var d = g.d || {};
+  if (d.to && _household && d.to === _household.hid) {
+    if (_household.role === 'viewer') { toast('You only read in your household — its owner or an editor answers it.', 7000); return false; }
+    try { await hhDb().collection('recipeGifts').doc(g.id).update({ declinedAt: firebase.firestore.FieldValue.serverTimestamp() }); d.declinedAt = Date.now(); }
+    catch(e) { toast('Could not remove it: ' + (e && e.message), 7000); return false; }
+  } else {
+    var l = giftLinks().filter(function(x){ return x && x.id !== g.id; });
+    try { localStorage.setItem(GIFT_LINKS_KEY, JSON.stringify(l)); } catch(e) {}
+  }
+  giftDots(); giftRenderIn();
+  return true;
+}
+async function giftBlock(g) {
+  var d = g.d || {};
+  if (!householdCanManage()) return false;
+  try { await hhLog(d.from, d.fromName, d.fromCode, 'blocked', Date.now()); }
+  catch(e) { toast('Could not block them: ' + (e && e.message), 7000); return false; }
+  await giftDecline(g);
+  toast('\u{1F6AB} Blocked. They are not told, and nothing more from them reaches you — recipes or link requests.', 7000);
+  syncLog('save', 'Blocked a household', d.fromCode || d.fromName || '');
+  return 'blocked';
+}
+// The recipe itself, read-only, in the linked kitchens' view (its photo, ingredients, steps, notes); signed out, with
+// what the closed beta allows instead of Save.
+async function giftLook(g, signedOut) {
+  var d = g.d || {}, r = normalizeRecipe(JSON.parse(JSON.stringify(Object.assign({ name: d.name }, d.recipe || {}))));
+  var photo = await giftPhoto(g);
+  _gifts.viewing = g.id; _linkedViewing = null;
+  var btn = 'padding:9px 14px;border-radius:9px;font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit;';
+  var actions = signedOut
+    ? '<div id="giftClosedBeta" style="border:1px solid var(--border);border-radius:10px;padding:12px;margin-top:16px;font-size:13px;line-height:1.55;">'
+        + '\u{1F512} <b>My Kitchen Notes is a closed beta for now</b> — new kitchens by invitation. To save this recipe, you need an account.'
+        + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">'
+        + '<button type="button" class="action-btn" id="giftAskInvite" onclick="giftAskInvitation()" style="' + btn + '">✉️ Ask for an invitation</button>'
+        + '<button type="button" class="action-btn" id="giftHaveAccount" onclick="giftSignInInstead()" style="' + btn + 'background:var(--card-bg);color:var(--heading);border:1px solid var(--border);">I already have an account — sign in</button>'
+        + '</div></div>'
+    : '<div class="recipe-actions" style="margin-top:16px;"><button class="action-btn" id="giftSaveBtn" onclick="giftSaveViewing()">\u{1F4E5} Save to my recipes</button></div>';
+  document.getElementById('linkedViewModal').innerHTML =
+      '<div style="position:sticky;top:60px;display:flex;justify-content:flex-end;padding:0 8px;z-index:20;pointer-events:none;">'
+    +   '<button onclick="closeM(\'linkedViewOverlay\')" aria-label="Close" style="pointer-events:auto;width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,0.95);border:none;cursor:pointer;font-size:18px;color:var(--warm-brown);box-shadow:0 2px 12px rgba(0,0,0,0.3);">✕</button></div>'
+    + '<div class="modal-hero" style="background:' + escA(r.bg) + ';">'
+    +   (photo ? '<img\u0020src="' + escA(photo) + '" alt="">' : '<span class="emoji-over">' + escH(r.emoji) + '</span>') + '</div>'
+    + '<div class="modal-content' + (recipeIsRTL(r) ? ' rtl-recipe' : '') + '">'
+    +   '<div id="giftFrom" style="background:var(--card-bg);border:1px solid var(--border);border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:12.5px;color:var(--ink);">'
+    +     '\u{1F4E8} <span>Sent by</span> <b data-no-i18n dir="auto">' + escH(d.fromName || '') + '</b> · <span>keeps until</span> <span data-no-i18n>' + escH(giftDay(d.expireAt)) + '</span>'
+    +     (d.note ? '<div dir="auto" data-no-i18n style="margin-top:4px;">\u{1F4AC} “' + escH(d.note) + '”</div>' : '') + '</div>'
+    +   '<div class="modal-category">' + escH(r.category) + '</div>'
+    +   '<div class="modal-title" dir="auto" data-no-i18n>' + escH(r.name) + '</div>'
+    +   '<div class="modal-meta">' + (isCollection(r) ? '<span>\u{1F4DA} <span data-no-i18n>' + recipeParts(r).length + '</span> recipes</span>'
+          : (metaVal(r.prep) ? '<bdi data-no-i18n>⏱ ' + escH(r.prep) + '</bdi>' : '') + (metaVal(r.servings) ? '<bdi>\u{1F37D} <span dir="auto" data-no-i18n>' + escH(r.servings) + '</span></bdi>' : '')
+          + '<span class="difficulty ' + escA(String(r.difficulty || '').toLowerCase()) + '">' + escH(r.difficulty) + '</span>') + '</div>'
+    +   (r.source ? '<div class="source-link" style="margin-bottom:8px;font-size:12px;"><bdi style="color:var(--muted);">Source:</bdi> <span dir="auto" data-no-i18n>' + sourceHtml(r.source) + '</span></div>' : '')
+    +   (r.notes ? '<div dir="auto" data-no-i18n style="background:var(--note-bg);border-inline-start:3px solid var(--note-border);padding:10px 14px;margin-bottom:14px;font-size:13px;line-height:1.6;">' + escH(r.notes) + '</div>' : '')
+    +   linkedLinesHtml(r) + actions
+    + '</div>';
+  _gifts.lookAt = g;
+  var ov = document.getElementById('linkedViewOverlay');
+  ov.style.zIndex = signedOut ? '10150' : '';                     // signed out: over the sign-in screen and the welcome
+  ov.classList.add('open');
+  ov.scrollTop = 0;
+  if (typeof trapFocus === 'function') trapFocus('linkedViewOverlay');
+  return 'looked';
+}
+function giftSaveViewing() { return _gifts.lookAt ? giftSave(_gifts.lookAt) : false; }
+// …?recipe=<id>, once this person's kitchen is open.
+async function giftFromUrl() {
+  var id = '';
+  try { id = sessionStorage.getItem(GIFT_KEY) || ''; } catch(e) {}
+  if (!id || !_household || !window._fbUser || !hhDb()) return false;
+  try { sessionStorage.removeItem(GIFT_KEY); } catch(e) {}
+  if (document.getElementById('linkedViewOverlay') && _gifts.viewing === id) closeM('linkedViewOverlay');
+  for (var w = 0; w < 300 && document.getElementById('askOverlay'); w++) await wait(200);
+  var g = await giftGet(id);
+  if (!g) {
+    await askConfirm({ icon: '\u{1F4E8}', title: 'This recipe is no longer here',
+      message: 'The link has expired — a sent recipe keeps for 4 weeks — or the kitchen that sent it took it back. Ask them to send it again.', okLabel: 'OK' });
+    return 'gone';
+  }
+  if (g.d.from === _household.hid) { toast('\u{1F4E4} That is a recipe your own kitchen sent.', 6000, openGiftsOut); return 'own'; }
+  if (!g.d.to) giftRememberLink(id, false);
+  giftMarkSeen(id);
+  return await giftAsk(g);
+}
+// Signed out (someone without an account, or not signed in on this device): the recipe, and the ways in.
+async function giftSignedOutMaybe() {
+  var id = '';
+  try { id = sessionStorage.getItem(GIFT_KEY) || ''; } catch(e) {}
+  if (!id || !window._fbDb) return false;
+  for (var i = 0; i < 40 && !window._fbAuthSettled; i++) await wait(250);
+  if (fbSignedInUser()) return false;
+  var g = null;
+  try { var s = await window._fbDb.collection('recipeGifts').doc(id).get(); if (s.exists) g = { id: id, d: s.data() || {} }; } catch(e) {}
+  if (!g) {
+    await askConfirm({ icon: '\u{1F4E8}', title: 'This recipe is no longer here', z: 10200,
+      message: 'The link has expired — a sent recipe keeps for 4 weeks — or the kitchen that sent it took it back.', okLabel: 'OK' });
+    try { sessionStorage.removeItem(GIFT_KEY); } catch(e) {}
+    return 'gone';
+  }
+  await giftLook(g, true);
+  return 'shown';
+}
+function giftSignInInstead() {
+  closeM('linkedViewOverlay');
+  var ls = document.getElementById('loginScreen');
+  if (ls && getComputedStyle(ls).display === 'none') ls.style.display = 'flex';
+  toast('Sign in — the recipe waits for you right after.', 6000);
+}
+// The closed beta (Tony: "an "Closed Beta. Ask for an Invitation" button, asking for their email address, to be sent to
+// Admin"): the address goes to the app's owner through the server, as a note in 📊 Households → 💬 Feedback.
+async function giftAskInvitation() {
+  var g = _gifts.lookAt, d = (g && g.d) || {};
+  var em = await askConfirm({ icon: '✉️', title: 'Ask for an invitation', z: 10200,
+    message: 'Your e-mail address goes to the app’s owner, who sends invitations by e-mail. It is used for nothing else.',
+    input: '', inputType: 'email', placeholder: 'name@example.com', okLabel: 'Send', cancelLabel: 'Cancel' });
+  if (typeof em !== 'string') return false;
+  em = em.trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(em)) { toast('That does not look like an e-mail address.', 6000); return false; }
+  try {
+    var r = await fetch(WORKER_ENDPOINT, { method: 'POST', headers: workerHeaders(), signal: AbortSignal.timeout(20000),
+      body: workerBody({ action: 'invite-ask', email: em, project: APP_CONFIG.firebase.projectId, env: APP_CONFIG.environment || '',
+        from: String(d.fromName || '').slice(0, 120), recipe: String(d.name || '').slice(0, 200), lang: (navigator.language || '').slice(0, 10),
+        device: navigator.userAgent.slice(0, 300), version: APP_VERSION }) });
+    var j = {}; try { j = await r.json(); } catch(e) {}
+    if (!r.ok) throw new Error(j.error || ('the server answered ' + r.status));
+  } catch(e) {
+    await askConfirm({ icon: '✉️', title: 'Not sent', z: 10200, message: 'It could not be sent just now: ' + ((e && e.message) || e) + '\n\nTry again in a moment.', okLabel: 'OK' });
+    return false;
+  }
+  await askConfirm({ icon: '✉️', title: 'Sent', z: 10200,
+    message: 'Thank you! The app’s owner will write to ' + em + ' with an invitation. Keep this link: once you are in, it saves the recipe to your new kitchen (for 4 weeks).', okLabel: 'OK' });
+  return true;
+}
+// ── ⋯ More → 📨 Recipes sent to me ──────────────────────────────────────────
+async function openGiftsIn() {
+  if (!_household || !window._fbUser || !hhDb()) { toast('Sign in first.', 5000); return null; }
+  var prev = document.getElementById('giftsInOverlay'); if (prev) prev.remove();
+  var ov = document.createElement('div');
+  ov.id = 'giftsInOverlay'; ov.className = 'modal-overlay open';
+  ov.innerHTML = '<div class="ask-card" role="dialog" aria-modal="true" aria-labelledby="giTitle" style="max-width:560px;text-align:start;max-height:88vh;overflow-y:auto;">'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><div class="ask-title" id="giTitle">\u{1F4E8} Recipes sent to me</div>'
+    + '<button type="button" class="modal-close" style="position:relative;top:auto;right:auto;" aria-label="Close" onclick="document.getElementById(\'giftsInOverlay\').remove()">✕</button></div>'
+    + '<div id="giBody"><div style="color:var(--muted);font-size:13px;padding:14px 0;">⏳ Reading…</div></div></div>';
+  ov.onclick = function(e){ if (e.target === ov) ov.remove(); };
+  document.body.appendChild(ov);
+  giftLiveStart();
+  if (!_gifts.list.length) {
+    try { var s = await hhDb().collection('recipeGifts').where('to', '==', _household.hid).get(); var l = []; s.forEach(function(d){ l.push({ id: d.id, d: d.data() || {} }); }); _gifts.list = l; } catch(e) {}
+  }
+  // links opened on this device and not saved yet
+  var links = giftLinks().filter(function(x){ return x && !x.saved; }), extra = [];
+  for (var i = 0; i < links.length; i++) {
+    if (_gifts.list.some(function(g){ return g.id === links[i].id; })) continue;
+    var g = await giftGet(links[i].id);
+    if (g && g.d.from !== _household.hid) extra.push(g);
+  }
+  _gifts.links = extra;
+  _gifts.list.forEach(function(g){ giftMarkSeen(g.id); });
+  giftDots(); giftRenderIn();
+  return ov;
+}
+function giftRenderIn() {
+  var body = document.getElementById('giBody');
+  if (!body) return;
+  var all = _gifts.list.filter(giftWaiting).concat((_gifts.links || []).filter(giftWaiting));
+  all.sort(function(a, b){ return giftMs(b.d.at) - giftMs(a.d.at); });
+  _gifts.shown = all;
+  var btn = 'padding:6px 11px;border-radius:8px;font-size:12.5px;font-weight:600;cursor:pointer;min-height:32px;font-family:inherit;';
+  var h = '<div style="font-size:12.5px;color:var(--muted);line-height:1.5;margin:4px 0 12px;">Recipes other kitchens sent yours through the app, and the links you opened on this device. Each keeps for 4 weeks from the day it was sent.</div>';
+  h += all.length ? all.map(function(g, i){
+      var d = g.d, inApp = d.to && d.to === _household.hid;
+      return '<div style="border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px;">'
+        + '<b dir="auto" data-no-i18n>' + escH(d.name) + '</b>'
+        + '<div style="font-size:12px;color:var(--muted);margin-top:2px;"><span>from</span> <span data-no-i18n dir="auto">' + escH(d.fromName || '') + '</span> · <span>sent</span> <span data-no-i18n>' + escH(giftDay(d.at)) + '</span> · <span>keeps until</span> <span data-no-i18n>' + escH(giftDay(d.expireAt)) + '</span></div>'
+        + (d.note ? '<div dir="auto" data-no-i18n style="font-size:12.5px;margin-top:6px;">\u{1F4AC} “' + escH(d.note) + '”</div>' : '')
+        + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">'
+        +   '<button type="button" style="' + btn + 'background:var(--terracotta-fill);color:#fff;border:none;" onclick="giftAct(' + i + ',\'save\')">\u{1F4E5} Save to my recipes</button>'
+        +   '<button type="button" style="' + btn + 'background:var(--card-bg);color:var(--heading);border:1px solid var(--border);" onclick="giftAct(' + i + ',\'look\')">\u{1F440} Look</button>'
+        +   '<button type="button" style="' + btn + 'background:var(--card-bg);color:var(--heading);border:1px solid var(--border);" onclick="giftAct(' + i + ',\'remove\')">Remove</button>'
+        +   (inApp && householdCanManage() ? '<button type="button" style="' + btn + 'background:var(--card-bg);color:var(--danger);border:1px solid var(--danger);" onclick="giftAct(' + i + ',\'block\')">\u{1F6AB} Block</button>' : '')
+        + '</div></div>';
+    }).join('') : '<div style="font-size:13px;color:var(--muted);padding:2px 0 8px;">Nothing waiting.</div>';
+  body.innerHTML = h;
+}
+async function giftAct(i, what) {
+  var g = (_gifts.shown || [])[i];
+  if (!g) return false;
+  if (what === 'save') return giftSave(g);
+  if (what === 'look') return giftLook(g);
+  if (what === 'block') {
+    if (await askConfirm({ icon: '\u{1F6AB}', title: 'Block ' + (g.d.fromName || 'this kitchen') + '?', message: 'Nothing more from them reaches your kitchen — recipes or link requests. They are not told.', okLabel: 'Block', cancelLabel: 'Cancel', danger: true }) !== true) return false;
+    return giftBlock(g);
+  }
+  if (await askConfirm({ icon: '\u{1F4E8}', title: 'Remove “' + g.d.name + '”?', message: 'It goes from this list, unsaved.', okLabel: 'Remove', cancelLabel: 'Cancel' }) !== true) return false;
+  return giftDecline(g);
+}
+// ── ⋯ More → 📤 Recipes I sent ──────────────────────────────────────────────
+async function giftSentList() {
+  var out = [];
+  try { (await hhDb().collection('recipeGifts').where('from', '==', _household.hid).get()).forEach(function(d){ out.push({ id: d.id, d: d.data() || {} }); }); } catch(e) {}
+  return out.sort(function(a, b){ return giftMs(b.d.at) - giftMs(a.d.at); });
+}
+async function openGiftsOut() {
+  if (!_household || !window._fbUser || !hhDb()) { toast('Sign in first.', 5000); return null; }
+  var prev = document.getElementById('giftsOutOverlay'); if (prev) prev.remove();
+  var ov = document.createElement('div');
+  ov.id = 'giftsOutOverlay'; ov.className = 'modal-overlay open';
+  ov.innerHTML = '<div class="ask-card" role="dialog" aria-modal="true" aria-labelledby="goTitle" style="max-width:560px;text-align:start;max-height:88vh;overflow-y:auto;">'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><div class="ask-title" id="goTitle">\u{1F4E4} Recipes I sent</div>'
+    + '<button type="button" class="modal-close" style="position:relative;top:auto;right:auto;" aria-label="Close" onclick="document.getElementById(\'giftsOutOverlay\').remove()">✕</button></div>'
+    + '<div id="goBody"><div style="color:var(--muted);font-size:13px;padding:14px 0;">⏳ Reading…</div></div></div>';
+  ov.onclick = function(e){ if (e.target === ov) ov.remove(); };
+  document.body.appendChild(ov);
+  var list = await giftSentList();
+  _gifts.sent = list.filter(function(g){ return giftLive(g.d); });
+  giftSweep(list);
+  giftRenderOut();
+  return ov;
+}
+function giftStatus(d) {
+  if (d.to) return d.savedAt ? '✅ Saved, ' + giftDay(d.savedAt) : d.declinedAt ? '\u{1F645} Not saved' : '⏳ Waiting — keeps until ' + giftDay(d.expireAt);
+  var n = Object.keys(d.saved || {}).length;
+  return n ? '✅ Saved by ' + n + (n === 1 ? ' kitchen' : ' kitchens') + ' — the link keeps until ' + giftDay(d.expireAt)
+           : '⏳ Not saved yet — the link keeps until ' + giftDay(d.expireAt);
+}
+function giftRenderOut() {
+  var body = document.getElementById('goBody');
+  if (!body) return;
+  var all = _gifts.sent || [], how = { email: 'a link, by e-mail', whatsapp: 'a link, on WhatsApp', link: 'a link' };
+  var btn = 'padding:6px 11px;border-radius:8px;font-size:12.5px;font-weight:600;cursor:pointer;min-height:32px;font-family:inherit;';
+  var h = '<div style="font-size:12.5px;color:var(--muted);line-height:1.5;margin:4px 0 12px;">What your kitchen sent in the last 4 weeks, and what became of it. Taken back, or 4 weeks old, a recipe is gone from here and from their list — what they saved stays theirs.</div>';
+  h += all.length ? all.map(function(g, i){
+      var d = g.d;
+      return '<div style="border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px;">'
+        + '<b dir="auto" data-no-i18n>' + escH(d.name) + '</b>'
+        + '<div style="font-size:12px;color:var(--muted);margin-top:2px;"><span>to</span> ' + (d.to ? '<span data-no-i18n style="font-family:ui-monospace,Menlo,monospace;">' + escH(d.toCode || '') + '</span>' : '<span>' + escH(how[d.via] || 'a link') + '</span>')
+        + ' · <span>sent</span> <span data-no-i18n>' + escH(giftDay(d.at)) + '</span></div>'
+        + '<div style="font-size:12.5px;margin-top:4px;">' + escH(giftStatus(d)) + '</div>'
+        + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">'
+        +   (d.to ? '' : '<button type="button" style="' + btn + 'background:var(--card-bg);color:var(--heading);border:1px solid var(--border);" onclick="giftOutAct(' + i + ',\'copy\')">\u{1F517} Copy the link</button>')
+        +   '<button type="button" style="' + btn + 'background:var(--card-bg);color:var(--heading);border:1px solid var(--border);" onclick="giftOutAct(' + i + ',\'withdraw\')">↩️ Take it back</button>'
+        + '</div></div>';
+    }).join('') : '<div style="font-size:13px;color:var(--muted);padding:2px 0 8px;">Nothing sent in the last 4 weeks. To send one: open a recipe → \u{1F4E4} Share → \u{1F4E8} Send to another kitchen.</div>';
+  body.innerHTML = h;
+}
+async function giftOutAct(i, what) {
+  var g = (_gifts.sent || [])[i];
+  if (!g) return false;
+  if (what === 'copy') {
+    try { await navigator.clipboard.writeText(giftUrl(g.id)); toast('\u{1F4CB} Link copied', 4000); }
+    catch(e) { await askConfirm({ icon: '\u{1F517}', title: 'The link', message: giftUrl(g.id), okLabel: 'OK' }); }
+    return 'copied';
+  }
+  if (await askConfirm({ icon: '↩️', title: 'Take back “' + g.d.name + '”?', message: 'It goes from their list, and the link stops working. A copy they already saved stays theirs.', okLabel: 'Take it back', cancelLabel: 'Cancel' }) !== true) return false;
+  try { await giftDelete(g); } catch(e) { toast('Could not take it back: ' + (e && e.message), 7000); return false; }
+  _gifts.sent = (_gifts.sent || []).filter(function(x){ return x.id !== g.id; });
+  syncLog('save', 'Took back a sent recipe', { name: g.d.name });
+  giftRenderOut();
+  return 'withdrawn';
+}
+async function giftDelete(g) {
+  var b = hhDb().batch();
+  b.delete(hhDb().collection('recipeGifts').doc(g.id));
+  if (g.d && g.d.photo) b.delete(hhDb().collection('recipeGiftPhotos').doc(g.id));
+  await b.commit();
+}
+// The sending kitchen's app clears its own expired ones (the database's TTL policy, once switched on, does it too):
+// once a day per device, or with the list it has just read.
+async function giftSweep(list) {
+  if (!_household || !hhDb() || !window._fbUser || (typeof _selfTestRunning !== 'undefined' && _selfTestRunning && !window._giftUnderTest)) return 0;
+  var key = GIFT_SWEEP_KEY + _household.hid;
+  if (!list) {
+    try { if (Date.now() - (+localStorage.getItem(key) || 0) < 864e5) return 0; } catch(e) {}
+    list = await giftSentList();
+  }
+  try { localStorage.setItem(key, String(Date.now())); } catch(e) {}
+  var old = list.filter(function(g){ return !giftLive(g.d); }), n = 0;
+  for (var i = 0; i < old.length; i++) { try { await giftDelete(old[i]); n++; } catch(e) {} }
+  if (n) syncLog('save', 'Cleared sent recipes older than 4 weeks', { n: n });
+  return n;
+}
+window.openSendRecipe = openSendRecipe; window.openGiftsIn = openGiftsIn; window.openGiftsOut = openGiftsOut;
+window.giftAct = giftAct; window.giftOutAct = giftOutAct; window.giftSaveViewing = giftSaveViewing;
+window.giftAskInvitation = giftAskInvitation; window.giftSignInInstead = giftSignInInstead;
+window.giftSend = giftSend; window.giftSave = giftSave; window.giftPayload = giftPayload; window.giftReceived = giftReceived;
+window.giftFromUrl = giftFromUrl; window.giftSignedOutMaybe = giftSignedOutMaybe; window.giftLiveStart = giftLiveStart;
+window.giftSweep = giftSweep; window.giftStatus = giftStatus; window.giftNewId = giftNewId;
 window.hhLinksHtml = hhLinksHtml;
 async function householdJoinByInvite(user, code) {
   var inv = await hhDb().collection('invites').doc(code).get();
@@ -7161,7 +7731,8 @@ async function householdUse(hid, role) {
   if (hhLinks().length) hhSetHome();
   householdRenderBar();
   if (typeof renderFilters === 'function' && document.getElementById('filterBar')) try { renderFilters(); } catch(e) {}
-  hhCheckLinkRequests().catch(function(){}).then(function(){ linkLiveStart(); return linkReqFromUrl(); }).catch(function(){});   // v38.49 — then live; v38.73 — a request's link
+  hhCheckLinkRequests().catch(function(){}).then(function(){ linkLiveStart(); return linkReqFromUrl(); }).catch(function(){})
+    .then(function(){ return giftFromUrl(); }).catch(function(){});   // v39.10 — a sent recipe's link   // v38.49 — then live; v38.73 — a request's link
   if (typeof fbRepliesCheck === 'function' && !_selfTestRunning) setTimeout(function(){ fbRepliesCheck().catch(function(){}); }, 3000);   // v38.00
   if (typeof applyOwnerOnlyItems === 'function') applyOwnerOnlyItems();
   if (typeof renderAccessMembers === 'function') try { renderAccessMembers(); } catch(e) {}
@@ -7599,6 +8170,11 @@ async function householdWipe(hid, onStep) {
     ti.forEach(function(d){ trefs.push(hhRef(hid).collection('talk').doc(d.id)); trefs.push(d.ref); });
     await inBatches(trefs);
   } catch(e) { syncLog('error', 'Could not delete the household\u2019s chat', String(e && e.message).slice(0, 160)); }
+  try {   // v39.10 — the recipes it sent, still waiting
+    var gs = await db.collection('recipeGifts').where('from', '==', hid).get(), grefs = [];
+    gs.forEach(function(d){ grefs.push(d.ref); if ((d.data() || {}).photo) grefs.push(db.collection('recipeGiftPhotos').doc(d.id)); });
+    await inBatches(grefs);
+  } catch(e) {}
   if (onStep) onStep(4, 'Removing the members…');
   var rq = await hhRef(hid).collection('requests').get(), rrefs = [];
   rq.forEach(function(d){ rrefs.push(d.ref); });
@@ -8341,7 +8917,8 @@ function sendFeedbackByEmail() {
     title: 'Send feedback', intro: 'Your note goes to ' + to + '. Choose how to write it \u2014 it opens ready, and you press Send:',
     subject: 'Feedback \u2014 ' + (APP_CONFIG.brandName || 'My Kitchen Notes') + ' ' + APP_VERSION, text: body });
 }
-setTimeout(function(){ firstRunLanguageOffer().catch(function(){}).then(function(){ return setupWizMaybe(); }).catch(function(){}); }, 1200);   // v38.95 — then the wizard
+setTimeout(function(){ firstRunLanguageOffer().catch(function(){}).then(function(){ return setupWizMaybe(); }).catch(function(){}); }, 1200);
+setTimeout(function(){ giftSignedOutMaybe().catch(function(){}); }, 1500);   // v39.10 — a sent recipe's link, signed out   // v38.95 — then the wizard
 window.householdCodeFrom = householdCodeFrom; window.householdWelcome = householdWelcome; window.firstRunEmptyHtml = firstRunEmptyHtml;
 window.addSampleRecipes = addSampleRecipes; window.startTour = startTour; window.tourTargets = tourTargets;
 window.i18nDeviceLangOffer = i18nDeviceLangOffer; window.firstRunLanguageOffer = firstRunLanguageOffer;
@@ -9716,7 +10293,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.09';
+var APP_VERSION = 'v39.10';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -12932,7 +13509,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.09</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.10</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -13020,7 +13597,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.09</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.10</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -13182,6 +13759,9 @@ body.banner-shown .header {
           <!-- v38.78 — Tony: "Add another button, above the 'Chat with joint kitchens' button, titled 'Chat with family members'" -->
           <button class="drop-item" id="familyChatItem" data-layout-only="households" onclick="closeDrop('moreDrop');openFamilyChat()">👪 Chat with family members</button>
           <button class="drop-item" id="kitchenChatsItem" data-layout-only="households" onclick="closeDrop('moreDrop');openKitchenChats()">💬 Chats with linked kitchens</button>
+          <!-- v39.10 — Tony: "a menu item for it under "More ...", called something like "Recipes sent to me"", and "📤 Recipes I sent" -->
+          <button class="drop-item" id="giftsInItem" data-layout-only="households" title="Recipes other kitchens sent yours, waiting to be saved — each for 4 weeks." onclick="closeDrop('moreDrop');openGiftsIn()"><span>📨 Recipes sent to me</span><span id="giftsInCount" data-no-i18n></span></button>
+          <button class="drop-item" id="giftsOutItem" data-layout-only="households" title="What your kitchen sent, and whether they saved it." onclick="closeDrop('moreDrop');openGiftsOut()">📤 Recipes I sent</button>
           <button class="drop-item" onclick="closeDrop('moreDrop');openShareAppModal()"><span aria-hidden="true" data-no-i18n style="display:inline-flex;"><svg class="share-ico" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="11.5" fill="#C1440E"/><path d="M7.2 12 14.8 7.6M7.2 12 14.8 16.4" stroke="#FFFFFF" stroke-width="1.9" stroke-linecap="round"/><circle cx="15" cy="7.4" r="2.6" fill="#FFFFFF"/><circle cx="7" cy="12" r="2.6" fill="#FFFFFF"/><circle cx="15" cy="16.6" r="2.6" fill="#FFFFFF"/></svg></span> <span id="shareAppMenuText">Share this app</span></button>
         <div style="height:1px;background:var(--border);margin:4px 0;"></div>
         <button class="drop-item" onclick="closeDrop('moreDrop');aiTagAllDiets()">🏷️ Auto-tag diet types</button>
@@ -21133,6 +21713,8 @@ function toggleShare(id){
     showEmailModal(id);
   };
   document.getElementById('shareWaBtn').onclick     = function(){ doWhatsApp(id); };
+  var giftBtn = document.getElementById('shareGiftBtn');   // v39.10
+  if (giftBtn) giftBtn.onclick = function(){ closeM('shareRecipeOverlay'); openSendRecipe(id); };
   var pageBtn = document.getElementById('sharePageBtn');
   if (pageBtn) pageBtn.onclick = function(){ closeM('shareRecipeOverlay'); shareAsPage(id); };
   document.getElementById('shareCopyBtn').onclick   = function(){ doCopy(id); };
@@ -32107,6 +32689,7 @@ var HELP_SYSTEM_PROMPT = [
   "- 📬 LINK REQUESTS: ⚙️ → 🏠 My household → 📬 Link requests — the number in brackets beside it is how many wait for an answer. Every request in one place: Waiting (Accept / Reject / 🚫 Block), Sent by your household (Withdraw), Linked now (Revoke access), and earlier answers. A request may carry a note, and the two households can write to each other there — the latest message shows, highlighted, with ↩ Reply; earlier ones are under 💬 Conversation. Only the household's name is shown, never a person's. Reject is for now: if they ask again — by identifier or by e-mail — their request is back under Waiting. 🚫 Block is for good, until you Unblock it under the earlier answers; they are never told, and on their side it reads “waiting”. A new message or request arrives while the app is open: a red dot (and a short notice with Open) within seconds, no reload needed. A red dot on ⚙️ leads to anything new. The switch there decides whether other households may ask through the app at all.",
   "- 👪 CHAT WITH FAMILY MEMBERS (the people in YOUR household only): ⋯ More → 👪 Chat with family members — or 💬 Chat beside a person in 👥 Family Access (someone added by address who has not signed in yet says ⏳ hasn’t signed in yet: their 💬 Chat comes once they do). 📣 Everyone in <your kitchen> is the room for announcements: everyone in the household reads it. Or choose one person: only the two of you read that conversation. Everyone in the household can write, readers too. Messages arrive live: a short notice with Open, and a red dot on ⋯ More until you have read them. Nothing is changed or deleted afterwards; deleting the household deletes them.",
   "- 🧑‍🍳 FIRST VISIT: a one-time setup on a notebook page — your account (your e-mail and a password you make up; or 'I already have an account', or Continue offline), this device's Save button (the iPhone shortcut, the Android app in the Share menu, or the computer's browser extension — each new device asks this once; later from ⚙️ Settings), the kitchen rules, then a quick tour.",
+  "- 📨 SEND A RECIPE TO ANOTHER KITCHEN: open the recipe → 📤 Share → 📨 Send to another kitchen. Via My Kitchen Notes: type their kitchen's identifier (MKN-…) — it pops up in their app, with a sound, and waits in ⋯ More → 📨 Recipes sent to me. Or Via Email, Via WhatsApp, or Copy the link: anyone with the link can open it, even without an account. It is a copy of the recipe as it is now — photo, bold words, notes and all; not your cooking log, ratings or the heart — with a note from you if you like. They tap 📥 Save to my recipes and it is theirs, no AI involved. It keeps for 4 weeks. ⋯ More → 📤 Recipes I sent shows whether it was saved, copies a link again, and takes one back. A kitchen that gets unwanted recipes can 🚫 Block the sender (the owner or an admin). During the closed beta, someone without an account who opens the link sees the recipe and can ask for an invitation.",
   "- 🔒 SECRET RECIPES: in the editor, tick 🔒 Secret — the recipe (and its photo) is then kept where only your own kitchen can read it; the kitchens you link with do not see it, nor know it exists. Untick it to share it again. A 🔒 shows on its card.",
   "- 🔄 RELOAD A LINKED KITCHEN: beside a linked kitchen's name in your recipe list, 🔄 Reload reads its recipes and photos again from the start — for when something looks missing or out of date.",
   "- 💬 CHATS WITH LINKED KITCHENS: ⋯ More → 💬 Chats with linked kitchens — or 💬 Chat beside a linked kitchen's name in your recipe list, or in 👥 Family Access. Every conversation, newest first, with what is new; open one to read it all and write (Enter sends, Shift+Enter starts a new line). The same conversations are also on 📬 Link requests. A red dot on ⋯ More and on ⚙️ says something new arrived.",
@@ -37638,6 +38221,11 @@ window.onHeaderScroll = onHeaderScroll;
       <div id="shareModalTitle" style="font-size:13px;color:var(--muted);margin-top:3px;"></div>
     </div>
     <div class="modal-body" style="padding:8px 16px 20px;display:flex;flex-direction:column;gap:10px;">
+      <!-- v39.10 — to another kitchen, ready to save with one tap -->
+      <button id="shareGiftBtn" data-layout-only="households" style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--terracotta-fill);color:white;border:none;border-radius:10px;cursor:pointer;font-size:14px;font-weight:600;font-family:'DM Sans','Heebo',sans-serif;width:100%;">
+        <span style="font-size:20px;">📨</span> Send to another kitchen
+        <span style="font-size:11px;opacity:0.85;">(saved with one tap)</span>
+      </button>
       <button id="shareNativeBtn" style="display:none;align-items:center;gap:12px;padding:14px 16px;background:var(--terracotta-fill);color:white;border:none;border-radius:10px;cursor:pointer;font-size:14px;font-weight:600;font-family:'DM Sans','Heebo',sans-serif;width:100%;">
         <span style="font-size:20px;">📲</span> Share via…
       </button>

@@ -1585,8 +1585,8 @@ console.log('\nAI per household (v60):');
       && /PUSHOVER_USER/.test(ta.pushoverWhy) && !/uKey456|aTok123/.test(ta.pushoverWhy), JSON.stringify(ta));
     // v85 — each kind of alert on WhatsApp, or not: all on by default, e-mail never affected.
     let ap = await (await worker.fetch(post({ action: 'meter-admin', op: 'alert-prefs', idToken: comOwner, device: 'dev-DDDD4444' }, TEST_ORIGIN), envWa)).json();
-    expect('v85: eight kinds of alert, all on WhatsApp by default', ap.ok === true && ap.kinds.length === 8 && ap.kinds.every(k => k.on === true) && ap.whatsappSet === true
-      && ap.kinds.map(k => k.key).join() === 'new-device,owner-action,near-limit,limit-reached,ai-service,household-ai,server-errors,usage-check', JSON.stringify(ap));
+    expect('v85: nine kinds of alert (v97: someone asking for an invitation), all on WhatsApp by default', ap.ok === true && ap.kinds.length === 9 && ap.kinds.every(k => k.on === true) && ap.whatsappSet === true
+      && ap.kinds.map(k => k.key).join() === 'new-device,owner-action,near-limit,limit-reached,ai-service,household-ai,server-errors,usage-check,invite-ask', JSON.stringify(ap));
     const apNo = await worker.fetch(post({ action: 'meter-admin', op: 'alert-prefs', idToken: tA }, TEST_ORIGIN), envWa);
     expect('v85: …only the owner reads or sets them', apNo.status === 403, 'got ' + apNo.status);
     ap = await (await worker.fetch(post({ action: 'meter-admin', op: 'alert-prefs-set', prefs: { 'new-device': false, 'owner-action': true, bogus: false }, idToken: comOwner, device: 'dev-DDDD4444' }, TEST_ORIGIN), envWa)).json();
@@ -2158,6 +2158,38 @@ console.log('\nReports retention and ntfy (v91):');
   const before = calls.length;
   await daily({ METER_DB: db, __fetch: gh });
   expect('v91: without the token: nothing', calls.length === before, 'called GitHub');
+}
+
+console.log('\nAsking for an invitation (v97):');
+{
+  const { DatabaseSync } = await import('node:sqlite');
+  const raw = new DatabaseSync(':memory:');
+  const stmt = (sql, args) => ({ bind: (...a) => stmt(sql, a), first: async () => raw.prepare(sql).get(...(args || [])) || null,
+    all: async () => ({ results: raw.prepare(sql).all(...(args || [])) }),
+    run: async () => { const x = raw.prepare(sql).run(...(args || [])); return { success: true, meta: { last_row_id: Number(x.lastInsertRowid), changes: Number(x.changes) } }; },
+    _run() { raw.prepare(sql).run(...(args || [])); } });
+  const db = { raw, prepare: (sql) => stmt(sql, []), batch: async (l) => { l.forEach(x => x._run()); return []; } };
+  raw.exec('CREATE TABLE IF NOT EXISTS feedback (id INTEGER PRIMARY KEY AUTOINCREMENT, project TEXT, uid TEXT, email TEXT, name TEXT, hid TEXT, household TEXT, text TEXT, shot TEXT, log TEXT, version TEXT, env TEXT, device TEXT, lang TEXT, at INTEGER, status TEXT)');   // made once per isolate, by an earlier section
+  const mails = [];
+  class FakeEmail { constructor(from, to, rawMail) { this.raw = rawMail; } }
+  const env = { METER_DB: db, ALERTS: { send: async m => { mails.push(m); } }, ALERT_TO: 'second@example.com', __EmailMessage: FakeEmail };
+  const ask = async (body, ip) => { const r = await worker.fetch(post(Object.assign({ action: 'invite-ask', project: 'my-kitchen-notes-beta' }, body), 'https://mykitchennotes.community', ip ? { 'CF-Connecting-IP': ip } : {}), env);
+    let d = null; try { d = await r.json(); } catch (e) {} return { status: r.status, d }; };
+  let a = await ask({ email: 'Newcomer@Example.com', from: 'Tony’s Kitchen Notes', recipe: 'Hard-boiled eggs', env: 'beta', lang: 'he' }, '192.0.2.10');
+  const row = raw.prepare("SELECT * FROM feedback WHERE email = 'newcomer@example.com'").get();
+  expect('v97: someone without an account asks for an invitation: a note in 💬 Feedback, with the address',
+    a.status === 200 && row && row.uid === '' && row.project === 'my-kitchen-notes-beta' && /Asks for an invitation/.test(row.text) && /Hard-boiled eggs/.test(row.text) && row.status === 'new', JSON.stringify([a, row]));
+  expect('v97: …and the owner hears of it', mails.length === 1 && /asks for an invitation/i.test(mails[0].raw), JSON.stringify(mails.map(m => m.raw.slice(0, 200))));
+  expect('v97: …the address is not in the note itself (it goes on to the reports repository)', row && !/@/.test(row.text), row && row.text);
+  a = await ask({ email: 'newcomer@example.com' }, '192.0.2.10');
+  expect('v97: the same address again within a day is kept once', a.status === 200 && a.d.already === true && raw.prepare("SELECT COUNT(*) AS n FROM feedback").get().n === 1, JSON.stringify(a));
+  a = await ask({ email: 'not-an-address' }, '192.0.2.11');
+  expect('v97: something that is not an address is refused', a.status === 400, JSON.stringify(a));
+  a = await ask({ email: 'x@example.com', project: 'someone-elses-app' }, '192.0.2.11');
+  expect('v97: …so is a copy this server does not serve', a.status === 400, JSON.stringify(a));
+  await ask({ email: 'b@example.com' }, '192.0.2.12'); await ask({ email: 'c@example.com' }, '192.0.2.12'); await ask({ email: 'd@example.com' }, '192.0.2.12');
+  a = await ask({ email: 'e@example.com' }, '192.0.2.12');
+  expect('v97: three a day from one network address, then refused', a.status === 429 && a.d.rateLimited === true, JSON.stringify(a));
 }
 
 if (failures.length) {

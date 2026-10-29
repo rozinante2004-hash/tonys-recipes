@@ -4548,6 +4548,120 @@ window.SELF_TESTS = [
       }
     } },
 
+  // v39.10 — Tony, 29 Oct 2026: "sending a recipe between registered users … the recipient just needs to click a "Save
+  // to my recipes" button and it is immediately added to their list of recipes, without any AI involvement".
+  { id:'sent_recipes', group:'Sync', name:'A recipe sent to another kitchen: a copy, saved with one tap; the link; what became of it (v39.10)',
+    test: async()=>{
+      ['openSendRecipe','openGiftsIn','openGiftsOut','giftSend','giftSave','giftPayload','giftReceived','giftFromUrl','giftSweep','giftStatus','giftNewId'].forEach(function(f){
+        if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
+      if(!document.getElementById('giftsInItem') || !document.getElementById('giftsOutItem') || !document.getElementById('shareGiftBtn')) throw new Error('⋯ More → 📨 / 📤, or 📤 Share → 📨 Send to another kitchen, is missing');
+      var id1=giftNewId(), id2=giftNewId();
+      if(!/^[A-Za-z0-9]{24}$/.test(id1) || id1===id2) throw new Error('a sent recipe’s key is not long and random: '+id1);
+      // What travels: the recipe as it shows — not the cooking log, ratings, the heart, old versions, the secret mark.
+      var p=giftPayload({ id:5, uid:'u5', name:'Eggs', fav:true, secret:true, cookLog:[{ rating:5 }], history:[{ name:'old' }], cookCount:3, _ph:1, by:'Dana',
+        ingredients:[{ a:'4', n:'eggs' }], steps:['Boil for **9** minutes.'], parts:[{ uid:'p1', fav:true, name:'Sauce', ingredients:[], steps:['Stir'] }] });
+      if(p.fav!==undefined || p.secret!==undefined || p.cookLog || p.history || p.cookCount!==undefined || p._ph || p.id || p.uid || p.by || p.parts[0].uid || p.parts[0].fav!==undefined
+         || p.steps[0]!=='Boil for **9** minutes.' || p.ingredients[0].n!=='eggs') throw new Error('what travels with a sent recipe: '+JSON.stringify(p));
+      var store={}, real={ db:window._fbDb, user:window._fbUser, hh:window._household, recipes:recipes.slice(), next:nextId, choice:window.askChoice, confirm:window.askConfirm,
+        share:window.shareDo, log:_linkState.log, gifts:JSON.parse(JSON.stringify({ list:_gifts.list })), keys:{} };
+      ['mkn_gift_links','mkn_gift_seen_hB','mkn_gift_sweep_hA'].forEach(function(k){ real.keys[k]=localStorage.getItem(k); });
+      var sess=null; try{ sess=sessionStorage.getItem('mkn_gift'); }catch(e){}
+      var now=function(){ return firebase.firestore.Timestamp.now(); };
+      var fix=function(v){ return v && typeof v==='object' && !(v instanceof firebase.firestore.Timestamp) && typeof v.isEqual==='function' && !Array.isArray(v) && !('seconds' in v) ? now() : v; };
+      function ref(path){ return { id:path.split('/').pop(), path:path,
+        get:async function(){ var d=store[path]; return { exists:!!d, id:path.split('/').pop(), data:function(){ return d ? JSON.parse(JSON.stringify(d), function(k,v){ return v && v._ts ? firebase.firestore.Timestamp.fromMillis(v._ts) : v; }) : undefined; } }; },
+        set:async function(d){ store[path]=enc(d); }, delete:async function(){ delete store[path]; },
+        update:async function(u){ var d=store[path]; if(!d) throw Object.assign(new Error('no such document'), { code:'not-found' });
+          Object.keys(u).forEach(function(k){ var parts=k.split('.'); if(parts.length===2){ d[parts[0]]=d[parts[0]]||{}; d[parts[0]][parts[1]]=enc1(u[k]); } else d[k]=enc1(u[k]); }); } }; }
+      function enc1(v){ v=fix(v); return v instanceof firebase.firestore.Timestamp ? { _ts:v.toMillis() } : (v && typeof v==='object' ? enc(v) : v); }
+      function enc(d){ var o=Array.isArray(d)?[]:{}; Object.keys(d).forEach(function(k){ o[k]=enc1(d[k]); }); return o; }
+      function q(c, f, v){ var docs=function(){ return Object.keys(store).filter(function(k){ return k.indexOf(c+'/')===0 && k.split('/').length===2 && store[k][f]===v; })
+          .map(function(k){ return { id:k.split('/')[1], ref:ref(k), data:function(){ return ref(k)._data(); } }; }); };
+        return { get:async function(){ var l=[]; for(const k of Object.keys(store)){ if(k.indexOf(c+'/')===0 && store[k][f]===v){ var s=await ref(k).get(); l.push({ id:s.id, ref:ref(k), data:s.data }); } } return { forEach:function(fn){ l.forEach(fn); } }; } }; }
+      window._fbDb={ collection:function(c){ return { doc:function(id){ return ref(c+'/'+id); }, where:function(f, op, v){ return q(c, f, v); } }; },
+        batch:function(){ var ops=[]; return { set:function(r,d){ ops.push(function(){ return r.set(d); }); }, delete:function(r){ ops.push(function(){ return r.delete(); }); },
+          commit:async function(){ for(const o of ops) await o(); } }; } };
+      store['codes/MKN-BBBB-2222']={ hid:'hB', at:1 };
+      window._fbUser={ uid:'uA', email:'a@example.com', emailVerified:true };
+      _household={ hid:'hA', name:'Kitchen A', code:'MKN-AAAA-2222', role:'owner' }; window._household=_household;
+      _linkState.log={};
+      var rid=TEST_ID_MIN+9601;
+      recipes.unshift(normalizeRecipe({ id:rid, name:'Hard-boiled eggs', photo:'data:image/jpeg;base64,AAAA', ingredients:[{ a:'4', n:'eggs' }], steps:['Boil for **9** minutes.'], cookLog:[{ at:1, rating:5 }], fav:true }));
+      var asked=[], said=[], shared=[];
+      try{
+        // 1. Through the app, by identifier: a copy with its photo, for that kitchen, for 4 weeks.
+        var ch=['app'], cf=['MKN-BBBB-2222', 'Try it!'];
+        window.askChoice=async function(m, o){ asked.push(m); return ch.shift(); };
+        window.askConfirm=async function(o){ said.push(o); return cf.length ? cf.shift() : true; };
+        var sent=await openSendRecipe(rid);
+        var gk=Object.keys(store).filter(function(k){ return /^recipeGifts\//.test(k); });
+        if(!sent || gk.length!==1) throw new Error('nothing sent: '+JSON.stringify(Object.keys(store)));
+        var g=store[gk[0]];
+        if(g.to!=='hB' || g.toCode!=='MKN-BBBB-2222' || g.via!=='app' || g.from!=='hA' || g.fromName!=='Kitchen A' || g.note!=='Try it!' || g.by!=='uA' || g.photo!==true
+           || g.recipe.cookLog || g.recipe.fav!==undefined || g.recipe.steps[0]!=='Boil for **9** minutes.') throw new Error('what was sent: '+JSON.stringify(g).slice(0,300));
+        if(!store['recipeGiftPhotos/'+sent.id] || store['recipeGiftPhotos/'+sent.id].data!=='data:image/jpeg;base64,AAAA') throw new Error('its photo did not go with it');
+        var days=(g.expireAt._ts-Date.now())/864e5;
+        if(!(days>27.9 && days<28.1)) throw new Error('it does not keep for 4 weeks: '+days);
+        // 2. By WhatsApp: a link, made once, carried in the message.
+        ch=['wa']; cf=['']; window.shareDo=async function(how, m){ shared.push([how, m]); return how; };
+        var link=await openSendRecipe(rid);
+        if(!link || !shared.length || shared[0][0]!=='wa' || shared[0][1].text.indexOf('?recipe='+link.id)===-1 || !/Kitchen A sent you a recipe for “Hard-boiled eggs”/.test(shared[0][1].text)) throw new Error('the WhatsApp message: '+JSON.stringify(shared));
+        if(store['recipeGifts/'+link.id].to!=='' || store['recipeGifts/'+link.id].via!=='whatsapp') throw new Error('a link is for nobody in particular: '+JSON.stringify(store['recipeGifts/'+link.id]).slice(0,200));
+        // 3. In the kitchen it was sent to: it pops up, counted in ⋯ More; saved with one tap, a recipe of its own.
+        window._fbUser={ uid:'uB', email:'b@example.com', emailVerified:true };
+        _household={ hid:'hB', name:'Kitchen B', code:'MKN-BBBB-2222', role:'editor' }; window._household=_household; _gifts.hid='hB';
+        localStorage.removeItem('mkn_gift_seen_hB');
+        var snapB=await _fbDb.collection('recipeGifts').where('to','==','hB').get();
+        ch=[null]; asked=[];
+        if(giftReceived(snapB)!==1) throw new Error('the recipe sent did not arrive as new');
+        if(!/\(1\)/.test(document.getElementById('giftsInCount').textContent)) throw new Error('⋯ More does not count it: '+document.getElementById('giftsInCount').textContent);
+        for(var w=0; w<40 && !asked.length; w++) await wait(50);
+        if(!asked.length || !/Kitchen A has sent you a recipe for “Hard-boiled eggs”/.test(asked[0]) || !/Try it!/.test(asked[0]) || !/Recipes sent to me/.test(asked[0])) throw new Error('the pop-up: '+JSON.stringify(asked));
+        var gB={ id:sent.id, d:(await _fbDb.collection('recipeGifts').doc(sent.id).get()).data() };
+        _household.role='viewer';
+        if(await giftSave(gB)!==false) throw new Error('someone who only reads saved it');
+        _household.role='editor';
+        var before=recipes.length, savedId=nextId; nextId=Math.max(nextId, TEST_ID_MIN+9610);
+        cf=[true];   // "You have one called that" (the sender's own recipe is in this test's list)
+        var newId=await giftSave(gB);
+        var copy=recipes.filter(function(x){ return x.id===newId; })[0];
+        if(!copy || recipes.length!==before+1 || copy.name!=='Hard-boiled eggs' || copy.photo!=='data:image/jpeg;base64,AAAA' || copy.fav || (copy.cookLog||[]).length
+           || copy.steps[0]!=='Boil for **9** minutes.' || !/Kitchen A/.test(copy.notes)) throw new Error('the saved copy: '+JSON.stringify(copy).slice(0,300));
+        if(!store['recipeGifts/'+sent.id].savedAt) throw new Error('not marked saved for the sender to see');
+        recipes.splice(recipes.indexOf(copy),1); nextId=savedId;
+        // 4. The link, saved into this kitchen: added to `saved`, kept for others.
+        var gL={ id:link.id, d:(await _fbDb.collection('recipeGifts').doc(link.id).get()).data() };
+        cf=[true]; var lid=await giftSave(gL);
+        var lc=recipes.filter(function(x){ return x.id===lid; })[0]; if(lc) recipes.splice(recipes.indexOf(lc),1);
+        if(!store['recipeGifts/'+link.id] || !store['recipeGifts/'+link.id].saved.hB || store['recipeGifts/'+link.id].lastSaver!=='hB') throw new Error('saving the link: '+JSON.stringify(store['recipeGifts/'+link.id]).slice(0,200));
+        // 5. What the sender sees, and taking one back.
+        if(!/^✅ Saved/.test(giftStatus(store['recipeGifts/'+sent.id]._ts ? {} : (await _fbDb.collection('recipeGifts').doc(sent.id).get()).data()))) throw new Error('the sender does not see it saved');
+        if(!/Saved by 1 kitchen/.test(giftStatus((await _fbDb.collection('recipeGifts').doc(link.id).get()).data()))) throw new Error('the link: how many saved it');
+        window._fbUser={ uid:'uA', email:'a@example.com', emailVerified:true };
+        _household={ hid:'hA', name:'Kitchen A', code:'MKN-AAAA-2222', role:'owner' }; window._household=_household;
+        _gifts.sent=await giftSentList();
+        if(_gifts.sent.length!==2) throw new Error('📤 Recipes I sent lists '+_gifts.sent.length);
+        var li=_gifts.sent.map(function(x){ return x.id; }).indexOf(sent.id); cf=[true];
+        if(await giftOutAct(li,'withdraw')!=='withdrawn' || store['recipeGifts/'+sent.id] || store['recipeGiftPhotos/'+sent.id]) throw new Error('taking one back');
+        // 6. Four weeks on: not waiting, and the sending kitchen's app clears it.
+        store['recipeGifts/'+link.id].expireAt={ _ts:Date.now()-1000 };
+        var old={ id:link.id, d:(await _fbDb.collection('recipeGifts').doc(link.id).get()).data() };
+        if(giftWaiting(old)) throw new Error('an expired one still waits');
+        window._giftUnderTest=true;
+        if(await giftSweep([old])!==1 || store['recipeGifts/'+link.id]) throw new Error('the expired one was not cleared');
+        // 7. A blocked kitchen's recipes do not wait.
+        _linkState.log={ hA:{ status:'blocked' } };
+        if(giftWaiting({ id:'x', d:{ from:'hA', to:'hB', expireAt:firebase.firestore.Timestamp.fromMillis(Date.now()+864e5) } })) throw new Error('a blocked kitchen’s recipe still waits');
+      } finally {
+        window._fbDb=real.db; window._fbUser=real.user; _household=real.hh; window._household=real.hh; window._giftUnderTest=false;
+        recipes=real.recipes; nextId=real.next; window.askChoice=real.choice; window.askConfirm=real.confirm; window.shareDo=real.share; _linkState.log=real.log;
+        _gifts.list=real.gifts.list; _gifts.hid=''; _gifts.sent=null; giftDots();
+        Object.keys(real.keys).forEach(function(k){ try{ if(real.keys[k]===null) localStorage.removeItem(k); else localStorage.setItem(k, real.keys[k]); }catch(e){} });
+        try{ if(sess===null) sessionStorage.removeItem('mkn_gift'); else sessionStorage.setItem('mkn_gift', sess); }catch(e){}
+        var ov=document.getElementById('askOverlay'); if(ov) ov.remove();
+      }
+    } },
+
   { id:'wpo_first_visit', group:'UI', name:'A first visit: welcome, an empty collection that teaches, a tour (v37.00)',
     test: async()=>{
       ['householdWelcome','householdCodeFrom','firstRunEmptyHtml','addSampleRecipes','startTour','i18nDeviceLangOffer','i18nEnsureLang','feedbackMailto','sendFeedback'].forEach(function(f){

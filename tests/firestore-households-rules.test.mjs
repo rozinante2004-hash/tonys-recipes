@@ -11,7 +11,7 @@ import { createHash } from 'crypto';
 // by e-mail (how the family arrives at migration); carol is a stranger.
 import { readFileSync } from 'node:fs';
 import { initializeTestEnvironment, assertSucceeds, assertFails } from '@firebase/rules-unit-testing';
-import { doc, getDoc, setDoc, updateDoc, deleteDoc, writeBatch, Timestamp,
+import { doc, getDoc, setDoc, updateDoc, deleteDoc, writeBatch, Timestamp, serverTimestamp,
          collection, collectionGroup, query, where, getDocs } from 'firebase/firestore';
 
 const rules = readFileSync(new URL('../firestore.rules', import.meta.url), 'utf8')
@@ -577,6 +577,64 @@ await check('v38.69: …and takes one back',                        deleteDoc(do
 await check('v38.69: taken back: no new household',               found(tina, 'hTester4', 'tina'), false);
 await check('the owner opens it again',                        setDoc(doc(alice, 'config/founding'), { open: true, by: 'alice@example.com', at: 2 }), true);
 await check('open: a newcomer starts one',                     found(carol, 'hOpen1', 'carol'), true);
+
+// v39.10 — sent recipes (Tony, 29 Oct 2026: "sending a recipe between registered users … the recipient just needs to
+// click a "Save to my recipes" button"). frank's kitchen gA sends; carol's kitchen gB receives, where bob may add
+// recipes and dave only reads.
+console.log('Sent recipes');
+await check('frank founds gA',  found(frank, 'gA', 'frank'), true);
+await check('carol founds gB',  found(carol, 'gB', 'carol'), true);
+await check('(their identifiers, bob and dave in gB)', env.withSecurityRulesDisabled(async (ctx) => {
+  const d = ctx.firestore();
+  await updateDoc(doc(d, 'households/gA'), { name: 'Frank’s Kitchen', code: 'MKN-FFFF-2345' });
+  await updateDoc(doc(d, 'households/gB'), { name: 'Carol’s Kitchen', code: 'MKN-CCCC-6789' });
+  await setDoc(doc(d, 'households/gB/members/bob'), { uid: 'bob', role: 'editor', email: 'bob@example.com', joinedAt: 3 });
+  await setDoc(doc(d, 'households/gB/members/dave'), { uid: 'dave', role: 'viewer', email: 'dave@example.com', joinedAt: 3 });
+}), true);
+const G1 = 'giftAbcdefghijklmnopqrs1', G2 = 'giftAbcdefghijklmnopqrs2', G3 = 'giftAbcdefghijklmnopqrs3', GX = 'giftAbcdefghijklmnopqrsX';
+const in28 = () => Timestamp.fromMillis(Date.now() + 28 * 864e5);
+const gift = (extra) => Object.assign({ from: 'gA', fromName: 'Frank’s Kitchen', fromCode: 'MKN-FFFF-2345', to: 'gB', toCode: 'MKN-CCCC-6789',
+  by: 'frank', via: 'app', name: 'Hard-boiled eggs', recipe: { ingredients: [{ a: '4', n: 'eggs' }], steps: ['Boil for **9** minutes.'] },
+  photo: true, note: 'Try it!', at: serverTimestamp(), expireAt: in28(), saved: {} }, extra || {});
+const sendWithPhoto = (db, id, g, ph) => { const b = writeBatch(db); b.set(doc(db, 'recipeGifts/' + id), g);
+  if (ph !== null) b.set(doc(db, 'recipeGiftPhotos/' + id), ph || { from: g.from, data: 'data:image/jpeg;base64,AAAA', expireAt: g.expireAt }); return b.commit(); };
+await check('frank sends gB a recipe, with its photo',               sendWithPhoto(frank, G1, gift()), true);
+await check('…not in a kitchen he is not in (as gB)',                setDoc(doc(frank, 'recipeGifts/' + GX), gift({ from: 'gB', fromName: 'Carol’s Kitchen', fromCode: 'MKN-CCCC-6789', to: 'gA', toCode: 'MKN-FFFF-2345', photo: false })), false);
+await check('…not under a name other than his kitchen’s',            setDoc(doc(frank, 'recipeGifts/' + GX), gift({ fromName: 'Tony’s Kitchen', photo: false })), false);
+await check('…not in someone else’s name',                           setDoc(doc(frank, 'recipeGifts/' + GX), gift({ by: 'carol', photo: false })), false);
+await check('…not kept longer than 4 weeks',                         setDoc(doc(frank, 'recipeGifts/' + GX), gift({ expireAt: Timestamp.fromMillis(Date.now() + 40 * 864e5), photo: false })), false);
+await check('…not to a kitchen under another kitchen’s identifier',  setDoc(doc(frank, 'recipeGifts/' + GX), gift({ toCode: 'MKN-ZZZZ-9999', photo: false })), false);
+await check('…not "through the app" to nobody',                      setDoc(doc(frank, 'recipeGifts/' + GX), gift({ to: '', toCode: '', photo: false })), false);
+await check('…not already "saved"',                                  setDoc(doc(frank, 'recipeGifts/' + GX), gift({ saved: { gB: 1 }, photo: false })), false);
+await check('…not under a short, guessable id',                      setDoc(doc(frank, 'recipeGifts/short1'), gift({ photo: false })), false);
+await check('…nothing else goes in it',                              setDoc(doc(frank, 'recipeGifts/' + GX), gift({ email: 'x@example.com', photo: false })), false);
+await check('…a photo only with a gift that says it has one',        sendWithPhoto(frank, GX, gift({ photo: false })), false);
+await check('…and only by whoever sent the gift',                    setDoc(doc(carol, 'recipeGiftPhotos/' + G1 + 'z'), { from: 'gA', data: 'x', expireAt: in28() }), false);
+await check('a link, sent by WhatsApp (to nobody in particular)',    sendWithPhoto(frank, G2, gift({ to: '', toCode: '', via: 'whatsapp', photo: false }), null), true);
+await check('whoever has the link reads it, signed out too',         getDoc(doc(nobody, 'recipeGifts/' + G1)), true);
+await check('…and its photo',                                        getDoc(doc(nobody, 'recipeGiftPhotos/' + G1)), true);
+await check('…but nobody lists them',                                getDocs(collection(nobody, 'recipeGifts')), false);
+await check('…nor someone signed in, unasked',                       getDocs(collection(erin, 'recipeGifts')), false);
+await check('the kitchen it was sent to lists what came to it',      getDocs(query(collection(dave, 'recipeGifts'), where('to', '==', 'gB'))), true);
+await check('…not what another kitchen sent',                        getDocs(query(collection(carol, 'recipeGifts'), where('from', '==', 'gA'))), false);
+await check('the sending kitchen lists what it sent',                getDocs(query(collection(frank, 'recipeGifts'), where('from', '==', 'gA'))), true);
+await check('someone in gB who only reads cannot mark it saved',     updateDoc(doc(dave, 'recipeGifts/' + G1), { savedAt: serverTimestamp() }), false);
+await check('the sender cannot mark it saved',                       updateDoc(doc(frank, 'recipeGifts/' + G1), { savedAt: serverTimestamp() }), false);
+await check('bob (gB, adds recipes) cannot change what was sent',    updateDoc(doc(bob, 'recipeGifts/' + G1), { savedAt: serverTimestamp(), name: 'Mine now' }), false);
+await check('bob marks it saved',                                    updateDoc(doc(bob, 'recipeGifts/' + G1), { savedAt: serverTimestamp() }), true);
+await check('…once (not declined afterwards)',                       updateDoc(doc(carol, 'recipeGifts/' + G1), { declinedAt: serverTimestamp() }), false);
+await check('carol saves the WhatsApp link into gB',                 updateDoc(doc(carol, 'recipeGifts/' + G2), { ['saved.gB']: serverTimestamp(), lastSaver: 'gB' }), true);
+await check('…but not in the name of a kitchen she is not in',       updateDoc(doc(carol, 'recipeGifts/' + G2), { ['saved.gA']: serverTimestamp(), lastSaver: 'gA' }), false);
+await check('…nor someone who only reads',                           updateDoc(doc(dave, 'recipeGifts/' + G2), { ['saved.gB']: serverTimestamp(), lastSaver: 'gB' }), false);
+await check('…nor anything else with it',                            updateDoc(doc(carol, 'recipeGifts/' + G2), { ['saved.gB']: serverTimestamp(), lastSaver: 'gB', note: 'x' }), false);
+await check('the kitchen sent to cannot delete it (the sender sees what became of it)', deleteDoc(doc(carol, 'recipeGifts/' + G1)), false);
+await check('the sender withdraws one',                              deleteDoc(doc(frank, 'recipeGifts/' + G2)), true);
+await check('…and its photo',                                        deleteDoc(doc(frank, 'recipeGiftPhotos/' + G1)), true);
+await check('(one sent 4 weeks ago)', env.withSecurityRulesDisabled(ctx => setDoc(doc(ctx.firestore(), 'recipeGifts/' + G3),
+  Object.assign(gift(), { at: Timestamp.fromMillis(Date.now() - 29 * 864e5), expireAt: Timestamp.fromMillis(Date.now() - 864e5) }))), true);
+await check('expired: the link opens nothing',                       getDoc(doc(nobody, 'recipeGifts/' + G3)), false);
+await check('…and it can no longer be saved',                        updateDoc(doc(bob, 'recipeGifts/' + G3), { savedAt: serverTimestamp() }), false);
+await check('…the sending kitchen still lists it, and clears it',    deleteDoc(doc(frank, 'recipeGifts/' + G3)), true);
 
 await env.cleanup();
 console.log(failures ? failures + ' household rules check(s) FAILED' : 'all household rules checks passed');
