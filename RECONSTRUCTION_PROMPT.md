@@ -871,7 +871,8 @@ theirs — and `recipeGiftPhotos/<id>`. Recipe → 📤 Share → 📨 Send to a
 listener on `to`, the request chime, a red dot, one pop-up at a time: Save / Look at it first / Not now / Block), or as a
 link by e-mail, WhatsApp or copied (`?recipe=<id>`, saved by any number of kitchens). Save makes a new recipe — no AI.
 ⋯ More → 📨 Recipes sent to me and 📤 Recipes I sent (saved / not saved / waiting; copy the link; take it back). The
-sending kitchen's app deletes its expired ones. Signed out during the closed beta: the recipe, read-only, and "✉️ Ask for
+sending kitchen's app deletes its expired ones, and a nightly job (clear-sent-recipes.yml) deletes every expired one
+in the beta's database — Firestore's own TTL needs billing. Signed out during the closed beta: the recipe, read-only, and "✉️ Ask for
 an invitation" (Worker `invite-ask`: a note to the owner + an alert, rate-limited). Privacy Statement 1.11.
 
 **State on 28 Oct 2026 (v39.06, Worker v96):** testers since 25 Oct; every release on the owner's yes. Their notes

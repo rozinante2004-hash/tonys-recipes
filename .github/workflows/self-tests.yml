@@ -248,6 +248,16 @@ jobs:
           cp "$GITHUB_WORKSPACE/tests/owner-recovery.test.mjs" .
           /tmp/hh/node_modules/.bin/firebase emulators:exec --only firestore,auth --project demo-family "node owner-recovery.test.mjs $GITHUB_WORKSPACE/tools/owner-recovery.mjs"
 
+      # v39.10 — the nightly clean-up of sent recipes past their 4 weeks
+      # (tools/clear-sent-recipes.mjs): expired ones go, the rest stay, more than
+      # one page, other collections untouched, only counts in the log.
+      - name: Clear expired sent recipes (emulator)
+        run: |
+          mkdir -p /tmp/gift && cd /tmp/gift
+          echo '{"emulators":{"firestore":{"port":8086},"ui":{"enabled":false},"singleProjectMode":false}}' > firebase.json
+          cp "$GITHUB_WORKSPACE/tests/clear-sent-recipes.test.mjs" .
+          /tmp/hh/node_modules/.bin/firebase emulators:exec --only firestore --project demo-gifts "node clear-sent-recipes.test.mjs $GITHUB_WORKSPACE/tools/clear-sent-recipes.mjs"
+
       # v36.91 — the job that publishes the languages into i18n/*.json, run
       # against the emulator with the real rules (translations are public).
       - name: Language publishing job (emulator)

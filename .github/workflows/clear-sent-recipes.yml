@@ -1,0 +1,56 @@
+name: Clear expired sent recipes
+
+# v39.10 — a recipe sent to another kitchen (recipeGifts/<id>, its picture in
+# recipeGiftPhotos/<id>) keeps for 4 weeks. Firestore's own time-to-live rules
+# need billing switched on (Tony, 29 Oct 2026: "Project my-kitchen-notes-beta has
+# billing disabled"), so every night tools/clear-sent-recipes.mjs removes those
+# past their expireAt from the beta's database (the family app's too). It reads
+# only the documents' names and prints only counts.
+#
+# Needs: FIREBASE_RULES_KEY's service account (rules-publisher@recipes-f379d)
+# with "Cloud Datastore User" on my-kitchen-notes-beta — given for the family's
+# move. Without it the job warns and does nothing.
+
+on:
+  schedule:
+    - cron: "23 3 * * *"      # 03:23 UTC every day
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: clear-sent-recipes
+  cancel-in-progress: false
+
+jobs:
+  clear:
+    runs-on: ubuntu-latest
+    env:
+      FIREBASE_KEY: ${{ secrets.FIREBASE_RULES_KEY }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+
+      - name: Is the key there?
+        id: key
+        run: |
+          if [ -z "$FIREBASE_KEY" ]; then
+            echo "::warning::FIREBASE_RULES_KEY is missing — expired sent recipes were NOT cleared."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Remove sent recipes past their 4 weeks
+        if: steps.key.outputs.ok == 'true'
+        run: |
+          if [ ! -f tools/clear-sent-recipes.mjs ]; then echo "::notice::Not released to main yet — nothing to do."; exit 0; fi
+          npm init -y >/dev/null 2>&1 || true
+          npm install --no-audit --no-fund google-auth-library@9 >/dev/null
+          node tools/clear-sent-recipes.mjs --project my-kitchen-notes-beta

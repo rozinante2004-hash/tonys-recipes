@@ -1466,8 +1466,14 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
       the same address once a day.
     - **Privacy Statement 1.11** (29 Oct, 11 languages): data rows "Recipes you send" and "Invitation requests", who sees
       a sent recipe, and its 4 weeks. Help: "📨 SEND A RECIPE TO ANOTHER KITCHEN".
-    - **Tony's optional step (a backstop; the app already clears what it sent):** Firestore's TTL policy, collection
-      groups `recipeGifts` and `recipeGiftPhotos`, field `expireAt`, in my-kitchen-notes-beta (and tonys-recipes-test).
+    - **No TTL — a nightly job instead (29 Oct):** Firestore's TTL policies need billing ("Project my-kitchen-notes-beta
+      has billing disabled" in Tony's Cloud Shell; the console's list also only offers collections that already exist).
+      `.github/workflows/clear-sent-recipes.yml` (03:23 UTC daily, from `main`) runs `tools/clear-sent-recipes.mjs
+      --project my-kitchen-notes-beta`: runQuery `expireAt < now` selecting `__name__` only, commits deletes 300 at a
+      time, prints counts only; a 403 → a warning ("Cloud Datastore User" — given to rules-publisher@ for the move).
+      The test project is not swept by it (the key's roles there are rules only; the app's `giftSweep` covers test).
+      Emulator test `tests/clear-sent-recipes.test.mjs` in Self Tests (305 expired over two pages, fresh ones kept,
+      other collections untouched, no names in the log).
   - **The test copy behaves as the beta will (Tony, 27 Oct: "once a build is released to it, it behaves exactly the same
     as the Beta would have"; "Perhaps we should update the database rules and server immediately upon the release to the
     test version"):**
