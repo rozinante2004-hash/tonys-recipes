@@ -1456,9 +1456,10 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
       by hand since the page's CSP forbids fetching data:; the recipe as the text), 📋 Copy (rich + plain). Usage word
       `recipe-mailed`. Privacy Statement 1.12 (11 languages): "Recipes you e-mail", Resend as a provider, who receives
       it, nothing kept but daily counts. index.html size budget 1800 → 1900 KB (1802 KB without comments; noted in the test).
-    - **Tony's setup (not done yet):** a Resend account, the domain mykitchennotes.community verified there (3 DNS
-      records on `send.` and `resend._domainkey` — the root's Email Routing MX untouched), an API key (Sending access)
-      as the GitHub secret RESEND_API_KEY, then a re-run of "Deploy the Worker" so the Worker gets it.
+    - **Tony's setup — done 29 Oct:** a Resend account, the domain mykitchennotes.community verified there with
+      Resend's "Auto configure" (DNS records on `send.` and `resend._domainkey` — the root's Email Routing MX untouched),
+      an API key (Sending access) as the GitHub secret RESEND_API_KEY. "Deploy the Worker" re-run (run 40916825736):
+      "RESEND_API_KEY is set", live v98. Tony sent himself a recipe from the test copy with 📨 Send: "Worked on the 1st try!"
   - **v39.14 — ✉️ Email is plain sharing again** (Tony, 29 Oct: "I have a feeling you got confused. When sharing a recipe
     using the "Send by Email", it is a simple sharing of the recipe. It is not an internal user-to-user share. It should
     contain the photo and recipe, not an internal link that only users can open in the app." Gmail and Outlook opened
