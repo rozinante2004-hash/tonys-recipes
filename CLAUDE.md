@@ -1424,6 +1424,13 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
     "The app's owner account stays", whatever way it is reached (also the sign-in that comes back to finish a deletion).
     Help says so. Self Test in the account-deletion test. Tony's yes came with the request ("Please release it to beta
     and family once ready and approved").
+  - **v39.09 — a page with no recipe, rescued by its video, is not "URL import failed"** (Tony's own log, 29 Oct: a
+    YouTube Short, 2,243 characters of page text, "URL import failed — no recipe found", then 17 s later "Recipe read
+    from the video itself" and the recipe saved; the log said "[BAD] 1 error recorded". Tony: "If this is the expected
+    behaviour, then why is it logged as an error?"). `runUrlImport`'s catch logged the error before the cascade went on
+    to the video. Now, for YouTube and Facebook with "no recipe found", it logs `import: The page's words hold no recipe —
+    now its video`, and `error: URL import failed — no recipe in the page or in its video` only if the video holds none
+    either. Self Test (import_facebook_and_video_say_what_works): both, with a page that has words.
   - **The test copy behaves as the beta will (Tony, 27 Oct: "once a build is released to it, it behaves exactly the same
     as the Beta would have"; "Perhaps we should update the database rules and server immediately upon the release to the
     test version"):**

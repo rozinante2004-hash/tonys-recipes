@@ -587,9 +587,21 @@ window.SELF_TESTS = [
         window.extractRecipesFromText=async function(t){ return /6 eggs/.test(t)
           ? { name:'Chocolate cake', ingredients:[{a:'6',n:'eggs'},{a:'1 cup',n:'sugar'}], steps:['Bake at 160C for an hour.'] }
           : { error:'no recipe found' }; };
-        await runUrlImport();
+        var ytLogged=[], realSL=window.syncLog; window.syncLog=function(k,m){ ytLogged.push(k+': '+m); return realSL.apply(this, arguments); };
+        try{ await runUrlImport(); } finally{ window.syncLog=realSL; }
         if(asked.indexOf('video-recipe')===-1) throw new Error('the video itself was not asked for: '+JSON.stringify(asked));
         if(!/Chocolate cake/.test(res.textContent) || !/Read from the video itself/.test(res.textContent)) throw new Error('the recipe from the video: '+res.textContent.slice(0,200));
+        // v39.09 — Tony's log: the page's words (2,243 characters of them) held no recipe, the video did — not a failed import
+        if(ytLogged.some(function(x){ return /^error: URL import failed/.test(x); })) throw new Error('a video whose page had no text, read from the video, was logged as a failed import: '+JSON.stringify(ytLogged));
+        reply=function(u, init){ var b={}; try{ b=JSON.parse(init.body); }catch(e){}
+          return b.action==='video-recipe'
+            ? { ok:true, status:200, json:async function(){ return { text:'Chocolate cake\n6 eggs\n1 cup sugar\nBake at 160C for an hour.', via:'gemini' }; } }
+            : { ok:true, json:async function(){ return { text:'A short about mushrooms, with music, likes and comments, and no recipe written anywhere. '.repeat(4), isYouTube:true }; } }; };
+        ytLogged=[]; window.syncLog=function(k,m){ ytLogged.push(k+': '+m); return realSL.apply(this, arguments); };
+        try{ await runUrlImport(); } finally{ window.syncLog=realSL; }
+        if(!/Chocolate cake/.test(res.textContent)) throw new Error('a page with words but no recipe, then its video: '+res.textContent.slice(0,200));
+        if(ytLogged.some(function(x){ return /^error: URL import failed/.test(x); }) || !ytLogged.some(function(x){ return /now its video/.test(x); }))
+          throw new Error('a page whose video held the recipe was logged as a failed import: '+JSON.stringify(ytLogged));
         // No recipe in the video either: said, and the ways that work are offered.
         reply=function(u, init){ var b={}; try{ b=JSON.parse(init.body); }catch(e){}
           return b.action==='video-recipe'
@@ -597,6 +609,14 @@ window.SELF_TESTS = [
             : { ok:true, json:async function(){ return { text:'#shorts', isYouTube:true }; } }; };
         await runUrlImport();
         if(!document.getElementById('videoRecipeFallback') || !/no recipe was found in it/.test(res.textContent)) throw new Error('a video with no recipe: '+res.textContent.slice(0,200));
+        // v39.09 — words on the page, no recipe in them nor in the video: that IS a failed import
+        reply=function(u, init){ var b={}; try{ b=JSON.parse(init.body); }catch(e){}
+          return b.action==='video-recipe'
+            ? { ok:true, status:200, json:async function(){ return { text:'', noRecipe:true }; } }
+            : { ok:true, json:async function(){ return { text:'A short about mushrooms, with music, likes and comments, and no recipe written anywhere. '.repeat(4), isYouTube:true }; } }; };
+        ytLogged=[]; window.syncLog=function(k,m){ ytLogged.push(k+': '+m); return realSL.apply(this, arguments); };
+        try{ await runUrlImport(); } finally{ window.syncLog=realSL; }
+        if(!ytLogged.some(function(x){ return /^error: URL import failed/.test(x); })) throw new Error('no recipe in the page nor in its video is not logged as a failed import: '+JSON.stringify(ytLogged));
         // v37.19 — Google busy: said as busy, and a Facebook link afterwards does
         // not repeat what the YouTube one said.
         // v37.32 — busy is waited out once, by itself, before it is said.

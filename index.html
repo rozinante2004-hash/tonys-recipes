@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.08 -->
+<!-- Tony's Recipes Collection v39.09 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -9716,7 +9716,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.08';
+var APP_VERSION = 'v39.09';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -12932,7 +12932,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.08</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.09</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -13020,7 +13020,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.08</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.09</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -24805,11 +24805,18 @@ async function runUrlImport() {
     // import can have behind a suggestion about something else. Only the first
     // one is a bookmark; the second is a fault, and it says so.
     var msg = (err && err.message) || String(err);
-    syncLog('error', 'URL import failed', msg.slice(0, 300));
-    if (/no recipe found|not a recipe/i.test(msg)) {
+    var noRecipe = /no recipe found|not a recipe/i.test(msg);
+    // v39.09 — Tony's log, 29 Oct: a YouTube Short's page held no recipe, the video did, and the recipe was saved — yet the
+    // log said "[BAD] 1 error recorded • URL import failed". While its video is still to be read, a page's words holding
+    // no recipe is a step of the cascade; it is a failure only when the video holds none either.
+    var videoNext = noRecipe && (videoPost === 'youtube' || videoPost === 'facebook');
+    if (videoNext) syncLog('import', 'The page\u2019s words hold no recipe \u2014 now its video', { url: url.slice(0, 120) });
+    else syncLog('error', 'URL import failed', msg.slice(0, 300));
+    if (noRecipe) {
       if (videoPost === 'youtube' && await youtubeRecipeFromVideo(url, res)) return;
       // THE CASCADE — the Facebook post's words hold no recipe: its video.
       if (videoPost === 'facebook' && await recipeFromReelVideo(url, _fbVideoUrl, res, '\u{1F4D8} The post\u2019s words hold no recipe \u2014 now its video.')) return;
+      if (videoNext) syncLog('error', 'URL import failed', 'no recipe in the page or in its video');
       // v37.29 — the reason is always said: Tony's first reel from the Share
       // menu ended here with none, and nothing to go on.
       if (videoPost) showVideoRecipeFallback(url, videoPost, videoPost === 'youtube' ? _videoAiWhy
