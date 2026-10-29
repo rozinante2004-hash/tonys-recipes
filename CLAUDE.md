@@ -1424,6 +1424,9 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
     "The app's owner account stays", whatever way it is reached (also the sign-in that comes back to finish a deletion).
     Help says so. Self Test in the account-deletion test. Tony's yes came with the request ("Please release it to beta
     and family once ready and approved").
+  - **Released: v39.08 (29 Oct 2026, 02:16 Israel time, on f77539a; Tony: "Please release it to beta and family once
+    ready and approved").** Every job success: Deploy to GitHub Pages, pages build, Publish languages, Translate new
+    phrases, Self Tests on main and test, Cloudflare Pages for the beta and test.
   - **v39.09 — a page with no recipe, rescued by its video, is not "URL import failed"** (Tony's own log, 29 Oct: a
     YouTube Short, 2,243 characters of page text, "URL import failed — no recipe found", then 17 s later "Recipe read
     from the video itself" and the recipe saved; the log said "[BAD] 1 error recorded". Tony: "If this is the expected
