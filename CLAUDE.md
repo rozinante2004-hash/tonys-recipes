@@ -1489,6 +1489,9 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
     - Self Tests: `gift_email_by_server`, `identifier_on_main_screen`, `share_menu_after_the_link_is_made`, the e-mail
       rows in `firebase_limits_told`; `email_recipe_link` checks the share menu is not offered on a computer.
     - CI on 677a683 (v39.16 before the share fix): Deploy the Worker (live v99), Self Tests, Cloudflare Pages — success.
+    - CI on 42680ce: Self Tests failed in the third run (log switched on) — `key_check` counted two of Firebase's own
+      background requests (Request objects, not addresses) as its own calls; runs 1–2 passed 425. The test's stand-in
+      fetch now lets Request objects through uncounted.
   - **v39.15 + Worker v98 — the e-mail sent by the server** (Tony, 29 Oct, on v39.14's paste: "Copy/pasting the recipe is
     unacceptable. The users could not be expected to need to remember to paste the recipe. They will end up with an empty
     mail message. We need to find a better way where no pasting is necessary." Asked: server / phone share menu / both →

@@ -9802,7 +9802,9 @@ window.SELF_TESTS = [
         // v38.48 — signed in for real (Tony's tester), the check also asked FIREBASE's own user for a fresh token —
         // through the stand-in fetch below, so it read "auth/nope". Nobody is signed in for this test.
         window._fbUser=null; window.fbSignedInUser=function(){ return null; };
-        window.fetch=async function(u, init){ asked.push(String(u));
+        // v39.16 — the check asks by address; a Request object is Firebase's own background traffic (CI, 29 Oct: two of
+        // them landed in this list during the run with the log switched on) — let it through, uncounted
+        window.fetch=async function(u, init){ if(typeof u!=='string' && !(u instanceof URL)) return real.fetch.apply(this, arguments); asked.push(String(u));
           if(blockFirestore && /firestore\.googleapis/.test(u)) return new Response('{"error":{"code":403,"message":"Requests to this API firestore.googleapis.com are blocked.","details":[{"reason":"API_KEY_SERVICE_BLOCKED"}]}}', { status:403 });
           return new Response('{"error":{"code":400,"message":"nope"}}', { status:400 }); };
         await openKeyCheck();
