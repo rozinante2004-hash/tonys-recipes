@@ -513,12 +513,20 @@
     // v39.18 — Tony: "the table it too wide … the eyes have to travel a long distance between the title and its value
     // … turn it into 2 narrower tables, side by side": the sections in two columns, about as long as each other (one
     // under the other on a narrow screen)
-    var size = function (h) { return (h.match(/<tr/g) || []).length; }, total = parts.reduce(function (t, h) { return t + size(h); }, 0);
+    var head = '<tr><th class="mg-trk"></th>' + months.map(function (m) { return '<th class="mg-c">' + esc(mon(m) + ' ' + m.slice(0, 4)) + '</th>'; }).join('') + '</tr>';
+    return '<div class="mg-h">What they use</div>' + rn + twoColumns(parts, months.length, function (x) {
+      return '<div class="mg-scroll"><table class="mg-table mg-trend mg-usetab">' + head + x.join('') + '</table></div>'; });
+  }
+  // v39.19 — sections in two columns about as long as each other, in their order (left first); one under the other
+  // where two do not fit — a column is as wide as its tables need (a label and a column a month), never wider.
+  // (Tony: "the eyes have to travel a long distance between the title and its value … 2 narrower tables, side by side")
+  function twoColumns(parts, nMonths, wrap) {
+    var size = function (h) { return (h.match(/<tr/g) || []).length + (/mg-card/.test(h) ? 3 : 0); }, total = parts.reduce(function (t, h) { return t + size(h); }, 0);
     var cols = [[], []], filled = 0;
     parts.forEach(function (h) { var n = size(h); cols[cols[1].length || (filled && filled + n / 2 > total / 2) ? 1 : 0].push(h); if (!cols[1].length) filled += n; });
-    var head = '<tr><th class="mg-trk"></th>' + months.map(function (m) { return '<th class="mg-c">' + esc(mon(m) + ' ' + m.slice(0, 4)) + '</th>'; }).join('') + '</tr>';
-    return '<div class="mg-h">What they use</div>' + rn + '<div class="mg-usegrid">' + cols.filter(function (x) { return x.length; }).map(function (x) {
-      return '<div class="mg-scroll"><table class="mg-table mg-trend mg-usetab">' + head + x.join('') + '</table></div>'; }).join('') + '</div>';
+    var minW = Math.min(1100, 230 + 80 * Math.max(1, nMonths));
+    return '<div class="mg-usegrid" style="grid-template-columns:repeat(auto-fit,minmax(min(100%,' + minW + 'px),1fr));max-width:' + (2 * minW + 260) + 'px;">'
+      + cols.filter(function (x) { return x.length; }).map(function (x) { return '<div class="mg-col">' + wrap(x) + '</div>'; }).join('') + '</div>';
   }
   // ─── v38.30: 📈 TRENDS (Worker v76 `trends`) ──────────────────────────────────
   // Tony: "I'd like to understand trends and foresee needs before they arise." Every copy's counts,
@@ -605,7 +613,9 @@
     });
     var rest = trendRowsHtml(c, { label: null, test: /^(?!added\.|from\.)/ }, used);   // every other feature, most used first
     if (rest) out.splice(4, 0, sectionTable('✨ Features', 'How many times each was used.', head, rest));
-    return intro + pick + sizesHtml() + out.join('');
+    // v39.19 — Tony: "The table in the "📈 Use" tab is too wide as well … make the tables narrower and place them side
+    // by side, like we did with the Households tables"
+    return intro + pick + sizesHtml() + twoColumns(out.filter(Boolean), c.months.length, function (x) { return x.join(''); });
   }
   function sectionTable(title, note, head, rows) {
     return '<div class="mg-card"><div class="mg-ptop"><b>' + esc(title) + '</b></div>' + (note ? '<div class="mg-muted" style="margin:2px 0 6px;">' + esc(note) + '</div>' : '')
@@ -1027,6 +1037,7 @@
     + '.mg-trsub{font-weight:700;color:var(--heading);padding-top:10px !important;background:var(--note-bg);}'
     + '.mg-trsec{font-weight:700;color:var(--heading);padding-top:12px !important;border-top:2px solid var(--border);}'   /* v39.17 */
     + '.mg-usegrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px 20px;align-items:start;max-width:1100px;}'   /* v39.18 */
+    + '.mg-col{min-width:0;}.mg-col>.mg-card{margin-top:0;}.mg-trend .mg-trk{width:auto;}.mg-trend td.mg-c,.mg-trend th.mg-c{width:72px;white-space:nowrap;}'   /* v39.19 */
     + '.mg-usetab .mg-trk{width:auto;min-width:0;}.mg-usetab td.mg-c,.mg-usetab th.mg-c{width:76px;white-space:nowrap;}'
     + 'a.mg-btn{text-decoration:none;display:inline-flex;align-items:center;}'
     + '#mgNote{width:100%;box-sizing:border-box;padding:8px;border:1px solid var(--border);border-radius:8px;background:var(--card-bg);color:var(--ink);margin-bottom:6px;font:inherit;}';

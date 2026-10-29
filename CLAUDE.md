@@ -1437,6 +1437,16 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
   - **Released: v39.09 (29 Oct 2026, 11:17 Israel time, on 0de2dde; Tony: "Yes, release v39.09").** Every job success:
     Deploy to GitHub Pages, pages build, Publish languages, Translate new phrases, Self Tests on main and test,
     Cloudflare Pages for the beta and test.
+  - **v39.20 — 📈 Use: the section tables narrower, side by side** (Tony, 30 Oct: "The table in the "📈 Use" tab is too
+    wide as well. Could you please make the tables narrower and place them side by side, like we did with the
+    Households tables?"). `twoColumns(parts, nMonths, wrap)` now serves both (the household details and 📈 Use): the
+    sections in two columns about as long as each other, in their order; a column's minimum width 230 + 80 px a month
+    (max 1100), so with many months (📈 Use keeps 12) it falls to one column rather than squeezing; month cells 72 px,
+    labels as wide as they need. Checked on screenshots at 1280 and 390 px.
+  - **Released: v39.19 (30 Oct 2026, 01:08 Israel time, on 11ae86a; Tony: "When done, please release it to the beta
+    and family app")** — with v39.17–v39.18 and Worker v100 (live since the test push). Every job success: Deploy to
+    GitHub Pages, pages build, Deploy the Worker, Publish languages (twice), Translate new phrases, Self Tests on main
+    and test, Cloudflare Pages for the beta and test. (No rules change, so no rules job.)
   - **v39.19 — two narrower tables, and the two farm counts told apart** (Tony, 29 Oct: "Why do we have both "Tapped
     a farm visitor" and "Tapped a visitor" in the table? Aren't they the same?" and "the table it too wide … the eyes
     have to travel a long distance between the title and its value … turn it into 2 narrower tables, side by side …
