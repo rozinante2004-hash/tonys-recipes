@@ -1437,6 +1437,10 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
   - **Released: v39.09 (29 Oct 2026, 11:17 Israel time, on 0de2dde; Tony: "Yes, release v39.09").** Every job success:
     Deploy to GitHub Pages, pages build, Publish languages, Translate new phrases, Self Tests on main and test,
     Cloudflare Pages for the beta and test.
+  - **Released: v39.20 (30 Oct 2026, 01:44 Israel time, on 73ebaf2; Tony: "Please update the reconstruction prompt and
+    release it to Beta and family when all checks are done")** — every job success: Deploy to GitHub Pages, pages
+    build, Publish languages, Translate new phrases, Self Tests on main and test, Cloudflare Pages for the beta and
+    test. (Worker and rules unchanged — no jobs for them; the Worker is v100.)
   - **v39.20 — 📈 Use: the section tables narrower, side by side** (Tony, 30 Oct: "The table in the "📈 Use" tab is too
     wide as well. Could you please make the tables narrower and place them side by side, like we did with the
     Households tables?"). `twoColumns(parts, nMonths, wrap)` now serves both (the household details and 📈 Use): the
