@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v39.14` — app. **Worker: v97**, deployed separately and versioned separately
+**Current version:** `v39.15` — app. **Worker: v98**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -873,9 +873,10 @@ link by e-mail, WhatsApp or copied (`?recipe=<id>`, saved by any number of kitch
 ⋯ More → 📨 Recipes sent to me and 📤 Recipes I sent (saved / not saved / waiting; copy the link; send again; take it
 back — each, or several ticked at once, v39.13). The
 sending kitchen's app deletes its expired ones, and a nightly job (clear-sent-recipes.yml) deletes every expired one
-in the beta's database — Firestore's own TTL needs billing. 📤 Share → ✉️ Email is ordinary sharing (v39.14): Gmail,
-Outlook or the mail app opens with To and Subject (a web address carries neither a photo nor a long recipe —
-`EMAIL_URL_MAX` 1,900), and the recipe, formatted with its photo, is copied as text/html + text/plain to paste in;
+in the beta's database — Firestore's own TTL needs billing. 📤 Share → ✉️ Email is ordinary sharing, sent by the server
+(v39.15, Worker v98 `mail-recipe` through Resend): their address and 📨 Send — the Worker lays the recipe out itself
+(never HTML from the app), the photo inline, from "<kitchen> via My Kitchen Notes", replies to the sender; 15 a day per
+person; on phones also 📤 Share menu (the photo as a file); 📋 Copy;
 📨 Send → Via Email asks for their address (optional) and puts it after # in the link (`#for=`); the link can hold the recipient's address
 after # (`#for=`), which fills in their invitation request; 💬 Feedback's invitation requests have ✉️ Send invitation
 (Invite testers with the address in To, in the copy the request came from). Signed out during the closed beta: the recipe, read-only, and "✉️ Ask for

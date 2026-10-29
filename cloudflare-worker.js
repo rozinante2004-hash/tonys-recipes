@@ -1,4 +1,8 @@
-// Tony's Recipes — Cloudflare Worker v97
+// Tony's Recipes — Cloudflare Worker v98
+// v98: A RECIPE E-MAILED BY THE SERVER (Tony, 29 Oct 2026: "Copy/pasting the recipe is unacceptable … We need to find a
+// better way where no pasting is necessary"). `mail-recipe`: signed in, the address confirmed, a member of the kitchen;
+// the e-mail laid out here from the recipe's fields (never HTML from the app), its photo inline, from "<kitchen> via My
+// Kitchen Notes", replies to the sender; through Resend (RESEND_API_KEY, MAIL_FROM); 15 a day per person, 90 in all.
 // v97: "CLOSED BETA — ASK FOR AN INVITATION" (Tony, 29 Oct 2026, for a sent recipe's link opened by someone without an
 // account: "an "Closed Beta. Ask for an Invitation" button, asking for their email address, to be sent to Admin").
 // `invite-ask` (no sign-in): the address, as a note in 📊 Households → 💬 Feedback (and on to the reports repository,
@@ -438,7 +442,7 @@
 //   AI_MAX_TOKENS   – the longest answer one call may ask for (32000; the
 //                     app's largest, reading several recipes at once, asks 8000).
 
-const WORKER_VERSION = 'v97';
+const WORKER_VERSION = 'v98';
 const VIDEO_MAX_MB_DEFAULT = 50;
 const GEMINI_API = 'https://generativelanguage.googleapis.com';
 const GEMINI_MODEL_DEFAULT = 'gemini-2.5-flash';
@@ -1234,6 +1238,7 @@ async function handleRequest(request, env, ctx) {
         // Anthropic refuses unknown fields — the v37 lesson).
         metering: { version: 1, db: !!env.METER_DB },
         feedback: !!env.METER_DB,     // v61 — notes from every copy, one inbox
+        mail: !!(env.RESEND_API_KEY && env.METER_DB),   // v98 — a recipe e-mailed by this server
         reports: !!(env.REPORTS_GITHUB_TOKEN && env.METER_DB),   // v90 — and on to the private reports repository
         alerts: !!(env.ALERTS && env.ALERT_TO),   // v73 — the owner hears about a new device and destructive actions
         owner: ownerEmails(env).length > 0,       // v74 — the owner's address is set (it is no longer in the code)
@@ -1743,6 +1748,7 @@ async function handleRequest(request, env, ctx) {
       if (ir.status === 200) reportsLater(env, ctx);
       return ir;
     }
+    if (body.action === 'mail-recipe') return await mailRecipe(request, env, body);   // v98 — 📤 Share → ✉️ Email, sent here
     if (body.action === 'household-report') return await householdReport(request, env, body);   // v62
     if (body.action === 'app-signals') {   // v69; v90 — a new error report on to the reports repository
       const sr = await appSignals(request, env, body);
@@ -2621,6 +2627,107 @@ async function inviteAsk(request, env, body) {
       'In the app: \u2699\uFE0F \u2192 \u{1F451} App owner \u2192 \u{1F4CA} Households \u2192 \u{1F4AC} Feedback. Invite them with \u2709\uFE0F Invite testers.'].join('\n'), { kind: 'invite-ask' });
   } catch (e) {}
   return jsonResp({ ok: true });
+}
+// v98 — 📤 Share → ✉️ Email, sent by this server (Tony, 29 Oct 2026: "Copy/pasting the recipe is unacceptable. The users
+// could not be expected to need to remember to paste the recipe … We need to find a better way where no pasting is
+// necessary"; his choice: the server sends, and a phone's share menu as well). The e-mail is laid out HERE from the
+// recipe's own fields — never HTML from the app, so nothing but a recipe ever leaves from the app's domain — with its
+// photo inside (an inline attachment), from "<the kitchen> via My Kitchen Notes" (the kitchen's name read from Firestore
+// with the sender's own sign-in, not taken from the request), replies going to the sender's own confirmed address.
+// Through Resend (RESEND_API_KEY; MAIL_FROM an address on the domain verified there). Signed in, the address confirmed,
+// a member of the kitchen; one address each time; 15 a day per person and 90 a day in all (Resend's free plan: 100 a
+// day). Nothing is kept but the day's counts.
+const MAIL_PER_USER_DAY = 15, MAIL_ALL_DAY = 90, MAIL_FROM_DEFAULT = ['recipes', 'mykitchennotes.community'].join('@');   // (no address written whole in the code)
+const RESEND_URL = 'https://api.resend.com/emails';
+async function mailRecipe(request, env, body) {
+  if (!env.RESEND_API_KEY) return jsonResp({ error: 'MAIL: sending e-mail is not set up on this server yet.', needsConfig: true }, 503);
+  if (!env.METER_DB) return jsonResp({ error: 'MAIL: not set up on this Worker (METER_DB).', needsConfig: true }, 503);
+  const str = (v, max) => String(v == null ? '' : v).slice(0, max);
+  let claims;
+  try { claims = await verifyIdToken(body.idToken, env); }
+  catch (e) { return jsonResp({ error: 'MAIL: your sign-in could not be checked (' + e.message + ').' }, 401); }
+  if (!claims.email_verified || !claims.email) return jsonResp({ error: 'MAIL: confirm your e-mail address first (look for our e-mail, in spam too).' }, 403);
+  const to = str(body.to, 200).trim().toLowerCase();
+  if (!/^[^\s@<>"',;:]+@[^\s@<>"',;:]+\.[^\s@<>"',;:]{2,}$/.test(to)) return jsonResp({ error: 'MAIL: that is not an e-mail address.' }, 400);
+  const hid = str(body.hid, 64);
+  if (!/^[A-Za-z0-9]{1,64}$/.test(hid)) return jsonResp({ error: 'MAIL: which kitchen?' }, 400);
+  let hh;
+  try { hh = await meterMembership(claims, hid, body.idToken, env); } catch (e) { return jsonResp({ error: 'MAIL: ' + e.message }, 502); }
+  if (!hh.member) return jsonResp({ error: 'MAIL: you are not in that kitchen.' }, 403);
+  const r = body.recipe && typeof body.recipe === 'object' ? body.recipe : {};
+  const rec = {
+    name: str(r.name, 200).trim(),
+    meta: (Array.isArray(r.meta) ? r.meta : []).slice(0, 6).map(x => str(x, 60)).filter(Boolean),
+    ingredients: (Array.isArray(r.ingredients) ? r.ingredients : []).slice(0, 300).map(i => ({ a: str(i && i.a, 80), n: str(i && i.n, 300) })).filter(i => i.a || i.n),
+    steps: (Array.isArray(r.steps) ? r.steps : []).slice(0, 150).map(s => str(s, 3000)).filter(Boolean),
+    notes: str(r.notes, 6000), source: str(r.source, 500), rtl: !!r.rtl
+  };
+  if (!rec.name) return jsonResp({ error: 'MAIL: the recipe has no name.' }, 400);
+  let img = null;
+  const pm = /^data:(image\/(jpeg|png|webp|gif));base64,([A-Za-z0-9+/=]+)$/.exec(str(body.photo, 1400000));
+  if (pm) img = { type: pm[1], ext: pm[2] === 'jpeg' ? 'jpg' : pm[2], b64: pm[3] };
+  // a photo the recipe has from the web (a photo library's address): shown from there
+  const remote = !img && /^https:\/\/[^\s"'<>()\\]{8,600}$/.test(str(body.photoUrl, 601)) ? str(body.photoUrl, 600) : '';
+  const day = new Date().toISOString().slice(0, 10);
+  const mine = await ceilingCount(env, 'mail:' + day + ':' + claims.sub, 86400, 1);
+  const all = await ceilingCount(env, 'mail:' + day, 86400, 1);
+  if (mine.used >= MAIL_PER_USER_DAY) return jsonResp({ error: 'MAIL: that is today\u2019s ' + MAIL_PER_USER_DAY + ' e-mails from you \u2014 tomorrow there are more.', rateLimited: true }, 429);
+  if (all.used >= MAIL_ALL_DAY) return jsonResp({ error: 'MAIL: the app has sent all its e-mails for today \u2014 try again tomorrow.', rateLimited: true }, 429);
+  const kitchen = String(hh.name || '').replace(/["\\<>\r\n]/g, '').trim().slice(0, 60);
+  const from = '"' + (kitchen ? kitchen + ' via ' : '') + 'My Kitchen Notes" <' + (env.MAIL_FROM || MAIL_FROM_DEFAULT) + '>';
+  const subject = str(body.subject, 200).replace(/[\r\n]+/g, ' ').trim() || rec.name;
+  const send = async (inline) => {
+    const payload = { from, to: [to], subject, reply_to: claims.email, html: mailRecipeHtml(rec, kitchen, img && inline ? 'cid:recipe-photo' : remote), text: mailRecipeText(rec, kitchen) };
+    if (img) payload.attachments = [Object.assign({ filename: 'photo.' + img.ext, content: img.b64 }, inline ? { content_id: 'recipe-photo' } : {})];
+    return (env.__fetch || fetch)(RESEND_URL, { method: 'POST', headers: { Authorization: 'Bearer ' + env.RESEND_API_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload), signal: AbortSignal.timeout(25000) });
+  };
+  let res;
+  try {
+    res = await send(true);
+    // A service that will not take the photo inline: once more, the photo attached beside the e-mail instead.
+    if (!res.ok && img && (res.status === 400 || res.status === 422)) { const t = await res.clone().text(); if (/content_?id/i.test(t)) res = await send(false); }
+  } catch (e) { return jsonResp({ error: 'MAIL: the e-mail service could not be reached (' + e.message + ').' }, 502); }
+  if (!res.ok) { let t = ''; try { t = (await res.text()).slice(0, 200); } catch (e) {} return jsonResp({ error: 'MAIL: the e-mail service refused it (' + res.status + '): ' + t }, 502); }
+  await mine.credit(); await all.credit();
+  return jsonResp({ ok: true, replyTo: claims.email });
+}
+// The recipe, for an e-mail: tables and inline styles (what mail programs keep), every word escaped, **bold** kept.
+function mailBold(s) { return htmlEsc(s).replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>').replace(/\n/g, '<br>'); }
+function mailRecipeHtml(rec, kitchen, photo) {
+  const dir = rec.rtl ? 'rtl' : 'ltr', align = rec.rtl ? 'right' : 'left', font = "font-family:Arial,Helvetica,sans-serif;";
+  const ing = rec.ingredients.map(i => '<tr><td style="' + font + 'padding:6px 10px;border-bottom:1px solid #EEE6DA;font-weight:bold;color:#5C3D2E;white-space:nowrap;vertical-align:top;">' + htmlEsc(i.a)
+    + '</td><td style="' + font + 'padding:6px 10px;border-bottom:1px solid #EEE6DA;color:#2B2622;">' + mailBold(i.n) + '</td></tr>').join('');
+  const steps = rec.steps.map((s, k) => '<tr><td style="' + font + 'padding:6px 10px;vertical-align:top;"><span style="display:inline-block;width:24px;height:24px;line-height:24px;border-radius:12px;background:#C1440E;color:#fff;text-align:center;font-size:13px;font-weight:bold;">'
+    + (k + 1) + '</span></td><td style="' + font + 'padding:6px 10px;color:#2B2622;line-height:1.55;">' + mailBold(s) + '</td></tr>').join('');
+  const head = (t) => '<div style="' + font + 'font-size:12px;font-weight:bold;letter-spacing:1px;color:#C1440E;border-bottom:2px solid #C1440E;padding-bottom:4px;margin:22px 0 8px;">' + t + '</div>';
+  const src = /^https?:\/\//i.test(rec.source) ? '<a href="' + htmlEsc(rec.source) + '" style="color:#C1440E;">' + htmlEsc(rec.source) + '</a>' : htmlEsc(rec.source);
+  return '<!doctype html><html><body style="margin:0;padding:16px;background:#FAF7F2;">'
+    + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;margin:0 auto;background:#fff;border-radius:12px;overflow:hidden;" dir="' + dir + '">'
+    + (kitchen ? '<tr><td style="' + font + 'padding:14px 18px;font-size:14px;color:#5C3D2E;" dir="auto">' + htmlEsc(kitchen) + ' shared a recipe with you</td></tr>' : '')
+    + (photo ? '<tr><td><img src="' + htmlEsc(photo) + '" alt="' + htmlEsc(rec.name) + '" width="600" style="display:block;width:100%;max-width:600px;height:auto;border:0;"></td></tr>' : '')
+    + '<tr><td style="background:#5C3D2E;padding:18px 20px;"><div style="' + font + 'font-size:24px;font-weight:bold;color:#fff;text-align:' + align + ';" dir="auto">' + htmlEsc(rec.name) + '</div>'
+    + (rec.meta.length ? '<div style="' + font + 'font-size:13px;color:#F3E4D3;margin-top:6px;text-align:' + align + ';">' + rec.meta.map(htmlEsc).join(' &middot; ') + '</div>' : '') + '</td></tr>'
+    + '<tr><td style="padding:4px 18px 18px;text-align:' + align + ';">'
+    + (ing ? head('INGREDIENTS') + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" dir="' + dir + '">' + ing + '</table>' : '')
+    + (steps ? head('METHOD') + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" dir="' + dir + '">' + steps + '</table>' : '')
+    + (rec.notes ? head('NOTES') + '<div style="' + font + 'color:#2B2622;line-height:1.55;" dir="auto">' + mailBold(rec.notes) + '</div>' : '')
+    + (rec.source ? '<div style="' + font + 'font-size:12px;color:#7A6F66;margin-top:16px;" dir="auto">Source: ' + src + '</div>' : '')
+    + '</td></tr>'
+    + '<tr><td style="' + font + 'background:#5C3D2E;color:#E9DCCD;font-size:12px;text-align:center;padding:12px;">Shared from <a href="https://mykitchennotes.community" style="color:#F2C14E;text-decoration:none;font-weight:bold;">My Kitchen Notes</a></td></tr>'
+    + '</table></body></html>';
+}
+function mailRecipeText(rec, kitchen) {
+  const L = [];
+  if (kitchen) L.push(kitchen + ' shared a recipe with you', '');
+  L.push(rec.name);
+  if (rec.meta.length) L.push(rec.meta.join(' · '));
+  if (rec.ingredients.length) { L.push('', 'INGREDIENTS'); rec.ingredients.forEach(i => L.push('• ' + [i.a, i.n].filter(Boolean).join(' '))); }
+  if (rec.steps.length) { L.push('', 'METHOD'); rec.steps.forEach((s, k) => L.push((k + 1) + '. ' + s)); }
+  if (rec.notes) L.push('', 'NOTES', rec.notes);
+  if (rec.source) L.push('', 'Source: ' + rec.source);
+  L.push('', '— Shared from My Kitchen Notes · https://mykitchennotes.community');
+  return L.join('\n').replace(/\*\*/g, '');
 }
 // The owner's side, through meter-admin: notes (newest 300, every copy),
 // note-status, note-delete, notes-new (how many are new).
@@ -3782,4 +3889,4 @@ export default {
   }
 };
 
-// ── END OF WORKER v97 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
+// ── END OF WORKER v98 ── If this is the last line in the Cloudflare editor, the whole file was pasted.

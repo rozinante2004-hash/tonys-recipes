@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.14 -->
+<!-- Tony's Recipes Collection v39.15 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -10470,7 +10470,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.14';
+var APP_VERSION = 'v39.15';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -10726,12 +10726,6 @@ function showEmailModal(id) {
   if(!r) return;
   gmailPreload();   // v38.33
   var htmlBody = rHtml(r), photoKnown = !!r.photo;
-  // v39.14 — the photo, wherever it is (this device's store, or the kitchen's cloud copy), into the preview and the copy
-  if (!r.photo && typeof giftPhotoOf === 'function') giftPhotoOf(r).then(function(p){
-    if (!p) return;
-    photoKnown = true; htmlBody = rHtml(Object.assign({}, r, { photo: p }));
-    try { iframe.srcdoc = htmlBody; } catch(e) {}
-  }).catch(function(){});
   var plainText = rText(r);
 
   var existing = document.getElementById('emailModalOverlay');
@@ -10792,7 +10786,7 @@ function showEmailModal(id) {
   // v36.70 — said "click Open Gmail" beside a button reading "Send Email".
   hint.textContent = featureOn('gmail')
     ? 'Preview of your email — press Send Email to send it from your Gmail'
-    : 'Preview of your email — Gmail, Outlook or your mail app opens with the address and subject; the recipe, with its photo, is copied for you to paste in';
+    : 'Preview of your email — 📨 Send e-mails it, with its photo, to the address above; their reply comes to you';
 
   var btnRow = document.createElement('div');
   btnRow.style.cssText = 'display:flex;gap:8px;';
@@ -10853,46 +10847,98 @@ function showEmailModal(id) {
   btnRow.appendChild(gmailBtn);
   // v36.70 — with Gmail switched off, the phone's own mail app does the
   // sending: plain text, because a mailto: link cannot carry the formatting.
-  // v39.11 — Tony: "if someone has no default mail app, he can only copy the text. Please add another option to send
-  // by Gmail." v39.14 — Tony: "it is a simple sharing of the recipe. It is not an internal user-to-user share. It
-  // should contain the photo and recipe" (v39.11–13 sent an app link instead, and Gmail first answered "Bad Request"
-  // to a whole Hebrew recipe in its address). A web address can carry neither a photo nor a long recipe, so: Gmail,
-  // Outlook or the mail app opens with the To and Subject filled in, and the recipe WITH its photo is on the clipboard,
-  // copied at the tap (before the new tab takes the focus) — formatted, as the preview shows it — to paste in.
+  // v39.15 — Tony, on v39.14 (the recipe copied, to paste into Gmail): "Copy/pasting the recipe is unacceptable. The
+  // users could not be expected to need to remember to paste the recipe. They will end up with an empty mail message."
+  // A link that opens Gmail, Outlook or a mail app carries plain text only — never a photo — so his choice, both:
+  //  · 📨 Send — the server sends it (Worker v98 `mail-recipe`): their address, Send, and it is in their inbox, the
+  //    recipe laid out with its photo, from "<kitchen> via My Kitchen Notes", replies coming to the sender;
+  //  · 📤 Share menu — where the device can share a picture (phones): the photo attached and the recipe as the text,
+  //    handed to the mail app the person picks;
+  //  · 📋 Copy — the recipe with its photo, to paste anywhere else.
   if (!featureOn('gmail')) {
     btnRow.style.flexWrap = 'wrap';
-    var emailOpts = function() {
-      return { to: toInput.value.trim(), subject: subjectInput.value.trim() || r.name, text: '', copyText: plainText, pasteReady: true };
-    };
-    var emailTap = function() { var c = emailCopyRich(); emailSay('⏳ Copying the recipe…'); c.then(emailPasteSay); return c; };
-    var webBtn = function(id, label, which) {
-      var b = document.createElement('button');
-      b.id = id; b.style.cssText = gmailBtn.style.cssText + 'flex:1 1 auto;min-width:96px;'; b.textContent = label;
-      b.onclick = function() {
-        emailTap();                                                  // first: the new tab takes the focus
-        window.open(shareTargets(emailOpts())[which], '_blank', 'noopener');
-      };
-      return b;
-    };
-    btnRow.appendChild(webBtn('emailGmailWebBtn', '✉️ Gmail', 'gmail'));
-    btnRow.appendChild(webBtn('emailOutlookBtn', '✉️ Outlook', 'outlook'));
-    var mailBtn = document.createElement('button');
-    mailBtn.id = 'emailMailtoBtn';
-    mailBtn.style.cssText = gmailBtn.style.cssText + 'flex:1 1 auto;min-width:96px;';
-    mailBtn.textContent = '✉️ My mail app';
-    mailBtn.onclick = async function() {
-      await emailTap();
-      var o = emailOpts();
-      await mailOrWebmail(o, shareTargets(o));
-    };
-    btnRow.appendChild(mailBtn);
+    var sendBtn = document.createElement('button');
+    sendBtn.id = 'emailServerSendBtn';
+    sendBtn.style.cssText = gmailBtn.style.cssText + 'flex:2 1 auto;min-width:120px;';
+    sendBtn.textContent = '📨 Send';
+    sendBtn.title = 'E-mails the recipe, with its photo, to the address above — replies come to you';
+    sendBtn.onclick = function() { emailServerSend(); };
+    btnRow.appendChild(sendBtn);
+    var shareBtn = document.createElement('button');
+    shareBtn.id = 'emailShareMenuBtn';
+    shareBtn.style.cssText = gmailBtn.style.cssText + 'flex:1 1 auto;min-width:96px;background:var(--card-bg);color:var(--heading);border:1px solid var(--border);display:none;';
+    shareBtn.textContent = '📤 Share menu';
+    shareBtn.title = 'Your phone’s share menu: the photo attached and the recipe as the text — pick your mail app';
+    shareBtn.onclick = function() { emailShareMenu(); };
+    btnRow.appendChild(shareBtn);
     copyBtn.textContent = '📋 Copy';
     copyBtn.onclick = async function(){
       var how = await emailCopyRich();
-      if (how) { copyBtn.textContent = '✅ Copied!'; setTimeout(function(){ copyBtn.textContent = '📋 Copy'; }, 2000); emailPasteSay(how); }
+      if (how) { copyBtn.textContent = '✅ Copied!'; setTimeout(function(){ copyBtn.textContent = '📋 Copy'; }, 2000); }
       else await askConfirm({ icon: '\u{1F4CB}', title: 'The recipe', message: plainText, okLabel: 'OK' });
     };
-    copyBtn.style.cssText += 'flex:1 1 auto;min-width:96px;';
+    copyBtn.style.cssText += 'flex:1 1 auto;min-width:96px;background:var(--card-bg);color:var(--heading);border:1px solid var(--border);';
+  }
+  // The photo, wherever it is (this device's store, the kitchen's cloud copy), and too big a one made smaller.
+  var photoData = '', photoFile = null;
+  var photoReady = (typeof giftPhotoOf === 'function' ? giftPhotoOf(r) : Promise.resolve(r.photo || '')).then(function(p){
+    photoData = p || '';
+    if (photoData && photoData !== r.photo) { htmlBody = rHtml(Object.assign({}, r, { photo: photoData })); try { iframe.srcdoc = htmlBody; } catch(e) {} }
+    photoKnown = !!photoData;
+    return emailFileFrom(photoData);
+  }).then(function(f){
+    photoFile = f;
+    // the share menu only where it can take the picture (a phone; Windows and Mac too) — a share without it is no better than Copy
+    var b = document.getElementById('emailShareMenuBtn');
+    try { if (b && navigator.share && navigator.canShare && (f ? navigator.canShare({ files: [f], text: 'x' }) : false)) b.style.display = ''; } catch(e) {}
+  }).catch(function(){});
+  // (decoded here: the page's own rules do not let it fetch a data: address)
+  function emailFileFrom(p) {
+    var m = /^data:(image\/(\w+));base64,(.+)$/.exec(p || '');
+    if (!m) return Promise.resolve(null);
+    try {
+      var bin = atob(m[3]), bytes = new Uint8Array(bin.length);
+      for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      var ext = m[2] === 'jpeg' ? 'jpg' : m[2];
+      return Promise.resolve(new File([bytes], String(r.name || 'recipe').replace(/[\\/:*?"<>|]+/g, ' ').slice(0, 60).trim() + '.' + ext, { type: m[1] }));
+    } catch(e) { return Promise.resolve(null); }
+  }
+  function emailRecipeFields() {
+    var meta = [r.category, r.difficulty, metaVal(r.prep) ? '⏱ ' + r.prep : '', metaVal(r.servings) ? r.servings + ' servings' : ''].filter(Boolean).map(String);
+    return { name: String(r.name || ''), meta: meta, rtl: typeof recipeIsRTL === 'function' ? !!recipeIsRTL(r) : false,
+      ingredients: allIngredients(r).map(function(i){ return { a: String((i && i.a) || ''), n: String((i && i.n) || '') }; }),
+      steps: allSteps(r), notes: String(r.notes || ''), source: String(r.source || '') };
+  }
+  async function emailServerSend() {
+    var to = toInput.value.trim();
+    if (!/^[^\s@<>"',;:]+@[^\s@<>"',;:]+\.[^\s@<>"',;:]{2,}$/.test(to)) { emailSay('Type their e-mail address in To first — one address.'); toInput.focus(); return false; }
+    if (!window._fbUser || !_household || typeof _fbUser.getIdToken !== 'function') { emailSay('Sign in to send e-mails from the app — or use 📋 Copy.'); return false; }
+    sendBtn.disabled = true; var was = sendBtn.textContent; sendBtn.textContent = '⏳ Sending…'; emailSay('');
+    try {
+      await photoReady;
+      var resp = await fetch(WORKER_ENDPOINT, { method: 'POST', headers: workerHeaders(), signal: AbortSignal.timeout(40000),
+        body: workerBody({ action: 'mail-recipe', idToken: await _fbUser.getIdToken(), hid: _household.hid, to: to,
+          subject: subjectInput.value.trim() || r.name, recipe: emailRecipeFields(), photo: /^data:image\//.test(photoData) ? photoData : '',
+          photoUrl: /^https:\/\//.test(photoData) ? photoData : '' }) });
+      var d = {}; try { d = await resp.json(); } catch(e) {}
+      if (!resp.ok) {
+        emailSay(d.needsConfig ? 'E-mailing from the app is not switched on yet. Meanwhile: ' + (document.getElementById('emailShareMenuBtn').style.display === 'none' ? '📋 Copy, then paste it into an e-mail.' : '📤 Share menu, or 📋 Copy.')
+          : String(d.error || ('The server answered ' + resp.status)).replace(/^MAIL:\s*/, ''));
+        sendBtn.disabled = false; sendBtn.textContent = was; return false;
+      }
+      sendBtn.textContent = '✅ Sent!'; sendBtn.style.background = 'var(--btn-ok)';
+      emailSay('✅ Sent to ' + to + (photoKnown ? ', with its photo' : '') + '. Their reply comes to ' + (d.replyTo || 'your address') + '.');
+      syncLog('save', 'E-mailed a recipe', { name: r.name, photo: !!photoKnown });
+      if (typeof insightCount === 'function') try { insightCount('recipe-mailed'); } catch(e) {}
+      return true;
+    } catch(e) {
+      emailSay('It could not be sent just now: ' + ((e && e.message) || e) + ' — try again in a moment.');
+      sendBtn.disabled = false; sendBtn.textContent = was; return false;
+    }
+  }
+  async function emailShareMenu() {
+    try { await navigator.share({ files: photoFile ? [photoFile] : undefined, title: subjectInput.value.trim() || r.name, text: plainText }); emailSay(''); return true; }
+    catch(e) { if (!e || e.name !== 'AbortError') emailSay('The share menu could not open here — use 📨 Send or 📋 Copy.'); return false; }
   }
   // The recipe as the preview shows it (its photo inside) and as plain text, together: a mail program pastes the first.
   function emailCopyRich() {
@@ -10905,12 +10951,6 @@ function showEmailModal(id) {
   }
   function emailCopyPlain() {
     try { return navigator.clipboard.writeText(plainText).then(function(){ return 'text'; }, function(){ return ''; }); } catch(e) { return Promise.resolve(''); }
-  }
-  function emailPasteSay(how) {
-    var key = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent) ? '⌘V' : 'Ctrl+V';
-    emailSay(how === 'rich' ? '\u{1F4CB} The recipe' + (photoKnown ? ' and its photo are' : ' is') + ' copied — paste it into the e-mail: ' + key + ' (on a phone: press and hold → Paste).'
-      : how === 'text' ? '\u{1F4CB} The recipe’s text is copied — paste it into the e-mail: ' + key + '. (This browser copies text only, so the photo stays out.)'
-      : 'The recipe could not be copied here — press 📋 Copy, then paste it into the e-mail.');
   }
   var sayBox = document.createElement('div');
   sayBox.id = 'emailSay'; sayBox.setAttribute('aria-live', 'polite');
@@ -13748,7 +13788,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.14</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.15</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -13836,7 +13876,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.14</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.15</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -32937,7 +32977,7 @@ var HELP_SYSTEM_PROMPT = [
   "- 👪 CHAT WITH FAMILY MEMBERS (the people in YOUR household only): ⋯ More → 👪 Chat with family members — or 💬 Chat beside a person in 👥 Family Access (someone added by address who has not signed in yet says ⏳ hasn’t signed in yet: their 💬 Chat comes once they do). 📣 Everyone in <your kitchen> is the room for announcements: everyone in the household reads it. Or choose one person: only the two of you read that conversation. Everyone in the household can write, readers too. Messages arrive live: a short notice with Open, and a red dot on ⋯ More until you have read them. Nothing is changed or deleted afterwards; deleting the household deletes them.",
   "- 🧑‍🍳 FIRST VISIT: a one-time setup on a notebook page — your account (your e-mail and a password you make up; or 'I already have an account', or Continue offline), this device's Save button (the iPhone shortcut, the Android app in the Share menu, or the computer's browser extension — each new device asks this once; later from ⚙️ Settings), the kitchen rules, then a quick tour.",
   "- 📨 SEND A RECIPE TO ANOTHER KITCHEN: open the recipe → 📤 Share → 📨 Send to another kitchen. Via My Kitchen Notes: type their kitchen's identifier (MKN-…) — it pops up in their app, with a sound, and waits in ⋯ More → 📨 Recipes sent to me. Or Via Email, Via WhatsApp, or Copy the link: anyone with the link can open it, even without an account. It is a copy of the recipe as it is now — photo, bold words, notes and all; not your cooking log, ratings or the heart — with a note from you if you like. They tap 📥 Save to my recipes and it is theirs, no AI involved. It keeps for 4 weeks. ⋯ More → 📤 Recipes I sent shows whether it was saved, copies a link again, sends it again, and takes one back — tick several (or Select all) to do it for all of them at once: ↩️ Take back, 📨 Send again (to a kitchen: it pops up in their app again for 4 more weeks, the earlier one taken back; a link: new links, good for 4 more weeks, in one message — the earlier ones keep working until they expire), 🔗 Copy the links. A kitchen that gets unwanted recipes can 🚫 Block the sender (the owner or an admin). During the closed beta, someone without an account who opens the link sees the recipe and can ask for an invitation — with their address already filled in when you typed it (Via Email asks for it, optional).",
-  "- ✉️ E-MAIL A RECIPE (📤 Share → ✉️ Email): an ordinary e-mail of the recipe, with its photo. ✉️ Gmail, ✉️ Outlook or ✉️ My mail app opens with the address and subject filled in, and the recipe — formatted as in the preview, its photo inside — is copied: paste it into the e-mail (Ctrl+V, ⌘V on a Mac, or press and hold → Paste on a phone). If no mail program opens, it offers Gmail, Outlook, Yahoo or Proton. 📋 Copy copies it the same way. (To send a recipe that another kitchen saves with one tap, use 📨 Send to another kitchen.)",
+  "- ✉️ E-MAIL A RECIPE (📤 Share → ✉️ Email): type their address and press 📨 Send — the app e-mails the recipe, laid out with its photo, from your kitchen's name via My Kitchen Notes; their reply comes to your own address. Nothing to paste, and no mail program needed (signed in, your address confirmed; up to 15 e-mails a day). On a phone, 📤 Share menu hands the photo and the recipe to the mail app you pick. 📋 Copy copies it, photo and all, to paste anywhere else. (To send a recipe that another kitchen saves with one tap, use 📨 Send to another kitchen.)",
   "- 🔒 SECRET RECIPES: in the editor, tick 🔒 Secret — the recipe (and its photo) is then kept where only your own kitchen can read it; the kitchens you link with do not see it, nor know it exists. Untick it to share it again. A 🔒 shows on its card.",
   "- 🔄 RELOAD A LINKED KITCHEN: beside a linked kitchen's name in your recipe list, 🔄 Reload reads its recipes and photos again from the start — for when something looks missing or out of date.",
   "- 💬 CHATS WITH LINKED KITCHENS: ⋯ More → 💬 Chats with linked kitchens — or 💬 Chat beside a linked kitchen's name in your recipe list, or in 👥 Family Access. Every conversation, newest first, with what is new; open one to read it all and write (Enter sends, Shift+Enter starts a new line). The same conversations are also on 📬 Link requests. A red dot on ⋯ More and on ⚙️ says something new arrived.",

@@ -1437,6 +1437,28 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
   - **Released: v39.09 (29 Oct 2026, 11:17 Israel time, on 0de2dde; Tony: "Yes, release v39.09").** Every job success:
     Deploy to GitHub Pages, pages build, Publish languages, Translate new phrases, Self Tests on main and test,
     Cloudflare Pages for the beta and test.
+  - **v39.15 + Worker v98 — the e-mail sent by the server** (Tony, 29 Oct, on v39.14's paste: "Copy/pasting the recipe is
+    unacceptable. The users could not be expected to need to remember to paste the recipe. They will end up with an empty
+    mail message. We need to find a better way where no pasting is necessary." Asked: server / phone share menu / both →
+    "Both"). A compose link (Gmail/Outlook/mailto) carries plain text only, never a photo — those buttons are gone.
+    - Worker v98 `mail-recipe`: verified sign-in, `email_verified`, member of `hid` (`meterMembership` — the kitchen's
+      NAME comes from Firestore, not the request); one address; the e-mail is built by the Worker (`mailRecipeHtml`,
+      tables + inline styles, everything `htmlEsc`'d, `**bold**` kept, dir rtl; `mailRecipeText`) from the recipe's
+      fields — HTML from the app is never used; the photo (data: URL ≤ 1.4 MB) as an inline attachment
+      `content_id: 'recipe-photo'` (a 400/422 naming content_id → sent again as a plain attachment), or a web photo by its
+      https address; From `"<kitchen> via My Kitchen Notes" <MAIL_FROM>` (default "recipes" at the community domain —
+      assembled, no address in the code), `reply_to` the sender's own address; Resend `POST https://api.resend.com/emails`
+      with `RESEND_API_KEY`; 15 a day per person, 90 in all (`ceilingCount`, credited only on success). `health.mail`.
+      deploy-worker.yml passes RESEND_API_KEY and MAIL_FROM. Worker tests: 18 checks.
+    - App: 📨 Send (`emailServerSend`: address checked, signed in, the recipe's fields + photo; "✅ Sent to …, with its
+      photo. Their reply comes to …"; 503 needsConfig → "not switched on yet" + what to use meanwhile), 📤 Share menu
+      (only where `navigator.canShare({files})` — phones, Windows, Mac: the photo as a File, decoded from the data: URL
+      by hand since the page's CSP forbids fetching data:; the recipe as the text), 📋 Copy (rich + plain). Usage word
+      `recipe-mailed`. Privacy Statement 1.12 (11 languages): "Recipes you e-mail", Resend as a provider, who receives
+      it, nothing kept but daily counts. index.html size budget 1800 → 1900 KB (1802 KB without comments; noted in the test).
+    - **Tony's setup (not done yet):** a Resend account, the domain mykitchennotes.community verified there (3 DNS
+      records on `send.` and `resend._domainkey` — the root's Email Routing MX untouched), an API key (Sending access)
+      as the GitHub secret RESEND_API_KEY, then a re-run of "Deploy the Worker" so the Worker gets it.
   - **v39.14 — ✉️ Email is plain sharing again** (Tony, 29 Oct: "I have a feeling you got confused. When sharing a recipe
     using the "Send by Email", it is a simple sharing of the recipe. It is not an internal user-to-user share. It should
     contain the photo and recipe, not an internal link that only users can open in the app." Gmail and Outlook opened

@@ -2192,6 +2192,89 @@ console.log('\nAsking for an invitation (v97):');
   expect('v97: three a day from one network address, then refused', a.status === 429 && a.d.rateLimited === true, JSON.stringify(a));
 }
 
+console.log('\nA recipe e-mailed by the server (v98):');
+{
+  const { DatabaseSync } = await import('node:sqlite');
+  const raw = new DatabaseSync(':memory:');
+  const stmt = (sql, args) => ({ bind: (...a) => stmt(sql, a), first: async () => raw.prepare(sql).get(...(args || [])) || null,
+    all: async () => ({ results: raw.prepare(sql).all(...(args || [])) }),
+    run: async () => { const x = raw.prepare(sql).run(...(args || [])); return { success: true, meta: { last_row_id: Number(x.lastInsertRowid), changes: Number(x.changes) } }; },
+    _run() { raw.prepare(sql).run(...(args || [])); } });
+  const db = { raw, prepare: (sql) => stmt(sql, []), batch: async (l) => { l.forEach(x => x._run()); return []; } };
+  const kp = await crypto.subtle.generateKey({ name: 'RSASSA-PKCS1-v1_5', modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' }, true, ['sign', 'verify']);
+  const pub = await crypto.subtle.exportKey('jwk', kp.publicKey);
+  const b64u = (x) => Buffer.from(typeof x === 'string' ? x : JSON.stringify(x)).toString('base64url');
+  const tok = async (claims) => { const now = Math.floor(Date.now() / 1000);
+    const c = Object.assign({ iss: 'https://securetoken.google.com/my-kitchen-notes-beta', aud: 'my-kitchen-notes-beta', sub: 'uM', email: 'cook@example.com', email_verified: true, iat: now - 10, exp: now + 3600 }, claims);
+    const head = b64u({ alg: 'RS256', kid: 'm1' }), bd = b64u(c);
+    const sig = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', kp.privateKey, new TextEncoder().encode(head + '.' + bd));
+    return head + '.' + bd + '.' + Buffer.from(sig).toString('base64url'); };
+  const sentMail = []; let refuseInline = false, serviceDown = false;
+  const fakeFetch = async (url, init) => {
+    if (String(url) !== 'https://api.resend.com/emails') throw new Error('unexpected ' + url);
+    if (serviceDown) return new Response('{"message":"down"}', { status: 500 });
+    const b = JSON.parse(init.body);
+    if (refuseInline && b.attachments && b.attachments.some(a => a.content_id)) return new Response('{"message":"Invalid `content_id`"}', { status: 422 });
+    sentMail.push({ auth: init.headers.Authorization, b });
+    return new Response('{"id":"e1"}', { status: 200 });
+  };
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (url, init) => {
+    url = String(url);
+    if (url.startsWith('https://fs.mail/')) {
+      const m = /households\/([^/]+)(?:\/members\/([^/?]+))?$/.exec(url);
+      if (m[2]) return new Response(m[1] === 'hM' && m[2] === 'uM' ? '{"fields":{"role":{"stringValue":"editor"}}}' : '{}', { status: m[1] === 'hM' && m[2] === 'uM' ? 200 : 403 });
+      return new Response(JSON.stringify({ fields: { name: { stringValue: 'Tony’s "Kitchen" <Notes>' }, code: { stringValue: 'MKN-MMMM-2222' } } }), { status: 200 });
+    }
+    return realFetch(url, init);
+  };
+  const env = { METER_DB: db, RESEND_API_KEY: 're_test', __testKeys: { m1: Object.assign({ kid: 'm1' }, pub) }, __firestoreBase: 'https://fs.mail', __fetch: fakeFetch };
+  const photo = 'data:image/jpeg;base64,' + Buffer.from('a tiny jpeg').toString('base64');
+  const recipe = { name: 'החומוס של טוני', rtl: true, meta: ['Dinner', 'Medium'], ingredients: [{ a: '500 g', n: 'chickpeas <script>' }, { a: '', n: '**tahini**' }],
+    steps: ['Soak overnight.', 'Cook until **soft**.'], notes: 'Serve warm', source: 'https://example.com/r' };
+  const mail = async (body, e = env) => { const r = await worker.fetch(post(Object.assign({ action: 'mail-recipe', hid: 'hM', subject: 'Hummus', to: 'Dana@Example.com', recipe, photo }, body), 'https://mykitchennotes.community'), e);
+    let d = null; try { d = await r.json(); } catch (x) {} return { status: r.status, d }; };
+  try {
+    const t = await tok({});
+    let a = await mail({ idToken: t });
+    const m = sentMail[0] && sentMail[0].b;
+    expect('v98: a member e-mails a recipe: sent through the e-mail service', a.status === 200 && a.d.ok === true && sentMail.length === 1 && sentMail[0].auth === 'Bearer re_test', JSON.stringify(a));
+    expect('v98: …to that one address, replies going to the sender', m && m.to.length === 1 && m.to[0] === 'dana@example.com' && m.reply_to === 'cook@example.com', JSON.stringify(m && [m.to, m.reply_to]));
+    expect('v98: …from the kitchen\'s own name (read from the database), via My Kitchen Notes', m && m.from === '"Tony’s Kitchen Notes via My Kitchen Notes" <' + ['recipes', 'mykitchennotes.community'].join('@') + '>', m && m.from);
+    expect('v98: …the photo inside the e-mail', m && m.attachments && m.attachments[0].content_id === 'recipe-photo' && m.attachments[0].content === Buffer.from('a tiny jpeg').toString('base64') && /src="cid:recipe-photo"/.test(m.html), JSON.stringify(m && m.attachments));
+    expect('v98: …the recipe laid out by the server, every word escaped, bold kept, right to left', m && m.html.indexOf('&lt;script&gt;') > -1 && m.html.indexOf('<script>') === -1 && /<b>tahini<\/b>/.test(m.html) && /dir="rtl"/.test(m.html) && /Cook until <b>soft<\/b>/.test(m.html), m && m.html.slice(0, 300));
+    expect('v98: …and as plain text too', m && /INGREDIENTS/.test(m.text) && /1\. Soak overnight\./.test(m.text) && !/\*\*/.test(m.text), m && m.text);
+    a = await mail({ idToken: t, photo: '', photoUrl: 'https://images.example/hummus.jpg' });
+    expect('v98: a photo from the web is shown from its address', a.status === 200 && /<img src="https:\/\/images\.example\/hummus\.jpg"/.test(sentMail[sentMail.length - 1].b.html) && !sentMail[sentMail.length - 1].b.attachments, '');
+    a = await mail({ idToken: t, photo: '', photoUrl: 'javascript:alert(1)' });
+    expect('v98: …and only an https one', a.status === 200 && !/<img/.test(sentMail[sentMail.length - 1].b.html), '');
+    a = await mail({ idToken: t, html: '<a href="http://phish.example">click</a>' });
+    expect('v98: HTML from the app is never used', a.status === 200 && sentMail[sentMail.length - 1].b.html.indexOf('phish.example') === -1, '');
+    a = await mail({ idToken: await tok({ email_verified: false }) });
+    expect('v98: an unconfirmed address may not send', a.status === 403 && /confirm/.test(a.d.error), JSON.stringify(a));
+    a = await mail({ idToken: await tok({ sub: 'uX' }) });
+    expect('v98: someone not in the kitchen may not send from it', a.status === 403 && /not in that kitchen/.test(a.d.error), JSON.stringify(a));
+    a = await mail({});
+    expect('v98: without a sign-in: refused', a.status === 401, JSON.stringify(a));
+    a = await mail({ idToken: t, to: 'a@example.com, b@example.com' });
+    expect('v98: one address at a time', a.status === 400, JSON.stringify(a));
+    refuseInline = true; const n0 = sentMail.length;
+    a = await mail({ idToken: t });
+    expect('v98: a service that will not take the photo inline: sent again with the photo attached', a.status === 200 && sentMail.length === n0 + 1 && !sentMail[n0].b.attachments[0].content_id && !/cid:/.test(sentMail[n0].b.html), JSON.stringify(a));
+    refuseInline = false; serviceDown = true;
+    a = await mail({ idToken: t });
+    expect('v98: the service failing is said, and not counted', a.status === 502 && /refused it \(500\)/.test(a.d.error), JSON.stringify(a));
+    serviceDown = false;
+    for (let i = sentMail.length; i < 15; i++) await mail({ idToken: t });
+    a = await mail({ idToken: t });
+    expect('v98: 15 a day per person, then refused kindly', a.status === 429 && a.d.rateLimited === true && sentMail.length === 15, JSON.stringify([a, sentMail.length]));
+    a = await mail({ idToken: t }, Object.assign({}, env, { RESEND_API_KEY: '' }));
+    expect('v98: no key on the server: "not set up yet"', a.status === 503 && a.d.needsConfig === true, JSON.stringify(a));
+    const h = await (await worker.fetch(post({ action: 'health' }), env)).json();
+    expect('v98: health says e-mail can be sent', h.mail === true && h.version === 'v98', JSON.stringify([h.mail, h.version]));
+  } finally { globalThis.fetch = realFetch; }
+}
+
 if (failures.length) {
   console.log(`\n${failures.length} failure(s):`);
   failures.forEach(f => console.log('  - ' + f));

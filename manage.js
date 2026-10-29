@@ -423,6 +423,7 @@
     'cvd-on': 'Turned on the red–green colours', 'cvd-off': 'Turned off the red–green colours',   // v38.83
     'toast-go': 'Clicked a notice to go where it points',   // v38.86
     'link-request': 'Asked to link with a household', 'recipe-sent': 'Sent a recipe to another kitchen',   // v39.10
+    'recipe-mailed': 'E-mailed a recipe (sent by the server)',   // v39.15
     'added.typed': 'typed in', 'added.link': 'from a link', 'added.extension': 'from the browser extension', 'added.shared': 'shared to the app (phone)',
     'added.photo': 'from a photo', 'added.screenshots': 'from screenshots', 'added.text': 'from pasted text', 'added.video-file': 'from a video file',
     'added.whatsapp': 'from WhatsApp', 'added.linked': 'copied from a linked household', 'added.sent': 'sent by another kitchen', 'added.suggestion': 'an AI suggestion',
