@@ -1437,6 +1437,9 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
   - **Released: v39.09 (29 Oct 2026, 11:17 Israel time, on 0de2dde; Tony: "Yes, release v39.09").** Every job success:
     Deploy to GitHub Pages, pages build, Publish languages, Translate new phrases, Self Tests on main and test,
     Cloudflare Pages for the beta and test.
+  - **Released: v39.22 (30 Oct 2026, 20:04 Israel time, on 2e3fbc9; Tony: "Yes, release v39.22").** Every job success:
+    Deploy to GitHub Pages, pages build, Publish languages, Translate new phrases, Self Tests on main and test,
+    Cloudflare Pages for the beta and test.
   - **v39.22 — passwords: Help for Forgot password, ⚙️ 🔑 Change my password, and the owner's 🔑 Reset password**
     (Tony, 30 Oct: "Do we have a "Forgot my password" mechanism somewhere?" — it existed, on the sign-in screen since
     v38.58; "Yes, please add it to the Help. Do we have a mechanism to change a password?" — there was none; "Please
