@@ -1629,6 +1629,51 @@ window.SELF_TESTS = [
       }
     } },
 
+  // v39.22 — Tony, 30 Oct: "Do we have a mechanism to change a password?"
+  { id:'account_change_password', group:'Security', name:'🔑 Change my password: the current one first, the new one twice (8+ characters, not the same); a wrong current one changes nothing; a Google account is told where its password lives (v39.22)',
+    test: async()=>{
+      if(typeof accountChangePassword!=='function' || !document.getElementById('changePasswordItem')) throw new Error('⚙️ → 🔑 Change my password is missing');
+      var real={ auth:window._fbAuth, confirm:window.askConfirm, toast:window.toast, err:window.showServiceError, choice:window.askChoice, user:window._fbUser,
+        cred:firebase.auth && firebase.auth.EmailAuthProvider && firebase.auth.EmailAuthProvider.credential };
+      var said=[], cf=[], updated=null, toasts=[], errs=[];
+      var mk=function(provider){ return { email:'cook@example.com', uid:'uP', providerData:[{ providerId:provider }],
+        reauthenticateWithCredential:async function(c){ if(c.p!=='old-pass-1') throw Object.assign(new Error('wrong'), { code:'auth/wrong-password' }); },
+        updatePassword:async function(p){ updated=p; } }; };
+      try{
+        firebase.auth.EmailAuthProvider.credential=function(e, p){ return { e:e, p:p }; };
+        window.askConfirm=async function(o){ said.push(o); return cf.length ? cf.shift() : null; };
+        window.toast=function(m){ toasts.push(String(m)); }; window.showServiceError=function(m){ errs.push(String(m)); };
+        window._fbAuth={ currentUser:mk('password') };
+        // too short, then two that differ, then right
+        cf=['old-pass-1', 'short', true, 'new-pass-22', 'new-pass-33', true, 'new-pass-22', 'new-pass-22'];
+        if(await accountChangePassword()!==true || updated!=='new-pass-22') throw new Error('not changed: '+updated+' / '+JSON.stringify(said.map(function(o){ return o.title; })));
+        if(!said.every(function(o){ return !('input' in o) || o.inputType==='password'; })) throw new Error('a password typed in a plain box');
+        if(!said.some(function(o){ return /At least 8/.test(o.message||''); }) || !said.some(function(o){ return /not the same/.test(o.message||''); })) throw new Error('too short / not the same not said: '+JSON.stringify(said.map(function(o){ return o.message; })));
+        if(!toasts.some(function(t){ return /password is changed/.test(t); })) throw new Error('not said it is changed');
+        // the current one, again as the new one
+        updated=null; said=[]; cf=['old-pass-1', 'old-pass-1', true, null];
+        if(await accountChangePassword()!==false || updated!==null || !said.some(function(o){ return /current password/.test(o.message||''); })) throw new Error('the same password accepted');
+        // a wrong current password: nothing changed, and how to get a new one
+        updated=null; said=[]; cf=['not-it', 'new-pass-22', 'new-pass-22'];
+        if(await accountChangePassword()!==false || updated!==null) throw new Error('changed after a wrong current password');
+        if(!said.some(function(o){ return /Not your current password/.test(o.title||'') && /Forgot password/.test(o.message||''); })) throw new Error('a wrong current password is not said with the way out');
+        // a Google account: where its password lives
+        said=[]; window._fbAuth={ currentUser:mk('google.com') };
+        if(await accountChangePassword()!==false || !/myaccount\.google\.com/.test((said[0]||{}).message||'')) throw new Error('a Google account: '+JSON.stringify(said));
+        // the account menu offers it to a password account
+        if(typeof cloudLayout==='function' && cloudLayout()==='households'){
+          var offered=null; window._fbUser={ uid:'uP', email:'cook@example.com' }; window._fbAuth={ currentUser:mk('password') };
+          window.askChoice=async function(m, o){ offered=(o||[]).map(function(x){ return x.value; }); return null; };
+          accountMenu(); await wait(30);
+          if(!offered || offered.indexOf('password')<0) throw new Error('the account menu does not offer it: '+JSON.stringify(offered));
+        }
+        return 'changed with the current one first, twice the same, 8+; wrong current / same / Google said';
+      } finally {
+        if(real.cred) firebase.auth.EmailAuthProvider.credential=real.cred;
+        window._fbAuth=real.auth; window.askConfirm=real.confirm; window.toast=real.toast; window.showServiceError=real.err; window.askChoice=real.choice; window._fbUser=real.user;
+      }
+    } },
+
   // v39.21 — Tony's iPhone, 30 Oct: the Households page blamed the database rules; that Safari's Google sign-in had no
   // authenticator code (older than the authenticator), which the rules and the server require of the owner.
   { id:'owner_signin_why', group:'Sharing', name:'📊 Households refused because of THIS sign-in (no authenticator code, or not Google): says so and what to do — not "publish the rules" (v39.21)',
@@ -1735,6 +1780,35 @@ window.SELF_TESTS = [
         mknManage.show(mknManage._state.rows.filter(function(r){ return r.name==='Kitchen A'; })[0].key);
         if(!/12 recipes in the collection \(counted today\)/.test(document.getElementById('manageOverlay').textContent)) throw new Error('the household’s details do not say how many recipes');
         mknManage.show(null); mknManage.sortBy('month');
+        // v39.22 — Tony: "a button, next to each of the households (for Admin) to reset the password"
+        var pwBtn=function(name){ var tr=Array.prototype.filter.call(document.querySelectorAll('#manageOverlay .mg-row'), function(t){ return t.querySelector('.mg-name').textContent===name; })[0];
+          return tr && tr.querySelector('.mg-pwbtn'); };
+        if(!pwBtn('Beta Kitchen') || pwBtn('Gone Kitchen')) throw new Error('🔑 Reset password: missing beside a household, or offered for a deleted one');
+        var realOpen=window.open, realReset=window.ownerSendPasswordReset, opened=[], resetFor=[];
+        try{
+          window.open=function(u){ opened.push(String(u)); return null; };
+          window.ownerSendPasswordReset=async function(e){ resetFor.push(e); return true; };
+          pwBtn('Beta Kitchen').click();
+          if(opened.length!==1 || opened[0].indexOf('#resetpw=r%40example.com')<0 || /\?manage/.test(opened[0]) || resetFor.length) throw new Error('another copy\u2019s account should be reset in that copy: '+JSON.stringify([opened, resetFor]));
+          var kA=mknManage._state.rows.filter(function(r){ return r.name==='Kitchen A'; })[0];
+          mknManage.show(kA.key);
+          var mb=document.querySelector('#manageOverlay .mg-panel .mg-pwbtn');
+          if(!mb) throw new Error('no 🔑 Reset password beside the members');
+          mb.click(); await wait(20);
+          if(resetFor.length!==1 || resetFor[0]!=='a@example.com' || opened.length!==1) throw new Error('this copy\u2019s member: '+JSON.stringify([resetFor, opened]));
+          if(!/Members/.test(document.querySelector('#manageOverlay .mg-panel').textContent)) throw new Error('the click opened or closed the wrong thing');
+          mknManage.show(null);
+        } finally { window.open=realOpen; window.ownerSendPasswordReset=realReset; }
+        // the e-mail itself: the owner only, to that address, coming back to this copy
+        var realA=window._fbAuth, realC=window.askConfirm, realT=window.toast, sentPw=[];
+        try{
+          window._fbAuth={ sendPasswordResetEmail:async function(e, o){ sentPw.push([e, o && o.url]); } };
+          window.askConfirm=async function(){ return true; }; window.toast=function(){};
+          if(await ownerSendPasswordReset('Dana@Example.com')!==true || sentPw.length!==1 || sentPw[0][0]!=='dana@example.com' || sentPw[0][1]!==APP_CONFIG.siteOrigin+APP_CONFIG.sitePath)
+            throw new Error('the reset e-mail: '+JSON.stringify(sentPw));
+          var ownerWas=window.isAppOwner; window.isAppOwner=function(){ return false; };
+          try { if(await ownerSendPasswordReset('dana@example.com')!==false || sentPw.length!==1) throw new Error('someone not the owner sent a reset e-mail'); } finally { window.isAppOwner=ownerWas; }
+        } finally { window._fbAuth=realA; window.askConfirm=realC; window.toast=realT; }
         // v39.07 — Tony: "an option in the Admin's Households page to hide the deleted accounts" (kept on this device)
         try{
           var hg=document.getElementById('mgHideGone');
@@ -11170,8 +11244,9 @@ window.SELF_TESTS = [
       var m=document.getElementById('settingsDrop');
       var heads=m.querySelectorAll('.set-group > .set-head');
       if(heads.length<6) throw new Error('sections: '+heads.length);
-      // Every item of the menu is in a section — but the account's deletion, last and on its own, and the confirmation reminder.
-      var loose=Array.prototype.filter.call(m.querySelectorAll('.drop-item'), function(b){ return !b.closest('.set-group') && b.id!=='deleteAccountItem' && b.id!=='confirmEmailItem'; });
+      // Every item of the menu is in a section — but the account's own: its deletion, last; changing its password (v39.22),
+      // just before; and the confirmation reminder.
+      var loose=Array.prototype.filter.call(m.querySelectorAll('.drop-item'), function(b){ return !b.closest('.set-group') && b.id!=='deleteAccountItem' && b.id!=='changePasswordItem' && b.id!=='confirmEmailItem'; });
       if(loose.length) throw new Error('items outside any section: '+loose.map(function(b){ return b.textContent.trim(); }).join(', '));
       var last=Array.prototype.slice.call(m.querySelectorAll('.drop-item')).pop();
       if(!last || last.id!=='deleteAccountItem') throw new Error('Delete my account is not the last item');

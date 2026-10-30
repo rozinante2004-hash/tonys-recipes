@@ -857,7 +857,7 @@
             + (r.movedOld ? '<div class="mg-muted">\u{1F4E6} Moved to the beta \u2014 the old copy, kept until it is cleared</div>' : '')
             + (r.left && r.left.length ? '<div class="mg-muted">' + r.left.length + ' left (deleted their account)</div>' : '') + '</td>'
             + (multi ? '<td data-label="Copy"><span class="mg-copy">' + esc(r.copy) + '</span></td>' : '')
-            + '<td class="mg-email" data-label="Owner">' + esc(r.owner || '—') + '</td>'
+            + '<td class="mg-email" data-label="Owner">' + esc(r.owner || '—') + (r.owner && !r.deleted ? '<div>' + '<button type="button" class="mg-btn mg-pwbtn" title="E-mails them a link to choose a new password themselves \u2014 you never see it" onclick="event.stopPropagation();mknManage.resetPw(' + jsA(r.key) + ',' + jsA(r.owner) + ')">\u{1F511} Reset password</button>' + '</div>' : '') + '</td>'   // v39.22
             + '<td class="mg-c" data-label="Members">' + r.members.length + '</td>'
             + '<td class="mg-c" data-label="Recipes"' + (r.recipesN && r.reportAt ? ' title="' + escA('Counted by their app ' + ago(r.reportAt)) + '"' : '') + '>'
             + (r.recipesN ? Number(r.recipesN).toLocaleString() : '—') + '</td>'   // v39.17
@@ -926,7 +926,7 @@
       + (r.months.length ? '<div class="mg-muted" style="margin-top:4px;">' + r.months.map(function (m) { return mon(m.month) + ': ' + money(m.usd) + ' (' + m.calls + ' calls)'; }).join(' · ') + '</div>' : '')
       + '<div class="mg-h">' + (r.deleted ? 'Members when it was deleted' : 'Members') + '</div>'
       + r.members.sort(function (a, b) { return roleRank(a.role) - roleRank(b.role); })
-          .map(function (m) { return '<div class="mg-li"><span class="mg-email">' + esc(m.email || '\u2014') + '</span> <span class="mg-muted">' + esc(m.role) + ' · last opened ' + ago(m.lastSeen)
+          .map(function (m) { return '<div class="mg-li"><span class="mg-email">' + esc(m.email || '\u2014') + '</span>' + (m.email && !r.deleted ? ' ' + '<button type="button" class="mg-btn mg-pwbtn" title="E-mails them a link to choose a new password themselves \u2014 you never see it" onclick="event.stopPropagation();mknManage.resetPw(' + jsA(r.key) + ',' + jsA(m.email) + ')">\u{1F511} Reset password</button>' : '') + ' <span class="mg-muted">' + esc(m.role) + ' · last opened ' + ago(m.lastSeen)
             // v37.83 — the record that they agreed to the terms (Tony).
             + ' · ' + (m.termsAt ? '\u{1F4DD} agreed to the terms' + (m.termsVersion ? ' (v' + esc(m.termsVersion) + ')' : '') + ' ' + new Date(m.termsAt).toLocaleDateString() : '<span class="mg-noterms">not yet agreed to the terms</span>')
             + '</span></div>'; }).join('')
@@ -1048,6 +1048,7 @@
     + '.mg-trend{min-width:0;}.mg-trend th,.mg-trend td{padding:5px 8px;}.mg-trend th.mg-c{text-align:center;}.mg-trk{min-width:150px;width:40%;}'
     + '.mg-trsub{font-weight:700;color:var(--heading);padding-top:10px !important;background:var(--note-bg);}'
     + '.mg-trsec{font-weight:700;color:var(--heading);padding-top:12px !important;border-top:2px solid var(--border);}'   /* v39.17 */
+    + '.mg-pwbtn{font-size:11px !important;padding:2px 8px !important;min-height:0 !important;margin-top:3px;}'   /* v39.22 */
     + '.mg-usegrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px 20px;align-items:start;max-width:1100px;}'   /* v39.18 */
     + '.mg-col{min-width:0;}.mg-col>.mg-card{margin-top:0;}.mg-trend .mg-trk{width:auto;}.mg-trend td.mg-c,.mg-trend th.mg-c{width:72px;white-space:nowrap;}'   /* v39.19 */
     + '.mg-usetab .mg-trk{width:auto;min-width:0;}.mg-usetab td.mg-c,.mg-usetab th.mg-c{width:76px;white-space:nowrap;}'
@@ -1249,6 +1250,19 @@
     },
     // v39.11 — ✉️ Send invitation: Invite testers here, with the address in To; a request from another copy opens that
     // copy (a tester's invitation belongs to the copy it is for), the address after # so no server sees it.
+    // v39.22 — 🔑 Reset password: this copy's account here (ownerSendPasswordReset); another copy's account in that copy's
+    // own app (#resetpw=), whose sign-in service holds it.
+    resetPw: function (key, email) {
+      var r = S.rows.filter(function (x) { return x.key === key; })[0];
+      if (!r || !email) return false;
+      if (r.remote && r.project && r.project !== thisProject()) {
+        var u = copyUrl(r.project).replace(/\?manage$/, '');
+        if (!u) { toast('Reset it from the ' + copyOf(r.project) + ' copy\u2019s own 📊 Households \u2014 the account is there.', 7000); return false; }
+        window.open(u + '#resetpw=' + encodeURIComponent(email), '_blank', 'noopener');
+        return 'other';
+      }
+      return typeof ownerSendPasswordReset === 'function' ? ownerSendPasswordReset(email) : false;
+    },
     inviteFor: function (key) {
       var n = noteBy(key); if (!n || !n.email) return false;
       if (!n.project || n.project === thisProject()) return typeof openInviteTesters === 'function' ? openInviteTesters({ to: n.email }) : false;

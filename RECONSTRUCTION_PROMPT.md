@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v39.21` — app. **Worker: v100**, deployed separately and versioned separately
+**Current version:** `v39.22` — app. **Worker: v100**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -272,7 +272,7 @@ hidden / refuses / silent / privacy text.
     months become one column. A refusal caused by the device's sign-in (v39.21, `ownerSignInWhy()` from the ID token's
     `firebase.sign_in_provider` / `sign_in_second_factor`: not Google, or Google without the authenticator's code while
     the owner's two-step is on) is said as such, with "sign out, sign in again with Google — the app asks for the
-    code", once on the page (`refusedHint`), instead of "this copy's database rules need publishing". Extras: "📧 E-mail recipes from their own Gmail" (said what it does: that
+    code", once on the page (`refusedHint`), instead of "this copy's database rules need publishing". 🔑 Reset password beside the owner and each member (v39.22, `mknManage.resetPw`; see the sign-in notes). Extras: "📧 E-mail recipes from their own Gmail" (said what it does: that
     household's ✉️ Email sends from each member's own Gmail instead of 📨 Send) and WhatsApp groups; a details panel (allowance: Save /
     Pause AI / default; private notes; "What they use"; **Extras for this household**; 🗑 Delete this
     household — typed name; deleted ones stay listed, struck through, with who/how). Header: "New
@@ -608,6 +608,16 @@ Each item names the function or key to look for; `CLAUDE.md` has the long story 
   and has one "Trouble signing in?" (v38.64; "🪵 Copy the log" only with the check it opens, `loginLogButtonReveal`).
 - **E-mail sign-in is password-first (v38.58):** the one-time link is a small fallback under "Forgot password?";
   Remember me works both ways in the e-mail form too (`rememberChoice`); the form is a real login `<form>`.
+- **Change and reset a password (v39.22):** ⚙️ → 🔑 Change my password (`#changePasswordItem`, and in the account
+  menu; only when `accountHasPassword(user)`): `accountChangePassword()` asks for the current password and
+  re-authenticates with it (`EmailAuthProvider.credential` → `reauthenticateWithCredential`; a second factor through
+  `mfaResolve`), then the new one twice (8+ characters, different), then `updatePassword`. Google accounts are sent to
+  myaccount.google.com → Security; link-only accounts to "Forgot password?". The owner's 🔑 Reset password (📊
+  Households, beside the owner and each member): `ownerSendPasswordReset(email)` → askConfirm →
+  `sendPasswordResetEmail(email, {url: continueUrl()})`, `auth/user-not-found` silent (never tells whether an address
+  has an account); a household of another copy opens that copy with `#resetpw=<address>` (`captureResetPw`, sent after
+  the owner signs in there — each Firebase project has its own accounts). Help: "FORGOT YOUR PASSWORD?", "CHANGE YOUR
+  PASSWORD", and the 📊 Households line.
 - **Firebase's free plan sends 5 sign-in-link e-mails a day per project.** v38.68: `linkSentTell()` after each
   `sendSignInLinkToEmail` → Worker `link-sent` counts them (§4, Worker v87); a refusal (`auth/quota-exceeded` →
   `firebaseLimitHit('auth-email')` → `limit-report`) is counted and told to the owner.

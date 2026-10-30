@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.21 -->
+<!-- Tony's Recipes Collection v39.22 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -4883,6 +4883,18 @@ var _inviteOnSignIn = '';
     history.replaceState(null, '', location.pathname + location.search + location.hash.replace(/(^#|&)invite=[^&]*/, '$1').replace(/^#&/, '#').replace(/^#$/, ''));
   } catch(e) {}
 })();
+// v39.22 — …#resetpw=<address> (📊 Households → 🔑 Reset password, for a household of this copy opened from another
+// copy's page): once the owner is signed in, the reset e-mail is offered here, where the account lives.
+var _resetPwOnSignIn = '';
+(function captureResetPw() {
+  try {
+    var m = /(?:^#|&)resetpw=([^&]+)/.exec(location.hash);
+    if (!m) return;
+    var em = ''; try { em = decodeURIComponent(m[1]).trim().toLowerCase(); } catch(e2) {}
+    if (/^[^\s@<>"']+@[^\s@<>"']+\.[^\s@<>"']{2,}$/.test(em)) _resetPwOnSignIn = em;
+    history.replaceState(null, '', location.pathname + location.search + location.hash.replace(/(^#|&)resetpw=[^&]*/, '$1').replace(/^#&/, '#').replace(/^#$/, ''));
+  } catch(e) {}
+})();
 (function captureRef() {
   try {
     var m = /[?&]ref=(MKN-[A-HJKMNP-Z2-9]{4}-[A-HJKMNP-Z2-9]{4})(?:&|$)/.exec(location.search);
@@ -7915,6 +7927,10 @@ async function householdUse(hid, role) {
     var inviteTo = _inviteOnSignIn; _inviteOnSignIn = '';
     setTimeout(async function(){ for (var w = 0; w < 100 && document.getElementById('askOverlay'); w++) await wait(300); openInviteTesters({ to: inviteTo }); }, 900);
   }
+  if (_resetPwOnSignIn && typeof isAppOwner === 'function' && isAppOwner()) {   // v39.22
+    var resetTo = _resetPwOnSignIn; _resetPwOnSignIn = '';
+    setTimeout(async function(){ for (var w = 0; w < 100 && document.getElementById('askOverlay'); w++) await wait(300); ownerSendPasswordReset(resetTo); }, 900);
+  }
   if (typeof deviceOffersCloud === 'function' && !_selfTestRunning) deviceOffersCloud().catch(function(){});   // v37.69
   if (typeof feedbackTellOwner === 'function') setTimeout(function(){ feedbackTellOwner().catch(function(){}); }, 5000);   // v37.64
   // v37.63 — Tony: "all my WhatsApp groups have disappeared". The chats are in
@@ -8667,13 +8683,86 @@ async function accountReauthenticate(user, before) {
   return false;
 }
 window.accountReauthenticate = accountReauthenticate;
+// v39.22 — Tony, 30 Oct: "Do we have a mechanism to change a password?" — there was none: only "Forgot password?" on
+// the sign-in screen, which means signing out first. ⚙️ (and the account menu) → 🔑 Change my password, for an account
+// with a password: the current one (Firebase asks for a fresh proof before a change), the new one twice, 8 characters
+// or more as when the account was made. A Google account: Google keeps its password; a link-only account: how to get one.
+function accountHasPassword(user) { return !!user && (user.providerData || []).some(function(p){ return p && p.providerId === 'password'; }); }
+async function accountChangePassword() {
+  var user = window._fbAuth && _fbAuth.currentUser;
+  if (!user || !user.email) { toast('Sign in first.'); return false; }
+  if (!accountHasPassword(user)) {
+    var google = (user.providerData || []).some(function(p){ return p && p.providerId === 'google.com'; });
+    await askConfirm({ icon: '\u{1F511}', title: 'Your password', okLabel: 'OK', message: google
+      ? 'You sign in with Google, so your password is Google\u2019s: change it in your Google account (myaccount.google.com \u2192 Security \u2192 Password).'
+      : 'Your account signs in with an e-mailed link, without a password. To have one: sign out, type ' + user.email + ' on the sign-in screen and press \u201cForgot password?\u201d \u2014 the e-mail lets you choose it.' });
+    return false;
+  }
+  var pwBox = { input: '', inputType: 'password' };
+  var cur = await askConfirm(Object.assign({ icon: '\u{1F511}', title: 'Change my password', message: 'First your current password, for ' + user.email + '.',
+    placeholder: 'Current password', okLabel: 'Next \u203a' }, pwBox));
+  if (typeof cur !== 'string' || !cur) return false;
+  try { await user.reauthenticateWithCredential(firebase.auth.EmailAuthProvider.credential(user.email, cur)); }
+  catch (e) {
+    if (e && e.code === 'auth/multi-factor-auth-required') { try { await mfaResolve(e); } catch (e2) { return false; } }
+    else if (e && /auth\/(wrong-password|invalid-credential|invalid-login-credentials|user-mismatch)/.test(e.code || '')) {
+      syncLog('auth', 'Changing the password refused: not the current password', user.email);
+      await askConfirm({ icon: '\u{1F511}', title: 'Not your current password', okLabel: 'OK',
+        message: 'That is not the password of ' + user.email + '. Forgot it? Sign out and press \u201cForgot password?\u201d on the sign-in screen: an e-mail lets you choose a new one.' });
+      return false;
+    }
+    else { showServiceError('Your password could not be checked: ' + authErrorText(e)); return false; }
+  }
+  var p1 = '';
+  for (var round = 0; round < 10; round++) {
+    p1 = await askConfirm(Object.assign({ icon: '\u{1F511}', title: 'Your new password', message: 'At least 8 characters \u2014 longer is safer.',
+      placeholder: 'New password', okLabel: 'Next \u203a' }, pwBox));
+    if (typeof p1 !== 'string' || !p1) return false;
+    var why = p1.length < 8 ? 'At least 8 characters, please.' : p1 === cur ? 'That is your current password \u2014 choose a new one.' : '';
+    if (!why) {
+      var p2 = await askConfirm(Object.assign({ icon: '\u{1F511}', title: 'Once more', message: 'Type the new password again.',
+        placeholder: 'New password again', okLabel: 'Change it' }, pwBox));
+      if (typeof p2 !== 'string' || !p2) return false;
+      if (p2 === p1) break;
+      why = 'The two were not the same.';
+    }
+    await askConfirm({ icon: '\u{1F511}', title: 'Not changed yet', message: why, okLabel: 'Try again' });
+    p1 = '';
+  }
+  if (!p1) return false;
+  try { await user.updatePassword(p1); }
+  catch (e) { showServiceError('The password was not changed: ' + authErrorText(e)); return false; }
+  syncLog('auth', 'Changed the password', user.email);
+  toast('\u{1F511} Your password is changed. Use the new one the next time you sign in.', 8000);
+  return true;
+}
+window.accountChangePassword = accountChangePassword; window.accountHasPassword = accountHasPassword;
+// v39.22 — Tony, 30 Oct: "add a button, next to each of the households (for Admin) to reset the password. I may get
+// requests via email". Firebase e-mails the PERSON a link to choose a new password: the owner never sees or sets one.
+// Said the same whether or not that address has a password account (Firebase does not say either). No address in the log.
+async function ownerSendPasswordReset(email) {
+  email = String(email || '').trim().toLowerCase();
+  if (!(typeof isAppOwner === 'function' && isAppOwner()) || !window._fbAuth || !/^[^\s@<>"']+@[^\s@<>"']+\.[^\s@<>"']{2,}$/.test(email)) return false;
+  var ok = await askConfirm({ icon: '\u{1F511}', title: 'Reset their password?', okLabel: 'Send the e-mail',
+    message: 'Sends ' + email + ' an e-mail with a link to choose a new password (from this copy\u2019s sign-in service \u2014 it may land in spam). You never see their password.'
+      + '\n\nIf they sign in with Google, they do not need it: their password is Google\u2019s.' });
+  if (ok !== true) return false;
+  try { await _fbAuth.sendPasswordResetEmail(email, { url: continueUrl() }); }
+  catch (e) { if (!e || e.code !== 'auth/user-not-found') { showServiceError('The e-mail was not sent: ' + authErrorText(e)); return false; } }
+  syncLog('auth', 'Sent a password-reset e-mail (the owner, for a member)');
+  toast('\u{1F511} If ' + email + ' has an account with a password, the e-mail is on its way. Tell them to look in spam too.', 9000);
+  return true;
+}
+window.ownerSendPasswordReset = ownerSendPasswordReset;
 function accountMenu() {
   if (cloudLayout() !== 'households' || !window._fbUser) return;
   askChoice(String(window._fbUser.email || ''), [
     { value: 'download', label: '⬇️ Download all my data' }
-  ].concat(accountIsAppOwner(window._fbAuth && window._fbAuth.currentUser) ? [] : [{ value: 'delete', label: '\u{1F5D1} Delete my account…' }]),   // v39.08
+  ].concat(accountHasPassword(window._fbAuth && window._fbAuth.currentUser) ? [{ value: 'password', label: '\u{1F511} Change my password' }] : [])   // v39.22
+  .concat(accountIsAppOwner(window._fbAuth && window._fbAuth.currentUser) ? [] : [{ value: 'delete', label: '\u{1F5D1} Delete my account…' }]),   // v39.08
     { icon: '\u{1F464}', title: 'Your account' }).then(function(v){
     if (v === 'download') accountDownload();
+    else if (v === 'password') accountChangePassword();
     else if (v === 'delete') accountDelete();
   });
 }
@@ -10567,7 +10656,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.21';
+var APP_VERSION = 'v39.22';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -13895,7 +13984,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.21</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.22</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -13983,7 +14072,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.21</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.22</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -14112,9 +14201,11 @@ body.banner-shown .header {
               <button class="drop-item" data-owner-only title="The connection that sends ingredients straight to the household's Bring! list." data-feature="bringDirect" onclick="closeDrop('settingsDrop');showBringBookmarklet()">🛒 Bring! Connection</button>
             </div>
           </div>
+          <div data-layout-only="households" data-not-owner style="height:1px;background:var(--border);margin:4px 0;"></div>
+          <!-- v39.22 — Tony: "Do we have a mechanism to change a password?" Shown for an account with a password; with the account's deletion, outside the sections. -->
+          <button class="drop-item" id="changePasswordItem" style="display:none;" title="Choose a new password for signing in with your e-mail address: your current one first, then the new one twice." onclick="closeDrop('settingsDrop');accountChangePassword()">🔑 Change my password</button>
           <!-- v37.05 — Tony: not hidden in a dialog; the last item, bold and red. -->
           <!-- v39.08 — not on the app owner's menu (data-not-owner): his account is never deleted from the app. -->
-          <div data-layout-only="households" data-not-owner style="height:1px;background:var(--border);margin:4px 0;"></div>
           <button class="drop-item" title="Deletes your account, and the households you own alone with all their recipes. Cannot be undone. A household shared with others must be handed over first." id="deleteAccountItem" data-layout-only="households" data-not-owner onclick="closeDrop('settingsDrop');accountDelete()"
                   style="font-weight:700;color:var(--danger);">🗑 Delete my account…</button>
         </div>
@@ -24515,6 +24606,8 @@ function toggleDrop(id){
   if (id === 'settingsDrop' && typeof applyOwnerOnlyItems === 'function') { applyOwnerOnlyItems(); renderUnitsMenuItem();
     var ci = document.getElementById('confirmEmailItem');
     if (ci) ci.style.display = (window._fbUser && window._fbUser.email && window._fbUser.emailVerified === false) ? '' : 'none';
+    var cp = document.getElementById('changePasswordItem');   // v39.22
+    if (cp) cp.style.display = accountHasPassword(window._fbAuth && window._fbAuth.currentUser) ? '' : 'none';
     if (!menu.classList.contains('open')) { try { refreshShortcutsSection(); } catch(e) {} try { applySelfTestVisibility(); } catch(e) {} settingsGroupsRefresh(true); } }
   const wasOpen=menu.classList.contains('open');
   // Close all
@@ -33140,6 +33233,8 @@ var HELP_SYSTEM_PROMPT = [
   "- Sign in with Google, or with any e-mail address (a password, or a sign-in link sent to it) where that is offered.",
   "- Google sign-in always shows Google's list of accounts, so you choose which one — even when the phone already knows another account. If a code from an authenticator app is asked for an account you did not mean, press 'Use another account' and sign in again.",
   "- 'Sign out' (in the header, next to the sync status) also removes this device's copy of the recipes — unless some changes have not reached the cloud yet; they come back when you sign in. Another account signing in on the same device never sees, or receives, the first account's recipes; recipes made on the device before signing in are added only if you choose 'Add them'.",
+  "- FORGOT YOUR PASSWORD? On the sign-in screen, type your e-mail address and press 'Forgot password?' (under Sign in and Create an account): an e-mail comes with a link to choose a new one (look in spam too). The app says the same whether or not the address has an account. Or use 'Or e-mail me a one-time sign-in link' to sign in without a password. With Google, your password is Google's.",
+  "- CHANGE YOUR PASSWORD: ⚙️ → 🔑 Change my password (also in the account menu) — your current password, then the new one twice (at least 8 characters). Shown for accounts with a password; with Google, change it in your Google account (myaccount.google.com → Security).",
   "- An address used with a password must be CONFIRMED from the e-mail sent to it; until then, places kept for that address do not open (invitation links still work). ⚙️ → ✉️ Confirm my e-mail address sends it again.",
   "- ⚙️ → 💾 Backups and photos → 💾 Backups saves a file with everything (every recipe and photo). ⚙️ → 🗑 Delete my account… (the last item) deletes the account and the households you own alone. The app's owner has no such item: the owner's account is never deleted from the app.",
   "- ⚙️ → 🔧 Troubleshooting → 🧽 Reset this device… erases only this device's copy; nothing in the cloud is deleted.",
@@ -33148,7 +33243,7 @@ var HELP_SYSTEM_PROMPT = [
   "",
   "=== FOR THE APP'S OWNER ===",
   "- ⚙️ → 👑 App owner is shown only to the app's owner: 📊 Households, 🩺 Server allowances, 📲 Phone alerts (which alerts also ring on the phone in the Pushover app, each on or off, and a test — among them the recipe e-mails: Resend refusing or not answering, a quota at 70% or used up), ✉️ Invite testers, 💳 Payments, 🚀 Deployments (a link to every console — Resend, which sends the recipe e-mails, too: its sent e-mails, domain, key, usage and plan), 🔑 Check the app's key, 🔐 Two-step sign-in for the owner, 🧑‍🍳 Preview the first-visit setup (every page of it, nothing recorded), 📧 Gmail Setup, 🛒 Bring!",
-  "- 📊 Households (the owner's): every household — in the family app and My Kitchen Notes, every copy's — with its owner, members, 📚 Recipes (how many it keeps, counted by its own app once a day; rest the mouse on the number for when), AI this month against its AI cap, AI in the two months before (e.g. 'AI in Sep · Oct' in November), links, who shared the app, last active. Click a heading (on a phone: Sort by) to sort — by Recipes for the biggest collections first; ⬇ CSV has the recipe counts too. 📈 Use adds every household up, month by month, in sections side by side (one under the other on a phone; one column when there are many months), with how big the collections are. Click a row for its details: the AI allowance, the members, the Extras, and What they use — two narrow tables side by side (one under the other on a phone), a column for each month, in sections (how often, signing in, recipes added and from where, the farm, devices and settings, then every feature and how many times). In The farm, 'Taps on a visitor (each one)' counts every tap and 'Visits with a farm visitor tapped' counts a visit once, however many taps. Extras: 📧 E-mail recipes from their own Gmail makes that household's ✉️ Email send from each member's own Gmail (Google asks each once) instead of the app's 📨 Send — best left off. If the page says this device's sign-in was made without the code from your authenticator app (or with a password): sign out (at the top, beside the sync status) and sign in again with Google — the app asks for the 6-digit code; the owner's tools need both.",
+  "- 📊 Households (the owner's): every household — in the family app and My Kitchen Notes, every copy's — with its owner, members, 📚 Recipes (how many it keeps, counted by its own app once a day; rest the mouse on the number for when), AI this month against its AI cap, AI in the two months before (e.g. 'AI in Sep · Oct' in November), links, who shared the app, last active. Click a heading (on a phone: Sort by) to sort — by Recipes for the biggest collections first; ⬇ CSV has the recipe counts too. 📈 Use adds every household up, month by month, in sections side by side (one under the other on a phone; one column when there are many months), with how big the collections are. Click a row for its details: the AI allowance, the members, the Extras, and What they use — two narrow tables side by side (one under the other on a phone), a column for each month, in sections (how often, signing in, recipes added and from where, the farm, devices and settings, then every feature and how many times). In The farm, 'Taps on a visitor (each one)' counts every tap and 'Visits with a farm visitor tapped' counts a visit once, however many taps. Extras: 📧 E-mail recipes from their own Gmail makes that household's ✉️ Email send from each member's own Gmail (Google asks each once) instead of the app's 📨 Send — best left off. If the page says this device's sign-in was made without the code from your authenticator app (or with a password): sign out (at the top, beside the sync status) and sign in again with Google — the app asks for the 6-digit code; the owner's tools need both. 🔑 Reset password, beside the owner and beside each member (in the details), e-mails that person a link to choose a new password — for someone who wrote to you that they can't sign in; you never see their password, and the app doesn't say whether the address has an account. For a household of another copy, the button opens that copy, which sends it after you sign in there.",
   "- 📊 Households → 💬 Feedback (the owner's): a request for an invitation has ✉️ Send invitation — ✉️ Invite testers opens with that address in To (a request from another copy opens that copy's app, where its invitations belong).",
   "- 📊 Households → 💬 Feedback and ⚠️ Errors (the owner's): tick several (or Select all shown), then 👀 Seen (n), ✅ Done (n) or 🗑 Delete selected (n) for all of them at once. 👀 Seen = read, off the ⚙️ red dot, still under 'Not done yet'; ✅ Done = also off that list (still under All). Deleting several asks once and sends one alert",
   "- ✉️ Invite testers: the tester invitation in English or עברית, with this copy's link; the wording can be changed (this device keeps it; 'The original words' brings it back). Paste the addresses; 📧 Send with Gmail sends each person their own e-mail, from the app's address when the owner's Gmail may send as it. Also ✉️ Mail app, 💬 WhatsApp and 📋 Copy. The first Gmail send needs the Gmail API switched on for the copy's Google Cloud project, and Google's permission",

@@ -1437,6 +1437,26 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
   - **Released: v39.09 (29 Oct 2026, 11:17 Israel time, on 0de2dde; Tony: "Yes, release v39.09").** Every job success:
     Deploy to GitHub Pages, pages build, Publish languages, Translate new phrases, Self Tests on main and test,
     Cloudflare Pages for the beta and test.
+  - **v39.22 — passwords: Help for Forgot password, ⚙️ 🔑 Change my password, and the owner's 🔑 Reset password**
+    (Tony, 30 Oct: "Do we have a "Forgot my password" mechanism somewhere?" — it existed, on the sign-in screen since
+    v38.58; "Yes, please add it to the Help. Do we have a mechanism to change a password?" — there was none; "Please
+    also add a button, next to each of the households (for Admin) to reset the password. I may get requests via email").
+    Help (SIGNING IN AND YOUR ACCOUNT): "FORGOT YOUR PASSWORD?" and "CHANGE YOUR PASSWORD". index.html
+    `accountHasPassword(user)` (providerData has 'password') and `accountChangePassword()`: a Google-only account is
+    sent to myaccount.google.com → Security; a link-only account to Forgot password; otherwise the current password
+    first (`reauthenticateWithCredential`, with the second factor through `mfaResolve`; a wrong one says so and points
+    to Forgot password), then the new one twice (8+ characters, not the current one), `updatePassword`, a sync-log line
+    (no password), a toast. Offered as ⚙️ → 🔑 Change my password (`#changePasswordItem`, shown by
+    `toggleDrop('settingsDrop')` only for password accounts) and in the account menu. The owner:
+    `ownerSendPasswordReset(email)` (owner only, a real address, askConfirm "Reset their password?") →
+    `sendPasswordResetEmail(email, {url: continueUrl()})` — Firebase e-mails the person a link to choose a new
+    password; the owner never sees it; `auth/user-not-found` is not told (the app never says whether an address has an
+    account); the sync log says "Sent a password-reset e-mail (the owner, for a member)" without the address. manage.js:
+    "🔑 Reset password" (`.mg-pwbtn`) beside the owner in each row and beside each member in the details;
+    `mknManage.resetPw(key, email)` sends it from this copy, or, for a household of ANOTHER copy (each Firebase
+    project has its own accounts), opens that copy with `#resetpw=<address>` — `captureResetPw` keeps it out of the
+    address bar and sends it once the owner is signed in there. Self Tests: `account_change_password` (new),
+    `management_all_copies` (the buttons, the remote copy link, owner-only).
   - **v39.21 — the owner's tools say when THIS sign-in is the reason** (Tony's iPhone screenshot, 30 Oct, 18:24 Israel
     time, after sharing an Instagram clip to the app — Safari, "◀ Instagram" only being iOS's way back: 📊 Households
     "beta copy · 0 households", "The households could not be read from the database: Missing or insufficient
