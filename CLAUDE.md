@@ -1457,6 +1457,14 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
     project has its own accounts), opens that copy with `#resetpw=<address>` — `captureResetPw` keeps it out of the
     address bar and sends it once the owner is signed in there. Self Tests: `account_change_password` (new),
     `management_all_copies` (the buttons, the remote copy link, owner-only).
+    CI's phone-fit (360 and 390 px) failed the first push (e24e740): the button sat beside the address in the phone's
+    card, 3 px past the edge; the address and the button are now one block, the button under it (reproduced locally,
+    8 failures before, none after). ⚙️: 🔑 Change my password sits with 🗑 Delete my account below the line, outside the
+    sections (settings_in_sections allows the account's own items there).
+  - **Released: v39.21 (30 Oct 2026, 19:05 Israel time, on a6e731b; Tony: "Yes, release v39.21").** Every job success:
+    Deploy to GitHub Pages, pages build, Publish languages, Translate new phrases, Self Tests on main and test,
+    Cloudflare Pages for the beta and test. Before it, Tony: "I signed out and in again with the code; Households works
+    now" — the iPhone's refusal was that old sign-in, as v39.21 now says.
   - **v39.21 — the owner's tools say when THIS sign-in is the reason** (Tony's iPhone screenshot, 30 Oct, 18:24 Israel
     time, after sharing an Instagram clip to the app — Safari, "◀ Instagram" only being iOS's way back: 📊 Households
     "beta copy · 0 households", "The households could not be read from the database: Missing or insufficient

@@ -857,7 +857,7 @@
             + (r.movedOld ? '<div class="mg-muted">\u{1F4E6} Moved to the beta \u2014 the old copy, kept until it is cleared</div>' : '')
             + (r.left && r.left.length ? '<div class="mg-muted">' + r.left.length + ' left (deleted their account)</div>' : '') + '</td>'
             + (multi ? '<td data-label="Copy"><span class="mg-copy">' + esc(r.copy) + '</span></td>' : '')
-            + '<td class="mg-email" data-label="Owner">' + esc(r.owner || '—') + (r.owner && !r.deleted ? '<div>' + '<button type="button" class="mg-btn mg-pwbtn" title="E-mails them a link to choose a new password themselves \u2014 you never see it" onclick="event.stopPropagation();mknManage.resetPw(' + jsA(r.key) + ',' + jsA(r.owner) + ')">\u{1F511} Reset password</button>' + '</div>' : '') + '</td>'   // v39.22
+            + '<td class="mg-email" data-label="Owner"><div>' + esc(r.owner || '—') + (r.owner && !r.deleted ? '<div>' + '<button type="button" class="mg-btn mg-pwbtn" title="E-mails them a link to choose a new password themselves \u2014 you never see it" onclick="event.stopPropagation();mknManage.resetPw(' + jsA(r.key) + ',' + jsA(r.owner) + ')">\u{1F511} Reset password</button>' + '</div>' : '') + '</div></td>'   // v39.22 — one block, so on a phone's card the button sits under the address
             + '<td class="mg-c" data-label="Members">' + r.members.length + '</td>'
             + '<td class="mg-c" data-label="Recipes"' + (r.recipesN && r.reportAt ? ' title="' + escA('Counted by their app ' + ago(r.reportAt)) + '"' : '') + '>'
             + (r.recipesN ? Number(r.recipesN).toLocaleString() : '—') + '</td>'   // v39.17
