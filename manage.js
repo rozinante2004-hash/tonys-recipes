@@ -82,6 +82,7 @@
     catch (e) { S.loadError = String((e && e.message) || e); }
     S.meter = null; S.meterError = '';
     try { S.meter = await meterList(); } catch (e) { S.meterError = e.message; }
+    await learnOwnerWhy();   // v39.21
     // v37.96 — whether newcomers may start a household in THIS copy.
     try { S.founding = typeof hhFoundingOpen === 'function' ? await hhFoundingOpen(true) : null; } catch (e) { S.founding = null; }
     var spend = {}, here = thisProject();
@@ -215,6 +216,7 @@
     if (gen !== _notesGen) return false;
     out.sort(function (a, b) { return (b.at || 0) - (a.at || 0); });
     S.notes = out; S.replies = replies; S.notesError = (!out.length && errs.length) ? errs.join('; ') : ''; S.notesPartial = errs.length > 0;
+    if (S.notesError) await learnOwnerWhy();   // v39.21
     return true;
   }
   // v38.16 — the notes ticked, in the order shown (newest first), and all of each as text.
@@ -247,9 +249,19 @@
   // v37.68 — the ⚙️ dot follows what is marked here.
   // v37.94 — what is counted here is a real count: kept on the device too (feedbackKnown).
   function syncDot() { if (S.notes && !S.notesError && !S.notesPartial) { if (typeof feedbackKnown === 'function') feedbackKnown(newCount()); else if (typeof feedbackDot === 'function') feedbackDot(newCount()); } }
+  // v39.21 — what to do about a refusal: this device's sign-in when that is the reason (ownerSignInWhy), else the rules
+  function refusedHint(err, rules) {
+    err = String(err || '');
+    if (S.ownerWhy && /permission|authenticator|with Google/i.test(err)) return ' \u2014 ' + S.ownerWhy;
+    return /permission/i.test(err) ? rules : '';
+  }
+  async function learnOwnerWhy() {
+    var errs = [S.loadError, S.meterError, S.notesError].join(' ');
+    S.ownerWhy = /permission|authenticator|with Google/i.test(errs) && typeof ownerSignInWhy === 'function' ? await ownerSignInWhy().catch(function () { return ''; }) : '';
+  }
   function notesHtml() {
     if (S.notesError) return '<div class="mg-note">The notes could not be read: ' + esc(S.notesError)
-      + (/permission/i.test(S.notesError) ? ' \u2014 this copy\u2019s database rules need publishing (⚙️ → 🏠 My household → 👥 Family Access → Show rules).' : '') + '</div>';
+      + esc(refusedHint(S.notesError, ' \u2014 this copy\u2019s database rules need publishing (⚙️ → 🏠 My household → 👥 Family Access → Show rules).')) + '</div>';
     if (!S.notes) return '<div class="mg-empty">⏳ Reading the notes…</div>';
     var list = S.notes.filter(function (n) { return S.noteFilter === 'all' || n.status !== 'done'; });
     // v38.16 — Tony: "select several feedback reports and in one click on a "Copy Reports" button,
@@ -792,7 +804,7 @@
       + '<button type="button" class="mg-btn" onclick="mknManage.csv()">⬇ CSV</button>'
       + '<button type="button" class="mg-btn" onclick="mknManage.reload()">↻</button></div></div>';
     if (S.loadError) head += '<div class="mg-note" id="mgLoadError">The households could not be read from the database: ' + esc(S.loadError)
-      + (/permission/i.test(S.loadError) ? ' \u2014 this copy\u2019s database rules need publishing: ⚙️ → 🏠 My household → 👥 Family Access → 🔧 Show Firestore security rules → Copy → Firebase → Publish, then ↻.' : '') + '</div>';
+      + esc(refusedHint(S.loadError, ' \u2014 this copy\u2019s database rules need publishing: ⚙️ → 🏠 My household → 👥 Family Access → 🔧 Show Firestore security rules → Copy → Firebase → Publish, then ↻.')) + '</div>';
     // v38.93 — (the v38.22 "📦 Bring the family app's allowances and AI history here" button is gone: it was used on the
     // move day, 20 Oct, and has no purpose since — Tony, 26 Oct. The Worker's owner-only copy-from stays, unused.)
     // v37.96 — Tony (security audit, "b"): newcomers by invitation only, per copy.
@@ -804,7 +816,7 @@
       + '<button type="button" class="mg-btn" id="mgFoundingBtn" style="min-height:28px;padding:3px 10px;" onclick="mknManage.setFounding(' + (S.founding ? 'false' : 'true') + ')">'
       + (S.founding ? 'Change to: invitation only' : 'Change to: anyone may start one') + '</button></div>';
     if (S.meterError) head += '<div class="mg-note">AI spending could not be read: ' + esc(S.meterError)
-      + (/METER_DB/.test(S.meterError) ? ' — the server’s spending database is not set up yet.' : '') + '</div>';
+      + (/METER_DB/.test(S.meterError) ? ' — the server’s spending database is not set up yet.' : S.loadError ? '' : esc(refusedHint(S.meterError, ''))) + '</div>';   // v39.21 — said once
     var nc = newCount();
     // v37.73 — the notes are read in the family app only (Tony: never in the beta's).
     var inbox = typeof feedbackInboxHere !== 'function' || feedbackInboxHere();

@@ -1629,6 +1629,40 @@ window.SELF_TESTS = [
       }
     } },
 
+  // v39.21 — Tony's iPhone, 30 Oct: the Households page blamed the database rules; that Safari's Google sign-in had no
+  // authenticator code (older than the authenticator), which the rules and the server require of the owner.
+  { id:'owner_signin_why', group:'Sharing', name:'📊 Households refused because of THIS sign-in (no authenticator code, or not Google): says so and what to do — not "publish the rules" (v39.21)',
+    test: async()=>{
+      if(typeof ownerSignInWhy!=='function') throw new Error('ownerSignInWhy not defined');
+      var real={ db:window._fbDb, user:window._fbUser, owner:window.isAppOwner, fetch:window.fetch, toast:window.toast, err:window.showServiceError, h:_workerHealth };
+      var claims={};
+      var user=function(c){ return { uid:'uO', email:'owner@example.com', emailVerified:true, getIdToken:async function(){ return 'tok'; }, getIdTokenResult:async function(){ return { claims:{ firebase:c } }; } }; };
+      try{
+        window._fbUser=user({ sign_in_provider:'google.com' });
+        var w=await ownerSignInWhy();
+        if(!/without the code from your authenticator app/.test(w) || !/Sign out/.test(w) || !/sign in again with Google/.test(w)) throw new Error('Google without the code: '+w);
+        window._fbUser=user({ sign_in_provider:'password' });
+        if(!/e-mail link or a password/.test(await ownerSignInWhy())) throw new Error('a password sign-in is not said');
+        window._fbUser=user({ sign_in_provider:'google.com', sign_in_second_factor:'totp' });
+        if(await ownerSignInWhy()!=='') throw new Error('a good sign-in was blamed');
+        // the page: the database and the server refuse — the reason given is the sign-in, once
+        window._fbUser=user({ sign_in_provider:'google.com' });
+        window.isAppOwner=function(){ return true; }; window.toast=function(){}; window.showServiceError=function(){};
+        var refuse=function(){ return Promise.reject(Object.assign(new Error('Missing or insufficient permissions.'), { code:'permission-denied' })); };
+        window._fbDb={ collection:function(){ return { get:refuse, doc:function(){ return { get:refuse, collection:function(){ return { get:refuse }; } }; }, orderBy:function(){ return { limit:function(){ return { get:refuse }; } }; } }; },
+          collectionGroup:function(){ return { get:refuse }; } };
+        window.fetch=async function(){ return new Response(JSON.stringify({ error:'METER: the owner\'s tools need a sign-in with the code from your authenticator app.', needTwoStep:true }), { status:403 }); };
+        await openManagement();
+        var ov=document.getElementById('manageOverlay'), le=document.getElementById('mgLoadError');
+        if(!le || !/without the code from your authenticator app/.test(le.textContent) || /rules need publishing/.test(le.textContent)) throw new Error('the households error: '+(le ? le.textContent : 'none'));
+        if((ov.textContent.match(/without the code from your authenticator app/g) || []).length!==1) throw new Error('the reason is said more than once');
+        return 'Google without the code, a password, a good sign-in; the page gives the reason once, not the rules';
+      } finally {
+        window._fbDb=real.db; window._fbUser=real.user; window.isAppOwner=real.owner; window.fetch=real.fetch; window.toast=real.toast; window.showServiceError=real.err; _workerHealth=real.h;
+        if(window.mknManage) mknManage.close();
+      }
+    } },
+
   { id:'management_all_copies', group:'Sharing', name:'📊 One Households page for every copy: each household reports itself once a day, and the owner\u2019s page lists every copy\u2019s with its copy, allowance and notes (v37.71)',
     test: async()=>{
       var now=Date.now(), month=new Date().toISOString().slice(0,7), here=String(APP_CONFIG.firebase.projectId);
@@ -7226,7 +7260,8 @@ window.SELF_TESTS = [
           realRevoke=URL.revokeObjectURL, realClick=HTMLAnchorElement.prototype.click;
       var calls=[], asked=null;
       try{
-        window.fetch=function(u){ calls.push(String(u));
+        // v39.21 — a Request object is Firebase's own background traffic (as in key_check), not the export's
+        window.fetch=function(u){ if(typeof u!=='string' && !(u instanceof URL)) return realFetch.apply(this, arguments); calls.push(String(u));
           return Promise.reject(new Error('an export must not use the network')); };
         URL.createObjectURL=function(){ return 'blob:stub'; };
         URL.revokeObjectURL=function(){};

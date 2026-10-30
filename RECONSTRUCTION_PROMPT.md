@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v39.20` — app. **Worker: v100**, deployed separately and versioned separately
+**Current version:** `v39.21` — app. **Worker: v100**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -269,7 +269,10 @@ hidden / refuses / silent / privacy text.
     farm visitor tapped") and `farm.tap` (every tap: "Taps on a visitor (each one)") are told apart. 📈 Use lays its
     section cards out the same way (v39.20): `twoColumns(parts, months, wrap)` — two columns about as long as each
     other, in order, each as wide as a label and a column a month need (min(100%, 230 + 80 × months px)), so many
-    months become one column. Extras: "📧 E-mail recipes from their own Gmail" (said what it does: that
+    months become one column. A refusal caused by the device's sign-in (v39.21, `ownerSignInWhy()` from the ID token's
+    `firebase.sign_in_provider` / `sign_in_second_factor`: not Google, or Google without the authenticator's code while
+    the owner's two-step is on) is said as such, with "sign out, sign in again with Google — the app asks for the
+    code", once on the page (`refusedHint`), instead of "this copy's database rules need publishing". Extras: "📧 E-mail recipes from their own Gmail" (said what it does: that
     household's ✉️ Email sends from each member's own Gmail instead of 📨 Send) and WhatsApp groups; a details panel (allowance: Save /
     Pause AI / default; private notes; "What they use"; **Extras for this household**; 🗑 Delete this
     household — typed name; deleted ones stay listed, struck through, with who/how). Header: "New

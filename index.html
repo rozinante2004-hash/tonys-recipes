@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.20 -->
+<!-- Tony's Recipes Collection v39.21 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -10567,7 +10567,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.20';
+var APP_VERSION = 'v39.21';
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -13895,7 +13895,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.20</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.21</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -13983,7 +13983,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.20</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.21</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -19095,6 +19095,22 @@ async function ownerTwoStepSwitch(on) {
   return true;
 }
 window.ownerTwoStepSwitch = ownerTwoStepSwitch;
+// v39.21 — why the owner's tools refuse THIS sign-in, in words to act on (Tony's iPhone, 30 Oct: 📊 Households said "could
+// not be read … this copy's database rules need publishing" and "AI spending could not be read: METER: the owner's tools
+// need a sign-in with the code from your authenticator app" — that Safari's Google sign-in was older than his
+// authenticator; the rules and the server want Google AND the code, v38.23). '' when the sign-in is not the reason.
+async function ownerSignInWhy() {
+  if (!window._fbUser || typeof _fbUser.getIdTokenResult !== 'function') return '';
+  var f = {};
+  try { f = ((await _fbUser.getIdTokenResult()).claims || {}).firebase || {}; } catch(e) { return ''; }
+  var how = 'Sign out (at the top, beside the sync status), then sign in again with Google: the app asks for the 6-digit code from your authenticator app.';
+  if (f.sign_in_provider && f.sign_in_provider !== 'google.com')
+    return 'This device is signed in with an e-mail link or a password, and the owner\u2019s tools need a sign-in with Google and your authenticator\u2019s code. ' + how;
+  if (f.sign_in_provider === 'google.com' && f.sign_in_second_factor !== 'totp')
+    return 'This device\u2019s sign-in was made without the code from your authenticator app (it may be older than the authenticator), and the owner\u2019s tools need it. ' + how;
+  return '';
+}
+window.ownerSignInWhy = ownerSignInWhy;
 function isAppOwner() {
   // v37.03 — and CONFIRMED: an account made with the owner's address and a
   // password proves nothing until the mailbox has confirmed it.
@@ -33132,7 +33148,7 @@ var HELP_SYSTEM_PROMPT = [
   "",
   "=== FOR THE APP'S OWNER ===",
   "- ⚙️ → 👑 App owner is shown only to the app's owner: 📊 Households, 🩺 Server allowances, 📲 Phone alerts (which alerts also ring on the phone in the Pushover app, each on or off, and a test — among them the recipe e-mails: Resend refusing or not answering, a quota at 70% or used up), ✉️ Invite testers, 💳 Payments, 🚀 Deployments (a link to every console — Resend, which sends the recipe e-mails, too: its sent e-mails, domain, key, usage and plan), 🔑 Check the app's key, 🔐 Two-step sign-in for the owner, 🧑‍🍳 Preview the first-visit setup (every page of it, nothing recorded), 📧 Gmail Setup, 🛒 Bring!",
-  "- 📊 Households (the owner's): every household — in the family app and My Kitchen Notes, every copy's — with its owner, members, 📚 Recipes (how many it keeps, counted by its own app once a day; rest the mouse on the number for when), AI this month against its AI cap, AI in the two months before (e.g. 'AI in Sep · Oct' in November), links, who shared the app, last active. Click a heading (on a phone: Sort by) to sort — by Recipes for the biggest collections first; ⬇ CSV has the recipe counts too. 📈 Use adds every household up, month by month, in sections side by side (one under the other on a phone; one column when there are many months), with how big the collections are. Click a row for its details: the AI allowance, the members, the Extras, and What they use — two narrow tables side by side (one under the other on a phone), a column for each month, in sections (how often, signing in, recipes added and from where, the farm, devices and settings, then every feature and how many times). In The farm, 'Taps on a visitor (each one)' counts every tap and 'Visits with a farm visitor tapped' counts a visit once, however many taps. Extras: 📧 E-mail recipes from their own Gmail makes that household's ✉️ Email send from each member's own Gmail (Google asks each once) instead of the app's 📨 Send — best left off.",
+  "- 📊 Households (the owner's): every household — in the family app and My Kitchen Notes, every copy's — with its owner, members, 📚 Recipes (how many it keeps, counted by its own app once a day; rest the mouse on the number for when), AI this month against its AI cap, AI in the two months before (e.g. 'AI in Sep · Oct' in November), links, who shared the app, last active. Click a heading (on a phone: Sort by) to sort — by Recipes for the biggest collections first; ⬇ CSV has the recipe counts too. 📈 Use adds every household up, month by month, in sections side by side (one under the other on a phone; one column when there are many months), with how big the collections are. Click a row for its details: the AI allowance, the members, the Extras, and What they use — two narrow tables side by side (one under the other on a phone), a column for each month, in sections (how often, signing in, recipes added and from where, the farm, devices and settings, then every feature and how many times). In The farm, 'Taps on a visitor (each one)' counts every tap and 'Visits with a farm visitor tapped' counts a visit once, however many taps. Extras: 📧 E-mail recipes from their own Gmail makes that household's ✉️ Email send from each member's own Gmail (Google asks each once) instead of the app's 📨 Send — best left off. If the page says this device's sign-in was made without the code from your authenticator app (or with a password): sign out (at the top, beside the sync status) and sign in again with Google — the app asks for the 6-digit code; the owner's tools need both.",
   "- 📊 Households → 💬 Feedback (the owner's): a request for an invitation has ✉️ Send invitation — ✉️ Invite testers opens with that address in To (a request from another copy opens that copy's app, where its invitations belong).",
   "- 📊 Households → 💬 Feedback and ⚠️ Errors (the owner's): tick several (or Select all shown), then 👀 Seen (n), ✅ Done (n) or 🗑 Delete selected (n) for all of them at once. 👀 Seen = read, off the ⚙️ red dot, still under 'Not done yet'; ✅ Done = also off that list (still under All). Deleting several asks once and sends one alert",
   "- ✉️ Invite testers: the tester invitation in English or עברית, with this copy's link; the wording can be changed (this device keeps it; 'The original words' brings it back). Paste the addresses; 📧 Send with Gmail sends each person their own e-mail, from the app's address when the owner's Gmail may send as it. Also ✉️ Mail app, 💬 WhatsApp and 📋 Copy. The first Gmail send needs the Gmail API switched on for the copy's Google Cloud project, and Google's permission",

@@ -1437,6 +1437,22 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
   - **Released: v39.09 (29 Oct 2026, 11:17 Israel time, on 0de2dde; Tony: "Yes, release v39.09").** Every job success:
     Deploy to GitHub Pages, pages build, Publish languages, Translate new phrases, Self Tests on main and test,
     Cloudflare Pages for the beta and test.
+  - **v39.21 — the owner's tools say when THIS sign-in is the reason** (Tony's iPhone screenshot, 30 Oct, 18:24 Israel
+    time, after sharing an Instagram clip to the app — Safari, "◀ Instagram" only being iOS's way back: 📊 Households
+    "beta copy · 0 households", "The households could not be read from the database: Missing or insufficient
+    permissions. — this copy's database rules need publishing…" and "AI spending could not be read: METER: the owner's
+    tools need a sign-in with the code from your authenticator app."). Not the rules: that Safari's Google sign-in had
+    no TOTP second factor (older than the authenticator — Firebase keeps a sign-in for ever), and both the rules
+    (`appAdmin` → `ownerTwoStepOk`) and the Worker (meter-admin: needTwoStep) require it, by design (v38.23). I first
+    told Tony it was Instagram's in-app browser — wrong: the address bar in the screenshot is Safari's; corrected. Now
+    `ownerSignInWhy()` (index.html) reads the ID token: not Google → "signed in with an e-mail link or a password";
+    Google without TOTP → "made without the code from your authenticator app (it may be older than the
+    authenticator)"; each with "Sign out (at the top, beside the sync status), then sign in again with Google: the app
+    asks for the 6-digit code". manage.js `learnOwnerWhy()` (after load and failed notes) + `refusedHint()`: said
+    once, in place of the rules advice (Households, Feedback, and AI spending when the households read did not fail).
+    Self Test `owner_signin_why`. Help: the 📊 Households line. Self Test `sec_no_local_save_helper`: lets Firebase's own background
+    Request objects through uncounted (it failed once locally on one, like key_check in CI). **Tony's fix on the iPhone: sign out, sign in with
+    Google + the code.**
   - **Released: v39.20 (30 Oct 2026, 01:44 Israel time, on 73ebaf2; Tony: "Please update the reconstruction prompt and
     release it to Beta and family when all checks are done")** — every job success: Deploy to GitHub Pages, pages
     build, Publish languages, Translate new phrases, Self Tests on main and test, Cloudflare Pages for the beta and
