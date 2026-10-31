@@ -1547,7 +1547,7 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
     is 4 weeks old yet); the service account reaches the beta's database. **Correction, 31 Oct: it did fire — late:**
     the 30 Oct scheduled run started at 10:12 UTC (12:12 Israel time, about 7 hours after 03:23; run 41039063481,
     event "schedule"), success, 0 removed. GitHub delays scheduled runs when busy (worst near the hour); "no run by
-    05:28" was too early to call. 31 Oct: none yet at 05:16 UTC; checked again in the afternoon.
+    05:28" was too early to call. 31 Oct: fired at 09:48 UTC (11:48 Israel time; run 41190168758), success, 0 removed.
   - **v39.16 + Worker v99 — warnings for the e-mail service, the kitchen send by e-mail through it, Deployments, and
     the identifier on the main screen** (Tony, 29 Oct: "Please add the relevant information to the Deployment area, and
     update the reconstruction prompt. Also, please make sure I get a warning if quota is exceeded or if any issues arise
