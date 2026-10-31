@@ -1544,8 +1544,11 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
     **30 Oct: the schedule did not fire on its first night** (no run by 05:28 UTC — GitHub's scheduler often skips or
     delays a schedule just added to the default branch). Started by hand (run 41008675953, 07:29 Israel time):
     success — "Sent recipes past their 4 weeks removed from my-kitchen-notes-beta: 0 recipe(s), 0 picture(s)" (none
-    is 4 weeks old yet); the service account reaches the beta's database. The 31 Oct scheduled run is checked too.
- the kitchen send by e-mail through it, Deployments, and
+    is 4 weeks old yet); the service account reaches the beta's database. **Correction, 31 Oct: it did fire — late:**
+    the 30 Oct scheduled run started at 10:12 UTC (12:12 Israel time, about 7 hours after 03:23; run 41039063481,
+    event "schedule"), success, 0 removed. GitHub delays scheduled runs when busy (worst near the hour); "no run by
+    05:28" was too early to call. 31 Oct: none yet at 05:16 UTC; checked again in the afternoon.
+  - **v39.16 + Worker v99 — warnings for the e-mail service, the kitchen send by e-mail through it, Deployments, and
     the identifier on the main screen** (Tony, 29 Oct: "Please add the relevant information to the Deployment area, and
     update the reconstruction prompt. Also, please make sure I get a warning if quota is exceeded or if any issues arise
     with this service"; then "Can we use the same Resend .com mailing mechanism when sharing between kitchens via
