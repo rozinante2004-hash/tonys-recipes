@@ -13,6 +13,12 @@
  * phone (and 360, a small one), with stand-in people and households, and measures: nothing may stick out of its card,
  * a name must have room, and the page must not scroll sideways. A computer's width is checked too (1280): the PC look
  * Tony likes must not change, and the row of someone asking to add recipes did not fit there either.
+ *
+ * v39.24 — Tony, 2 Nov 2026: "the opened modals (like a recipe) do not match the screen's size. They often open too big,
+ * or to the side … All modals should auto-adjust their sizes to the screen when opened." So, with a signed-in kitchen and
+ * recipes with long names: on 320 px (an iPhone with Display Zoom — the header made the page 49 px wider than that) and on
+ * 390 px, and on 390 px zoomed in as a phone does after a tap in a small text box, every window and menu checked here
+ * must open inside what the screen shows, and the page must not be wider than the screen.
  */
 function loadPlaywright() {
   for (const m of ['playwright', '/opt/node22/lib/node_modules/playwright']) {
@@ -106,8 +112,73 @@ async function households(page) {
   return res;
 }
 
+async function windowsFit(page) {
+  await page.evaluate(() => {
+    const l = document.getElementById('loginScreen'); if (l) l.style.display = 'none';
+    window._fbUser = { uid: 'uMe', email: 'owner.longname@example.com', displayName: 'Owner Longname', emailVerified: true, providerData: [{ providerId: 'google.com' }] };
+    window._household = { hid: 'hH', role: 'owner', name: 'Admin Kitchen Notes', code: 'MKN-J5DM-F9BX', ownerUid: 'uMe', ownerName: 'Owner Longname',
+      links: [{ hid: 'hL', name: 'Tester’s Kitchen Notes', code: 'MKN-QPMV-F5VB', at: 1 }], asking: [] };
+    recipes.length = 0;
+    ['Slow-roasted lamb shoulder with pomegranate molasses, za’atar and charred lemon', 'מרק עגבניות קלויות עם בצל, שום וטימין', 'Shakshuka'].forEach((n, i) =>
+      recipes.push(normalizeRecipe({ id: 9000 + i, uid: 'u' + i, name: n, category: 'Soups', emoji: '🍲', time: '1h 30m', servings: 4, difficulty: 'Medium', tags: ['family', 'holiday'],
+        ingredients: [{ a: '2 tbsp', n: 'olive oil, extra-virgin, the good one from the market' }], steps: ['Heat the oil in a heavy, wide, ovenproof pot until shimmering.'],
+        source: 'https://www.example.com/a/very/long/path/to/a/recipe/page/that/goes/on', updatedAt: Date.now() })));
+    try { renderFilters(); renderGrid(); householdBrand(); } catch (e) {}
+  });
+  await page.waitForTimeout(300);
+  const measure = sel => page.evaluate(sel => {
+    const vv = window.visualViewport, de = document.documentElement;
+    const scr = vv ? { l: vv.offsetLeft, t: vv.offsetTop, r: vv.offsetLeft + vv.width, b: vv.offsetTop + vv.height } : { l: 0, t: 0, r: innerWidth, b: innerHeight };
+    const out = { page: de.scrollWidth - de.clientWidth };
+    if (!sel) return out;
+    const ov = document.querySelector(sel); if (!ov) return Object.assign(out, { problem: 'did not open' });
+    const card = ov.matches('.drop-menu') ? ov : Array.from(ov.children).find(c => getComputedStyle(c).display !== 'none' && c.getBoundingClientRect().height > 40) || ov;
+    const r = card.getBoundingClientRect();
+    if (r.left < scr.l - 1 || r.top < scr.t - 1 || r.right > scr.r + 1 || r.bottom > scr.b + 1)
+      out.problem = `outside the screen: ${[r.left, r.top, r.right, r.bottom].map(Math.round).join(',')} on ${[scr.l, scr.t, scr.r, scr.b].map(Math.round).join(',')}`;
+    return out;
+  }, sel);
+  const res = { main: await measure(null) };
+  const wins = [
+    ['a recipe', 'openView(9000)', '#viewOverlay', 'closeView()'],
+    ['a recipe in Hebrew', 'openView(9001)', '#viewOverlay', 'closeView()'],
+    ['the recipe editor', 'openAddModal(9000)', '#editOverlay', "document.getElementById('editOverlay').classList.remove('open')"],
+    ['··· More', "toggleDrop('moreDrop')", '#moreDrop', "closeDrop('moreDrop')"],
+    ['⚙️ Settings', "toggleDrop('settingsDrop')", '#settingsDrop', "closeDrop('settingsDrop')"],
+    ['Help', 'openHelp()', '#helpOverlay', "document.getElementById('helpOverlay').classList.remove('open')"],
+    ['👥 Family Access', 'openAccessControl()', '#accessOverlay', "document.getElementById('accessOverlay').classList.remove('open')"],
+    ['📤 Share', 'toggleShare(9000)', '#shareRecipeOverlay', "document.getElementById('shareRecipeOverlay').classList.remove('open')"],
+    ['a question', "askConfirm({ icon: '🔑', title: 'Reset their password?', message: 'Sends someone.with.a.long.address@example.com an e-mail.', okLabel: 'Send the e-mail' })", '#askOverlay', "document.getElementById('askOverlay').remove()"],
+    ['a Service Error', "showServiceError('PERMISSION: test\\n\\nhttps://console.firebase.google.com/u/0/project/my-kitchen-notes-beta/firestore/databases/-default-/security/rules')", '#serviceErrorOverlay', "document.getElementById('serviceErrorOverlay').remove()"],
+  ];
+  for (const [label, open, sel, close] of wins) {
+    // `void`: a question's window answers only when someone presses a button — not waited for here
+    try { await page.evaluate('void (' + open + ')'); } catch (e) { res[label] = { problem: 'could not open: ' + String(e.message || e).slice(0, 80) }; continue; }
+    await page.waitForTimeout(450);
+    res[label] = await measure(sel);
+    try { await page.evaluate(close); } catch (e) { /* closed already */ }
+    await page.waitForTimeout(120);
+  }
+  return res;
+}
+
 (async () => {
   const browser = await chromium.launch();
+  // v39.24 — every window opens inside what the screen shows: a small screen, a usual one, and one zoomed in
+  for (const [w, h, zoom, label] of [[320, 690, 1, 'an iPhone with Display Zoom'], [390, 844, 1, 'iPhone'], [390, 844, 1.25, 'iPhone, zoomed in after a tap in a text box']]) {
+    const ctx = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
+    const page = await ctx.newPage();
+    const crashes = [];
+    page.on('pageerror', e => crashes.push(String(e && e.message || e)));
+    await page.goto(`http://127.0.0.1:${PORT}/index.html`, { waitUntil: 'networkidle' });
+    if (zoom !== 1) { const cdp = await ctx.newCDPSession(page); await cdp.send('Emulation.setPageScaleFactor', { pageScaleFactor: zoom }); await page.waitForTimeout(300); }
+    console.log(`\n${label} (${w}px${zoom !== 1 ? ', zoom ' + zoom : ''}): the windows`);
+    const res = await windowsFit(page);
+    Object.keys(res).forEach(k => expect(k === 'main' ? 'the page is not wider than the screen' : `${k}: opens inside the screen`,
+      !res[k].problem && res[k].page <= 0, res[k].problem || `the page is ${res[k].page}px wider than the screen`));
+    expect('no page errors', !crashes.length, crashes.join(' | '));
+    await ctx.close();
+  }
   for (const [w, h, label] of [[390, 844, 'iPhone'], [360, 740, 'a small phone'], [1280, 900, 'a computer']]) {
     for (const scheme of ['dark', 'light']) {
       const ctx = await browser.newContext({ viewport: { width: w, height: h }, colorScheme: scheme, isMobile: w < 600, hasTouch: w < 600 });

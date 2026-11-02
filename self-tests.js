@@ -11315,6 +11315,54 @@ window.SELF_TESTS = [
       if(!/Why this is needed/.test(ad) || !/always has an owner/.test(ad)) throw new Error('deleting an account does not explain why a handover is needed');
     } },
 
+  { id:'windows_fit_the_screen', group:'UI', name:'📱 A window opens fitted to what the screen shows when the page is zoomed or wider than the screen — at its normal size; it follows the screen, lets go on a pinch inside it or when it closes; a menu too (v39.24)',
+    test: async()=>{
+      // Tony, 2 Nov 2026: "the opened modals (like a recipe) do not match the screen's size. They often open too big, or to
+      // the side … All modals should auto-adjust their sizes to the screen when opened." The screen is stood in for here:
+      // 300×520 at zoom 1.25, 12 px in and 30 px down — as a phone is after zooming into a small text box.
+      var realBox=window.screenBox, box={ left:12, top:30, width:300, height:520, scale:1.25 }, ov=null;
+      var tick=function(){ return new Promise(function(r){ setTimeout(r, 40); }); };
+      var frames=function(){ return new Promise(function(r){ requestAnimationFrame(function(){ requestAnimationFrame(function(){ setTimeout(r, 20); }); }); }); };
+      var gs=document.getElementById('gridSettingsOverlay'), gsWas=gs && gs.classList.contains('open');
+      try{
+        window.screenBox=function(){ return Object.assign({}, box); };
+        ov=document.createElement('div'); ov.className='modal-overlay open'; ov.id='fitTestOverlay';
+        ov.innerHTML='<div class="modal" style="padding:20px;">A window</div>';
+        document.body.appendChild(ov); await tick();
+        if(ov.style.left!=='12px' || ov.style.top!=='30px' || ov.style.width!=='375px' || ov.style.height!=='650px' || ov.style.transform!=='scale(0.8)')
+          throw new Error('a window that opened was not fitted to the screen: '+ov.style.cssText);
+        // the keyboard, or the browser's bars: it follows the screen
+        box.height=300; screenFitFollow();
+        if(ov.style.height!=='375px') throw new Error('it did not follow the screen: '+ov.style.height);
+        // a pinch inside it: let go — it zooms with the page, as before
+        box.scale=1.6; screenFitFollow();
+        if(ov.style.transform || ov.style.left || ov.hasAttribute('data-screen-fit')) throw new Error('a pinch inside it did not let it go: '+ov.style.cssText);
+        ov.remove(); ov=null;
+        // one of the page's own windows: fitted as it opens, its own styles back as it closes
+        box={ left:12, top:30, width:300, height:520, scale:1.25 };
+        if(gs){
+          gs.classList.remove('open'); await tick(); gs.classList.add('open'); await tick();
+          if(!gs.hasAttribute('data-screen-fit') || gs.style.transform!=='scale(0.8)') throw new Error('⊞ Grid Layout was not fitted as it opened');
+          gs.classList.remove('open'); await tick();
+          if(gs.hasAttribute('data-screen-fit') || gs.style.transform || gs.style.left || gs.style.width) throw new Error('⊞ Grid Layout kept the fit after closing: '+gs.style.cssText);
+        }
+        // a menu: inside the screen, at its normal size
+        toggleDrop('moreDrop'); await frames();
+        var m=document.getElementById('moreDrop'), L=parseFloat(m.style.left), T=parseFloat(m.style.top);
+        if(m.style.transform!=='scale(0.8)') throw new Error('··· More was not drawn at its normal size: '+m.style.transform);
+        if(L<12-0.5 || T<30-0.5 || L+m.offsetWidth*0.8>12+300+0.5) throw new Error('··· More opened outside the screen: '+L+', '+T+', '+m.offsetWidth);
+        closeDrop('moreDrop');
+        if(m.style.transform) throw new Error('··· More kept its scale after closing');
+        // the page at its normal zoom and not too wide: nothing is touched
+        box={ left:0, top:0, width:document.documentElement.clientWidth, height:window.innerHeight, scale:1 };
+        if(screenFitOff({ left:0, top:0, width:box.width, height:box.height }, box)) throw new Error('a page that fits was taken for one that does not');
+      } finally {
+        window.screenBox=realBox; if(ov) ov.remove(); try{ closeDrop('moreDrop'); }catch(e){}
+        if(gs){ if(gsWas) gs.classList.add('open'); else gs.classList.remove('open'); }
+      }
+      return 'fitted as it opens (zoom 1.25), follows the screen, lets go on a pinch and on closing; ··· More inside the screen at its size';
+    } },
+
   { id:'settings_in_sections', group:'UI', name:'⚙️ Settings in sections: their names first, one open at a time, empty ones not shown, below the bar (v37.74)',
     test: async()=>{
       var m=document.getElementById('settingsDrop');
@@ -17660,7 +17708,8 @@ window.SELF_TESTS = [
       // Direction-based means a scroll listener, and the LISTENER must be the
       // throttled one — checking merely that a throttled function exists is
       // satisfied by one nothing calls.
-      var m = code.match(/addEventListener\('scroll',\s*([A-Za-z_$][\w$]*)/);
+      // (the page's own scroll — v39.24 added the visual viewport's, which the header does not follow)
+      var m = code.match(/window\.addEventListener\('scroll',\s*([A-Za-z_$][\w$]*)/);
       if(!m) throw new Error('nothing listens for scroll, so the header cannot follow it');
       if(!new RegExp('function '+m[1]+'\\([\\s\\S]{0,200}requestAnimationFrame').test(code))
         throw new Error('the scroll listener ('+m[1]+') is not rAF-throttled');

@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v39.23` — app. **Worker: v100**, deployed separately and versioned separately
+**Current version:** `v39.24` — app. **Worker: v100**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -786,6 +786,21 @@ buttons). Phones' own filters are named in Help for the whole phone.
 **Phone layouts (v38.84):** 👥 Family Access rows wrap below 600 px (name first, buttons under, ✕ in the card's corner);
 the 👑 📊 Households table is cards below 700 px (cells with data-label) with a Sort-by menu; the tabs wrap. CI
 tests/phone-fit.js measures both at 390/360/1280 px.
+**Every window fits the phone's screen (v39.24).** Three causes of windows opening "too big, or to the side" and of
+tiny text in Chrome: (1) below ~375 px (an iPhone with Display Zoom is 320) the header's kitchen name (`.logo`,
+`white-space: nowrap`) made the page wider than the screen — Chrome showed everything smaller, Safari slid sideways and
+centred windows on the wider page; below 600 px the name wraps, below 375 it is 17 px and the row's padding 12 px;
+text boxes in a row may shrink (`min-width: 0`). (2) A phone zooms into a text box under 16 px and stays zoomed: on
+`(pointer: coarse)` every text box, select and textarea is 16 px (`!important`, over inline sizes), menu items 15 px.
+(3) `screenFit` (beside `toggleDrop`): a MutationObserver on body's children; a layer over the whole page that opens
+while its box differs from the visual viewport (`screenBox()`: offset, size, scale — zoomed, or the layout viewport
+wider than the screen) is laid over the visual viewport — left/top at its offset, width/height × scale,
+`transform: scale(1/scale)` from its corner — so it shows at its normal size on what the screen shows; it follows
+visualViewport resize/scroll (keyboard, bars, pan), is let go on a pinch inside it (scale changes) or when it closes
+(inline styles restored); a line in the log each time. `toggleDrop` places a menu the same way when zoomed or too
+wide. The viewport meta has `shrink-to-fit=no` (WebKit). tests/phone-fit.js also opens ten windows and menus with a
+signed-in kitchen at 320, 390 and 390 zoomed 1.25 (CDP `Emulation.setPageScaleFactor`) and requires each inside the
+visual viewport; Self Test `windows_fit_the_screen` stands in for the screen with a stubbed `screenBox`.
 A place kept for an address that nobody has signed in with yet says "⏳ hasn’t signed in yet" under it (v38.85): it
 has no 💬 Chat, because there is nobody to chat with until they sign in with that address.
 

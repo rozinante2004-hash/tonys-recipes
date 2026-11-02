@@ -1,9 +1,9 @@
-<!-- Tony's Recipes Collection v39.23 -->
+<!-- Tony's Recipes Collection v39.24 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, shrink-to-fit=no">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -10678,7 +10678,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.23';
+var APP_VERSION = 'v39.24';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -12420,6 +12420,34 @@ html.setup-first #loginScreen > * { visibility: hidden; }   /* v39.02 — a firs
 #helpDetailOverlay > * { max-height: min(85vh, 100%) !important; }
 #termsGate > *, #setupWiz > * { max-height: min(94vh, 100%) !important; }
 .modal-overlay.open { display: flex; }
+/* v39.24 — Tony, 2 Nov 2026: "the opened modals (like a recipe) do not match the screen's size. They often open too
+   big, or to the side … In chrome it is even worse and the fonts (under More... for example) are significantly
+   smaller … All modals should auto-adjust their sizes to the screen when opened." Three causes, all on phones:
+   1. On a 320–374 px screen (an iPhone with Display Zoom, a small Android phone) the kitchen's name in the header never
+      wrapped and made the page wider than the screen: Chrome showed the whole page smaller, Safari let it slide sideways
+      and centred every window on the too-wide page. The name wraps now (and is a little smaller there).
+   2. A phone zooms into a text box whose letters are under 16 px — all of the app's were 13–14 px — and stays zoomed
+      after it, so the next window opened too big and to one side. On a touch screen they are 16 px.
+   3. Whatever the zoom, and however wide the page, a window is fitted to what the screen shows as it opens
+      (screenFit, beside toggleDrop) — and so is a menu, drawn at its normal size. */
+@media (max-width: 600px) {
+  .header-brand { min-width: 0; max-width: 100%; }
+  .header-brand > svg { flex-shrink: 0; }
+  .header .logo { white-space: normal; overflow-wrap: anywhere; line-height: 1.15; min-width: 0; }
+}
+@media (max-width: 374px) {
+  .header-row { padding-left: 12px; padding-right: 12px; }
+  .header .logo { font-size: 17px; }
+}
+@media (max-width: 600px) {   /* a text box in a row shrinks with it (its own width would push the row off a small screen) */
+  input, select, textarea { min-width: 0; max-width: 100%; }
+}
+@media (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not([type="button"]):not([type="submit"]),
+  select, textarea { font-size: 16px !important; }
+  .drop-item { font-size: 15px; }
+}
+#serviceErrorOverlay a { overflow-wrap: anywhere; word-break: break-word; }
 /* v38.36 — the install hint never sits on an open window: on an iPhone it covered
    "✓ Add to My Collection" in the import window. */
 body:has(.modal-overlay.open) #pwaIosBanner, body:has(#askOverlay) #pwaIosBanner, body:has(.modal-overlay.open) #pwaInstallBanner, body:has(#askOverlay) #pwaInstallBanner { display: none !important; }
@@ -14008,7 +14036,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.23</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.24</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14096,7 +14124,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.23</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.24</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -24641,7 +24669,7 @@ function toggleDrop(id){
   const wasOpen=menu.classList.contains('open');
   // Close all
   _disarmDropOutside();
-  document.querySelectorAll('.drop-menu').forEach(m=>{ m.classList.remove('open'); m.style.top='-999px'; m.style.left='-999px'; });
+  document.querySelectorAll('.drop-menu').forEach(m=>{ m.classList.remove('open'); m.style.top='-999px'; m.style.left='-999px'; m.style.transform=''; });
   if(!wasOpen){
     // Find button rect BEFORE showing menu
     const btn=menu.previousElementSibling||menu.parentElement.querySelector('button');
@@ -24661,7 +24689,17 @@ function toggleDrop(id){
     // Use rAF to let browser calculate size without showing
     requestAnimationFrame(function(){
       menu.style.maxHeight='';                 // measure its NATURAL height
-      var vv=window.visualViewport;
+      var vv=window.visualViewport, sb=screenBox(), de=document.documentElement;
+      // v39.24 — the page zoomed, or wider than the screen: placed within what the screen shows, at its normal size
+      if (Math.abs(sb.scale-1)>0.01 || Math.abs(sb.left)>1.5 || Math.abs(sb.top)>1.5 || de.scrollWidth>de.clientWidth+1) {
+        var s=sb.scale, rr={ top:(r.top-sb.top)*s, bottom:(r.bottom-sb.top)*s, left:(r.left-sb.left)*s, right:(r.right-sb.left)*s };
+        var q=dropPlacement(rr, menu.offsetWidth, menu.scrollHeight, sb.width*s, sb.height*s, safeAreaTopPx());
+        menu.style.transformOrigin='0 0'; menu.style.transform=Math.abs(s-1)>0.001 ? 'scale('+(1/s)+')' : '';
+        menu.style.top=(sb.top+q.top/s)+'px'; menu.style.left=(sb.left+q.left/s)+'px';
+        menu.style.maxHeight=q.maxHeight ? q.maxHeight+'px' : '';
+        menu.scrollTop=0; menu.classList.toggle('drop-scrolls', !!q.maxHeight);
+        return;
+      }
       var p=dropPlacement(r, menu.offsetWidth, menu.scrollHeight,
                           window.innerWidth, (vv && vv.height) || window.innerHeight, safeAreaTopPx());
       menu.style.top=p.top+'px';
@@ -24724,9 +24762,94 @@ window.settingsGroup = settingsGroup; window.settingsGroupsRefresh = settingsGro
 function closeDrop(id){
   var m=document.getElementById(id); if(!m) return;
   m.classList.remove('open');
-  m.style.top='-999px'; m.style.left='-999px';
+  m.style.top='-999px'; m.style.left='-999px'; m.style.transform='';
   _disarmDropOutside();
 }
+
+// ─── A WINDOW OPENS FITTED TO THE SCREEN (v39.24) ────────────────────────────
+// Tony, 2 Nov 2026: "All modals should auto-adjust their sizes to the screen when opened." A window is laid over the
+// page's own box (position: fixed, inset 0). When the page is zoomed — a pinch, or a phone zooming into a text box —
+// or wider than the screen, that box is not what the screen shows, and the window opened too big or to one side. So
+// as one opens it is laid over exactly what the screen shows, at the screen's size, and drawn at the page's normal
+// scale whatever the zoom (transform: scale(1/zoom)). On a page that fits at the normal zoom nothing is touched. While
+// a fitted window is open it follows the screen (the keyboard, the browser's bars, a pan); a pinch inside it lets it go,
+// so it zooms like the rest of the page.
+function screenBox() {
+  var vv = window.visualViewport;
+  if (!vv) return { left: 0, top: 0, width: window.innerWidth, height: window.innerHeight, scale: 1 };
+  return { left: vv.offsetLeft, top: vv.offsetTop, width: vv.width, height: vv.height, scale: vv.scale || 1 };
+}
+function screenFitOff(r, b) {   // does a box of the page (getBoundingClientRect) differ from what the screen shows?
+  return Math.abs(b.scale - 1) > 0.01 || Math.abs(r.left - b.left) > 1.5 || Math.abs(r.top - b.top) > 1.5
+    || Math.abs(r.width - b.width) > 1.5 || Math.abs(r.height - b.height) > 1.5;
+}
+var SCREEN_FIT_PROPS = ['left', 'top', 'right', 'bottom', 'width', 'height', 'transform', 'transformOrigin'];
+var _screenFitted = [];          // [{ el, scale, orig }]
+function screenWindow(el) {      // a layer over the whole page: a window, not a menu, a banner or a farm visitor
+  if (!el || el.nodeType !== 1 || el.parentNode !== document.body || el.id === 'toast' || el.classList.contains('farm-visitor')) return false;
+  // cheap first (the farm's animals change their style every frame): what a window looks like before it is measured
+  if (!(el.classList.contains('modal-overlay') || /(Overlay|Modal)$/.test(el.id || '') || /^(termsGate|setupWiz|loginScreen)$/.test(el.id || '')
+    || el.style.position === 'fixed' || el.hasAttribute('data-screen-fit'))) return false;
+  var cs = getComputedStyle(el);
+  if (cs.position !== 'fixed' || cs.display === 'none' || cs.visibility === 'hidden') return false;
+  var r = el.getBoundingClientRect(), de = document.documentElement;
+  return r.width >= de.clientWidth - 2 && r.height >= Math.min(de.clientHeight, window.innerHeight) * 0.9;
+}
+function screenFitApply(f) {
+  var b = screenBox(), el = f.el, s = b.scale;
+  el.style.left = b.left + 'px'; el.style.top = b.top + 'px'; el.style.right = 'auto'; el.style.bottom = 'auto';
+  el.style.width = (b.width * s) + 'px'; el.style.height = (b.height * s) + 'px';
+  el.style.transformOrigin = '0 0'; el.style.transform = Math.abs(s - 1) > 0.001 ? 'scale(' + (1 / s) + ')' : '';
+  f.scale = s;
+}
+function screenFitRelease(f) {
+  SCREEN_FIT_PROPS.forEach(function(p){ f.el.style[p] = f.orig[p]; });
+  f.el.removeAttribute('data-screen-fit');
+  _screenFitted = _screenFitted.filter(function(x){ return x !== f; });
+}
+function screenFitCheck(el) {
+  var f = _screenFitted.filter(function(x){ return x.el === el; })[0];
+  if (!screenWindow(el)) { if (f && (!el.isConnected || getComputedStyle(el).display === 'none')) screenFitRelease(f); return false; }
+  if (f) return true;
+  var b = screenBox();
+  if (!screenFitOff(el.getBoundingClientRect(), b)) return false;
+  var orig = {}; SCREEN_FIT_PROPS.forEach(function(p){ orig[p] = el.style[p]; });
+  f = { el: el, scale: b.scale, orig: orig };
+  _screenFitted.push(f); el.setAttribute('data-screen-fit', '');
+  screenFitApply(f);
+  try { if (typeof syncLog === 'function') syncLog('system', 'A window was fitted to the screen (zoom ' + (Math.round(b.scale * 100) / 100)
+    + ', the page ' + Math.round(document.documentElement.scrollWidth) + ' px wide, the screen ' + Math.round(b.width * b.scale) + ')', el.id || el.className); } catch(e) {}
+  return true;
+}
+function screenFitFollow() {
+  _screenFitted.slice().forEach(function(f) {
+    if (!f.el.isConnected || getComputedStyle(f.el).display === 'none') { screenFitRelease(f); return; }
+    var s = screenBox().scale;
+    if (Math.abs(s - f.scale) > 0.02) { screenFitRelease(f); return; }   // a pinch inside it: it zooms with the page
+    screenFitApply(f);
+  });
+}
+var _screenFitRaf = 0;
+function screenFitOnScreen() {   // the screen moved or changed size (a pinch, the keyboard, a pan): once a frame at most
+  if (_screenFitRaf || !_screenFitted.length) return;
+  _screenFitRaf = requestAnimationFrame(function(){ _screenFitRaf = 0; screenFitFollow(); });
+}
+(function screenFitStart() {
+  if (!window.MutationObserver || !document.body) return;
+  new MutationObserver(function(list) {
+    var seen = [];
+    list.forEach(function(m) {
+      var els = m.type === 'childList' ? Array.prototype.slice.call(m.addedNodes) : [m.target];
+      els.forEach(function(el) { if (el && el.parentNode === document.body && seen.indexOf(el) < 0) seen.push(el); });
+      if (m.type === 'childList') Array.prototype.forEach.call(m.removedNodes, function(el) {
+        _screenFitted.filter(function(x){ return x.el === el; }).forEach(screenFitRelease); });
+    });
+    seen.forEach(function(el){ try { screenFitCheck(el); } catch(e) {} });
+  }).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'style'] });
+  if (window.visualViewport) { visualViewport.addEventListener('resize', screenFitOnScreen); visualViewport.addEventListener('scroll', screenFitOnScreen, { passive: true }); }
+  window.addEventListener('resize', screenFitOnScreen);
+})();
+window.screenBox = screenBox; window.screenFitCheck = screenFitCheck; window.screenFitFollow = screenFitFollow;
 
 // ═══════════════════════════════════
 // MODAL / UTILS
@@ -33342,6 +33465,7 @@ var HELP_SYSTEM_PROMPT = [
   "- The log's report says, under the browser line, who this account is to its household: how it signs in, its role (Read only, Read + Write, Full access, Owner), whether changes are waiting to be sent, and whether it runs as the installed app or in a browser tab — never an address. The log keeps each opening of the app, every message shown on screen as an error, and every save the database refused (what it was writing, and the role).",
   "",
   "=== IF SOMETHING LOOKS WRONG ===",
+  "- ON A PHONE, A WINDOW TOO BIG OR OFF TO ONE SIDE, OR TINY TEXT: every window and menu opens fitted to what the screen shows — even when the page is zoomed (a pinch, or the phone zooming into a text box) — and at its normal size. Text boxes use 16-pixel letters on a touch screen, so the phone does not zoom in when you tap one, and the kitchen's name in the header wraps on a narrow screen (an iPhone with Display Zoom, a small phone) instead of making the page wider than the screen. If it still happens, send the log from ⚙️ → 🔧 Troubleshooting: it notes each window it had to fit, with the zoom and the widths.",
   "- WHITE BLOCKS (white blobs or panels) covering the fields while editing a recipe, sliding as you scroll: that is the GINGER grammar browser extension, not the app. In a window that scrolls it draws its underline layer in the wrong place — in Chrome on any computer (Windows, Mac, Linux). Fix: click Ginger's icon in the browser toolbar → switch it off for this site → reload. The app says so once when it notices Ginger in the editor. Other writing assistants can do the same; switching them off for this site fixes it too",
   "- Something not working at all: ⚙️ → 🔧 Troubleshooting → 🧪 Self Test, then 📋 Copy report (or Send to admin)",
   "",

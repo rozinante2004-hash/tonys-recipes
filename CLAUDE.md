@@ -1437,6 +1437,24 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
   - **Released: v39.09 (29 Oct 2026, 11:17 Israel time, on 0de2dde; Tony: "Yes, release v39.09").** Every job success:
     Deploy to GitHub Pages, pages build, Publish languages, Translate new phrases, Self Tests on main and test,
     Cloudflare Pages for the beta and test.
+  - **v39.24 — every window and menu opens fitted to the phone's screen** (Tony, 2 Nov 2026: "the opened modals (like a
+    recipe) do not match the screen's size. They often open too big, or to the side, and do not match or snap to the
+    size of the device. I am running safari on my iPhone and one of the testers is running Chrome. In chrome it is even
+    worse and the fonts (under More... for example) are significantly smaller than in Safari. Practically too small to
+    read." — "All modals should auto-adjust their sizes to the screen when opened."). Not reproducible at 375–430 px in
+    Chromium's phone emulation with no data; with a signed-in kitchen and real-looking recipes a probe of 15 windows
+    found: **at 320 px (an iPhone with Display Zoom, a small phone) the page was 49 px wider than the screen** — the
+    header's `.logo` (nowrap) + 🏅 badge + version — so every window sat centred on the wider page, cut off on the
+    right and too tall, and Chrome shows such a page shrunk (the tiny text); and **when the page is zoomed** (an iPhone
+    zooms into any text box under 16 px — the app's were 13–14 px — and stays zoomed), every window opened too big and
+    to one side (screenshot pair: before, the recipe cut off with ✕ off-screen; after, the whole card at normal size).
+    Fix: the name wraps below 600 px (17 px, 12 px padding below 375); text boxes 16 px and menu items 15 px on touch
+    screens; text boxes in a row may shrink; the error window's link wraps; `screenFit` lays a window over what the
+    screen shows (visual viewport, counter-scaled) as it opens, follows the keyboard/bars, lets go on a pinch inside or
+    on closing, logs it; menus placed the same way; `shrink-to-fit=no`. tests/phone-fit.js: ten windows/menus at 320,
+    390 and 390 zoomed 1.25 must open inside the screen (on the old code: the page 11 px too wide at 320, and 8 of the
+    10 outside the screen zoomed). Self Test `windows_fit_the_screen`. Help: "ON A PHONE, A WINDOW TOO BIG…". Not
+    verifiable here: real WebKit (Safari, and Chrome on iPhone, which is WebKit too) — to be checked on Tony's iPhone.
   - **v39.23 — a reader's device sends nothing; refusals in words and in the log; more in the log** (Tony, 2 Nov 2026:
     a member of his household, on an Android phone in the beta, was shown "PERMISSION: The cloud write was denied by
     your Firestore security rules … console.firebase.google.com …" while going through a recipe — "she only opened the
