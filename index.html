@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.22 -->
+<!-- Tony's Recipes Collection v39.23 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1116,6 +1116,7 @@ function syncLogReportText() {
   L.push('Logging ' + (logEnabled() ? 'ON' : 'OFF') + ', keeping ' + logRetentionDays() + ' day(s)'
        + '  ·  ' + list.length + ' event(s), ' + formatBytes(syncLogBytes()));
   try { L.push('Browser: ' + navigator.userAgent); } catch(e) {}
+  try { L.push(syncLogAccountLine()); } catch(e) {}   // v39.23
   L.push('');
   L.push('WHAT THIS LOOKS LIKE');
   findings.forEach(function(f, i) {
@@ -1136,6 +1137,27 @@ function syncLogReportText() {
   return logMaskAddresses(L.join('\n'));   // v38.28 — also entries written before addresses were shortened
 }
 window.syncLogReportText = syncLogReportText;
+// v39.23 — Tony, 2 Nov 2026, after a member's report said "Nothing looks wrong" over a refusal she was shown: "Perhaps we
+// need to add more parameters to the log". Who this account is to its household, in one line — never an address or a name.
+function syncLogAccountLine() {
+  var u = window._fbUser, h = (typeof _household !== 'undefined') ? _household : null, P = [];
+  if (!u) P.push('not signed in');
+  else {
+    var how = (u.providerData || []).map(function(p){ return ({ 'google.com': 'Google', password: 'password' })[p && p.providerId] || ''; })
+      .filter(Boolean);
+    P.push('signed in' + (how.length ? ' (' + how.join(' + ') + ')' : '') + (u.emailVerified === false ? ', e-mail address not confirmed' : ''));
+  }
+  if (typeof _cloudLayout !== 'undefined' && _cloudLayout === 'households') {
+    P.push(h && h.role ? 'role in the household: ' + ({ owner: 'Owner', admin: 'Full access', editor: 'Read + Write', viewer: 'Read only' }[h.role] || h.role)
+      + (h.role === 'viewer' && h.asked ? ' (asked to add and change)' : '') : 'no household yet');
+  }
+  var waiting = typeof _offlineQueue !== 'undefined' && !!_offlineQueue;
+  try { waiting = waiting || localStorage.getItem('tonys_offline_queue') === '1'; } catch(e) {}
+  P.push('changes waiting to be sent: ' + (waiting ? 'yes' : 'no'));
+  P.push(typeof setupStandalone === 'function' && setupStandalone() ? 'the installed app' : 'a browser tab');
+  return 'Account: ' + P.join('  \u00b7  ');
+}
+window.syncLogAccountLine = syncLogAccountLine;
 
 // ─── THE NUDGE (v35.6) ────────────────────────────────────────────────────────
 //
@@ -10656,7 +10678,9 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.22';
+var APP_VERSION = 'v39.23';
+// v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
+try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
 // ─── VERSION CHECK ────────────────────────────────────────────────────────────
 // Fetches version.json (never cached) to detect if a newer version is deployed.
@@ -13984,7 +14008,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.22</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.23</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14072,7 +14096,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.22</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.23</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -24480,6 +24504,11 @@ async function _aiCallUncached(prompt, maxTokens, tools, _ck, model, system) {
 // — see refreshRecipeFromCloud and the EDITED_ELSEWHERE case below.
 function showServiceError(message, actions) {
   if (typeof insightError === 'function') { try { insightError('service', message, ''); } catch(e) {} }   // v38.15
+  // v39.23 — what the person was shown is in their log too (a member's phone showed a refusal; her report said
+  // "Nothing looks wrong"). Reported to the server once, above — not again from the log.
+  window._insFromRecord = true;
+  try { syncLog('error', 'On screen: ' + String(message == null ? '' : message).split('\n')[0].slice(0, 200)); } catch(e) {}
+  window._insFromRecord = false;
   // Parse multi-line messages with URLs into clickable links
   var lines = message.split('\n').filter(function(l){ return l.trim(); });
   var html = '';
@@ -27302,7 +27331,8 @@ let saveTimer = null;
 function saveData() {
   saveLocal();
   if (window._driveMode && window._fbUser) {
-    if (!navigator.onLine) {
+    if (readerHere()) _readerChangedAt = Date.now();   // v39.23 — sent nowhere; said once (readerKeepsChanges)
+    else if (!navigator.onLine) {
       _offlineQueue = true;
       setDriveStatus('syncing', 'Offline - changes saved locally');
       return;
@@ -27311,6 +27341,43 @@ function saveData() {
     saveTimer = setTimeout(timedCloudSave, 1500);
   }
 }
+// ─── SOMEONE WHO ONLY READS SENDS NOTHING (v39.23) ───────────────────────────
+// Tony, 2 Nov 2026 — a member of his household with 👁 Read only, on her phone: "PERMISSION: The cloud write was
+// denied by your Firestore security rules … console.firebase.google.com …" while going through a recipe, and again
+// later with nobody touching anything. The rules let only Read + Write and above write a household's recipes, photos
+// and index — by design. One refused save had left 'tonys_offline_queue' set; from then on every load read the whole
+// collection and sent again (every save writes the index, state/meta), was refused, and set it again: the owner's
+// message, console link and all, at every opening, reconnection and change made elsewhere — and none of it in her log.
+// Now a reader's device sends nothing and clears the flag; a change they made is said once a session, in words, with
+// the way to ask for more.
+var _readerChangedAt = 0, _readerTold = false;
+function readerHere() { return _cloudLayout === 'households' && !!_household && _household.role === 'viewer'; }
+function readerKeepsChanges() {
+  var waiting = !!_offlineQueue;
+  try { waiting = waiting || localStorage.getItem('tonys_offline_queue') === '1'; } catch(e) {}
+  _offlineQueue = false;
+  try { localStorage.removeItem('tonys_offline_queue'); } catch(e) {}
+  var n = 0;
+  try { n = cloudDirtyIds(cloudBound(recipes), _cloudRecipeStamp).length + Object.keys(_pendingCloudDeletes).length; } catch(e) {}
+  if (waiting || n) syncLog('save', 'Not sent: this account only reads in the household (Read only)'
+    + (n ? ' \u2014 ' + n + ' change(s) kept on this device' : ''), waiting ? 'changes-waiting mark cleared' : undefined);
+  if (!n || !_readerChangedAt || _readerTold) return n;
+  _readerTold = true;
+  var asked = !!_household.asked;
+  askConfirm({ icon: '\u{1F441}', title: 'You read this kitchen\u2019s recipes', notebook: true,
+    message: 'Your household\u2019s recipes are there for you to read and cook from; adding and changing them is for its '
+      + 'owner and the people with Read + Write. What you changed is kept on this device only, not in the household\u2019s recipes.'
+      + (asked ? '\n\nYou have asked to add and change recipes \u2014 the owner sees it in \u{1F465} Family Access.'
+               : '\n\nTo add and change recipes for everyone, ask the owner.'),
+    okLabel: asked ? '\u{1F465} Family Access' : '\u270b Ask the owner', cancelLabel: asked ? 'OK' : 'Not now' })
+    .then(function(ok){
+      if (ok !== true) return;
+      if (asked) { if (typeof openAccessControl === 'function') openAccessControl(); return; }
+      householdAskToWrite().catch(function(e){ showServiceError('Your request was not sent: ' + ((e && e.message) || e)); });
+    });
+  return n;
+}
+window.readerHere = readerHere; window.readerKeepsChanges = readerKeepsChanges;
 // ─── A TIMED SAVE WAITS FOR THE SELF TEST (v36.67) ───────────────────────────
 // Tony, twice after a Self Test run: "❌ Cloud sync failed: db.runTransaction is
 // not a function — will retry shortly", and the header red. Many tests call
@@ -28905,6 +28972,7 @@ async function sweepOrphanPhotos() {
 }
 window.sweepOrphanPhotos = sweepOrphanPhotos;
 
+var _cloudSaveStep = '';   // v39.23 — recipes / deletions / index / photos while saveToFirestore runs
 function handleFirestoreSaveError(err) {
   setDriveStatus('error', 'Sync failed');
   console.error('[Firestore] Save FAILED:', err && err.code, err && err.message, err);
@@ -28929,9 +28997,21 @@ function handleFirestoreSaveError(err) {
         .then(function(ok){ if (ok === true) resendConfirmation(); });
       return;
     }
-    showServiceError('PERMISSION: The cloud write was denied by your Firestore security rules.\n\n'
-      + 'Make sure your account is allowed to write to the shared collection:\n'
-      + 'https://console.firebase.google.com/u/0/project/' + APP_CONFIG.firebase.projectId + '/firestore/databases/-default-/security/rules');
+    // v39.23 — what was refused, and for whom, in the log; the console link only for the app's owner (a household
+    // member who only reads was shown it — see "SOMEONE WHO ONLY READS SENDS NOTHING")
+    var role = (_cloudLayout === 'households' && _household && _household.role) || '';
+    var what = { recipes: 'a recipe', deletions: 'a deletion', index: 'the list of recipes', photos: 'a photo' }[_cloudSaveStep] || '';
+    syncLog('save', 'Refused by the database' + (what ? ' \u2014 writing ' + what : '') + (role ? '; this account: ' + role : ''), code || msg.slice(0, 80));
+    _cloudSaveStep = '';
+    if (role === 'viewer') { readerKeepsChanges(); return; }   // Read only since this save began
+    if (typeof isAppOwner === 'function' && isAppOwner()) {
+      showServiceError('PERMISSION: The cloud write was denied by your Firestore security rules.\n\n'
+        + 'Make sure your account is allowed to write to the shared collection:\n'
+        + 'https://console.firebase.google.com/u/0/project/' + APP_CONFIG.firebase.projectId + '/firestore/databases/-default-/security/rules');
+    } else {
+      showServiceError('Your change was not accepted by the household\u2019s recipes \u2014 your account may not add or change them.\n\n'
+        + 'It is kept on this device. The household\u2019s owner can see your role in \u{1F465} Family Access: Read + Write or Full access can change recipes.');
+    }
     return;
   }
   if (msg.indexOf('quota') > -1 || code === 'resource-exhausted' || msg.indexOf('RESOURCE_EXHAUSTED') > -1) {
@@ -28969,9 +29049,11 @@ async function saveToFirestore() {
       toast('Error: Database not ready. Please refresh.');
     return;
   }
+  if (readerHere()) { readerKeepsChanges(); return; }   // v39.23 — see "SOMEONE WHO ONLY READS SENDS NOTHING"
   setDriveStatus('syncing', '☁️ Saving...');
   try {
     window._justSaved = true;
+    _cloudSaveStep = 'recipes';   // v39.23 — what a refusal was refusing, for the log
 
     // 1) 5.4 — one document per changed recipe. Only what actually changed is
     //    written, so favouriting one recipe no longer re-uploads all of them.
@@ -28996,14 +29078,18 @@ async function saveToFirestore() {
       toast(i18nPhrase('🔒 Secret recipes are not switched on for this copy yet — the {1} you marked stay as they were (linked kitchens still see them) until they are.').replace('{1}', String(secretWaiting)), 9000);
     }
     // 2) Deletions the user actually made, and the membership/nextId document
+    _cloudSaveStep = 'deletions';
     var delRes = await flushCloudDeletes();
+    _cloudSaveStep = 'index';
     // 5.9 — record the stamp we just wrote, so our own save doesn't force the
     // next load to re-read the whole collection.
     setLastCloudMetaAt(await writeCloudMeta(live, nextId));
     saveCloudBase();   // v29.2 — so the next session still knows its base
 
     // 3) Each changed photo into its own doc
+    _cloudSaveStep = 'photos';
     var photoErrors = await syncCloudPhotos();
+    _cloudSaveStep = '';
 
     setTimeout(function() { window._justSaved = false; }, 5000);
     _offlineQueue = false;
@@ -29164,6 +29250,7 @@ async function _loadFromFirestoreInner(user) {
     // second read as well, checking the legacy `shared/recipes` document in case
     // a device on v27.9 (which never touches `meta`) had edited it. That document
     // is gone, so an unchanged collection now costs exactly ONE read.
+    if (readerHere()) readerKeepsChanges();   // v39.23 — nothing of a reader's waits to be sent: an ordinary (partial) read
     var offlineQueued = _offlineQueue || localStorage.getItem('tonys_offline_queue') === '1';
     var haveAllBases = recipes.length > 0 && recipes.every(function(r) {
       return _cloudRecipeBase[r.id] !== undefined;
@@ -33190,6 +33277,7 @@ var HELP_SYSTEM_PROMPT = [
   "- INVITATION LINK: Family Access → 🔗 Invitation link… — anyone with it can join for 14 days, always as Read only.",
   "- Someone with Read only can tap ✋ Ask to add and change recipes; the owner (or someone with full access) sees it in Family Access and taps ✅ Allow or Decline.",
   "- ROLES: Read only (sees), Read + Write (adds and changes), Full access (also deletes and manages people). The owner can also 👑 hand the household over, or 🗑 delete it.",
+  "- 👁 READ ONLY: you read your household's recipes and cook from them. A change you make (a ❤️, a 🍳, an edit) stays on your device only and is not sent — the app says so once and offers ✋ Ask the owner (also in 👥 Family Access). Once the owner gives you Read + Write, your changes go to everyone.",
   "- A new person is asked whether to start their own collection or join one they were invited to (paste the link).",
   "- DURING THE BETA, MY KITCHEN NOTES IS BY INVITATION ONLY: a new kitchen can be started only by someone the app's owner invited, signed in with the very address the invitation was sent to (forwarding the invitation lets nobody else in). Invited at another address? Sign out and sign in with that one.",
   "- To cook together with family or friends, invite them to YOUR kitchen: the 📲 share icon next to the language picker (or ⚙️ → 🏠 My household → 🔗 Invitation link…) makes a link that works for 14 days and lets them in with 👁 Read only; give them more once they have joined. Only the kitchen's owner and its managers can invite. Someone can also be added by e-mail in 👥 Family Access, or ask to join with your kitchen's identifier.",
@@ -33251,6 +33339,7 @@ var HELP_SYSTEM_PROMPT = [
   "- 🩺 Server allowances: a table of every free allowance — Cloudflare's day (Worker requests, KV, D1, server errors), Pages builds this month per copy, what is running now, Firestore reads as the apps count them, sign-in-link e-mails (today, the most in a day, days all 5 went, days someone was turned away), and recipe e-mails (today of the app's 90, and Resend's own day and month). ⚠️ near the limit, ⛔ stopped",
   "- 🔐 Two-step sign-in: an authenticator app's 6-digit code on top of the Google sign-in, for the owner's tools",
   "- The owner's log panel and its pop-up offer 📋 Copy log (everyone else's send the report to the owner)",
+  "- The log's report says, under the browser line, who this account is to its household: how it signs in, its role (Read only, Read + Write, Full access, Owner), whether changes are waiting to be sent, and whether it runs as the installed app or in a browser tab — never an address. The log keeps each opening of the app, every message shown on screen as an error, and every save the database refused (what it was writing, and the role).",
   "",
   "=== IF SOMETHING LOOKS WRONG ===",
   "- WHITE BLOCKS (white blobs or panels) covering the fields while editing a recipe, sliding as you scroll: that is the GINGER grammar browser extension, not the app. In a window that scrolls it draws its underline layer in the wrong place — in Chrome on any computer (Windows, Mac, Linux). Fix: click Ginger's icon in the browser toolbar → switch it off for this site → reload. The app says so once when it notices Ginger in the editor. Other writing assistants can do the same; switching them off for this site fixes it too",

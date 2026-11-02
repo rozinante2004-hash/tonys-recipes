@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v39.22` — app. **Worker: v100**, deployed separately and versioned separately
+**Current version:** `v39.23` — app. **Worker: v100**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -213,7 +213,10 @@ Each household is its own space; nothing is guarded by e-mails typed into the ru
   asks again; "not for me" signs out.
 - **Members:** Family Access lists them (owner/admin manage; others read-only). Adding an address
   keeps a Read-only place; invitations are Read only; a viewer can "✋ Ask to add and change recipes"
-  (✅ Allow / Decline). Roles via the role menu. "👑 Hand over…" and "🗑 Delete this household…"
+  (✅ Allow / Decline). A viewer's device sends nothing (v39.23, `readerHere()` / `readerKeepsChanges()`:
+  `saveToFirestore` returns before writing — the rules refuse every viewer write, and every save writes `state/meta` —
+  and clears `tonys_offline_queue`, which otherwise made every load a full read plus a refused save); a change of
+  theirs is said once a session (kept on this device only; ✋ Ask the owner). Roles via the role menu. "👑 Hand over…" and "🗑 Delete this household…"
   (typed name; content, places, members, then the household and its code in one batch).
 - **Account deletion** (⚙️ → 🗑 Delete my account…): ONE process through to Firebase's own user
   list — fresh sign-in first (pop-up, password, or an e-mailed link that resumes the delete), refuses
@@ -1795,7 +1798,7 @@ at app start, when the panel opens, and when the retention is changed. There is 
 because one cannot run while the app is closed. It records recipe ids and names, **never recipe
 contents**; it is never synced and never reaches a backup. `analyseSyncLog(list, now)` is a pure
 function turning entries into findings that each carry a **fix**; `syncLogReportText()` is the
-plain-text Copy payload. Because it shares `localStorage` with the recipes, **a logging failure
+plain-text Copy payload; under its Browser line an **Account** line (v39.23, `syncLogAccountLine`: how it signs in, the role in the household, changes waiting yes/no, installed app or browser tab — never an address). Every `showServiceError` is logged ("On screen: …"), every refused save says what it was writing (`_cloudSaveStep`) and the role, and each start logs "App opened — <version>, <installed app / browser tab>"; the Firebase console link in a refusal is for the app's owner only. Because it shares `localStorage` with the recipes, **a logging failure
 must never break a save**: every path is wrapped, and on a quota error the log halves and then
 deletes itself rather than letting the error reach the caller. **Log an outcome where the outcome
 happens** — v35.4 logged a successful write inside `saveRecipeDoc` and the refusal one level up,

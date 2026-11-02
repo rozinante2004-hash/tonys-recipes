@@ -1676,6 +1676,82 @@ window.SELF_TESTS = [
 
   // v39.21 — Tony's iPhone, 30 Oct: the Households page blamed the database rules; that Safari's Google sign-in had no
   // authenticator code (older than the authenticator), which the rules and the server require of the owner.
+  { id:'reader_never_sends', group:'Sync', name:'👁 Read only: a reader’s device sends nothing — no refused save, no owner’s console link, the waiting mark cleared; their own change said once; refusals and on-screen errors in the log; the report’s Account line (v39.23)',
+    test: async()=>{
+      // Tony, 2 Nov 2026: a member of his household with Read only was shown the owner's PERMISSION message (with the
+      // Firebase console link) going through a recipe, and again later on its own — and her log said "Nothing looks wrong".
+      var real={ hh:window._household, lay:window._cloudLayout, db:window._fbDb, user:window._fbUser, drive:window._driveMode,
+        q:window._offlineQueue, dirty:window.cloudDirtyIds, ask:window.askConfirm, err:window.showServiceError, owner:window.isAppOwner,
+        changed:window._readerChangedAt, told:window._readerTold, step:window._cloudSaveStep, status:window.setDriveStatus, hid:window._cloudHid };
+      var kOn=null, kLog=null, kQ=null;
+      try{ kOn=localStorage.getItem('tonys_log_enabled'); kLog=localStorage.getItem('tonys_sync_log'); kQ=localStorage.getItem('tonys_offline_queue'); }catch(e){}
+      var writes=[], asks=[], errs=[];
+      var refuse=function(what){ return function(){ writes.push(what); throw Object.assign(new Error('Missing or insufficient permissions.'), { code:'permission-denied' }); }; };
+      setLogEnabled(true); purgeSyncLog();
+      try{
+        window._cloudLayout='households'; window._cloudHid='hR';
+        window._household={ hid:'hR', role:'viewer', name:'·', ownerUid:'uO' };
+        window._fbUser={ uid:'uR', email:'reader@example.com', emailVerified:true, providerData:[{ providerId:'password' }] };
+        window._driveMode=true; window._fbDb={ collection:refuse('collection'), runTransaction:refuse('transaction') };
+        window.askConfirm=async function(o){ asks.push(o); return false; };
+        window.showServiceError=function(m){ errs.push(String(m)); };
+        window.setDriveStatus=function(){};
+        window.cloudDirtyIds=function(){ return [101]; };
+        window._readerChangedAt=0; window._readerTold=false;
+        // 1. the mark a refused save left, and a save started by the app itself: nothing sent, nothing said, the mark gone
+        localStorage.setItem('tonys_offline_queue','1'); window._offlineQueue=true;
+        await saveToFirestore();
+        if(writes.length) throw new Error('a reader’s device tried to write: '+writes.join(', '));
+        if(window._offlineQueue || localStorage.getItem('tonys_offline_queue')==='1') throw new Error('the changes-waiting mark was not cleared — every opening would send again');
+        if(asks.length || errs.length) throw new Error('told about a change they did not make: '+JSON.stringify(asks.concat(errs)));
+        if(!readSyncLog().some(function(e){ return e.k==='save' && /^Not sent: this account only reads/.test(e.m); })) throw new Error('"Not sent" is not in the log');
+        // 2. a change of their own: said once a session, plainly, with the way to ask — and still nothing sent
+        window._readerChangedAt=Date.now();
+        await saveToFirestore(); await saveToFirestore();
+        if(writes.length) throw new Error('a reader’s change was sent: '+writes.join(', '));
+        if(asks.length!==1) throw new Error('told '+asks.length+' times in one session');
+        if(!/kept on this device only/.test(asks[0].message) || !/Ask the owner/.test(asks[0].okLabel) || /console\.firebase|PERMISSION/.test(asks[0].message))
+          throw new Error('not said plainly: '+asks[0].message);
+        // 3. refused while a save ran (the role changed meanwhile): the reader's way, the mark gone, the refusal in the log
+        window._offlineQueue=true; window._cloudSaveStep='index';
+        handleFirestoreSaveError({ code:'permission-denied', message:'Missing or insufficient permissions.' });
+        if(errs.length) throw new Error('a reader was shown: '+errs[0]);
+        if(window._offlineQueue || localStorage.getItem('tonys_offline_queue')==='1') throw new Error('a reader’s refusal left the mark');
+        if(!readSyncLog().some(function(e){ return e.k==='save' && /Refused by the database — writing the list of recipes; this account: viewer/.test(e.m); }))
+          throw new Error('the refusal is not in the log: '+JSON.stringify(readSyncLog().slice(0, 3)));
+        // 4. a member with Read + Write refused: words, no console link; the app's owner keeps the link
+        window._household={ hid:'hR', role:'editor', name:'·' };
+        window.isAppOwner=function(){ return false; };
+        handleFirestoreSaveError({ code:'permission-denied', message:'x' });
+        if(errs.length!==1 || /console\.firebase/.test(errs[0]) || !/Family Access/.test(errs[0])) throw new Error('a member was shown: '+errs[0]);
+        window.isAppOwner=function(){ return true; };
+        handleFirestoreSaveError({ code:'permission-denied', message:'x' });
+        if(errs.length!==2 || !/console\.firebase/.test(errs[1])) throw new Error('the owner lost the console link: '+errs[1]);
+        // 5. what the screen showed is in the log
+        real.err('PERMISSION: shown by the Self Test');
+        var ov=document.getElementById('serviceErrorOverlay'); if(ov) ov.remove();
+        if(!readSyncLog().some(function(e){ return e.k==='error' && e.m==='On screen: PERMISSION: shown by the Self Test'; })) throw new Error('a Service Error shown is not in the log');
+        // 6. the report says who this account is to its household — never the address
+        window._household={ hid:'hR', role:'viewer', name:'·', asked:true };
+        window._offlineQueue=false; localStorage.removeItem('tonys_offline_queue');
+        var rep=syncLogReportText();
+        if(rep.indexOf('Account: signed in (password)  ·  role in the household: Read only (asked to add and change)  ·  changes waiting to be sent: no  ·  ')===-1)
+          throw new Error('no Account line: '+rep.split('\n').slice(0, 7).join(' | '));
+        if(/reader@example\.com/.test(rep)) throw new Error('the address is in the report');
+      } finally {
+        window._household=real.hh; window._cloudLayout=real.lay; window._fbDb=real.db; window._fbUser=real.user; window._driveMode=real.drive;
+        window._offlineQueue=real.q; window.cloudDirtyIds=real.dirty; window.askConfirm=real.ask; window.showServiceError=real.err;
+        window.isAppOwner=real.owner; window._readerChangedAt=real.changed; window._readerTold=real.told; window._cloudSaveStep=real.step;
+        window.setDriveStatus=real.status; window._cloudHid=real.hid;
+        try{
+          if(kOn===null) localStorage.removeItem('tonys_log_enabled'); else localStorage.setItem('tonys_log_enabled', kOn);
+          if(kLog===null) localStorage.removeItem('tonys_sync_log'); else localStorage.setItem('tonys_sync_log', kLog);
+          if(kQ===null) localStorage.removeItem('tonys_offline_queue'); else localStorage.setItem('tonys_offline_queue', kQ);
+        }catch(e){}
+      }
+      return 'nothing sent, the mark cleared, told once in words; refusals and the screen in the log; the Account line';
+    } },
+
   { id:'owner_signin_why', group:'Sharing', name:'📊 Households refused because of THIS sign-in (no authenticator code, or not Google): says so and what to do — not "publish the rules" (v39.21)',
     test: async()=>{
       if(typeof ownerSignInWhy!=='function') throw new Error('ownerSignInWhy not defined');

@@ -1437,6 +1437,31 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
   - **Released: v39.09 (29 Oct 2026, 11:17 Israel time, on 0de2dde; Tony: "Yes, release v39.09").** Every job success:
     Deploy to GitHub Pages, pages build, Publish languages, Translate new phrases, Self Tests on main and test,
     Cloudflare Pages for the beta and test.
+  - **v39.23 — a reader's device sends nothing; refusals in words and in the log; more in the log** (Tony, 2 Nov 2026:
+    a member of his household, on an Android phone in the beta, was shown "PERMISSION: The cloud write was denied by
+    your Firestore security rules … console.firebase.google.com …" while going through a recipe — "she only opened the
+    app and went through one of the recipes" — and again later "unrelated to anything I did"; her log report (v39.22)
+    said "Nothing looks wrong". "Perhaps we need to add more parameters to the log … Please opine once you find the
+    root cause"). **Root cause:** her role is 👁 Read only (`viewer`); the rules let only `editor`+ write a household's
+    recipes, photos and `state/meta` — by design. Every `saveToFirestore` writes `state/meta` (`writeCloudMeta`), so
+    any save of hers is refused. One refused save (cause unknowable now: a tap, or a background save — photo recovery)
+    left `tonys_offline_queue` = '1'; from then on every load skipped the partial read (`offlineQueued`), read all 66
+    recipes, took the mark as "offline changes", sent, was refused, set the mark again — at each opening, each
+    reconnection ('online'), each change made elsewhere (meta listener). `handleFirestoreSaveError` showed the
+    owner's message to anyone, and logged nothing. **Fix:** `readerHere()` / `readerKeepsChanges()` (beside
+    `saveData`): a reader's device sends nothing — `saveToFirestore` returns before writing, the mark is cleared (also
+    at load, so partial reads again), "Not sent: this account only reads…" in the log; a change of their own this
+    session (`_readerChangedAt`, set in `saveData`) is said once (askConfirm: kept on this device only; ✋ Ask the
+    owner → `householdAskToWrite`, or 👥 Family Access when already asked). A permission refusal: logged (`save`,
+    "Refused by the database — writing <a recipe / a deletion / the list of recipes / a photo>; this account: <role>",
+    from `_cloudSaveStep`); a reader → the reader's way; the app's owner keeps the console link; anyone else is told in
+    words (not accepted, kept on this device, roles in 👥 Family Access). **Log (Tony's request):** every
+    `showServiceError` is logged ("On screen: <first line>", kind error — reported to the server once, not twice:
+    `_insFromRecord`); the report gains an **Account** line under Browser (`syncLogAccountLine`: signed in and how
+    (Google / password), e-mail not confirmed, role in the household in the app's words, asked to add and change,
+    changes waiting to be sent yes/no, the installed app or a browser tab — no address, no name); "App opened —
+    <version>, <installed app / browser tab>" at each start. Self Test `reader_never_sends` (fails on the old code:
+    "a reader's device tried to write"). Help: "👁 READ ONLY" and the log's report line.
   - **Released: v39.22 (30 Oct 2026, 20:04 Israel time, on 2e3fbc9; Tony: "Yes, release v39.22").** Every job success:
     Deploy to GitHub Pages, pages build, Publish languages, Translate new phrases, Self Tests on main and test,
     Cloudflare Pages for the beta and test.
