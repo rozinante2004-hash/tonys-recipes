@@ -1437,6 +1437,21 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
   - **Released: v39.09 (29 Oct 2026, 11:17 Israel time, on 0de2dde; Tony: "Yes, release v39.09").** Every job success:
     Deploy to GitHub Pages, pages build, Publish languages, Translate new phrases, Self Tests on main and test,
     Cloudflare Pages for the beta and test.
+  - **v39.28 — 💾 Backup — Save and 📂 Restore on every device** (Tony, 3 Nov 2026, on the test copy: "I do not see an
+    option to save a backup. Where is it? It should be under Files and backups"). A rule older than the project's
+    history (`/iPhone|iPad|iPod|Android/` → hidden) kept both off phones — though the reminder's 💾 Back up now runs
+    `backupSave` there, the backup panel says "Back up now still works here, and saves to this device's downloads", and
+    a backup is recorded as taken "on an iPhone". v39.27 had then named the phone's menu "📁 Files" — undone: the menu
+    is "📁 Files & backup" everywhere (📁 Files below 375 px, for room). And `backupSave` had its own download that let
+    go of the file's link the moment it was clicked, where a phone asks "Download?" first; it goes through `downloadBlob`
+    now, which keeps the link a minute (was 0.5 s; FileSaver.js waits 40 s for Safari). On a phone the notice says where
+    the file is (iPhone: Files › Downloads; Android: Downloads). Not tried on a real iPhone (none here): Chromium's
+    phone pages download it — a tap on 💾 Backup — Save on an emulated iPhone gave the file (3 recipes, the photo), and
+    📂 Restore read it back up to its "Add what is missing / Replace" question. Help: no "(desktop only)". Self Test
+    `backup_on_every_device` (fails on v39.27: hidden on an emulated iPhone; the link let go of at once on a desktop
+    page). `photo_one_shape_no_storage` now keeps the backup record as it was (the runner caught it): its stand-in
+    `appendChild` had made the old download's `removeChild` throw, so `backupSave` stopped before noting a backup — by
+    accident, until the backup went through `downloadBlob`.
   - **v39.27 — 📂 Drop File Here checked: it works; an Excel file did not, by either route, since v28.5** (Tony, 3 Nov
     2026, on v39.26's menu: "If I'm not mistaken, the Drop file here was a test we had a long time ago. I'm not even
     sure it is still functional"). It works — a dropped file goes to `importFromFile`, as From File's does — shown end

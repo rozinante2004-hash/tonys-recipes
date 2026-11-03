@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v39.27` — app. **Worker: v100**, deployed separately and versioned separately
+**Current version:** `v39.28` — app. **Worker: v100**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -2073,10 +2073,10 @@ Send photos to the cloud, Photo rescue, Undo auto-fetch, Clean up orphaned photo
 - **📁 Files & backup** (v39.26; was "⇅ Imp/Exp", which repeated three of + Add Recipe's items) → From File
   `.docx/.xlsx/.pdf/.html`, Drop File Here | All to Word | Backup — Save, Backup — Restore. Its label is one `<span>` (in
   the flex button, loose words lose their spaces) holding `.lbl-long` "Files & backup" and `.lbl-short` "Files", which
-  replaces it below 375 px so + Add Recipe stays on the row at 320 px — and (v39.27) on a phone, which has no backup
-  items (by user agent, as ever), `backupMenuForDevice()` sets `html.no-backup-menu`: "📁 Files", and the line over the hidden
-  backup items (`#backupDivider`) goes too. Drop File Here is `.drop-computer-only`: hidden under
-  `(hover: none) and (pointer: coarse)` — a file cannot be dragged into a phone's browser.
+  replaces it below 375 px so + Add Recipe stays on the row at 320 px. Backup — Save and Restore are on every device
+  (v39.28: a rule older than the project's history hid them on phones — "I do not see an option to save a backup",
+  Tony). Drop File Here is `.drop-computer-only`: hidden under `(hover: none) and (pointer: coarse)` — a file cannot be
+  dragged into a phone's browser (v39.27).
 - **+ Add Recipe** → Fill in manually, Paste free‑hand text, Import from URL, Scan (camera).
 
 A thin save‑status bar with a **Reset** (clear all data) link sits under the header.
@@ -2295,11 +2295,14 @@ lines accept `amount — name` / `amount - name` separators. Editing preserves `
 - **Backup**: `backupSave` writes a single JSON `{version, exportedAt, nextId, recipes, photos,
   settings}` where inline data‑URL photos are **de‑duplicated** into a `photos` map and replaced
   by `__photo__N` refs. `backupRestore`/`backupRestoreFile` reverse it and re‑hydrate. Backup
-  buttons are desktop‑only. **Restore is the app's most destructive action — see §4c** for the
+  buttons are on every device (v39.28; they were hidden on phones before). **Restore is the app's most destructive action — see §4c** for the
   confirmation and validation it must carry. `backupIsOverdue()`/`checkBackupOverdue()` nudge
   after 30 days (5d.1); the nudge never claims a backup happened.
 - **Exports use a plain `<a download>` + blob URL and nothing else.** `downloadBlob` is
-  synchronous: it makes an object URL, sets `download`, clicks, revokes. Until **v35.0** it
+  synchronous: it makes an object URL, sets `download`, clicks, and revokes the URL **a minute later** (v39.28: a phone
+  asks "Download?" first and may fetch the file only after the tap; FileSaver.js waits 40 s for the same reason). The
+  backup goes through it too (it had its own copy that revoked at once). On a phone the backup's notice says where the
+  file is kept (iPhone: Files › Downloads; Android: Downloads). Until **v35.0** it
   base64‑encoded the whole blob through a `FileReader` so it could POST it to a local Python
   daemon on `127.0.0.1:27182` that wrote the file itself, because Chrome saved Tony's Hebrew
   filenames as `Download`. **The cause was his machine's locale, not the browser and not the

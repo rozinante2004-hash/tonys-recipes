@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.27 -->
+<!-- Tony's Recipes Collection v39.28 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -10678,7 +10678,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.27';
+var APP_VERSION = 'v39.28';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -11874,7 +11874,6 @@ body.banner-shown #envRibbon.env-beta { padding-top: 2px; }
 .more-sec[hidden] { display: none !important; }
 .lbl-short { display: none; }   /* a button's label in one <span>: in a flex button, loose words lose their spaces */
 @media (max-width: 374px) { .lbl-long { display: none; } .lbl-short { display: inline; } }
-html.no-backup-menu .lbl-long { display: none; } html.no-backup-menu .lbl-short { display: inline; }   /* v39.27 — a phone: no backup here */
 /* v36.69 — a menu taller than the screen scrolls; the fade at its foot says so. */
 .drop-menu.drop-scrolls { -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent);
                           mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent); padding-bottom: 20px; }
@@ -14075,7 +14074,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.27</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.28</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14163,7 +14162,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.27</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.28</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -14360,7 +14359,7 @@ body.banner-shown .header {
           <button class="drop-item drop-computer-only" onclick="closeDrop('importExportDrop');openDropZone()">📂 Drop File Here <span class="drop-hint">drag & drop</span></button>
           <div style="height:1px;background:var(--border);margin:4px 0;"></div>
           <button class="drop-item" onclick="closeDrop('importExportDrop');exportAllWord()">📄 All to Word</button>
-          <div id="backupDivider" style="height:1px;background:var(--border);margin:4px 0;"></div>
+          <div style="height:1px;background:var(--border);margin:4px 0;"></div>
           <button class="drop-item" onclick="closeDrop('importExportDrop');backupSave()" id="backupSaveBtn">💾 Backup — Save</button>
           <button class="drop-item" onclick="closeDrop('importExportDrop');backupRestore()" id="backupRestoreBtn">📂 Backup — Restore</button>
         </div>
@@ -23237,7 +23236,9 @@ function downloadBlob(blob, filename) {
   a.style.display = 'none';
   document.body.appendChild(a);
   a.click();
-  setTimeout(function(){ URL.revokeObjectURL(url); document.body.removeChild(a); }, 500);
+  // v39.28 — let go of after a minute, not half a second: a phone asks first ("Download?") and may fetch the file only
+  // after the tap — a link already let go of leaves it nothing to fetch. (FileSaver.js waits 40 s for the same reason.)
+  setTimeout(function(){ URL.revokeObjectURL(url); if (a.parentNode) a.parentNode.removeChild(a); }, 60000);
 }
 
 function expOneWord(id){
@@ -33430,10 +33431,10 @@ var HELP_SYSTEM_PROMPT = [
   "- Filter by Favourites or Clips using the top filter buttons",
   "",
   "=== EXPORT & BACKUP ===",
-  "Via 📁 Files & backup ▾ (on a phone: 📁 Files ▾ — backups are taken on a computer):",
+  "Via 📁 Files & backup ▾ (on a narrow phone: 📁 Files ▾):",
   "- 📄 All to Word: exports all recipes to a .docx file",
-  "- 💾 Backup — Save: saves all recipes + photos to a timestamped JSON file (desktop only)",
-  "- 📂 Backup — Restore: restores from a backup JSON file (desktop only)",
+  "- 💾 Backup — Save: saves all recipes + photos to a timestamped JSON file — on a computer, a phone or a tablet. On an iPhone, tap Download if asked: the file is kept in Files › Downloads; on Android, in Downloads",
+  "- 📂 Backup — Restore: restores from a backup JSON file (on a phone, pick it from Files or Downloads)",
   "- 💾 THE BACKUP REMINDER: when no backup has been taken (or the last is over a month old), a notice says so with 💾 Back up now — once a day at most, and only when no window or menu is open. After 60 days it stays until you close it; after 90 days it asks.",
   "- One recipe: open it → 📄 Word (or 🖨️ Print)",
   "",
@@ -36877,12 +36878,17 @@ async function backupSave() {
     }
 
     markBackupTaken();
-    var blob=new Blob([json],{type:'application/json'});
-    var url=URL.createObjectURL(blob); var a=document.createElement('a');
-    a.href=url; a.download=backupFileName();
-    document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+    // v39.28 — through downloadBlob, as every other file the app saves. This let go of the file's link the moment it
+    // was clicked; a phone, which asks before it downloads, could be left with nothing to save.
+    downloadBlob(new Blob([json],{type:'application/json'}), backupFileName());
     familyBackupNote(false);
-    toast('\u2705 Backup saved! '+recipes.length+' recipes, '+nPhotos+' photos, '+nLangs+' languages');
+    var kind = backupDeviceKind();
+    if (kind === 'an iPhone' || kind === 'an iPad')
+      toast('💾 Backup ready: '+recipes.length+' recipes, '+nPhotos+' photos — tap Download if asked; it is kept in Files › Downloads', 9000);
+    else if (kind === 'an Android phone')
+      toast('💾 Backup ready: '+recipes.length+' recipes, '+nPhotos+' photos — it is kept in Downloads', 9000);
+    else
+      toast('\u2705 Backup saved! '+recipes.length+' recipes, '+nPhotos+' photos, '+nLangs+' languages');
   } catch(err){ toast('\u274c Backup failed: '+err.message); }
 }
 
@@ -37080,20 +37086,10 @@ function backupDateLabel(v){
 }
 window.backupDateLabel=backupDateLabel;
 
-// Show backup buttons only on desktop
-// v39.27 — and on a phone, where there is no backup in it, the menu is "📁 Files" (not "Files & backup"), without the
-// line that stood over the hidden backup items.
-function backupMenuForDevice(mob) {
-  if (mob === undefined) mob = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-  ['backupSaveBtn','backupRestoreBtn','backupDivider'].forEach(function(id){ var el=document.getElementById(id); if(el) el.style.display=mob?'none':''; });
-  document.documentElement.classList.toggle('no-backup-menu', !!mob);
-  return !!mob;
-}
-window.backupMenuForDevice = backupMenuForDevice;
-(function(){
-  function upd(){ backupMenuForDevice(); }
-  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',upd); else upd();
-})();
+// v39.28 — Backup — Save and Restore are on every device. Tony, 3 Nov 2026: "I do not see an option to save a backup.
+// Where is it? It should be under Files and backups". They were hidden on phones by a rule older than this project's
+// history, though the reminder's 💾 Back up now (backupSave) runs on phones, the backup panel says "Back up now still
+// works here, and saves to this device's downloads", and a backup is recorded as taken "on an iPhone".
 
 window.addIngRow=addIngRow; window.syncIngsTextarea=syncIngsTextarea; window.loadIngsTable=loadIngsTable; window.readIngsTable=readIngsTable;
 window.openPhotoSearch=openPhotoSearch; window.searchPhotos=searchPhotos; window.selectSearchPhoto=selectSearchPhoto; window.photoSearchMore=photoSearchMore;

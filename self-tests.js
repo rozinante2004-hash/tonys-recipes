@@ -4040,6 +4040,41 @@ window.SELF_TESTS = [
       return 'stays when asked to; once a day; its words translated; waits for an open window and an open menu';
     } },
 
+  { id:'backup_on_every_device', group:'Backup', name:'💾 Backup — Save and 📂 Restore are in 📁 Files & backup on every device, and the saved file\'s link is kept until a phone has fetched it (v39.28)',
+    test: async()=>{
+      // Tony, 3 Nov 2026: "I do not see an option to save a backup. Where is it? It should be under Files and backups."
+      // A rule older than the project's history hid both on phones, though the reminder's 💾 Back up now ran there.
+      var shown=function(el){ return !!el && el.getClientRects().length>0 && getComputedStyle(el).display!=='none'; };
+      toggleDrop('importExportDrop');
+      await new Promise(function(r){ requestAnimationFrame(function(){ requestAnimationFrame(r); }); });
+      try{
+        ['backupSaveBtn','backupRestoreBtn'].forEach(function(id){
+          if(!shown(document.getElementById(id))) throw new Error(document.getElementById(id).textContent.trim()+' is not in 📁 Files & backup on this device ('+((navigator.userAgent.match(/iPhone|iPad|Android|Macintosh|Windows|Linux/)||['?'])[0])+')');
+        });
+      } finally { closeDrop('importExportDrop'); }
+      // The file: one download, through downloadBlob, its link not let go of at once
+      var realCreate=URL.createObjectURL, realRevoke=URL.revokeObjectURL, realClick=HTMLAnchorElement.prototype.click;
+      var keep={ dir:window.backupDirLoad, toast:window.toast, mark:window.markBackupTaken, note:window.familyBackupNote }, rec=_backupRecordForTest();
+      var revoked=[], clicked=null, said=[];
+      try{
+        window.backupDirLoad=function(){ return Promise.resolve(null); };
+        window.toast=function(m){ said.push(String(m)); }; window.markBackupTaken=function(){}; window.familyBackupNote=function(){};
+        URL.createObjectURL=function(){ return 'blob:backup-test'; };
+        URL.revokeObjectURL=function(u){ revoked.push(u); };
+        HTMLAnchorElement.prototype.click=function(){ if(this.getAttribute('href')==='blob:backup-test') clicked=this.download; };
+        await backupSave();
+        if(!clicked || !/\.json$/.test(clicked)) throw new Error('Backup — Save started no download ('+said.join(' | ')+')');
+        await wait(700);
+        if(revoked.indexOf('blob:backup-test')!==-1) throw new Error('the backup file\'s link was let go of at once — a phone that asks "Download?" first is left with nothing to save');
+      } finally {
+        URL.createObjectURL=realCreate; URL.revokeObjectURL=realRevoke; HTMLAnchorElement.prototype.click=realClick;
+        window.backupDirLoad=keep.dir; window.toast=keep.toast; window.markBackupTaken=keep.mark; window.familyBackupNote=keep.note;
+        _backupRecordRestoreForTest(rec);
+        document.querySelectorAll('a[href="blob:backup-test"]').forEach(function(a){ a.remove(); });
+      }
+      return 'both shown here; one download ('+clicked+'), its link kept';
+    } },
+
   { id:'safety_backup_family', group:'Backup', name:'A backup taken on the PC counts on the phone (v36.61, audit E2)',
     test: ()=>_inFirstLayout(async()=>{
       ['newestBackupAt','familyBackupFetch','familyBackupNote','familyBackupRemember','backupWhereText']
@@ -11561,16 +11596,7 @@ window.SELF_TESTS = [
       ["fileIn').click()",'openDropZone','exportAllWord','backupSave','backupRestore'].forEach(function(f){
         if(!fd.querySelector('[onclick*="'+f+'"]')) throw new Error('📁 Files & backup lost '+f);
       });
-      // v39.27 — on a phone there is no backup in it (it never was): "📁 Files", without the line over the hidden backup items.
-      var shown=function(el){ return !!el && getComputedStyle(el).display!=='none'; }, wide=window.innerWidth>374;
-      try{
-        backupMenuForDevice(true);
-        if(shown(btn.querySelector('.lbl-long')) || !shown(btn.querySelector('.lbl-short'))) throw new Error('on a phone (no backup) the menu is not called just 📁 Files');
-        if(shown(document.getElementById('backupDivider')) || shown(document.getElementById('backupSaveBtn'))) throw new Error('on a phone the backup items, or the line over them, are shown');
-        backupMenuForDevice(false);
-        if(wide && (!shown(btn.querySelector('.lbl-long')) || shown(btn.querySelector('.lbl-short')))) throw new Error('on a computer the menu is not called 📁 Files & backup');
-        if(!shown(document.getElementById('backupSaveBtn')) || !shown(document.getElementById('backupDivider'))) throw new Error('on a computer the backup items are hidden');
-      } finally { backupMenuForDevice(); }
+      var shown=function(el){ return !!el && getComputedStyle(el).display!=='none'; };
       // 📂 Drop File Here: only where a file can be dragged in — not on a touch-only phone or tablet
       var drop=fd.querySelector('[onclick*="openDropZone"]');
       toggleDrop('importExportDrop');
@@ -11758,9 +11784,12 @@ window.SELF_TESTS = [
       // backup that had just been written to his disk. What is under test here
       // is whether the file is self-contained, not which of the two ways out it
       // took; the folder path has its own test.
-      var bDir=window.backupDirLoad;
+      var bDir=window.backupDirLoad, bNote=window.familyBackupNote, bRec=_backupRecordForTest();
       try{
         window.backupDirLoad=function(){ return Promise.resolve(null); };
+        // v39.28 — and the family's backup note: until the backup went through downloadBlob, the stand-in appendChild
+        // below made its removeChild throw, so backupSave stopped before noting a backup — by accident.
+        window.familyBackupNote=function(){};
         window.toast=function(){}; window.markBackupTaken=function(){};
         URL.createObjectURL=function(blob){ captured=blob; return 'blob:stub'; };
         URL.revokeObjectURL=function(){};
@@ -11777,7 +11806,7 @@ window.SELF_TESTS = [
           throw new Error('the temporary backup field leaked into the exported file');
       } finally {
         recipes=bR; window.toast=bToast; window.markBackupTaken=bMark;
-        window.backupDirLoad=bDir;
+        window.backupDirLoad=bDir; window.familyBackupNote=bNote; _backupRecordRestoreForTest(bRec);
         URL.createObjectURL=realCreate; URL.revokeObjectURL=realRevoke;
         document.body.appendChild=realAppend;
       }
