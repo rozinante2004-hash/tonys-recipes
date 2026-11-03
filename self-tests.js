@@ -1472,10 +1472,19 @@ window.SELF_TESTS = [
         localStorage.removeItem(DEVICE_OFFER_KEY); setUA(IPHONE);
         if(maybeOfferDeviceShortcut(9)!=='ios' || (dlg().querySelector('#deviceOfferGo')||{}).getAttribute('href')!=='https://www.icloud.com/shortcuts/abc123') throw new Error('an iPhone is not offered the shortcut');
         dlg().remove();
-        // Android that can install: one tap installs.
-        localStorage.removeItem(DEVICE_OFFER_KEY); setUA(ANDROID); _pwaInstallEvent={ prompt:function(){}, userChoice:Promise.resolve({ outcome:'dismissed' }) };
-        if(maybeOfferDeviceShortcut(9)!=='android' || !dlg().querySelector('button#deviceOfferGo')) throw new Error('Android is not offered the install');
-        dlg().remove();
+        // Android that can install: one tap installs. v39.30 — "not installed yet" stood in for as well: on Tony's
+        // installed iPhone app the real answer (installed) reached the pretend Android, and an installed app is rightly
+        // offered nothing — so this failed there, and only there.
+        var realInstalled=window.appInstalled;
+        try{
+          window.appInstalled=function(){ return false; };
+          localStorage.removeItem(DEVICE_OFFER_KEY); setUA(ANDROID); _pwaInstallEvent={ prompt:function(){}, userChoice:Promise.resolve({ outcome:'dismissed' }) };
+          if(maybeOfferDeviceShortcut(9)!=='android' || !dlg().querySelector('button#deviceOfferGo')) throw new Error('Android is not offered the install');
+          dlg().remove();
+          // …and an Android phone that has installed the app is not offered it again
+          window.appInstalled=function(){ return true; }; localStorage.removeItem(DEVICE_OFFER_KEY);
+          if(maybeOfferDeviceShortcut(9)!==false || dlg()) throw new Error('Android is offered the install although the app is installed');
+        } finally { window.appInstalled=realInstalled; }
         // Send feedback: to the app's address (v38.17: contact@, the domain's), through a choice that works without a mail app.
         setUA(CHROME);
         window.askChoice=async function(intro, options){ if(options.some(function(o){ return o.value==='wa'; })) throw new Error('feedback offers WhatsApp'); if(intro.indexOf(ST_CONTACT)===-1) throw new Error('feedback does not say where it goes'); return 'gmail'; };
@@ -4715,9 +4724,18 @@ window.SELF_TESTS = [
       // slid off the top, and the menu opened at -35px below the hidden button.
       var gone=dropPlacement({ top:-150, bottom:-122, right:380 }, 230, 510, W, H);
       if(gone.top<8) throw new Error('a menu for a button above the screen starts off the top (top '+gone.top+')');
-      // And for real: the ⚙️ menu, opened with the header slid away, is inside the window.
-      var hidWas=_hdrHidden;
+      // And for real: the ⚙️ menu, opened with the header slid away, is inside the window. v39.30 — slid away FOR REAL:
+      // the header is sticky, so at the top of the page a "slid" header does not move, ⚙️ stays on the screen and there
+      // is nothing to bring back. On a phone (where the header slides at all) the run is at the top of the page, so this
+      // failed on Tony's iPhone; a computer never reached the check. The page is scrolled down first.
+      var hidWas=_hdrHidden, yWas=window.scrollY, padWas=document.body.style.paddingBottom;
+      document.body.style.paddingBottom='2400px'; window.scrollTo(0, 900);
+      await new Promise(function(r){ requestAnimationFrame(function(){ requestAnimationFrame(r); }); });
       _hdrHidden=headerSlidePx(); applyHeaderGeometry();
+      if(headerSlidePx() && document.getElementById('settingsBtn').getBoundingClientRect().bottom>0){
+        window.scrollTo(0, yWas); document.body.style.paddingBottom=padWas; _hdrHidden=hidWas; applyHeaderGeometry();
+        throw new Error('the test could not slide the header away (⚙️ still on the screen)');
+      }
       toggleDrop('settingsDrop');
       await new Promise(function(r){ requestAnimationFrame(function(){ requestAnimationFrame(r); }); });
       await wait(40);
@@ -4728,7 +4746,11 @@ window.SELF_TESTS = [
         if(m.scrollHeight>m.clientHeight+1 && getComputedStyle(m).overflowY!=='auto') throw new Error('a capped menu cannot be scrolled');
         var sb=document.getElementById('settingsBtn').getBoundingClientRect();
         if(rc.top<sb.bottom-1) throw new Error('the Settings menu covers ⚙️ (menu top '+Math.round(rc.top)+', ⚙️ bottom '+Math.round(sb.bottom)+')');
-      } finally { closeDrop('settingsDrop'); _hdrHidden=hidWas; applyHeaderGeometry(); }
+      } finally {
+        closeDrop('settingsDrop'); window.scrollTo(0, yWas); document.body.style.paddingBottom=padWas;
+        await new Promise(function(r){ requestAnimationFrame(function(){ requestAnimationFrame(r); }); });
+        _hdrHidden=hidWas; applyHeaderGeometry();
+      }
     } },
 
   { id:'report_staged_errors_apart', group:'UI', name:'Errors the tests stage are not reported as real ones (v36.67)',
@@ -9282,7 +9304,11 @@ window.SELF_TESTS = [
           if(typeof fn!=='function') throw new Error(f[0]+' is not there to check');
           if(String(fn).indexOf(f[1])===-1) throw new Error(f[0]+' does not carry the bold through ('+f[1]+')');
         });
-        // Save / Update Recipe floats at the bottom of the editor
+        // Save / Update Recipe floats at the bottom of the editor. v39.30 — on Tony's iPhone (v39.29) nothing of the
+        // editor was found at the button's centre: the fields typed into above were still focused, and a phone may then
+        // move what the screen shows. The focus is let go of and the screen let settle first; and a failure says what is there.
+        if(document.activeElement && document.activeElement!==document.body && document.activeElement.blur) document.activeElement.blur();
+        for(var vs=0; vs<16 && window.visualViewport && (visualViewport.height<window.innerHeight-1 || visualViewport.offsetTop>0.5); vs++) await wait(50);
         loadIngsTable(Array.from({ length:40 }, function(_, k){ return { a:String(k+1), n:'ingredient '+(k+1) }; }));
         ov.classList.add('open');
         if(loginEl) loginEl.style.display='none';             // signed out in the test: the sign-in screen is over everything
@@ -9293,8 +9319,12 @@ window.SELF_TESTS = [
         if(!(modal.scrollHeight > modal.clientHeight + 200)) throw new Error('the editor did not scroll in the test (nothing proved)');
         if(!(br.bottom <= mr.bottom + 1 && br.top >= mr.top && br.height > 20)) throw new Error('Update Recipe is not in sight at the top of the editor: button '+Math.round(br.top)+'–'+Math.round(br.bottom)+', window '+Math.round(mr.top)+'–'+Math.round(mr.bottom));
         // the topmost thing OF THE EDITOR there is the button (the Self Test's own window is above everything during a run)
-        var hit=document.elementsFromPoint(br.left + br.width/2, br.top + br.height/2).filter(function(x){ return modal.contains(x); })[0];
-        if(hit!==btn && !btn.contains(hit)) throw new Error('something in the editor covers Update Recipe: '+(hit && (hit.id || hit.className)));
+        var hx=br.left + br.width/2, hy=br.top + br.height/2, there=document.elementsFromPoint(hx, hy);
+        var hit=there.filter(function(x){ return modal.contains(x); })[0];
+        if(hit!==btn && !btn.contains(hit)) throw new Error('something in the editor covers Update Recipe: '+(hit ? (hit.id || hit.className)
+          : 'nothing of the editor at '+Math.round(hx)+','+Math.round(hy)+' (screen '+window.innerWidth+'×'+window.innerHeight
+            +(window.visualViewport ? ', showing '+Math.round(visualViewport.width)+'×'+Math.round(visualViewport.height)+' from '+Math.round(visualViewport.offsetTop) : '')
+            +'; there: '+(there.slice(0,3).map(function(e){ return e.id || String(e.className || '').split(' ')[0] || e.tagName; }).join(' / ') || 'nothing')+')'));
         modal.scrollTop=modal.scrollHeight; await wait(60);
         br=btn.getBoundingClientRect(); mr=modal.getBoundingClientRect();
         if(!(br.bottom <= mr.bottom + 1)) throw new Error('at the end of the editor it is out of sight');
@@ -10792,7 +10822,9 @@ window.SELF_TESTS = [
         for(i=0;i<50;i++){ var w=farmWait(); if(w<2*60000 || w>4*60000) throw new Error('waited '+w+' ms, outside 2–4 minutes'); }
         // A visit: across the screen, and gone at the end.
         if(window.speechSynthesis) speechSynthesis.speak=function(u){ spoken.push([u.text, u.lang, u.pitch]); };
-        var el=farmVisit(null, { speed:1500, stops:0, ltr:true }); await el._farm.ready;
+        // v39.30 — at most the screen's width a second: at 1,500 px/s the goose crossed a phone's 393 px and was gone
+        // before the second look (370 ms), so on Tony's iPhone "it does not walk" — now and then; a computer is 1,280 wide.
+        var el=farmVisit(null, { speed:Math.min(1500, Math.max(300, window.innerWidth)), stops:0, ltr:true }); await el._farm.ready;
         if(!el || el._farm.animal!=='goose' || getComputedStyle(el).position!=='fixed' || !el.hasAttribute('data-no-i18n')) throw new Error('the visitor is not the goose, on top of the app, in English');
         await wait(120); var x1=el.getBoundingClientRect().left; await wait(250);
         if(!(el.getBoundingClientRect().left>x1)) throw new Error('it does not walk');
@@ -11584,7 +11616,7 @@ window.SELF_TESTS = [
       return 'fitted as it opens (zoom 1.25), follows the screen, lets go on a pinch and on closing; ··· More inside the screen at its size';
     } },
 
-  { id:'menus_files_and_more_headings', group:'UI', name:'📁 Files & backup holds what only it has (adding stays in + Add Recipe); ··· More is under five headings, and one with nothing to show is hidden (v39.26)',
+  { id:'menus_files_and_more_headings', group:'UI', name:'📁 Files & backup holds what only it has (adding stays in + Add Recipe); ··· More shows five headings that open their items in place, pushing the next down, one at a time; one with nothing to show is hidden (v39.26, v39.30)',
     test: async()=>{
       // Tony, 3 Nov 2026, from the audit: "I accept suggestions 1, 2".
       var btn=document.querySelector('[onclick="toggleDrop(\'importExportDrop\')"]'), fd=document.getElementById('importExportDrop');
@@ -11605,7 +11637,8 @@ window.SELF_TESTS = [
         if(touchOnly===shown(drop)) throw new Error(touchOnly ? '📂 Drop File Here is offered on a touch-only screen' : '📂 Drop File Here is hidden on a computer');
       } finally { closeDrop('importExportDrop'); }
       var m=document.getElementById('moreDrop');
-      var heads=Array.prototype.map.call(m.querySelectorAll('.more-sec > .drop-head'), function(h){ return h.textContent.trim(); });
+      // v39.30 — the headings are the menu: buttons (⚙️'s .set-head), their items under them in a .set-body
+      var heads=Array.prototype.map.call(m.querySelectorAll('.more-sec > .set-head'), function(h){ return h.textContent.replace(/^[^A-Za-z]+/, '').trim(); });
       if(heads.join('|')!=='Ideas|Tools|Kitchens and people|WhatsApp|Tidy up') throw new Error('the headings are '+heads.join(' | '));
       var where={ openExploreModal:'ideas', openSuggestModal:'ideas', openWhatCanIMake:'ideas', openCalcModal:'tools', openConnectHousehold:'people',
         openFamilyChat:'people', openKitchenChats:'people', openGiftsIn:'people', openGiftsOut:'people', openShareAppModal:'people',
@@ -11614,9 +11647,34 @@ window.SELF_TESTS = [
         var it=m.querySelectorAll('[onclick*="'+f+'("]');
         if(it.length!==1) throw new Error(f+' is in ··· More '+it.length+' times');
         var sec=it[0].closest('.more-sec');
-        if(!sec || sec.getAttribute('data-sec')!==where[f]) throw new Error(f+' is under "'+(sec&&sec.getAttribute('data-sec'))+'", not "'+where[f]+'"');
+        if(!sec || sec.getAttribute('data-sec')!==where[f] || !it[0].closest('.set-body')) throw new Error(f+' is under "'+(sec&&sec.getAttribute('data-sec'))+'", not in "'+where[f]+'"\'s body');
       });
-      if(m.querySelectorAll('.drop-item').length!==14) throw new Error('··· More has '+m.querySelectorAll('.drop-item').length+' items, not 14');
+      if(m.querySelectorAll('.set-body .drop-item').length!==14) throw new Error('··· More has '+m.querySelectorAll('.set-body .drop-item').length+' items, not 14');
+      // v39.30 — Tony: "the titles … to become the only menu items under More. Clicking any of them will open a sub menu
+      // with whatever is under the same title right now … in the same menu, expanding downwards, pushing the next title down."
+      var seen=function(el){ return !!el && el.getClientRects().length>0 && getComputedStyle(el).visibility!=='hidden'; };
+      var frames=function(){ return new Promise(function(r){ requestAnimationFrame(function(){ requestAnimationFrame(r); }); }); };
+      var head=function(k){ return m.querySelector('.more-sec[data-sec="'+k+'"] > .set-head'); };
+      var shownItems=function(){ return Array.prototype.filter.call(m.querySelectorAll('.set-body .drop-item'), seen).length; };
+      toggleDrop('moreDrop'); await frames();
+      try{
+        if(shownItems()) throw new Error('··· More opens with '+shownItems()+' items showing — only its headings should');
+        if(!seen(head('ideas')) || !seen(head('tools'))) throw new Error('··· More opens without its headings');
+        var toolsAt=head('tools').getBoundingClientRect().top;
+        head('ideas').click(); await frames();
+        var ideasItems=Array.prototype.filter.call(m.querySelectorAll('.more-sec[data-sec="ideas"] .set-body .drop-item'), seen).length;
+        if(ideasItems!==3 || shownItems()!==3) throw new Error('tapping 💡 Ideas showed '+shownItems()+' items ('+ideasItems+' of its 3)');
+        if(head('ideas').getAttribute('aria-expanded')!=='true') throw new Error('an open heading does not say so (aria-expanded)');
+        var pushed=head('tools').getBoundingClientRect().top - toolsAt, bodyH=m.querySelector('.more-sec[data-sec="ideas"] .set-body').getBoundingClientRect().height;
+        if(!m.classList.contains('open')) throw new Error('tapping a heading closed ··· More');
+        if(pushed < bodyH - 2) throw new Error('the next heading moved '+Math.round(pushed)+' px for '+Math.round(bodyH)+' px of items — not pushed down below them');
+        head('tools').click(); await frames();
+        if(seen(m.querySelector('[onclick*="openExploreModal("]')) || !seen(m.querySelector('[onclick*="openCalcModal("]'))) throw new Error('two headings open at once, or 🧰 Tools did not open');
+        head('tools').click(); await frames();
+        if(shownItems()) throw new Error('a second tap did not close the heading');
+        head('people').click(); closeDrop('moreDrop'); toggleDrop('moreDrop'); await frames();
+        if(shownItems()) throw new Error('··· More opened again with a heading still open');
+      } finally { closeDrop('moreDrop'); }
       // a section with nothing to show goes
       var wa=Array.prototype.slice.call(m.querySelectorAll('.more-sec[data-sec="whatsapp"] .drop-item')), was=wa.map(function(b){ return b.style.display; });
       try{
@@ -11625,7 +11683,7 @@ window.SELF_TESTS = [
         if(!m.querySelector('.more-sec[data-sec="whatsapp"]').hidden) throw new Error('the WhatsApp heading stayed with nothing under it');
         if(m.querySelector('.more-sec[data-sec="ideas"]').hidden) throw new Error('a heading with items was hidden');
       } finally { wa.forEach(function(b, i){ b.style.display=was[i]; }); moreSectionsRefresh(); }
-      return 'Files & backup: 5 items, none repeated; More: 5 headings, 14 items each in its place; an empty heading hidden';
+      return 'Files & backup: 5 items, none repeated; More: 5 headings alone, each opening its items in place and pushing the next down, one at a time; 14 items each in its place; an empty heading hidden';
     } },
 
   { id:'selftest_execute_in_view', group:'UI', name:'🧪 The Self Test window keeps ▶ Execute in view on a short screen — the list gives way — and ends above the home bar (v39.29)',

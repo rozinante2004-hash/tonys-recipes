@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.29 -->
+<!-- Tony's Recipes Collection v39.30 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -10681,7 +10681,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.29';
+var APP_VERSION = 'v39.30';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -11868,9 +11868,7 @@ body.banner-shown #envRibbon.env-beta { padding-top: 2px; }
 .drop-group { position: static; }
 .drop-menu { opacity: 0; pointer-events: none; position: fixed; top: -999px; left: -999px; background: white; border: 1px solid var(--border); border-radius: 8px; min-width: 180px; max-width: calc(100vw - 24px); box-shadow: 0 6px 20px rgba(0,0,0,0.13); z-index: 9999; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; transition: opacity 0.12s ease; }   /* v36.67 — scrolls when capped to the screen (dropPlacement) */
 .drop-menu.open { opacity: 1; pointer-events: auto; }
-/* v39.26 — a heading inside a menu (··· More's five); a section with nothing to show is hidden as the menu opens */
-.drop-head { padding: 8px 14px 2px; font-size: 11px; font-weight: 700; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; font-family: 'DM Sans', 'Heebo', sans-serif; }
-.more-sec + .more-sec { border-top: 1px solid var(--border); margin-top: 2px; }
+/* v39.26 — ··· More in five sections, one with nothing to show hidden as the menu opens; v39.30: they open as ⚙️'s do */
 .drop-hint { font-size: 10px; color: var(--muted); }
 /* v39.27 — a file cannot be dragged into a phone's browser: Drop File Here is for a computer (and a tablet with a mouse) */
 @media (hover: none) and (pointer: coarse) { .drop-computer-only { display: none !important; } }
@@ -11972,7 +11970,7 @@ body.banner-shown #envRibbon.env-beta { padding-top: 2px; }
 /* v37.75 — `.drop-item {display:flex}` outranks the browser's own [hidden] rule:
    the iPhone and Android lines showed on Tony's PC although switched off. */
 .drop-menu [hidden] { display: none !important; }
-#settingsDrop .set-head { font-weight: 700; justify-content: space-between; }
+#settingsDrop .set-head, #moreDrop .set-head { font-weight: 700; justify-content: space-between; }
 /* v37.88 — the farm visitors: a cartoon animal strolls across now and then. */
 .farm-visitor { position: fixed; left: 0; top: 0; width: 132px; z-index: 10040; cursor: pointer; will-change: transform; -webkit-tap-highlight-color: transparent; }
 /* v38.07 — Tony: "I should be able to grab them with the mouse or my finger and move them".
@@ -12167,12 +12165,12 @@ html.setup-first #loginScreen > * { visibility: hidden; }   /* v39.02 — a firs
 .path-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--dot-new); box-shadow: 0 0 0 2.5px var(--dot-ring); flex-shrink: 0; margin-inline-start: auto; margin-inline-end: 6px; }
 #settingsDrop .set-head > .path-dot { margin-inline-end: 9px; }
 .btn > .path-dot { display: inline-block; vertical-align: middle; margin: -2px 0 0; margin-inline-start: 8px; }   /* ⋯ More: clear of the word */
-#settingsDrop .set-head::after { content: '›'; font-size: 16px; line-height: 1; color: var(--muted); transition: transform 0.15s; }
-[dir="rtl"] #settingsDrop .set-head::after { content: '‹'; }
-#settingsDrop .set-group.open > .set-head::after { transform: rotate(90deg); }
-#settingsDrop .set-group:not(.open) > .set-body, #settingsDrop .set-group.set-empty { display: none; }
-#settingsDrop .set-body { border-inline-start: 3px solid var(--terracotta-fill); margin-inline-start: 10px; margin-bottom: 4px; }
-#settingsDrop .set-body .drop-item { padding-inline-start: 12px; }
+#settingsDrop .set-head::after, #moreDrop .set-head::after { content: '›'; font-size: 16px; line-height: 1; color: var(--muted); transition: transform 0.15s; }
+[dir="rtl"] #settingsDrop .set-head::after, [dir="rtl"] #moreDrop .set-head::after { content: '‹'; }
+#settingsDrop .set-group.open > .set-head::after, #moreDrop .set-group.open > .set-head::after { transform: rotate(90deg); }
+#settingsDrop .set-group:not(.open) > .set-body, #settingsDrop .set-group.set-empty, #moreDrop .set-group:not(.open) > .set-body { display: none; }
+#settingsDrop .set-body, #moreDrop .set-body { border-inline-start: 3px solid var(--terracotta-fill); margin-inline-start: 10px; margin-bottom: 4px; }
+#settingsDrop .set-body .drop-item, #moreDrop .set-body .drop-item { padding-inline-start: 12px; }
 
 /* SEARCH */
 
@@ -12473,7 +12471,7 @@ html.setup-first #loginScreen > * { visibility: hidden; }   /* v39.02 — a firs
   input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not([type="button"]):not([type="submit"]),
   select, textarea { font-size: 16px !important; }
   .drop-item { font-size: 15px; }
-  .drop-head, .drop-hint { font-size: 12px; }   /* v39.26 — ··· More's headings, Files & backup's hints: the 12 px floor of v39.25 */
+  .drop-hint { font-size: 12px; }   /* v39.26 — Files & backup's hints: the 12 px floor of v39.25 */
 }
 #serviceErrorOverlay a { overflow-wrap: anywhere; word-break: break-word; }
 /* v39.25 — the audit (3 Nov 2026), measured at 390 px: the header's round buttons were 28 px, a card's ❤️ 24, a recipe's
@@ -14092,7 +14090,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.29</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.30</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14180,7 +14178,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.29</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.30</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -14336,16 +14334,28 @@ body.banner-shown .header {
         <div class="drop-menu" id="moreDrop">
           <!-- v39.26 — Tony, 3 Nov 2026 (the audit, "I accept suggestions 1, 2"): fourteen items in one list, now under five
                headings. A heading with nothing to show in this copy (WhatsApp off, a family copy without households) is
-               hidden as the menu opens (moreSectionsRefresh). -->
-          <div class="more-sec" data-sec="ideas"><div class="drop-head">Ideas</div>
+               hidden as the menu opens (moreSectionsRefresh).
+               v39.30 — Tony: "I would like the titles (Ideas, Tools, Kitchens and people, etc.) to become the only menu items
+               under More. Clicking any of them will open a sub menu with whatever is under the same title right now. Also,
+               the sub menu will not open as a new window but rather in the same menu, expanding downwards, pushing the next
+               title down." As ⚙️'s sections (.set-group / .set-head / .set-body): one open at a time, a second tap closes. -->
+          <div class="more-sec set-group" data-sec="ideas" data-group="ideas">
+            <button type="button" class="drop-item set-head" aria-expanded="false" title="Meal ideas, suggestions, and what you can make with what you have" onclick="moreGroup('ideas')">💡 Ideas</button>
+            <div class="set-body">
             <button class="drop-item" onclick="closeDrop('moreDrop');openExploreModal()">🔭 Explore meal ideas</button>
             <button class="drop-item" onclick="closeDrop('moreDrop');openSuggestModal()">✨ Suggest recipes</button>
             <button class="drop-item" onclick="closeDrop('moreDrop');openWhatCanIMake()">🥫 What can I make with what I have?</button>
+            </div>
           </div>
-          <div class="more-sec" data-sec="tools"><div class="drop-head">Tools</div>
+          <div class="more-sec set-group" data-sec="tools" data-group="tools">
+            <button type="button" class="drop-item set-head" aria-expanded="false" title="The measurement converter" onclick="moreGroup('tools')">🧰 Tools</button>
+            <div class="set-body">
             <button class="drop-item" onclick="closeDrop('moreDrop');openCalcModal()">⚖️ Measurement converter</button>
+            </div>
           </div>
-          <div class="more-sec" data-sec="people"><div class="drop-head">Kitchens and people</div>
+          <div class="more-sec set-group" data-sec="people" data-group="people">
+            <button type="button" class="drop-item set-head" aria-expanded="false" title="Linked kitchens, the chats, recipes sent and received, and sharing the app" onclick="moreGroup('people')">🏡 Kitchens and people</button>
+            <div class="set-body">
             <button class="drop-item" data-layout-only="households" title="Link your kitchen with another household: once they agree, each of you sees the other's recipes, read-only." onclick="closeDrop('moreDrop');openConnectHousehold()">🤝 Connect with another household</button>
             <!-- v38.78 — Tony: "Add another button, above the 'Chat with joint kitchens' button, titled 'Chat with family members'" -->
             <button class="drop-item" id="familyChatItem" data-layout-only="households" onclick="closeDrop('moreDrop');openFamilyChat()">👪 Chat with family members</button>
@@ -14354,14 +14364,21 @@ body.banner-shown .header {
             <button class="drop-item" id="giftsInItem" data-layout-only="households" title="Recipes other kitchens sent yours, waiting to be saved — each for 4 weeks." onclick="closeDrop('moreDrop');openGiftsIn()"><span>📨 Recipes sent to me</span><span id="giftsInCount" data-no-i18n></span></button>
             <button class="drop-item" id="giftsOutItem" data-layout-only="households" title="What your kitchen sent, and whether they saved it." onclick="closeDrop('moreDrop');openGiftsOut()">📤 Recipes I sent</button>
             <button class="drop-item" onclick="closeDrop('moreDrop');openShareAppModal()"><span aria-hidden="true" data-no-i18n style="display:inline-flex;"><svg class="share-ico" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="11.5" fill="#C1440E"/><path d="M7.2 12 14.8 7.6M7.2 12 14.8 16.4" stroke="#FFFFFF" stroke-width="1.9" stroke-linecap="round"/><circle cx="15" cy="7.4" r="2.6" fill="#FFFFFF"/><circle cx="7" cy="12" r="2.6" fill="#FFFFFF"/><circle cx="15" cy="16.6" r="2.6" fill="#FFFFFF"/></svg></span> <span id="shareAppMenuText">Share this app</span></button>
+            </div>
           </div>
-          <div class="more-sec" data-sec="whatsapp"><div class="drop-head">WhatsApp</div>
+          <div class="more-sec set-group" data-sec="whatsapp" data-group="whatsapp">
+            <button type="button" class="drop-item set-head" aria-expanded="false" title="Ask your WhatsApp groups, and the recipes hiding in your chats" onclick="moreGroup('whatsapp')">📱 WhatsApp</button>
+            <div class="set-body">
             <button class="drop-item" id="waAskItem" data-feature="whatsapp" onclick="closeDrop('moreDrop');openWaAsk()">💬 Ask my WhatsApp groups</button>
             <button class="drop-item" id="waLinksItem" data-feature="whatsapp" onclick="closeDrop('moreDrop');openWaLinks()">🧺 Recipes hiding in my chats</button>
+            </div>
           </div>
-          <div class="more-sec" data-sec="tidy"><div class="drop-head">Tidy up</div>
+          <div class="more-sec set-group" data-sec="tidy" data-group="tidy">
+            <button type="button" class="drop-item set-head" aria-expanded="false" title="Diet types and missing photos, for the whole collection" onclick="moreGroup('tidy')">🧹 Tidy up</button>
+            <div class="set-body">
             <button class="drop-item" onclick="closeDrop('moreDrop');aiTagAllDiets()">🏷️ Auto-tag diet types</button>
             <button class="drop-item" onclick="closeDrop('moreDrop');autoFetchMissingPhotos()">📸 Auto-fetch missing photos</button>
+            </div>
           </div>
         <input type="file" id="photoRescueFile" accept=".json,application/json" style="display:none"
                onchange="runPhotoRescue(this.files&&this.files[0])">
@@ -24802,14 +24819,20 @@ function toggleDrop(id){
 // not shown at all.
 // v39.26 — ··· More's headings: one whose items are all hidden in this copy goes with them (WhatsApp switched off hides
 // its heading; in a copy without households, "Kitchens and people" keeps only Share this app, and stays).
-function moreSectionsRefresh() {
+function moreSectionsRefresh(collapse) {
   var m = document.getElementById('moreDrop'), shown = 0;
   if (!m) return 0;
   Array.prototype.forEach.call(m.querySelectorAll('.more-sec'), function(sec) {
+    var body = sec.querySelector('.set-body') || sec;
     sec.hidden = false;
-    var any = Array.prototype.some.call(sec.querySelectorAll('.drop-item'), function(b){ return settingsItemShown(b, sec); });
+    // its items, not its heading — judged up to its body, which is closed while its heading is (v39.30)
+    var any = Array.prototype.some.call(body.querySelectorAll('.drop-item'), function(b){ return settingsItemShown(b, body); });
     sec.hidden = !any;
     if (any) shown++;
+    if (collapse !== false) {   // v39.30 — ··· More opens on its headings alone
+      sec.classList.remove('open');
+      var h = sec.querySelector('.set-head'); if (h) h.setAttribute('aria-expanded', 'false');
+    }
   });
   return shown;
 }
@@ -24833,17 +24856,19 @@ function settingsGroupsRefresh(collapse) {
   });
   return groups.length;
 }
-function settingsGroup(id) {
-  var menu = document.getElementById('settingsDrop'), opened = null;
+// v39.30 — ··· More's sections open the same way (moreGroup): the toggle and the placing are shared.
+function dropGroupToggle(menuId, btn, id) {
+  var menu = document.getElementById(menuId), opened = null;
+  if (!menu) return false;
   Array.prototype.forEach.call(menu.querySelectorAll('.set-group'), function(g) {
     var on = g.getAttribute('data-group') === id && !g.classList.contains('open');
     g.classList.toggle('open', on);
     g.querySelector('.set-head').setAttribute('aria-expanded', on ? 'true' : 'false');
     if (on) opened = g;
   });
-  // Placed again for its new height: below ⚙️, scrolling if it must.
+  // Placed again for its new height: below its button, scrolling if it must.
   if (menu.classList.contains('open')) {
-    var btn = document.getElementById('settingsBtn'), r = btn ? btn.getBoundingClientRect() : { top: 0, bottom: 56, right: window.innerWidth };
+    var r = btn ? btn.getBoundingClientRect() : { top: 0, bottom: 56, right: window.innerWidth };
     menu.style.maxHeight = '';
     var vv = window.visualViewport;
     var p = dropPlacement(r, menu.offsetWidth, menu.scrollHeight, window.innerWidth, (vv && vv.height) || window.innerHeight, safeAreaTopPx());
@@ -24854,7 +24879,10 @@ function settingsGroup(id) {
   }
   return !!opened;
 }
+function settingsGroup(id) { return dropGroupToggle('settingsDrop', document.getElementById('settingsBtn'), id); }
+function moreGroup(id) { var m = document.getElementById('moreDrop'); return dropGroupToggle('moreDrop', m ? m.previousElementSibling : null, id); }
 window.settingsGroup = settingsGroup; window.settingsGroupsRefresh = settingsGroupsRefresh;
+window.moreGroup = moreGroup; window.dropGroupToggle = dropGroupToggle;
 function closeDrop(id){
   var m=document.getElementById(id); if(!m) return;
   m.classList.remove('open');
@@ -33381,7 +33409,7 @@ var HELP_SYSTEM_PROMPT = [
   (APP_CONFIG.environment === 'live' ? "Tony's Recipes Collection" : (APP_CONFIG.brandName || 'My Kitchen Notes')) + " is a single-page web app hosted at " + APP_CONFIG.siteOrigin + APP_CONFIG.sitePath,
   "It stores recipes in Firebase Firestore (cloud) and localStorage (offline). All AI features route through a Cloudflare Worker.",
   "THE HEADER'S MENUS: ··· More, 📁 Files & backup (📁 Files on a narrow phone) and + Add Recipe; ⚙️ is Settings.",
-  "- ··· MORE is in five parts: Ideas (Explore, Suggest, What can I make), Tools (the measurement converter), Kitchens and people (connecting with another household, the chats, recipes sent to you and by you, sharing the app), WhatsApp, and Tidy up (auto-tag diet types, auto-fetch missing photos). A part with nothing in it on your copy is not shown.",
+  "- ··· MORE shows five headings: 💡 Ideas (Explore, Suggest, What can I make), 🧰 Tools (the measurement converter), 🏡 Kitchens and people (connecting with another household, the chats, recipes sent to you and by you, sharing the app), 📱 WhatsApp, and 🧹 Tidy up (auto-tag diet types, auto-fetch missing photos). Tap a heading to open what is under it, right in the menu (the headings below move down); tap it again, or another heading, to close it — as in ⚙️ Settings. A heading with nothing under it on your copy is not shown.",
   "",
   "=== BROWSING & FILTERING ===",
   "- Recipes are shown in List or Grid view (toggle top-right)",

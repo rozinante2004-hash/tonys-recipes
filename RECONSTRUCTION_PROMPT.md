@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v39.29` — app. **Worker: v100**, deployed separately and versioned separately
+**Current version:** `v39.30` — app. **Worker: v100**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -2072,12 +2072,15 @@ badge; right side: sync‑status pill with Sign in/out, a `?` help button, and a
 dropdown (Family Access, Gmail Setup, Self Test, 🪵 Logging & debugging, Payments, Deployments, plus the photo tools —
 Send photos to the cloud, Photo rescue, Undo auto-fetch, Clean up orphaned photos). Second header row: **search input**
 (filters live via `renderGrid()`), plus three dropdown button‑groups:
-- **··· More** (v39.26: under five small headings — `.more-sec[data-sec]` blocks, each with a `.drop-head`) →
-  *Ideas* (Explore meal ideas, Suggest recipes, What can I make), *Tools* (Measurement converter), *Kitchens and people*
-  (Connect with another household, Chat with family members, Chats with linked kitchens, Recipes sent to me, Recipes I
-  sent, Share this app), *WhatsApp* (Ask my WhatsApp groups, Recipes hiding in my chats), *Tidy up* (Auto‑tag diet
-  types, Auto‑fetch missing photos). `moreSectionsRefresh()` (called by `toggleDrop` as ··· More opens) hides a heading
-  whose items are all hidden (`settingsItemShown`, as ⚙️'s sections).
+- **··· More** (v39.30: its five headings ARE the menu — Tony: "the titles … to become the only menu items under More.
+  Clicking any of them will open a sub menu … in the same menu, expanding downwards, pushing the next title down") →
+  💡 *Ideas* (Explore meal ideas, Suggest recipes, What can I make), 🧰 *Tools* (Measurement converter), 🏡 *Kitchens and
+  people* (Connect with another household, Chat with family members, Chats with linked kitchens, Recipes sent to me,
+  Recipes I sent, Share this app), 📱 *WhatsApp* (Ask my WhatsApp groups, Recipes hiding in my chats), 🧹 *Tidy up*
+  (Auto‑tag diet types, Auto‑fetch missing photos). Each `.more-sec` is a `.set-group` (`.set-head` button + `.set-body`)
+  styled and toggled as ⚙️'s: `dropGroupToggle(menuId, button, id)` behind `settingsGroup` and `moreGroup` — one open at
+  a time, a second tap closes, the menu placed again for its new height. `moreSectionsRefresh()` (called by `toggleDrop`
+  as ··· More opens) closes them all and hides a heading whose items are all hidden (`settingsItemShown` up to its body).
 - **📁 Files & backup** (v39.26; was "⇅ Imp/Exp", which repeated three of + Add Recipe's items) → From File
   `.docx/.xlsx/.pdf/.html`, Drop File Here | All to Word | Backup — Save, Backup — Restore. Its label is one `<span>` (in
   the flex button, loose words lose their spaces) holding `.lbl-long` "Files & backup" and `.lbl-short` "Files", which

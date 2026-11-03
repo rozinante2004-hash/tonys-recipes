@@ -1437,6 +1437,27 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
   - **Released: v39.09 (29 Oct 2026, 11:17 Israel time, on 0de2dde; Tony: "Yes, release v39.09").** Every job success:
     Deploy to GitHub Pages, pages build, Publish languages, Translate new phrases, Self Tests on main and test,
     Cloudflare Pages for the beta and test.
+  - **v39.30 — ··· More is its five headings; a tap opens one in place, pushing the next down** (Tony, 3 Nov 2026: "I
+    would like the titles (Ideas, Tools, Kitchens and people, etc.) to become the only menu items under More. Clicking
+    any of them will open a sub menu with whatever is under the same title right now. Also, the sub menu will not open
+    as a new window but rather in the same menu, expanding downwards, pushing the next title down."). As ⚙️'s sections:
+    each `.more-sec` is a `.set-group` with a `.set-head` button (💡 Ideas, 🧰 Tools, 🏡 Kitchens and people, 📱 WhatsApp,
+    🧹 Tidy up — icons as ⚙️'s headings have; a › that turns) and a `.set-body`; one open at a time, a second tap closes,
+    ··· More opens on its headings alone (`moreSectionsRefresh` collapses them; a heading with nothing to show stays
+    hidden, judged up to its body). `settingsGroup` and the new `moreGroup` share `dropGroupToggle(menuId, button, id)`
+    (toggle, aria-expanded, placed again for the new height). The v39.26 small uppercase headings (`.drop-head`) are
+    gone. Self Test `menus_files_and_more_headings`: only headings at first; 💡 Ideas shows its 3 items and pushes 🧰 Tools
+    down by them; one open at a time; a second tap closes; reopened, all closed (fails on v39.29's menu, without the
+    collapse, and with two open at once). Help says so.
+    **And four Self Tests that failed only on Tony's installed iPhone** (his two reports, v39.28 and v39.29, 3 Nov; all
+    test faults, not the app's): `shortcuts_and_extensions` stood in for an Android phone but not for "not installed
+    yet" — the installed app's real answer reached it (now stood in for, and the installed case checked: shown failing
+    the old way with `navigator.standalone` true); `ui_menus_stay_on_screen` "slid" the sticky header at the top of the
+    page, where it does not move, so ⚙️ stayed on the screen and nothing needed bringing back (a computer never reached
+    the check) — the page is scrolled down first now; `farm_visitors` sent the goose at 1,500 px/s, across a 393 px
+    phone and gone before the second look, now and then (now at most the screen's width a second; 3 of 3 on a phone);
+    `recipe_bold` found nothing of the editor at Update Recipe's centre once, with the fields it typed into still
+    focused — it lets go of the focus and lets the screen settle first, and a failure now says what is at that point.
   - **v39.29 — the Self Test's ▶ Execute row always on the screen; windows end above the home bar** (Tony, 3 Nov 2026,
     a screenshot of the Self Test on his iPhone, the installed app, at 21:36: "the Execute button is placed too low on
     the. Screen."). Two causes. The list had a fixed `max-height: 55vh`; with the title, the note and the select row
