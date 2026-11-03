@@ -1450,6 +1450,9 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
     `backup_reminder_considerate` (an open menu; the words in the translations — each fault planted, each caught).
     Help: the menus (in the overview), the reminder. On a touch screen ··· More's headings and Files' two hints
     (`.drop-head`, `.drop-hint`, were 10–11 px) are 12 px.
+  - **Released: v39.25 (3 Nov 2026, 19:41 Israel time, on cf99f74; Tony: "Please release 39.25").** Every job success:
+    Deploy to GitHub Pages, pages build, Publish languages, Translate new phrases, Self Tests on main and test,
+    Cloudflare usage, Cloudflare Pages for the beta and test.
   - **v39.25 — the audit of 3 Nov (AUDIT-2026-11-03.md): Self Tests that test what they say; the backup reminder; phones'
     small buttons and text; a large collection on a phone** (Tony, 3 Nov: "let's run another audit, focusing on
     usability, functionality, efficiency and visuality" — "please make sure all the self test tests are indeed testing
