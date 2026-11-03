@@ -1437,6 +1437,19 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
   - **Released: v39.09 (29 Oct 2026, 11:17 Israel time, on 0de2dde; Tony: "Yes, release v39.09").** Every job success:
     Deploy to GitHub Pages, pages build, Publish languages, Translate new phrases, Self Tests on main and test,
     Cloudflare Pages for the beta and test.
+  - **v39.26 — "📁 Files & backup ▾" and ··· More under five headings** (Tony, 3 Nov 2026, on the audit's "Needs Tony":
+    "I accept suggestions 1, 2. Please release 39.25 and then put the new suggestions on the Test release."). "⇅ Imp/Exp ▾"
+    is "📁 Files & backup ▾" (📁 Files ▾ below 375 px, `.lbl-long`/`.lbl-short` in one `<span>` — loose words in the flex
+    button lost their spaces) without the three items + Add Recipe has (From URL, Free-hand text, Scan); the Help's "📊 All
+    to Excel" line went too (the export was removed in v28.5); ··· More's 14 items under Ideas, Tools, Kitchens
+    and people, WhatsApp, Tidy up (`.more-sec` + `.drop-head`; `moreSectionsRefresh()` hides a heading with nothing to
+    show, called as the menu opens). Found on the way (the Hebrew walk of the new menus): the backup reminder came up
+    over an open menu (`backupNagWhenFree` now waits for `.drop-menu.open` too), and its words were English in Hebrew
+    (composed, so no reading of the source found them: now in `I18N_EXTRA`). Self Tests `menus_files_and_more_headings`
+    (fails on v39.25's menus, a no-op `moreSectionsRefresh`, the converter under Ideas, From URL back in Files) and
+    `backup_reminder_considerate` (an open menu; the words in the translations — each fault planted, each caught).
+    Help: the menus (in the overview), the reminder. On a touch screen ··· More's headings and Files' two hints
+    (`.drop-head`, `.drop-hint`, were 10–11 px) are 12 px.
   - **v39.25 — the audit of 3 Nov (AUDIT-2026-11-03.md): Self Tests that test what they say; the backup reminder; phones'
     small buttons and text; a large collection on a phone** (Tony, 3 Nov: "let's run another audit, focusing on
     usability, functionality, efficiency and visuality" — "please make sure all the self test tests are indeed testing

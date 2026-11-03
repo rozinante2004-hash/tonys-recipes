@@ -3931,7 +3931,7 @@ window.SELF_TESTS = [
       })(); } finally { _backupRecordRestoreForTest(_bk); }
     } },
 
-  { id:'backup_reminder_considerate', group:'Backup', name:'💾 The backup reminder: once a day at most, never over an open window, and the 60-day one stays until dismissed (v39.25)',
+  { id:'backup_reminder_considerate', group:'Backup', name:'💾 The backup reminder: once a day at most, never over an open window or menu, in the reader’s language, and the 60-day one stays until dismissed (v39.25, v39.26)',
     test: async()=>{
       // The audit, 3 Nov 2026: a kitchen never backed up was told at every opening, for 12 s, over the recipe just opened
       // (its buttons hidden); and the reminder meant to stay after 60 days went away after 9 s.
@@ -3956,6 +3956,12 @@ window.SELF_TESTS = [
         if(said.length!==1 || !/No backup has been taken yet/.test(said[0])) throw new Error('a kitchen never backed up was not reminded: '+said.join(' | '));
         await checkBackupOverdue();
         if(said.length!==1) throw new Error('reminded twice in one day');
+        // its words are translated (v39.26 — English in the Hebrew walk: no reading of the source finds them)
+        if(I18N_EXTRA.indexOf(said[0])===-1) throw new Error('the reminder’s words are not in the translations: '+said[0]);
+        _backupRecordRestoreForTest({ tonys_last_backup_at: String(Date.now()-61*86400000) });
+        await checkBackupOverdue();
+        if(said.length!==2 || !/Last backup was 61 days ago/.test(said[1])) throw new Error('a 61-day-old backup was not reminded: '+said.join(' | '));
+        if(I18N_EXTRA.indexOf(said[1].replace(/\b61\b/, '{1}'))===-1) throw new Error('the reminder’s words are not in the translations: '+said[1]);
         // not over an open window: it waits, and goes on once the window is closed
         win=document.createElement('div'); win.className='modal-overlay open'; win.id='bkNagTestOverlay'; document.body.appendChild(win);
         window._backupNagUnderTest=true;
@@ -3965,12 +3971,20 @@ window.SELF_TESTS = [
         win.remove(); win=null;
         await wait(80);
         if(free!==true) throw new Error('the reminder did not go on once the window was closed');
+        // …nor over an open menu (v39.26 — on a phone it came up over ··· More)
+        win=document.createElement('div'); win.className='drop-menu open'; win.id='bkNagTestMenu'; document.body.appendChild(win);
+        free=null; backupNagWhenFree(20).then(function(v){ free=v; });
+        await wait(80);
+        if(free!==null) throw new Error('the reminder did not wait for an open menu');
+        win.remove(); win=null;
+        await wait(80);
+        if(free!==true) throw new Error('the reminder did not go on once the menu was closed');
       } finally {
         window.toastAction=real.ta; window.autoBackupIfDue=real.auto; window.familyBackupFetch=real.fetch; window.backupForgetUnvouched=real.forget;
         window._backupNagUnderTest=false; if(win) win.remove(); try{ toastHide(t); }catch(e){}
         recipes=realR; _backupRecordRestoreForTest(rec);
       }
-      return 'stays when asked to; once a day; waits for an open window';
+      return 'stays when asked to; once a day; its words translated; waits for an open window and an open menu';
     } },
 
   { id:'safety_backup_family', group:'Backup', name:'A backup taken on the PC counts on the phone (v36.61, audit E2)',
@@ -11480,6 +11494,42 @@ window.SELF_TESTS = [
         if(gs){ if(gsWas) gs.classList.add('open'); else gs.classList.remove('open'); }
       }
       return 'fitted as it opens (zoom 1.25), follows the screen, lets go on a pinch and on closing; ··· More inside the screen at its size';
+    } },
+
+  { id:'menus_files_and_more_headings', group:'UI', name:'📁 Files & backup holds what only it has (adding stays in + Add Recipe); ··· More is under five headings, and one with nothing to show is hidden (v39.26)',
+    test: async()=>{
+      // Tony, 3 Nov 2026, from the audit: "I accept suggestions 1, 2".
+      var btn=document.querySelector('[onclick="toggleDrop(\'importExportDrop\')"]'), fd=document.getElementById('importExportDrop');
+      if(!btn || !/Files & backup/.test(btn.textContent) || !btn.querySelector('.lbl-short')) throw new Error('the menu is not called 📁 Files & backup (with 📁 Files on a narrow phone): '+(btn&&btn.textContent));
+      ['openUrlImportModal','openFreehandModal','openCameraImport'].forEach(function(f){
+        if(fd.querySelector('[onclick*="'+f+'"]')) throw new Error('📁 Files & backup still repeats '+f+' from + Add Recipe');
+        if(!document.querySelector('#addDrop [onclick*="'+f+'"]')) throw new Error('+ Add Recipe lost '+f);
+      });
+      ["fileIn').click()",'openDropZone','exportAllWord','backupSave','backupRestore'].forEach(function(f){
+        if(!fd.querySelector('[onclick*="'+f+'"]')) throw new Error('📁 Files & backup lost '+f);
+      });
+      var m=document.getElementById('moreDrop');
+      var heads=Array.prototype.map.call(m.querySelectorAll('.more-sec > .drop-head'), function(h){ return h.textContent.trim(); });
+      if(heads.join('|')!=='Ideas|Tools|Kitchens and people|WhatsApp|Tidy up') throw new Error('the headings are '+heads.join(' | '));
+      var where={ openExploreModal:'ideas', openSuggestModal:'ideas', openWhatCanIMake:'ideas', openCalcModal:'tools', openConnectHousehold:'people',
+        openFamilyChat:'people', openKitchenChats:'people', openGiftsIn:'people', openGiftsOut:'people', openShareAppModal:'people',
+        openWaAsk:'whatsapp', openWaLinks:'whatsapp', aiTagAllDiets:'tidy', autoFetchMissingPhotos:'tidy' };
+      Object.keys(where).forEach(function(f){
+        var it=m.querySelectorAll('[onclick*="'+f+'("]');
+        if(it.length!==1) throw new Error(f+' is in ··· More '+it.length+' times');
+        var sec=it[0].closest('.more-sec');
+        if(!sec || sec.getAttribute('data-sec')!==where[f]) throw new Error(f+' is under "'+(sec&&sec.getAttribute('data-sec'))+'", not "'+where[f]+'"');
+      });
+      if(m.querySelectorAll('.drop-item').length!==14) throw new Error('··· More has '+m.querySelectorAll('.drop-item').length+' items, not 14');
+      // a section with nothing to show goes
+      var wa=Array.prototype.slice.call(m.querySelectorAll('.more-sec[data-sec="whatsapp"] .drop-item')), was=wa.map(function(b){ return b.style.display; });
+      try{
+        wa.forEach(function(b){ b.style.display='none'; });
+        moreSectionsRefresh();
+        if(!m.querySelector('.more-sec[data-sec="whatsapp"]').hidden) throw new Error('the WhatsApp heading stayed with nothing under it');
+        if(m.querySelector('.more-sec[data-sec="ideas"]').hidden) throw new Error('a heading with items was hidden');
+      } finally { wa.forEach(function(b, i){ b.style.display=was[i]; }); moreSectionsRefresh(); }
+      return 'Files & backup: 5 items, none repeated; More: 5 headings, 14 items each in its place; an empty heading hidden';
     } },
 
   { id:'settings_in_sections', group:'UI', name:'⚙️ Settings in sections: their names first, one open at a time, empty ones not shown, below the bar (v37.74)',

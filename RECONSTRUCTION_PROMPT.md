@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v39.25` — app. **Worker: v100**, deployed separately and versioned separately
+**Current version:** `v39.26` — app. **Worker: v100**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -810,8 +810,11 @@ lay out in, and a notice with a button stood one word to a line. Cards off the s
 (`.recipe-card`/`.recipe-list-item { content-visibility: auto; contain-intrinsic-height: auto 250px / 52px }`): with
 600 recipes on a phone's speed a category tap went 410 → 85 ms. **The backup reminder** (`checkBackupOverdue`) comes
 once a day at most at every level (`backupNaggedToday`/`markBackupNagged`), waits until no window is open
-(`backupNagWhenFree`, up to ten minutes, the Self Test window aside), and `toastAction(…, 0)` stays until dismissed
-(the 60-day level; `|| 9000` had made it 9 s).
+(`backupNagWhenFree`, up to ten minutes, the Self Test window aside) — nor a menu (v39.26: it came up over ··· More) —
+and `toastAction(…, 0)` stays until dismissed (the 60-day level; `|| 9000` had made it 9 s). Its words are composed
+(a choice and a place), so they are listed in `I18N_EXTRA` (v39.26; English in the Hebrew walk until then).
+··· More's headings and 📁 Files & backup's two hints are 12 px on a touch screen (`.drop-head`, `.drop-hint`; 11 and 10
+elsewhere).
 A place kept for an address that nobody has signed in with yet says "⏳ hasn’t signed in yet" under it (v38.85): it
 has no 💬 Chat, because there is nobody to chat with until they sign in with that address.
 
@@ -2061,10 +2064,16 @@ badge; right side: sync‑status pill with Sign in/out, a `?` help button, and a
 dropdown (Family Access, Gmail Setup, Self Test, 🪵 Logging & debugging, Payments, Deployments, plus the photo tools —
 Send photos to the cloud, Photo rescue, Undo auto-fetch, Clean up orphaned photos). Second header row: **search input**
 (filters live via `renderGrid()`), plus three dropdown button‑groups:
-- **··· More** → Explore meal ideas, Suggest recipes, Convert measurements, Share this app,
-  Auto‑tag diet types, Auto‑fetch missing photos.
-- **⇅ Imp/Exp** → Import (From URL, Free‑hand text, Scan camera, From File `.docx/.xlsx/.pdf/.html`,
-  Drop File) and Export (All to Excel, All to Word, Backup Save, Backup Restore).
+- **··· More** (v39.26: under five small headings — `.more-sec[data-sec]` blocks, each with a `.drop-head`) →
+  *Ideas* (Explore meal ideas, Suggest recipes, What can I make), *Tools* (Measurement converter), *Kitchens and people*
+  (Connect with another household, Chat with family members, Chats with linked kitchens, Recipes sent to me, Recipes I
+  sent, Share this app), *WhatsApp* (Ask my WhatsApp groups, Recipes hiding in my chats), *Tidy up* (Auto‑tag diet
+  types, Auto‑fetch missing photos). `moreSectionsRefresh()` (called by `toggleDrop` as ··· More opens) hides a heading
+  whose items are all hidden (`settingsItemShown`, as ⚙️'s sections).
+- **📁 Files & backup** (v39.26; was "⇅ Imp/Exp", which repeated three of + Add Recipe's items) → From File
+  `.docx/.xlsx/.pdf/.html`, Drop File Here | All to Word | Backup — Save, Backup — Restore. Its label is one `<span>` (in
+  the flex button, loose words lose their spaces) holding `.lbl-long` "Files & backup" and `.lbl-short` "Files", which
+  replaces it below 375 px so + Add Recipe stays on the row at 320 px.
 - **+ Add Recipe** → Fill in manually, Paste free‑hand text, Import from URL, Scan (camera).
 
 A thin save‑status bar with a **Reset** (clear all data) link sits under the header.

@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.25 -->
+<!-- Tony's Recipes Collection v39.26 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -10678,7 +10678,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.25';
+var APP_VERSION = 'v39.26';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -11865,6 +11865,13 @@ body.banner-shown #envRibbon.env-beta { padding-top: 2px; }
 .drop-group { position: static; }
 .drop-menu { opacity: 0; pointer-events: none; position: fixed; top: -999px; left: -999px; background: white; border: 1px solid var(--border); border-radius: 8px; min-width: 180px; max-width: calc(100vw - 24px); box-shadow: 0 6px 20px rgba(0,0,0,0.13); z-index: 9999; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; transition: opacity 0.12s ease; }   /* v36.67 — scrolls when capped to the screen (dropPlacement) */
 .drop-menu.open { opacity: 1; pointer-events: auto; }
+/* v39.26 — a heading inside a menu (··· More's five); a section with nothing to show is hidden as the menu opens */
+.drop-head { padding: 8px 14px 2px; font-size: 11px; font-weight: 700; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; font-family: 'DM Sans', 'Heebo', sans-serif; }
+.more-sec + .more-sec { border-top: 1px solid var(--border); margin-top: 2px; }
+.drop-hint { font-size: 10px; color: var(--muted); }
+.more-sec[hidden] { display: none !important; }
+.lbl-short { display: none; }   /* a button's label in one <span>: in a flex button, loose words lose their spaces */
+@media (max-width: 374px) { .lbl-long { display: none; } .lbl-short { display: inline; } }
 /* v36.69 — a menu taller than the screen scrolls; the fade at its foot says so. */
 .drop-menu.drop-scrolls { -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent);
                           mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent); padding-bottom: 20px; }
@@ -12446,6 +12453,7 @@ html.setup-first #loginScreen > * { visibility: hidden; }   /* v39.02 — a firs
   input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not([type="button"]):not([type="submit"]),
   select, textarea { font-size: 16px !important; }
   .drop-item { font-size: 15px; }
+  .drop-head, .drop-hint { font-size: 12px; }   /* v39.26 — ··· More's headings, Files & backup's hints: the 12 px floor of v39.25 */
 }
 #serviceErrorOverlay a { overflow-wrap: anywhere; word-break: break-word; }
 /* v39.25 — the audit (3 Nov 2026), measured at 390 px: the header's round buttons were 28 px, a card's ❤️ 24, a recipe's
@@ -14064,7 +14072,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.25</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.26</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14152,7 +14160,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.25</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.26</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -14306,39 +14314,48 @@ body.banner-shown .header {
       <div class="drop-group">
         <button class="btn btn-secondary" onclick="toggleDrop('moreDrop')">··· More</button>
         <div class="drop-menu" id="moreDrop">
-          <button class="drop-item" onclick="closeDrop('moreDrop');openExploreModal()">🔭 Explore meal ideas</button>
-          <button class="drop-item" onclick="closeDrop('moreDrop');openSuggestModal()">✨ Suggest recipes</button>
-          <button class="drop-item" onclick="closeDrop('moreDrop');openCalcModal()">⚖️ Measurement converter</button>
-          <button class="drop-item" id="waAskItem" data-feature="whatsapp" onclick="closeDrop('moreDrop');openWaAsk()">💬 Ask my WhatsApp groups</button>
-          <button class="drop-item" id="waLinksItem" data-feature="whatsapp" onclick="closeDrop('moreDrop');openWaLinks()">🧺 Recipes hiding in my chats</button>
-          <button class="drop-item" onclick="closeDrop('moreDrop');openWhatCanIMake()">🥫 What can I make with what I have?</button>
-          <button class="drop-item" data-layout-only="households" title="Link your kitchen with another household: once they agree, each of you sees the other's recipes, read-only." onclick="closeDrop('moreDrop');openConnectHousehold()">🤝 Connect with another household</button>
-          <!-- v38.78 — Tony: "Add another button, above the 'Chat with joint kitchens' button, titled 'Chat with family members'" -->
-          <button class="drop-item" id="familyChatItem" data-layout-only="households" onclick="closeDrop('moreDrop');openFamilyChat()">👪 Chat with family members</button>
-          <button class="drop-item" id="kitchenChatsItem" data-layout-only="households" onclick="closeDrop('moreDrop');openKitchenChats()">💬 Chats with linked kitchens</button>
-          <!-- v39.10 — Tony: "a menu item for it under "More ...", called something like "Recipes sent to me"", and "📤 Recipes I sent" -->
-          <button class="drop-item" id="giftsInItem" data-layout-only="households" title="Recipes other kitchens sent yours, waiting to be saved — each for 4 weeks." onclick="closeDrop('moreDrop');openGiftsIn()"><span>📨 Recipes sent to me</span><span id="giftsInCount" data-no-i18n></span></button>
-          <button class="drop-item" id="giftsOutItem" data-layout-only="households" title="What your kitchen sent, and whether they saved it." onclick="closeDrop('moreDrop');openGiftsOut()">📤 Recipes I sent</button>
-          <button class="drop-item" onclick="closeDrop('moreDrop');openShareAppModal()"><span aria-hidden="true" data-no-i18n style="display:inline-flex;"><svg class="share-ico" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="11.5" fill="#C1440E"/><path d="M7.2 12 14.8 7.6M7.2 12 14.8 16.4" stroke="#FFFFFF" stroke-width="1.9" stroke-linecap="round"/><circle cx="15" cy="7.4" r="2.6" fill="#FFFFFF"/><circle cx="7" cy="12" r="2.6" fill="#FFFFFF"/><circle cx="15" cy="16.6" r="2.6" fill="#FFFFFF"/></svg></span> <span id="shareAppMenuText">Share this app</span></button>
-        <div style="height:1px;background:var(--border);margin:4px 0;"></div>
-        <button class="drop-item" onclick="closeDrop('moreDrop');aiTagAllDiets()">🏷️ Auto-tag diet types</button>
-        <button class="drop-item" onclick="closeDrop('moreDrop');autoFetchMissingPhotos()">📸 Auto-fetch missing photos</button>
+          <!-- v39.26 — Tony, 3 Nov 2026 (the audit, "I accept suggestions 1, 2"): fourteen items in one list, now under five
+               headings. A heading with nothing to show in this copy (WhatsApp off, a family copy without households) is
+               hidden as the menu opens (moreSectionsRefresh). -->
+          <div class="more-sec" data-sec="ideas"><div class="drop-head">Ideas</div>
+            <button class="drop-item" onclick="closeDrop('moreDrop');openExploreModal()">🔭 Explore meal ideas</button>
+            <button class="drop-item" onclick="closeDrop('moreDrop');openSuggestModal()">✨ Suggest recipes</button>
+            <button class="drop-item" onclick="closeDrop('moreDrop');openWhatCanIMake()">🥫 What can I make with what I have?</button>
+          </div>
+          <div class="more-sec" data-sec="tools"><div class="drop-head">Tools</div>
+            <button class="drop-item" onclick="closeDrop('moreDrop');openCalcModal()">⚖️ Measurement converter</button>
+          </div>
+          <div class="more-sec" data-sec="people"><div class="drop-head">Kitchens and people</div>
+            <button class="drop-item" data-layout-only="households" title="Link your kitchen with another household: once they agree, each of you sees the other's recipes, read-only." onclick="closeDrop('moreDrop');openConnectHousehold()">🤝 Connect with another household</button>
+            <!-- v38.78 — Tony: "Add another button, above the 'Chat with joint kitchens' button, titled 'Chat with family members'" -->
+            <button class="drop-item" id="familyChatItem" data-layout-only="households" onclick="closeDrop('moreDrop');openFamilyChat()">👪 Chat with family members</button>
+            <button class="drop-item" id="kitchenChatsItem" data-layout-only="households" onclick="closeDrop('moreDrop');openKitchenChats()">💬 Chats with linked kitchens</button>
+            <!-- v39.10 — Tony: "a menu item for it under "More ...", called something like "Recipes sent to me"", and "📤 Recipes I sent" -->
+            <button class="drop-item" id="giftsInItem" data-layout-only="households" title="Recipes other kitchens sent yours, waiting to be saved — each for 4 weeks." onclick="closeDrop('moreDrop');openGiftsIn()"><span>📨 Recipes sent to me</span><span id="giftsInCount" data-no-i18n></span></button>
+            <button class="drop-item" id="giftsOutItem" data-layout-only="households" title="What your kitchen sent, and whether they saved it." onclick="closeDrop('moreDrop');openGiftsOut()">📤 Recipes I sent</button>
+            <button class="drop-item" onclick="closeDrop('moreDrop');openShareAppModal()"><span aria-hidden="true" data-no-i18n style="display:inline-flex;"><svg class="share-ico" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="11.5" fill="#C1440E"/><path d="M7.2 12 14.8 7.6M7.2 12 14.8 16.4" stroke="#FFFFFF" stroke-width="1.9" stroke-linecap="round"/><circle cx="15" cy="7.4" r="2.6" fill="#FFFFFF"/><circle cx="7" cy="12" r="2.6" fill="#FFFFFF"/><circle cx="15" cy="16.6" r="2.6" fill="#FFFFFF"/></svg></span> <span id="shareAppMenuText">Share this app</span></button>
+          </div>
+          <div class="more-sec" data-sec="whatsapp"><div class="drop-head">WhatsApp</div>
+            <button class="drop-item" id="waAskItem" data-feature="whatsapp" onclick="closeDrop('moreDrop');openWaAsk()">💬 Ask my WhatsApp groups</button>
+            <button class="drop-item" id="waLinksItem" data-feature="whatsapp" onclick="closeDrop('moreDrop');openWaLinks()">🧺 Recipes hiding in my chats</button>
+          </div>
+          <div class="more-sec" data-sec="tidy"><div class="drop-head">Tidy up</div>
+            <button class="drop-item" onclick="closeDrop('moreDrop');aiTagAllDiets()">🏷️ Auto-tag diet types</button>
+            <button class="drop-item" onclick="closeDrop('moreDrop');autoFetchMissingPhotos()">📸 Auto-fetch missing photos</button>
+          </div>
         <input type="file" id="photoRescueFile" accept=".json,application/json" style="display:none"
                onchange="runPhotoRescue(this.files&&this.files[0])">
         </div>
       </div>
       <div class="drop-group">
-        <button class="btn btn-secondary" onclick="toggleDrop('importExportDrop')">⇅ Imp/Exp ▾</button>
+        <!-- v39.26 — Tony, 3 Nov 2026, from the audit ("I accept suggestions 1, 2"): "⇅ Imp/Exp" repeated three items of
+             "+ Add Recipe" and its name was jargon. Now "📁 Files & backup", with what only it has; adding from a link, text or
+             a photo stays in "+ Add Recipe". On a narrow phone the label is "📁 Files", so "+ Add Recipe" stays on screen. -->
+        <button class="btn btn-secondary" onclick="toggleDrop('importExportDrop')" title="Recipes from a file, the whole collection to Word, and backups"><span>📁 <span class="lbl-long">Files &amp; backup</span><span class="lbl-short">Files</span> ▾</span></button>
         <div class="drop-menu" id="importExportDrop">
-          <div style="padding:4px 12px 2px;font-size:10px;font-weight:700;color:var(--muted);letter-spacing:0.6px;text-transform:uppercase;">Import</div>
-          <button class="drop-item" onclick="closeDrop('importExportDrop');openUrlImportModal()">🔗 From URL</button>
-          <button class="drop-item" onclick="closeDrop('importExportDrop');openFreehandModal()">✍️ Free-hand text</button>
-          <button class="drop-item" onclick="closeDrop('importExportDrop');openCameraImport()">📷 Scan (camera)</button>
-          <button class="drop-item" onclick="closeDrop('importExportDrop');document.getElementById('fileIn').click()">📁 From File <span style="font-size:10px;color:var(--muted);">.docx .xlsx .pdf .html</span></button>
-          <button class="drop-item" onclick="closeDrop('importExportDrop');openDropZone()">📂 Drop File Here <span style="font-size:10px;color:var(--muted);">drag & drop</span></button>
-
-          <div style="height:1px;background:var(--border);margin:6px 0 2px;"></div>
-          <div style="padding:4px 12px 2px;font-size:10px;font-weight:700;color:var(--muted);letter-spacing:0.6px;text-transform:uppercase;">Export</div>
+          <button class="drop-item" onclick="closeDrop('importExportDrop');document.getElementById('fileIn').click()">📁 From File <span class="drop-hint">.docx .xlsx .pdf .html</span></button>
+          <button class="drop-item" onclick="closeDrop('importExportDrop');openDropZone()">📂 Drop File Here <span class="drop-hint">drag & drop</span></button>
+          <div style="height:1px;background:var(--border);margin:4px 0;"></div>
           <button class="drop-item" onclick="closeDrop('importExportDrop');exportAllWord()">📄 All to Word</button>
           <div style="height:1px;background:var(--border);margin:4px 0;"></div>
           <button class="drop-item" onclick="closeDrop('importExportDrop');backupSave()" id="backupSaveBtn">💾 Backup — Save</button>
@@ -17629,6 +17646,13 @@ window.i18nPatternsFromDict = i18nPatternsFromDict; window.i18nAsk = i18nAsk;
 // translating a string nobody sees. A `{1}` makes it a shape, matched the same
 // way a built toast is.
 var I18N_EXTRA = [
+  // v39.26 — the backup reminder, built from a choice and a place (checkBackupOverdue): every new tester's first notice,
+  // and it was English in the Hebrew walk
+  '\u{1F4BE} No backup has been taken yet',
+  '\u{1F4BE} Last backup was {1} days ago, on this device', '\u{1F4BE} Last backup was {1} days ago, on a computer',
+  '\u{1F4BE} Last backup was {1} days ago, on a computer (automatic)', '\u{1F4BE} Last backup was {1} days ago, on an iPhone',
+  '\u{1F4BE} Last backup was {1} days ago, on an iPad', '\u{1F4BE} Last backup was {1} days ago, on an Android phone',
+  '\u{1F4BE} Last backup was {1} days ago, on another device',
   // v38.90 — the beta-eve walk in Hebrew: put together from a choice (a ternary), so no reading of the source finds them
   'Recipe imported!', '📚 Collection imported — {1} recipes in “{2}”',
   '\u2713 Synced — {1}', '(yours)', 'Reading the recipe…', 'Fetching page via server…', 'about ${1}', 'under ${1}', '{1} of {2}', '⏳ Reading the requests…', 'new — nothing saved to the cloud yet',
@@ -24694,6 +24718,7 @@ function toggleDrop(id){
     var cp = document.getElementById('changePasswordItem');   // v39.22
     if (cp) cp.style.display = accountHasPassword(window._fbAuth && window._fbAuth.currentUser) ? '' : 'none';
     if (!menu.classList.contains('open')) { try { refreshShortcutsSection(); } catch(e) {} try { applySelfTestVisibility(); } catch(e) {} settingsGroupsRefresh(true); } }
+  if (id === 'moreDrop' && !menu.classList.contains('open')) moreSectionsRefresh();   // v39.26
   const wasOpen=menu.classList.contains('open');
   // Close all
   _disarmDropOutside();
@@ -24746,6 +24771,20 @@ function toggleDrop(id){
 // closes the one that was open). A section with nothing for this person on
 // this device (features off, not the owner, no shortcut for this device) is
 // not shown at all.
+// v39.26 — ··· More's headings: one whose items are all hidden in this copy goes with them (WhatsApp switched off hides
+// its heading; in a copy without households, "Kitchens and people" keeps only Share this app, and stays).
+function moreSectionsRefresh() {
+  var m = document.getElementById('moreDrop'), shown = 0;
+  if (!m) return 0;
+  Array.prototype.forEach.call(m.querySelectorAll('.more-sec'), function(sec) {
+    sec.hidden = false;
+    var any = Array.prototype.some.call(sec.querySelectorAll('.drop-item'), function(b){ return settingsItemShown(b, sec); });
+    sec.hidden = !any;
+    if (any) shown++;
+  });
+  return shown;
+}
+window.moreSectionsRefresh = moreSectionsRefresh;
 function settingsItemShown(el, stop) {
   for (var e = el; e && e !== stop; e = e.parentElement) {
     if (e.hidden || getComputedStyle(e).display === 'none') return false;
@@ -33312,6 +33351,8 @@ var HELP_SYSTEM_PROMPT = [
   "=== APP OVERVIEW ===",
   (APP_CONFIG.environment === 'live' ? "Tony's Recipes Collection" : (APP_CONFIG.brandName || 'My Kitchen Notes')) + " is a single-page web app hosted at " + APP_CONFIG.siteOrigin + APP_CONFIG.sitePath,
   "It stores recipes in Firebase Firestore (cloud) and localStorage (offline). All AI features route through a Cloudflare Worker.",
+  "THE HEADER'S MENUS: ··· More, 📁 Files & backup (📁 Files on a narrow phone) and + Add Recipe; ⚙️ is Settings.",
+  "- ··· MORE is in five parts: Ideas (Explore, Suggest, What can I make), Tools (the measurement converter), Kitchens and people (connecting with another household, the chats, recipes sent to you and by you, sharing the app), WhatsApp, and Tidy up (auto-tag diet types, auto-fetch missing photos). A part with nothing in it on your copy is not shown.",
   "",
   "=== BROWSING & FILTERING ===",
   "- Recipes are shown in List or Grid view (toggle top-right)",
@@ -33337,13 +33378,13 @@ var HELP_SYSTEM_PROMPT = [
   "- SAVE / UPDATE RECIPE (v38.87): the button floats at the bottom of the editor, as ✕ does at its top — no need to scroll to the end to save.",
   "",
   "=== IMPORTING RECIPES ===",
-  "Via ⇅ Imp/Exp → Import section:",
-  "- 🔗 From URL: paste any recipe website URL — app fetches and extracts the recipe via AI",
+  "Via + Add Recipe ▾ (and 📁 Files & backup ▾ for a file):",
+  "- 🔗 Import from URL: paste any recipe website URL — app fetches and extracts the recipe via AI",
   "- YouTube: paste a YouTube URL — extracts recipe from video description",
   "- Instagram: paste an Instagram reel/post URL — extracts recipe from caption",
-  "- ✍️ Free-hand text: paste copied recipe text — AI parses it",
-  "- 📷 Scan: take a photo of a printed recipe — AI reads it",
-  "- 📊 From Excel / 📄 From Word: import previously exported files",
+  "- ✍️ Paste free-hand text: paste copied recipe text — AI parses it",
+  "- 📷 Scan recipe: take a photo of a printed recipe — AI reads it",
+  "- 📁 Files & backup ▾ → 📁 From File (a Word, Excel, PDF or web page file) or 📂 Drop File Here (drag a file in)",
   "- If no recipe is found in a URL, the app offers to save it as a video bookmark (🎥)",
   "- All imports preserve the original language (no auto-translation)",
   "",
@@ -33361,7 +33402,7 @@ var HELP_SYSTEM_PROMPT = [
   "- Toggle metric/imperial units",
   "- Hebrew recipes: method steps are right-aligned with step numbers on the right",
   "- Tap the photo to change it: upload one from the device, or 🔍 search the web — the free photo libraries Pexels, Unsplash and Pixabay, then Wikimedia Commons; 🔄 See more shows the next library at once. Where a photo's licence asks for it, the photographer's credit is kept with it and shown under the photo",
-  "- Action buttons: Edit, Translate, Excel, Word, Print, Share, Send to Bring!, Calculate nutrition",
+  "- Action buttons: Edit, Translate, Word, Print, Share, Send to Bring!, Calculate nutrition",
   "- Scaling also changes the amounts written in the method (\"add 2 eggs\" becomes \"add 4 eggs\" at ×2) — shown in bold; the recipe itself is not changed",
   "- On a computer, drag the recipe window's bottom-right corner to make it bigger; click the corner once for full size, again for the usual size",
   "",
@@ -33379,13 +33420,12 @@ var HELP_SYSTEM_PROMPT = [
   "- Filter by Favourites or Clips using the top filter buttons",
   "",
   "=== EXPORT & BACKUP ===",
-  "Via ⇅ Imp/Exp → Export section:",
-  "- 📊 All to Excel: exports all recipes to an .xlsx file",
+  "Via 📁 Files & backup ▾ (on a narrow phone: 📁 Files ▾):",
   "- 📄 All to Word: exports all recipes to a .docx file",
   "- 💾 Backup — Save: saves all recipes + photos to a timestamped JSON file (desktop only)",
   "- 📂 Backup — Restore: restores from a backup JSON file (desktop only)",
-  "- 💾 THE BACKUP REMINDER: when no backup has been taken (or the last is over a month old), a notice says so with 💾 Back up now — once a day at most, and only when no window is open. After 60 days it stays until you close it; after 90 days it asks.",
-  "- Individual recipe export: open recipe → Excel or Word buttons",
+  "- 💾 THE BACKUP REMINDER: when no backup has been taken (or the last is over a month old), a notice says so with 💾 Back up now — once a day at most, and only when no window or menu is open. After 60 days it stays until you close it; after 90 days it asks.",
+  "- One recipe: open it → 📄 Word (or 🖨️ Print)",
   "",
   "=== CLOUD SYNC & OFFLINE ===",
   "- Sign in with Google to sync recipes across all your devices via Firebase",
@@ -36709,7 +36749,8 @@ async function checkBackupOverdue() {
 // dialog would replace a question being answered. False: still busy — the next opening of the app asks again.
 async function backupNagWhenFree(pollMs) {
   for (var i = 0; i < 20; i++) {
-    if (!document.querySelector('.modal-overlay.open:not(#selfTestOverlay), #askOverlay, .calc-overlay.open, #serviceErrorOverlay')) return true;
+    // v39.26 — an open menu too: on a phone it came up over ··· More, a few seconds after the app opened
+    if (!document.querySelector('.modal-overlay.open:not(#selfTestOverlay), #askOverlay, .calc-overlay.open, #serviceErrorOverlay, .drop-menu.open')) return true;
     if (window._selfTestRunning && !window._backupNagUnderTest) return false;
     await new Promise(function(r){ setTimeout(r, pollMs || 30000); });
   }

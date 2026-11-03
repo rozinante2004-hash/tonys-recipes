@@ -192,7 +192,7 @@ const SCAN = `(() => {
   }
   await p.evaluate(() => document.querySelectorAll('.mobile-dropdown-panel').forEach(e => e.classList.remove('open')));
 
-  // Every drop-menu (⚙️, ··· More, Imp/Exp, + Add, Sort).
+  // Every drop-menu (⚙️, ··· More, 📁 Files & backup, + Add, Sort).
   const drops = await p.evaluate(() => Array.from(document.querySelectorAll('.drop-menu')).map(e => e.id).filter(Boolean));
   for (const id of drops) {
     await p.evaluate(i => { document.querySelectorAll('.drop-menu').forEach(e => e.classList.remove('open'));
