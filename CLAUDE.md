@@ -1444,8 +1444,10 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
     all success), Self Tests on main (01:46) and test, Cloudflare Pages for the beta and test. The publish wrote the
     central translations over the files, as designed: every v39.26–v39.32 phrase translated (the release's job added
     them to the store; several in the same words as the hand ones); the Hebrew "✅ Updated from the cloud" is
-    "✅ עודכן מהעננה" again — the store still holds it; corrected only where translations are edited (🌐 → ✏️ Edit
-    translations… on the beta copy, then 🚀 Publish languages now).
+    "✅ עודכן מהעננה" again — the store still held it; corrected only where translations are edited (🌐 → ✏️ Edit
+    translations… on the beta copy, then 🚀 Publish languages now). **Tony did (4 Nov, "I fixed the Hebrew translation and
+    published the languages"): published 01:52 Israel time (5ea0e46 on main, merged into test); "✅ עודכן מהענן" in
+    i18n/he.json; its deploy, pages build and Cloudflare Pages for test success.**
   - **v39.32 — the pull-down checks for a new version and says what it found** (Tony, 4 Nov 2026: "Please make pulling
     the app down check for new versions"). v39.31 already asked on a pull-down, silently when there was nothing newer.
     Now `checkAppVersion` hands back `{ server, newer }` / `{ error }`, and the pull-down (signed in or not) waits for
