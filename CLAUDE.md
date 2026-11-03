@@ -1437,6 +1437,9 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
   - **Released: v39.09 (29 Oct 2026, 11:17 Israel time, on 0de2dde; Tony: "Yes, release v39.09").** Every job success:
     Deploy to GitHub Pages, pages build, Publish languages, Translate new phrases, Self Tests on main and test,
     Cloudflare Pages for the beta and test.
+  - **Released: v39.23 and v39.24 (3 Nov 2026, 02:17 Israel time, on 2af6b8f; Tony: "Yes, release v39.23 and v39.24").**
+    Every job success: Deploy to GitHub Pages, pages build, Publish languages, Translate new phrases, Self Tests on main
+    and test, Cloudflare Pages for the beta and test.
   - **v39.24 — every window and menu opens fitted to the phone's screen** (Tony, 2 Nov 2026: "the opened modals (like a
     recipe) do not match the screen's size. They often open too big, or to the side, and do not match or snap to the
     size of the device. I am running safari on my iPhone and one of the testers is running Chrome. In chrome it is even
