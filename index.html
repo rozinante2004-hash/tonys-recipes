@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.26 -->
+<!-- Tony's Recipes Collection v39.27 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -10678,7 +10678,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.26';
+var APP_VERSION = 'v39.27';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -11869,9 +11869,12 @@ body.banner-shown #envRibbon.env-beta { padding-top: 2px; }
 .drop-head { padding: 8px 14px 2px; font-size: 11px; font-weight: 700; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; font-family: 'DM Sans', 'Heebo', sans-serif; }
 .more-sec + .more-sec { border-top: 1px solid var(--border); margin-top: 2px; }
 .drop-hint { font-size: 10px; color: var(--muted); }
+/* v39.27 — a file cannot be dragged into a phone's browser: Drop File Here is for a computer (and a tablet with a mouse) */
+@media (hover: none) and (pointer: coarse) { .drop-computer-only { display: none !important; } }
 .more-sec[hidden] { display: none !important; }
 .lbl-short { display: none; }   /* a button's label in one <span>: in a flex button, loose words lose their spaces */
 @media (max-width: 374px) { .lbl-long { display: none; } .lbl-short { display: inline; } }
+html.no-backup-menu .lbl-long { display: none; } html.no-backup-menu .lbl-short { display: inline; }   /* v39.27 — a phone: no backup here */
 /* v36.69 — a menu taller than the screen scrolls; the fade at its foot says so. */
 .drop-menu.drop-scrolls { -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent);
                           mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent); padding-bottom: 20px; }
@@ -14072,7 +14075,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.26</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.27</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14160,7 +14163,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.26</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.27</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -14354,10 +14357,10 @@ body.banner-shown .header {
         <button class="btn btn-secondary" onclick="toggleDrop('importExportDrop')" title="Recipes from a file, the whole collection to Word, and backups"><span>📁 <span class="lbl-long">Files &amp; backup</span><span class="lbl-short">Files</span> ▾</span></button>
         <div class="drop-menu" id="importExportDrop">
           <button class="drop-item" onclick="closeDrop('importExportDrop');document.getElementById('fileIn').click()">📁 From File <span class="drop-hint">.docx .xlsx .pdf .html</span></button>
-          <button class="drop-item" onclick="closeDrop('importExportDrop');openDropZone()">📂 Drop File Here <span class="drop-hint">drag & drop</span></button>
+          <button class="drop-item drop-computer-only" onclick="closeDrop('importExportDrop');openDropZone()">📂 Drop File Here <span class="drop-hint">drag & drop</span></button>
           <div style="height:1px;background:var(--border);margin:4px 0;"></div>
           <button class="drop-item" onclick="closeDrop('importExportDrop');exportAllWord()">📄 All to Word</button>
-          <div style="height:1px;background:var(--border);margin:4px 0;"></div>
+          <div id="backupDivider" style="height:1px;background:var(--border);margin:4px 0;"></div>
           <button class="drop-item" onclick="closeDrop('importExportDrop');backupSave()" id="backupSaveBtn">💾 Backup — Save</button>
           <button class="drop-item" onclick="closeDrop('importExportDrop');backupRestore()" id="backupRestoreBtn">📂 Backup — Restore</button>
         </div>
@@ -23316,7 +23319,9 @@ async function importFromFile(event){
     if(ext === 'xlsx' || ext === 'xls') {
       // ── Excel ──────────────────────────────────────────────────────────────
       var buf = fileBuffer;
-      if(typeof XLSX === 'undefined') { toast('❌ Excel library not loaded'); return; }
+      // v39.27 — Tony asked whether Drop File Here still works; it does, but an .xlsx did not, by either route, since
+      // v28.5 (2 Aug 2026): that made the reader load on first use and left the old "is it loaded?" check in front of
+      // the load, so every first .xlsx of a visit ended in "❌ Excel library not loaded".
       try { await loadScriptOnce(CDN_XLSX, 'XLSX'); }
       catch(e) { showImportError('The spreadsheet reader could not be loaded (you may be offline). Try again when online, or paste the recipe as free-hand text.'); return; }
       var wb = XLSX.read(buf, {type:'array'});
@@ -23396,7 +23401,12 @@ async function importFromFile(event){
       // fetch remote resources or fire handlers such as <img onerror> from the file.
       var pdoc = new DOMParser().parseFromString(raw2, 'text/html');
       pdoc.querySelectorAll('script,style,nav,footer,header,aside,noscript,iframe').forEach(function(el){ el.remove(); });
-      text = (pdoc.body && (pdoc.body.innerText || pdoc.body.textContent)) || '';
+      // v39.27 — a parsed page is never laid out, so innerText is textContent: "<p>Serves 4</p><li>1 cup lentils</li>"
+      // came out "Serves 41 cup lentils". Each block ends its line, each table cell with " | ".
+      pdoc.querySelectorAll('br').forEach(function(el){ el.replaceWith('\n'); });
+      pdoc.querySelectorAll('p,div,li,tr,h1,h2,h3,h4,h5,h6,dt,dd,blockquote,pre,section,article,figcaption,caption,ul,ol,table,td,th')
+        .forEach(function(el){ el.append(/^T[DH]$/.test(el.tagName) ? ' | ' : '\n'); });
+      text = ((pdoc.body && pdoc.body.textContent) || '').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
 
     } else if(ext === 'txt') {
       text = new TextDecoder('utf-8', {fatal:false}).decode(new Uint8Array(fileBuffer));
@@ -33384,7 +33394,7 @@ var HELP_SYSTEM_PROMPT = [
   "- Instagram: paste an Instagram reel/post URL — extracts recipe from caption",
   "- ✍️ Paste free-hand text: paste copied recipe text — AI parses it",
   "- 📷 Scan recipe: take a photo of a printed recipe — AI reads it",
-  "- 📁 Files & backup ▾ → 📁 From File (a Word, Excel, PDF or web page file) or 📂 Drop File Here (drag a file in)",
+  "- 📁 Files & backup ▾ → 📁 From File (a Word, Excel, PDF, web page or text file) or, on a computer, 📂 Drop File Here (drag the file in from a folder). An old Word .doc: save it as .docx first.",
   "- If no recipe is found in a URL, the app offers to save it as a video bookmark (🎥)",
   "- All imports preserve the original language (no auto-translation)",
   "",
@@ -33420,7 +33430,7 @@ var HELP_SYSTEM_PROMPT = [
   "- Filter by Favourites or Clips using the top filter buttons",
   "",
   "=== EXPORT & BACKUP ===",
-  "Via 📁 Files & backup ▾ (on a narrow phone: 📁 Files ▾):",
+  "Via 📁 Files & backup ▾ (on a phone: 📁 Files ▾ — backups are taken on a computer):",
   "- 📄 All to Word: exports all recipes to a .docx file",
   "- 💾 Backup — Save: saves all recipes + photos to a timestamped JSON file (desktop only)",
   "- 📂 Backup — Restore: restores from a backup JSON file (desktop only)",
@@ -37071,8 +37081,17 @@ function backupDateLabel(v){
 window.backupDateLabel=backupDateLabel;
 
 // Show backup buttons only on desktop
+// v39.27 — and on a phone, where there is no backup in it, the menu is "📁 Files" (not "Files & backup"), without the
+// line that stood over the hidden backup items.
+function backupMenuForDevice(mob) {
+  if (mob === undefined) mob = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  ['backupSaveBtn','backupRestoreBtn','backupDivider'].forEach(function(id){ var el=document.getElementById(id); if(el) el.style.display=mob?'none':''; });
+  document.documentElement.classList.toggle('no-backup-menu', !!mob);
+  return !!mob;
+}
+window.backupMenuForDevice = backupMenuForDevice;
 (function(){
-  function upd(){ var mob=/iPhone|iPad|iPod|Android/i.test(navigator.userAgent); ['backupSaveBtn','backupRestoreBtn'].forEach(function(id){ var el=document.getElementById(id); if(el) el.style.display=mob?'none':''; }); }
+  function upd(){ backupMenuForDevice(); }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',upd); else upd();
 })();
 
@@ -39236,7 +39255,7 @@ window.onHeaderScroll = onHeaderScroll;
         style="border:3px dashed var(--border);border-radius:14px;padding:48px 24px;text-align:center;cursor:pointer;transition:all 0.2s;margin-top:8px;">
         <div style="font-size:48px;margin-bottom:12px;">📄</div>
         <div style="font-size:15px;font-weight:600;color:var(--ink);margin-bottom:6px;">Drop your file here</div>
-        <div style="font-size:12px;color:var(--muted);">Supports .doc, .docx, .xlsx, .pdf, .html, .txt</div>
+        <div style="font-size:12px;color:var(--muted);">Word (.docx), Excel (.xlsx), PDF, a saved web page (.html) or text (.txt)</div>
       </div>
       <div id="dropZoneStatus" style="margin-top:12px;font-size:13px;color:var(--muted);text-align:center;min-height:20px;"></div>
       <div style="margin-top:16px;padding:12px;background:var(--linked-bg);border:1px solid var(--linked-border);border-radius:8px;font-size:12px;color:var(--info-text);line-height:1.6;">

@@ -1437,6 +1437,21 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
   - **Released: v39.09 (29 Oct 2026, 11:17 Israel time, on 0de2dde; Tony: "Yes, release v39.09").** Every job success:
     Deploy to GitHub Pages, pages build, Publish languages, Translate new phrases, Self Tests on main and test,
     Cloudflare Pages for the beta and test.
+  - **v39.27 — 📂 Drop File Here checked: it works; an Excel file did not, by either route, since v28.5** (Tony, 3 Nov
+    2026, on v39.26's menu: "If I'm not mistaken, the Drop file here was a test we had a long time ago. I'm not even
+    sure it is still functional"). It works — a dropped file goes to `importFromFile`, as From File's does — shown end
+    to end with .txt, .html, .docx (the app's own Word export) and .xlsx by both routes; nothing had tested either.
+    Found on the way: **an .xlsx failed by both routes since v28.5 (2 Aug 2026)** ("❌ Excel library not loaded": a
+    `typeof XLSX` check in front of the on-first-use load) — fixed; **a saved web page's lines ran together** (a parsed
+    page has no layout, so `innerText` is `textContent`: "Serves 41 cup lentils") — each block ends its line now, each
+    table cell " | ". Drop File Here is for computers (`.drop-computer-only`, hidden on touch-only screens: a file cannot
+    be dragged into a phone's browser); on a phone, which has no backup items (as ever), the menu is "📁 Files"
+    (`backupMenuForDevice`, `html.no-backup-menu`) without the stray line under All to Word (`#backupDivider`); the drop
+    window lists what is read (not ".doc"). Help says so. Self Test `import_file_and_drop` (fails on v39.26, with the
+    lines glued, with a drop not handed on); `menus_files_and_more_headings` checks the phone's menu and where Drop is
+    offered (each fault planted, each caught — on a desktop page and an emulated iPhone). And `perf_lazy_libs` counted
+    the tags `loadScriptOnce` adds (marked `data-on-demand` since v36.73 for exactly this) as eager — never seen while
+    no earlier test read a spreadsheet; it reads only tags written in the page now (still fails with one planted).
   - **v39.26 — "📁 Files & backup ▾" and ··· More under five headings** (Tony, 3 Nov 2026, on the audit's "Needs Tony":
     "I accept suggestions 1, 2. Please release 39.25 and then put the new suggestions on the Test release."). "⇅ Imp/Exp ▾"
     is "📁 Files & backup ▾" (📁 Files ▾ below 375 px, `.lbl-long`/`.lbl-short` in one `<span>` — loose words in the flex

@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v39.26` — app. **Worker: v100**, deployed separately and versioned separately
+**Current version:** `v39.27` — app. **Worker: v100**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -2073,7 +2073,10 @@ Send photos to the cloud, Photo rescue, Undo auto-fetch, Clean up orphaned photo
 - **📁 Files & backup** (v39.26; was "⇅ Imp/Exp", which repeated three of + Add Recipe's items) → From File
   `.docx/.xlsx/.pdf/.html`, Drop File Here | All to Word | Backup — Save, Backup — Restore. Its label is one `<span>` (in
   the flex button, loose words lose their spaces) holding `.lbl-long` "Files & backup" and `.lbl-short` "Files", which
-  replaces it below 375 px so + Add Recipe stays on the row at 320 px.
+  replaces it below 375 px so + Add Recipe stays on the row at 320 px — and (v39.27) on a phone, which has no backup
+  items (by user agent, as ever), `backupMenuForDevice()` sets `html.no-backup-menu`: "📁 Files", and the line over the hidden
+  backup items (`#backupDivider`) goes too. Drop File Here is `.drop-computer-only`: hidden under
+  `(hover: none) and (pointer: coarse)` — a file cannot be dragged into a phone's browser.
 - **+ Add Recipe** → Fill in manually, Paste free‑hand text, Import from URL, Scan (camera).
 
 A thin save‑status bar with a **Reset** (clear all data) link sits under the header.
@@ -2281,8 +2284,14 @@ lines accept `amount — name` / `amount - name` separators. Editing preserves `
   - `buildZip` values may be a string **or a `Uint8Array`**. Running image bytes through
     `TextEncoder` mangles everything above 0x7F and yields a broken‑image placeholder.
 - **PDF/HTML/TXT** import supported by `importFromFile` (accept
-  `.xlsx,.xls,.docx,.doc,.pdf,.html,.htm,.txt`), plus a **drag‑and‑drop** zone (`handleFileDrop`)
-  and the native **File System Access API** picker (`importViaFilePicker`) as an option.
+  `.xlsx,.xls,.docx,.doc,.pdf,.html,.htm,.txt`), plus a **drag‑and‑drop** zone (`handleFileDrop`, which hands the
+  file to `importFromFile`) and the native **File System Access API** picker (`importViaFilePicker`) as an option.
+  The spreadsheet and Word readers load on first use (`loadScriptOnce`) — nothing may test for them before that load
+  (v39.27: a leftover `typeof XLSX` check had made every first .xlsx of a visit fail since v28.5). A saved web page is
+  parsed with `DOMParser` (inert: no scripts, no fetches) and has no layout, so `innerText` is `textContent`: each
+  block element ends its line and each table cell gets " | " before the text is taken ("Serves 4", "1 cup" had become
+  "Serves 41 cup"). An old binary `.doc` is not read (save it as .docx). Self Test `import_file_and_drop` sends a
+  .xlsx (reader not yet loaded), .docx (the app's own export), .html and .txt through both routes to a stand-in AI.
 - **Backup**: `backupSave` writes a single JSON `{version, exportedAt, nextId, recipes, photos,
   settings}` where inline data‑URL photos are **de‑duplicated** into a `photos` map and replaced
   by `__photo__N` refs. `backupRestore`/`backupRestoreFile` reverse it and re‑hydrate. Backup

@@ -605,6 +605,57 @@ window.SELF_TESTS = [
       if(v!=='Shared recipe text for extraction') throw new Error('openFreehandModal did not accept prefilled text — text shares would arrive empty');
     }
   },
+  { id:'import_file_and_drop', group:'Import/Export', name:'📁 From File and 📂 Drop File Here: a Word, Excel, web page or text file reaches the AI and opens the preview — the spreadsheet reader loaded on first use, a web page\'s lines kept apart (v39.27)',
+    test: async()=>{
+      // Tony, 3 Nov 2026: "the Drop file here was a test we had a long time ago. I'm not even sure it is still functional."
+      // It was. An .xlsx was not, by either route, since v28.5 ("❌ Excel library not loaded": the reader became
+      // load-on-first-use behind an old "is it loaded?" check); and a web page came out "Serves 41 cup lentils".
+      var realEx=window.extractRecipesFromText, got=[], fi=document.getElementById('fileIn'), n0=recipes.length, X=window.XLSX;
+      var fh=document.getElementById('freehandOverlay'), dz=document.getElementById('dropZoneOverlay');
+      var unloadReader=function(){ window.XLSX=undefined; delete _scriptPromises[CDN_XLSX]; };   // as on a fresh visit
+      try{
+        await loadScriptOnce(CDN_XLSX, 'XLSX');
+        var ws=XLSX.utils.aoa_to_sheet([['Lentil soup'],['1 cup red lentils'],['Simmer the lentils for 20 minutes.']]);
+        var wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Recipe');
+        var files={
+          xlsx: new File([XLSX.write(wb, { type:'array', bookType:'xlsx' })], 'lentil-soup.xlsx', { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }),
+          docx: new File([await makeDocxBlob([normalizeRecipe({ id:888990, name:'Lentil soup', category:'Soups', ingredients:[{ a:'1 cup', n:'red lentils' }], steps:['Simmer the lentils for 20 minutes.'] })]).arrayBuffer()],
+                         'lentil-soup.docx', { type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document' }),
+          html: new File(['<html><body><h1>Lentil soup</h1><p>Serves 4</p><ul><li>1 cup red lentils</li></ul><p>Simmer the lentils for 20 minutes.</p></body></html>'], 'lentil-soup.html', { type:'text/html' }),
+          txt: new File(['Lentil soup\nServes 4\n1 cup red lentils\nSimmer the lentils for 20 minutes.'], 'lentil-soup.txt', { type:'text/plain' })
+        };
+        window.extractRecipesFromText=async function(text){ got.push(String(text)); return { name:'Lentil soup', category:'Soups', ingredients:[{ a:'1 cup', n:'red lentils' }], steps:['Simmer the lentils for 20 minutes.'] }; };
+        for(var how of ['From File', 'Drop File Here']){
+          for(var kind of ['xlsx', 'docx', 'html', 'txt']){
+            if(kind==='xlsx') unloadReader();
+            got.length=0;
+            var dt=new DataTransfer(); dt.items.add(files[kind]);
+            if(how==='From File'){ fi.files=dt.files; fi.dispatchEvent(new Event('change', { bubbles:true })); }
+            else {
+              openDropZone();
+              if(!dz.classList.contains('open')) throw new Error('📂 Drop File Here did not open its window');
+              document.getElementById('dropZone').dispatchEvent(new DragEvent('drop', { dataTransfer:dt, bubbles:true, cancelable:true }));
+            }
+            for(var i=0; i<80 && !fh.classList.contains('open') && !document.getElementById('importErrorModal'); i++) await wait(50);
+            var err=document.getElementById('importErrorModal');
+            if(err) throw new Error(how+', .'+kind+': '+err.innerText.replace(/\s+/g,' ').slice(0,120));
+            if(!fh.classList.contains('open')) throw new Error(how+', .'+kind+': the recipe preview did not open'+(got.length?'':' — nothing reached the AI'));
+            if(!/red lentils/.test(got[0]||'')) throw new Error(how+', .'+kind+': the AI was not given the file\'s words: '+String(got[0]).slice(0,80));
+            if(kind==='html' && !/Serves 4\s*\n\s*1 cup/.test(got[0])) throw new Error('a web page\'s lines ran together: '+JSON.stringify(got[0].slice(0,60)));
+            if(how==='Drop File Here' && dz.classList.contains('open')) throw new Error('the drop window stayed open over the preview');
+            closeM('freehandOverlay');
+          }
+        }
+        if(recipes.length!==n0) throw new Error('an import saved a recipe without being asked');
+      } finally {
+        window.extractRecipesFromText=realEx;
+        if(typeof window.XLSX==='undefined' && X) window.XLSX=X;
+        ['freehandOverlay','dropZoneOverlay'].forEach(function(id){ var o=document.getElementById(id); if(o && o.classList.contains('open')) closeM(id); });
+        var ie=document.getElementById('importErrorModal'); if(ie) ie.remove();
+        try{ fi.value=''; }catch(e){}
+      }
+      return 'both routes: .xlsx (reader loaded on first use), .docx, .html (lines apart), .txt — each to the AI and the preview';
+    } },
   { id:'import_facebook_and_video_say_what_works', group:'Import/Export', name:'A Facebook post or a recipe-less video says why, and what works; a video can be watched (v37.14, v37.15)',
     test: async()=>{
       var real={ fetch:window.fetch, consent:window.proxyConsent, extract:window.extractRecipesFromText, log:window.syncLog };
@@ -3421,7 +3472,9 @@ window.SELF_TESTS = [
       // xlsx and mammoth are the two biggest dependencies and matter only when
       // someone imports a spreadsheet or a Word file. If either creeps back into
       // a <script> tag in <head>, every visit silently pays for it again.
-      var eager=Array.prototype.slice.call(document.querySelectorAll('head script[src]'))
+      // v39.27 — only a tag written in the page: one loadScriptOnce added (data-on-demand, below) is a first use — the
+      // file-import test (import_file_and_drop) reads a spreadsheet and a Word file, and this then failed on its tags.
+      var eager=Array.prototype.slice.call(document.querySelectorAll('head script[src]:not([data-on-demand])'))
         .map(function(t){ return t.getAttribute('src')||''; })
         .filter(function(src){ return /xlsx|mammoth|qrcode/i.test(src); });
       if(eager.length) throw new Error('loaded eagerly in <head>: '+eager.join(', ')+' — these must load on first use');
@@ -11508,6 +11561,23 @@ window.SELF_TESTS = [
       ["fileIn').click()",'openDropZone','exportAllWord','backupSave','backupRestore'].forEach(function(f){
         if(!fd.querySelector('[onclick*="'+f+'"]')) throw new Error('📁 Files & backup lost '+f);
       });
+      // v39.27 — on a phone there is no backup in it (it never was): "📁 Files", without the line over the hidden backup items.
+      var shown=function(el){ return !!el && getComputedStyle(el).display!=='none'; }, wide=window.innerWidth>374;
+      try{
+        backupMenuForDevice(true);
+        if(shown(btn.querySelector('.lbl-long')) || !shown(btn.querySelector('.lbl-short'))) throw new Error('on a phone (no backup) the menu is not called just 📁 Files');
+        if(shown(document.getElementById('backupDivider')) || shown(document.getElementById('backupSaveBtn'))) throw new Error('on a phone the backup items, or the line over them, are shown');
+        backupMenuForDevice(false);
+        if(wide && (!shown(btn.querySelector('.lbl-long')) || shown(btn.querySelector('.lbl-short')))) throw new Error('on a computer the menu is not called 📁 Files & backup');
+        if(!shown(document.getElementById('backupSaveBtn')) || !shown(document.getElementById('backupDivider'))) throw new Error('on a computer the backup items are hidden');
+      } finally { backupMenuForDevice(); }
+      // 📂 Drop File Here: only where a file can be dragged in — not on a touch-only phone or tablet
+      var drop=fd.querySelector('[onclick*="openDropZone"]');
+      toggleDrop('importExportDrop');
+      try{
+        var touchOnly=matchMedia('(hover: none) and (pointer: coarse)').matches;
+        if(touchOnly===shown(drop)) throw new Error(touchOnly ? '📂 Drop File Here is offered on a touch-only screen' : '📂 Drop File Here is hidden on a computer');
+      } finally { closeDrop('importExportDrop'); }
       var m=document.getElementById('moreDrop');
       var heads=Array.prototype.map.call(m.querySelectorAll('.more-sec > .drop-head'), function(h){ return h.textContent.trim(); });
       if(heads.join('|')!=='Ideas|Tools|Kitchens and people|WhatsApp|Tidy up') throw new Error('the headings are '+heads.join(' | '));
