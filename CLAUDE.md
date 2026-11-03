@@ -1437,6 +1437,27 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
   - **Released: v39.09 (29 Oct 2026, 11:17 Israel time, on 0de2dde; Tony: "Yes, release v39.09").** Every job success:
     Deploy to GitHub Pages, pages build, Publish languages, Translate new phrases, Self Tests on main and test,
     Cloudflare Pages for the beta and test.
+  - **v39.31 — every new phrase translated now; a new version noticed while the app stays open; Israel time in the
+    reports** (Tony, 3–4 Nov 2026: "Please translate the "More ..." titles". They cannot be in English only. they should
+    be translated to all available languages." — "on iPhone at least, when the app is already opened and a new version
+    arrives, I do not know about it … only if I close the already opened app and reopen it from the shortcut. Pulling
+    the app down does not resolve it. Is there a way to indicate that there is a new version without having to restart
+    the app on the phone? I do not know whether it behaves the same on Android." — "Please use Israel time. I find it
+    difficult to convert from UTC."). **Languages:** the app's own `i18nGapList` against `i18nFullCatalogue()` found
+    the same 24 phrases missing in all 11 languages — all from v39.26–v39.30 (the More headings and their titles,
+    Files & backup / Files and its title, the drop window's line, the backup notices); translated by hand in each
+    file's own register and terms, written as the publisher writes (`updatedAt`/`count` moved on, index too): 0
+    missing after. The release's translate job still adds them to the central store (it compares against it, not the
+    files). **New versions:** `checkAppVersion` ran only at the start, and an installed app on a phone (iPhone and
+    Android alike) is brought back, not started; `checkAppVersionSoon` now asks on coming back (at most every 5
+    minutes), on a pull-down (signed in or not), every 30 minutes while on the screen, on `online` and on a
+    back-forward restore; Later / ✕ keep that version quiet for two hours. Self Test `ver_rechecks_while_open` (fails
+    without the return, without the pull-down, and with Later ignored; a pull-down is ignored while a window is open —
+    by design — so the test sets the run's own Self Test window aside for the gesture). **Reports:** the Self Test report and Sync
+    Health print this device's time with its offset (`reportTime`) and the zone's name on "run at"; the backup-line
+    test reads the new form. **And** an opened section of ··· More or ⚙️ is measured at its own width: in Hebrew the
+    right-hand menu had only the room left to the screen's edge and "מה אפשר להכין ממה שיש לי?" wrapped. Help: how a new
+    version is noticed.
   - **v39.30 — ··· More is its five headings; a tap opens one in place, pushing the next down** (Tony, 3 Nov 2026: "I
     would like the titles (Ideas, Tools, Kitchens and people, etc.) to become the only menu items under More. Clicking
     any of them will open a sub menu with whatever is under the same title right now. Also, the sub menu will not open

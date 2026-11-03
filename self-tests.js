@@ -364,6 +364,64 @@ window.SELF_TESTS = [
       if(parseVersion('v1.2').join()!=='1,2,0') throw new Error('a two-part version must imply a .0 patch');
     } },
 
+  { id:'ver_rechecks_while_open', group:'Storage', name:'📲 A new version is noticed while the app stays open: on coming back to it (at most every 5 minutes), on a pull-down, now and then — and "Later" keeps that version quiet (v39.31)',
+    test: async()=>{
+      // Tony, 3 Nov 2026: "when the app is already opened and a new version arrives, I do not know about it … only if I
+      // close the already opened app and reopen it from the shortcut. Pulling the app down does not resolve it."
+      var realFetch=window.fetch, realLoad=window.loadFromFirestore, realToast=window.toast, asked=[], serverHas='v99.90';
+      var banner=document.getElementById('swUpdateBanner'), badge=document.getElementById('appVersionBadge');
+      var keep={ shown:banner.style.display, msg:document.getElementById('swUpdateMsg').innerHTML, badge:badge.textContent, title:badge.title,
+                 at:_verCheckedAt, server:_verServer, later:_verLater, lastSeen:localStorage.getItem('tonys_last_version') };
+      var shown=function(){ return banner.style.display==='flex'; };
+      var settle=function(){ return new Promise(function(r){ setTimeout(r, 60); }); };
+      try{
+        window.fetch=function(u){
+          if(typeof u==='string' && /^version\.json\?/.test(u)){ asked.push(u); return Promise.resolve(new Response(JSON.stringify({ version: serverHas }), { headers:{ 'Content-Type':'application/json' } })); }
+          return realFetch.apply(this, arguments);
+        };
+        banner.style.display='none'; _verLater=null;
+        // the app comes back to the screen
+        _verCheckedAt=0; document.dispatchEvent(new Event('visibilitychange')); await settle();
+        if(document.visibilityState==='visible'){
+          if(asked.length!==1) throw new Error('coming back to the app did not ask the server for its version ('+asked.length+' asks)');
+          if(!shown()) throw new Error('a newer version on the server was not announced when the app came back');
+          if(badge.textContent.indexOf(serverHas)===-1) throw new Error('the version badge does not say '+serverHas+' is ready: '+badge.textContent);
+          // …again a minute later: not asked again so soon
+          document.dispatchEvent(new Event('visibilitychange')); await settle();
+          if(asked.length!==1) throw new Error('asked the server again within 5 minutes');
+        }
+        // "Later": that version stays quiet when the app comes back; a newer one still speaks
+        swUpdateLater();
+        if(shown()) throw new Error('Later did not put the notice away');
+        _verCheckedAt=0; checkAppVersionSoon('back'); await settle();
+        if(shown()) throw new Error('the same version was announced again right after Later');
+        serverHas='v99.91'; _verCheckedAt=0; checkAppVersionSoon('back'); await settle();
+        if(!shown()) throw new Error('a still newer version was kept quiet by an earlier Later');
+        // a pull-down asks at once (signed in or not), however recently it last asked
+        banner.style.display='none'; var before=asked.length;
+        window.loadFromFirestore=function(){ return Promise.resolve(false); }; window.toast=function(){};
+        var ev=function(type, y){ var e=new Event(type, { bubbles:true }); Object.defineProperty(e, 'touches', { value: y==null ? [] : [{ clientY:y }] }); document.dispatchEvent(e); };
+        // (a pull-down is ignored while a window is open — this run's own Self Test window included — so it is set
+        // aside for the gesture and put back at once)
+        var aside=Array.prototype.slice.call(document.querySelectorAll('.modal-overlay.open, .calc-overlay.open'));
+        var yWas=window.scrollY; window.scrollTo(0, 0);
+        try{
+          aside.forEach(function(o){ o.classList.remove('open'); });
+          ev('touchstart', 10); ev('touchmove', 10+PULL_TRIGGER+30); ev('touchend', null);
+        } finally { aside.forEach(function(o){ o.classList.add('open'); }); }
+        await settle(); window.scrollTo(0, yWas);
+        if(asked.length!==before+1) throw new Error('a pull-down did not ask the server for its version');
+        // the run is still on what it is running
+        if(APP_VERSION===serverHas) throw new Error('the stand-in version is the running one');
+      } finally {
+        window.fetch=realFetch; window.loadFromFirestore=realLoad; window.toast=realToast;
+        banner.style.display=keep.shown; document.getElementById('swUpdateMsg').innerHTML=keep.msg; badge.textContent=keep.badge; badge.title=keep.title;
+        _verCheckedAt=keep.at; _verServer=keep.server; _verLater=keep.later;
+        try{ if(keep.lastSeen===null) localStorage.removeItem('tonys_last_version'); else localStorage.setItem('tonys_last_version', keep.lastSeen); }catch(e){}
+      }
+      return 'coming back asks (once in 5 minutes) and announces it; Later quiets that version, not a newer one; a pull-down asks at once';
+    } },
+
   { id:'ver_manifest',   group:'Storage', name:'version.json matches the build it ships with',
     test: async()=>{
       // The banner reads version.json; if a release bumps index.html and forgets
@@ -4209,7 +4267,8 @@ window.SELF_TESTS = [
         if(String(checkBackupOverdue).indexOf('backupForgetUnvouched')===-1) throw new Error('the reminder does not check first');
         // (6) The report says WHEN, not only "0 days ago".
         _backupRecordRestoreForTest({}); familyBackupRemember({ at:now, device:'a computer' });
-        if(!/last backup: .*\(\d{4}-\d\d-\d\d \d\d:\d\d UTC\)/.test(syncHealthText())) throw new Error('the report does not give the time of the last backup');
+        // v39.31 — in this device's own time, its offset after it (Tony: "Please use Israel time")
+        if(!/last backup: .*\(\d{4}-\d\d-\d\d \d\d:\d\d UTC[+-]\d{1,2}(:\d\d)?\)/.test(syncHealthText())) throw new Error('the report does not give the time of the last backup, in this device\u2019s time');
       } finally {
         _backupRecordRestoreForTest(bk);
         try{ if(logWas===null) localStorage.removeItem('tonys_sync_log'); else localStorage.setItem('tonys_sync_log',logWas); }catch(e){}

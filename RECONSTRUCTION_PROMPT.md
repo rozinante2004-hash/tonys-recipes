@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v39.30` — app. **Worker: v100**, deployed separately and versioned separately
+**Current version:** `v39.31` — app. **Worker: v100**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -465,6 +465,14 @@ under its plain path only (a `?url=` request goes network-first).
 - **Sign-in options per copy** (`APP_CONFIG.signIn`): Google (all), password + e-mail link
   (community, test); Microsoft and Apple built but off. Sign-in runs on each copy's own address
   (`authDomain` = the site; Firebase's helper files served at `/__/auth/`).
+
+**Phrases added between releases (v39.31):** the release's "Translate new phrases" job compares the app's catalogue
+with the CENTRAL store, not with i18n/*.json — so translations written into the files by hand (Tony: "They cannot be in
+English only") show on the test copy at once and are still added centrally at the release, after which the publishing
+job writes them from there. A hand edit moves each file's `updatedAt`/`count` and `i18n/index.json`'s `at`/`count`
+forward (a device takes the file only when it is as new as its own copy: `i18nReadBest`), keeps the publisher's format
+(`JSON.stringify(doc, null, 1)`, keys in JavaScript's sort order) and is checked with the app's own `i18nGapList`
+against `i18nFullCatalogue()` (24 phrases × 11 languages in v39.31, 0 missing after).
 
 ### 1b.9 The iPhone's top edge (iOS 26/27 "Liquid Glass")
 
@@ -2626,7 +2634,16 @@ breach its Terms of Service and get numbers banned. The feature therefore reads 
 - **PWA install** prompts: Android `beforeinstallprompt` banner + iOS "Add to Home Screen" hint,
   each dismissible and remembered.
 - **Version check** (`checkAppVersion`): poll `version.json` (no‑store); when it differs from
-  `APP_VERSION` show an update banner (`swUpdateNow` posts `SKIP_WAITING` to the SW and reloads).
+  `APP_VERSION` show an update banner (`swUpdateNow` posts `SKIP_WAITING` to the SW and reloads). **Not only at the
+  start** (v39.31 — Tony: on his iPhone a new version was announced only after closing and reopening the app; an
+  installed app on a phone is brought back, not started, and `reg.update()` sees only sw.js): `checkAppVersionSoon(why,
+  force)` asks again when the page becomes visible (at most every 5 minutes), on a `pageshow` from the back-forward
+  cache, on `online`, every 30 minutes while visible, and on a pull-down (signed in or not). A re-check logs "A newer
+  version is on the server" once; **Later** / ✕ (`swUpdateLater`) keep that version quiet for two hours (a newer one
+  still speaks; a fresh start always does). Self Test `ver_rechecks_while_open`.
+- **Times in the reports are the device's own** (v39.31, `reportTime`, `reportZone`): the Self Test report's "run at"
+  (with the zone's name), its error lines, Sync Health's heading and the last backup — "2026-11-04 00:39:28 UTC+2",
+  never bare UTC (Tony: "Please use Israel time. I find it difficult to convert from UTC.").
 - **Toasts** (`toast`), **dropdown/modal helpers** (`toggleDrop`, `closeDrop`, `closeM`, `bgClose`).
 - **Print** (`buildPrintHtml`/`printRecipes`/`printRecipe`): builds one **valid** document for one
   or many recipes (page‑break between them) and opens it to `window.print()`. The `<style>` MUST be

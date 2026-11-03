@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.30 -->
+<!-- Tony's Recipes Collection v39.31 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -3037,6 +3037,20 @@ window.renderSelfTestSummary = renderSelfTestSummary;
 // Everything needed to diagnose a failure WITHOUT a second round of questions.
 // Written as plain text so it pastes into a chat legibly. The rule for what goes
 // in: if its absence would make me ask a follow-up, it belongs here.
+// v39.31 — Tony, 3 Nov 2026: "Please use Israel time. I find it difficult to convert from UTC." The reports he pastes
+// (this one and Sync Health) printed UTC ("2026-11-03T19:39:13.286Z"); they print this device's own time now, its
+// offset after it — for Tony, Israel time.
+function reportTime(t, upTo) {
+  var d = (t instanceof Date) ? t : new Date(t);
+  if (isNaN(d.getTime())) return String(t);
+  var p = function(n){ return (n < 10 ? '0' : '') + n; };
+  var off = -d.getTimezoneOffset(), a = Math.abs(off);
+  return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes())
+    + (upTo === 'min' ? '' : ':' + p(d.getSeconds()))
+    + ' UTC' + (off >= 0 ? '+' : '-') + Math.floor(a / 60) + (a % 60 ? ':' + p(a % 60) : '');
+}
+function reportZone() { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch(e) { return ''; } }
+window.reportTime = reportTime;
 function selfTestReportText() {
   var L = [];
   var failing = [], passing = [];
@@ -3049,7 +3063,7 @@ function selfTestReportText() {
   L.push('='.repeat(52));
   L.push('copy:          ' + appCopyLabel());
   L.push('app version:   ' + APP_VERSION);
-  L.push('run at:        ' + (_selfTestStartedAt ? _selfTestStartedAt.toISOString() : new Date().toISOString()));
+  L.push('run at:        ' + reportTime(_selfTestStartedAt || new Date()) + (reportZone() ? ' (this device\u2019s time: ' + reportZone() + ')' : ''));
   L.push('result:        ' + passing.length + ' passed, ' + failing.length + ' failed, '
          + _selfTestNotRun.length + ' not run (' + SELF_TESTS.length + ' in suite)');
   // v38.02 — how long it waited while its tab was behind another, and what it ran again in front.
@@ -3106,7 +3120,7 @@ function selfTestReportText() {
   var allErrs = (typeof recentErrors === 'function') ? recentErrors() : [];
   var errs = allErrs.filter(function(e){ return !e.duringTest; });
   var staged = allErrs.filter(function(e){ return e.duringTest; });
-  var line = function(e){ L.push('  ' + e.at + '  [' + e.kind + '] ' + e.message + (e.where ? '  @ ' + e.where : '')); };
+  var line = function(e){ L.push('  ' + reportTime(e.at) + '  [' + e.kind + '] ' + e.message + (e.where ? '  @ ' + e.where : '')); };
   L.push('RECENT JS ERRORS (' + errs.length + ')');
   if (!errs.length) L.push('  none captured this session');
   errs.forEach(line);
@@ -4221,7 +4235,7 @@ function syncHealthText() {
   var h = syncHealth();
   var L = [];
   var env = String(window.APP_CONFIG.environment || 'live');
-  L.push('Sync Health — ' + (env === 'live' ? '' : env.toUpperCase() + ' COPY — ') + APP_VERSION + ' — ' + new Date().toISOString());
+  L.push('Sync Health — ' + (env === 'live' ? '' : env.toUpperCase() + ' COPY — ') + APP_VERSION + ' — ' + reportTime(new Date()));
   L.push('copy: ' + appCopyLabel());
   L.push('account: ' + (h.signedIn ? (h.account || 'signed in') : 'signed out'));
   L.push('network: ' + (h.online ? 'online' : 'offline'));
@@ -4254,7 +4268,7 @@ function syncHealthText() {
   // v36.68 — the moment, not only "0 days ago": a stamp that matches a Self
   // Test run rather than a backup is then visible to anyone reading this.
   L.push('last backup: ' + (h.backupDays === null ? 'never, on any device'
-    : h.backupDays + ' days ago, ' + backupWhereText() + ' (' + new Date(newestBackupAt()).toISOString().slice(0, 16).replace('T', ' ') + ' UTC)'));
+    : h.backupDays + ' days ago, ' + backupWhereText() + ' (' + reportTime(newestBackupAt(), 'min') + ')'));
   L.push('meta high-water mark: ' + (h.metaAt === null ? 'none' : h.metaAt));
   // Two numbers that must AGREE with the "No photo" chip. They did not: the panel
   // counted !!r.photo while the chip excluded clips, so "30 of 44" sat beside
@@ -10681,7 +10695,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.30';
+var APP_VERSION = 'v39.31';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -10714,7 +10728,27 @@ function versionIsNewer(a, b) {
 window.parseVersion = parseVersion;
 window.versionIsNewer = versionIsNewer;
 
-function checkAppVersion() {
+// v39.31 — Tony, 3 Nov 2026: "when the app is already opened and a new version arrives, I do not know about it. I get
+// the message that there is a new version … only if I close the already opened app and reopen it from the shortcut.
+// Pulling the app down does not resolve it." The version was asked only as the page STARTED, and an installed app on a
+// phone (iPhone or Android) is brought back, not started — and the service worker's own look (reg.update) sees only
+// sw.js, which rarely changes. Now it is also asked when the app comes back to the screen (at most every 5 minutes), on
+// a pull-down, every 30 minutes while it is on the screen, and when the connection returns (checkAppVersionSoon).
+// "Later" (or ✕) keeps that version quiet for two hours; a new start always says it.
+var _verCheckedAt = 0, _verServer = '', _verLater = null;
+var VER_RECHECK_MS = 5 * 60 * 1000, VER_POLL_MS = 30 * 60 * 1000, VER_LATER_MS = 2 * 60 * 60 * 1000;
+function checkAppVersionSoon(why, force) {
+  if (!force && Date.now() - _verCheckedAt < VER_RECHECK_MS) return false;
+  try { checkAppVersion(why || 'back'); } catch(e) {}
+  return true;
+}
+function swUpdateLater() {
+  var b = document.getElementById('swUpdateBanner'); if (b) b.style.display = 'none';
+  if (_verServer) _verLater = { v: _verServer, at: Date.now() };
+}
+window.checkAppVersionSoon = checkAppVersionSoon; window.swUpdateLater = swUpdateLater;
+function checkAppVersion(why) {
+  _verCheckedAt = Date.now();
   // Keep header badge in sync with this build's version
   var badge = document.getElementById('appVersionBadge');
   if (badge) badge.textContent = APP_VERSION;
@@ -10755,9 +10789,16 @@ function checkAppVersion() {
       // string. `lastSeen` was stored the moment the banner appeared, so the
       // banner showed exactly once and then went quiet while the device stayed
       // on the old build for good.
+      _verServer = serverVersion;
       if (versionIsNewer(serverVersion, APP_VERSION)) {
         var banner = document.getElementById('swUpdateBanner');
         var msg    = document.getElementById('swUpdateMsg');
+        // v39.31 — asked again while the app stays open: said once, and "Later" honoured for two hours
+        var quiet = why && _verLater && _verLater.v === serverVersion && (Date.now() - _verLater.at) < VER_LATER_MS;
+        if (why && !quiet && !(banner && banner.style.display === 'flex')) {
+          try { syncLog('system', 'A newer version is on the server: ' + serverVersion + ' (this is ' + APP_VERSION + '; asked ' + ({ back: 'as the app came back', pull: 'on a pull-down', poll: 'while it was open', online: 'as the connection returned' }[why] || why) + ')'); } catch(e) {}
+        }
+        if (quiet) banner = null;
         if (msg) msg.innerHTML = '📲 You are running <strong style="color:white;">' + escH(APP_VERSION)
           + '</strong>. <strong style="color:white;">' + escH(serverVersion)
           + '</strong> is ready — tap <strong style="color:white;">Update Now</strong>.';
@@ -10778,6 +10819,10 @@ function checkAppVersion() {
     });
 }
 window.checkAppVersion = checkAppVersion;
+document.addEventListener('visibilitychange', function() { if (document.visibilityState === 'visible') checkAppVersionSoon('back'); });
+window.addEventListener('pageshow', function(e) { if (e && e.persisted) checkAppVersionSoon('back', true); });   // put back whole by the browser
+window.addEventListener('online', function() { checkAppVersionSoon('online'); });
+setInterval(function() { if (document.visibilityState === 'visible') checkAppVersionSoon('poll'); }, VER_POLL_MS);
 
 
 
@@ -14090,7 +14135,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.30</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.31</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14178,7 +14223,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.30</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.31</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -21236,6 +21281,7 @@ function initPullToRefresh() {
     var fire = _pull.on;
     _pull = null; hidePullHint();
     if (!fire) return;
+    checkAppVersionSoon('pull', true);   // v39.31 — and for a newer version of the app, signed in or not
     if (!window._driveMode || !window._fbUser) { toast('Sign in to sync with the cloud'); return; }
     toast('🔄 Checking for changes…');
     loadFromFirestore().then(function(changed) {
@@ -24870,6 +24916,9 @@ function dropGroupToggle(menuId, btn, id) {
   if (menu.classList.contains('open')) {
     var r = btn ? btn.getBoundingClientRect() : { top: 0, bottom: 56, right: window.innerWidth };
     menu.style.maxHeight = '';
+    // v39.31 — measured at its own width: placed further along (a right-hand menu, as in Hebrew), an opened section's
+    // longer lines had only the room left to the screen's edge, and wrapped ("מה אפשר להכין ממה שיש לי?" on two lines).
+    menu.style.left = '0px';
     var vv = window.visualViewport;
     var p = dropPlacement(r, menu.offsetWidth, menu.scrollHeight, window.innerWidth, (vv && vv.height) || window.innerHeight, safeAreaTopPx());
     menu.style.top = p.top + 'px'; menu.style.left = p.left + 'px';
@@ -33496,6 +33545,7 @@ var HELP_SYSTEM_PROMPT = [
   "- On PC (Chrome/Edge): look for the install icon in the address bar, or wait for the install banner",
   "- On iPhone: tap Share ⎙ → 'Add to Home Screen'",
   "- Once installed: opens in its own window without browser chrome",
+  "- A NEW VERSION is noticed while the app stays open too (v39.31): when you come back to it, when you pull the list down, and every half hour — a notice at the bottom says so, with 🔄 Update now; Later keeps it quiet for two hours. Closing and reopening the app is no longer needed",
   "",
   "=== MEASUREMENT CONVERTER ===",
   "- Click ⋯ More → ⚖️ Measurement converter",
@@ -39263,7 +39313,7 @@ window.onHeaderScroll = onHeaderScroll;
         Pull down to refresh, or tap <strong style="color:white;">Update now</strong> below.
       </div>
     </div>
-    <button onclick="document.getElementById('swUpdateBanner').style.display='none'"
+    <button onclick="swUpdateLater()" aria-label="Later"
       style="background:none;border:none;color:rgba(255,255,255,0.6);font-size:20px;cursor:pointer;padding:0;flex-shrink:0;line-height:1;">✕</button>
   </div>
   <div style="display:flex;gap:8px;">
@@ -39271,7 +39321,7 @@ window.onHeaderScroll = onHeaderScroll;
       style="flex:1;padding:10px;background:var(--terracotta-fill);color:white;border:none;border-radius:8px;font-size:13px;font-weight:700;font-family:'DM Sans','Heebo',sans-serif;cursor:pointer;">
       🔄 Update now
     </button>
-    <button onclick="document.getElementById('swUpdateBanner').style.display='none'"
+    <button onclick="swUpdateLater()"
       style="padding:10px 16px;background:rgba(255,255,255,0.15);color:white;border:1px solid rgba(255,255,255,0.3);border-radius:8px;font-size:13px;font-weight:600;font-family:'DM Sans','Heebo',sans-serif;cursor:pointer;">
       Later
     </button>
