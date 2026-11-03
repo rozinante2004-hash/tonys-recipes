@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.24 -->
+<!-- Tony's Recipes Collection v39.25 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -10678,7 +10678,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.24';
+var APP_VERSION = 'v39.25';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -12448,6 +12448,23 @@ html.setup-first #loginScreen > * { visibility: hidden; }   /* v39.02 — a firs
   .drop-item { font-size: 15px; }
 }
 #serviceErrorOverlay a { overflow-wrap: anywhere; word-break: break-word; }
+/* v39.25 — the audit (3 Nov 2026), measured at 390 px: the header's round buttons were 28 px, a card's ❤️ 24, a recipe's
+   tick boxes 22, the scale and filter chips 26–28, Family Access's buttons 24 — a finger needs about 44. Each keeps
+   its look; an invisible margin around it takes the tap (more above and below than to the sides, so a row's
+   neighbours keep theirs). And no text under 12 px on a touch screen: labels, pills and Family Access were 10–11 px
+   (the uppercase category badges, 10, are 11 — that reads as 12 and still fits on a phone's three-across cards). */
+@media (pointer: coarse) {
+  .help-icon-btn, .fav-btn, .tick-box, .mult-btn, .mobile-filter-toggle, .view-toggle-btn, .filter-btn,
+  .access-role-btn, .access-remove-btn, .serv-step { position: relative; }
+  .help-icon-btn::after, .fav-btn::after, .tick-box::after, .serv-step::after { content: ''; position: absolute; inset: -8px -3px; }
+  /* chips and buttons in rows ~11 px apart: 5 px, so two rows' margins never overlap */
+  .mult-btn::after, .mobile-filter-toggle::after, .mobile-dropdown-btn::after, .view-toggle-btn::after, .filter-btn::after,
+  .access-role-btn::after, .access-remove-btn::after { content: ''; position: absolute; inset: -5px -2px; }
+  .form-label, .difficulty, .access-badge, .access-email, .control-label, .nutrition-title, .nutrition-btn,
+  .access-role-btn, .access-remove-btn, #dsText, #saveStatusBar, #idBadgeCode, .step-num { font-size: 12px !important; }
+  .card-category-badge, .modal-category { font-size: 11px !important; }
+  #appVersionBadge { font-size: 11px !important; }
+}
 /* v38.36 — the install hint never sits on an open window: on an iPhone it covered
    "✓ Add to My Collection" in the import window. */
 body:has(.modal-overlay.open) #pwaIosBanner, body:has(#askOverlay) #pwaIosBanner, body:has(.modal-overlay.open) #pwaInstallBanner, body:has(#askOverlay) #pwaInstallBanner { display: none !important; }
@@ -12882,6 +12899,17 @@ li.line-sub-indent { padding-inline-start: 22px; }
 .empty-state { text-align: center; padding: 3rem 2rem; color: var(--muted); grid-column: 1/-1; }
 .toast { position: fixed; bottom: 2rem; left: 50%; transform: translateX(-50%) translateY(120px); background: var(--card-bg); color: var(--ink); padding: 10px 16px 10px 10px; border-radius: 14px; font-size: 13px; font-weight: 500; z-index: 999; transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1); pointer-events: none; white-space: nowrap; border: 1px solid var(--border); box-shadow: 0 4px 20px rgba(0,0,0,0.12); display: flex; align-items: center; gap: 10px; }
 .toast.show { transform: translateX(-50%) translateY(0); }
+/* v39.25 — the audit (3 Nov 2026): on a phone "💾 No backup has been taken yet" stood one word to a line beside its
+   button. Centred with left:50%, a notice is laid out in what is left to the right of the middle — half the screen.
+   Now it is as wide as its words, up to the screen's width less a margin, and only then wraps. */
+.toast { width: max-content; max-width: calc(100vw - 24px); box-sizing: border-box; }
+/* v39.25 — the audit, on a phone's speed (a processor 4× slower) with 600 recipes: a tap on a category took 410 ms and
+   redrawing the filter bar 423 ms — most of it the browser laying out all 600 cards again, though a screen shows a
+   dozen. A card off the screen is now laid out only when it comes near (content-visibility); its height meanwhile is
+   about a card's (238 px on a phone, 260 on a computer; a list row 74 — 52 inside its padding), and once seen, its own. Measured after: 107 ms
+   and 40 ms. Browsers without it (Safari before 18) simply lay everything out, as before. */
+.recipe-card { content-visibility: auto; contain-intrinsic-height: auto 250px; }
+.recipe-list-item { content-visibility: auto; contain-intrinsic-height: auto 52px; }
 /* v38.86 — a toast that leads to what it is about: the whole toast is the button, a › at its end says so */
 .toast.toast-go { cursor: pointer; }
 .toast.toast-go:hover { border-color: var(--terracotta); }
@@ -14036,7 +14064,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.24</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.25</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14124,7 +14152,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.24</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.25</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -25071,7 +25099,9 @@ function toastGo(go) {
 }
 // Toast with an action button (used by Undo). Stays up longer and is tappable.
 function toastAction(msg, actionLabel, onAction, duration, go){
-  duration = duration || 9000;
+  // v39.25 — 0 is "stays until it is dismissed" (the 60-day backup reminder asks for it); `|| 9000` made it 9 s
+  var stays = duration === 0;
+  duration = stays ? 0 : (duration || 9000);
   var t = document.getElementById('toast');
   if (!t) { toast(msg); return; }
   clearTimeout(t._tid);
@@ -25092,7 +25122,7 @@ function toastAction(msg, actionLabel, onAction, duration, go){
   t.style.pointerEvents = 'auto';
   t.classList.add('show');
   t._shownFor = duration;
-  t._tid = setTimeout(function(){ toastHide(t); }, duration);
+  if (!stays) t._tid = setTimeout(function(){ toastHide(t); }, duration);
 }
 window.toastAction = toastAction;
 
@@ -33354,6 +33384,7 @@ var HELP_SYSTEM_PROMPT = [
   "- 📄 All to Word: exports all recipes to a .docx file",
   "- 💾 Backup — Save: saves all recipes + photos to a timestamped JSON file (desktop only)",
   "- 📂 Backup — Restore: restores from a backup JSON file (desktop only)",
+  "- 💾 THE BACKUP REMINDER: when no backup has been taken (or the last is over a month old), a notice says so with 💾 Back up now — once a day at most, and only when no window is open. After 60 days it stays until you close it; after 90 days it asks.",
   "- Individual recipe export: open recipe → Excel or Word buttons",
   "",
   "=== CLOUD SYNC & OFFLINE ===",
@@ -33465,6 +33496,7 @@ var HELP_SYSTEM_PROMPT = [
   "- The log's report says, under the browser line, who this account is to its household: how it signs in, its role (Read only, Read + Write, Full access, Owner), whether changes are waiting to be sent, and whether it runs as the installed app or in a browser tab — never an address. The log keeps each opening of the app, every message shown on screen as an error, and every save the database refused (what it was writing, and the role).",
   "",
   "=== IF SOMETHING LOOKS WRONG ===",
+  "- ON A PHONE, SMALL BUTTONS: the round buttons at the top, a card's ❤️ and a recipe's tick boxes take a tap a little beside them too, and no text on a touch screen is smaller than 12 pixels.",
   "- ON A PHONE, A WINDOW TOO BIG OR OFF TO ONE SIDE, OR TINY TEXT: every window and menu opens fitted to what the screen shows — even when the page is zoomed (a pinch, or the phone zooming into a text box) — and at its normal size. Text boxes use 16-pixel letters on a touch screen, so the phone does not zoom in when you tap one, and the kitchen's name in the header wraps on a narrow screen (an iPhone with Display Zoom, a small phone) instead of making the page wider than the screen. If it still happens, send the log from ⚙️ → 🔧 Troubleshooting: it notes each window it had to fit, with the zoom and the widths.",
   "- WHITE BLOCKS (white blobs or panels) covering the fields while editing a recipe, sliding as you scroll: that is the GINGER grammar browser extension, not the app. In a window that scrolls it draws its underline layer in the wrong place — in Chrome on any computer (Windows, Mac, Linux). Fix: click Ginger's icon in the browser toolbar → switch it off for this site → reload. The app says so once when it notices Ginger in the editor. Other writing assistants can do the same; switching them off for this site fixes it too",
   "- Something not working at all: ⚙️ → 🔧 Troubleshooting → 🧪 Self Test, then 📋 Copy report (or Send to admin)",
@@ -36655,6 +36687,10 @@ async function checkBackupOverdue() {
     : '\u{1F4BE} Last backup was ' + days + ' days ago, ' + backupWhereText();
   var level = backupNagLevel(days);
   if (level === 'modal' && backupNaggedToday()) level = 'sticky';
+  // v39.25 — the audit: a kitchen never backed up was told at EVERY opening, for 12 s, over whatever had just been
+  // opened (an open recipe's buttons). Once a day now, as the dialog already was; and not over an open window.
+  if (level !== 'modal' && backupNaggedToday()) return;
+  if (!(await backupNagWhenFree())) return;
   if (level === 'modal') {
     var ok = await askConfirm({
       icon: '\u{1F4BE}', title: 'It has been ' + days + ' days since a backup',
@@ -36666,8 +36702,20 @@ async function checkBackupOverdue() {
     else markBackupNagged();          // asked and answered; do not ask again today
     return;
   }
+  markBackupNagged();
   toastAction(msg, 'Back up now', function(){ backupSave(); }, level === 'sticky' ? 0 : 12000, showBackupPanel);
 }
+// v39.25 — waits (up to ten minutes) until no window is open: a reminder over an open recipe hid its buttons, and a
+// dialog would replace a question being answered. False: still busy — the next opening of the app asks again.
+async function backupNagWhenFree(pollMs) {
+  for (var i = 0; i < 20; i++) {
+    if (!document.querySelector('.modal-overlay.open:not(#selfTestOverlay), #askOverlay, .calc-overlay.open, #serviceErrorOverlay')) return true;
+    if (window._selfTestRunning && !window._backupNagUnderTest) return false;
+    await new Promise(function(r){ setTimeout(r, pollMs || 30000); });
+  }
+  return false;
+}
+window.backupNagWhenFree = backupNagWhenFree;
 // The modal asks once a day at most. Without this, "Not now" on a 200-day-old
 // backup means a dialog on every single reload, which trains the reader to
 // dismiss it without looking — the opposite of what escalating is for.

@@ -1437,6 +1437,24 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
   - **Released: v39.09 (29 Oct 2026, 11:17 Israel time, on 0de2dde; Tony: "Yes, release v39.09").** Every job success:
     Deploy to GitHub Pages, pages build, Publish languages, Translate new phrases, Self Tests on main and test,
     Cloudflare Pages for the beta and test.
+  - **v39.25 — the audit of 3 Nov (AUDIT-2026-11-03.md): Self Tests that test what they say; the backup reminder; phones'
+    small buttons and text; a large collection on a phone** (Tony, 3 Nov: "let's run another audit, focusing on
+    usability, functionality, efficiency and visuality" — "please make sure all the self test tests are indeed testing
+    what they are supposed to test" — "prepare an execution plan, ordered from most severe to least severe, and
+    immediately start executing everything you consider needs fixing. Items that require inputs or decisions from me,
+    leave to the end"). New tests/selftest-knockout.js (and `--subject`): 332 of 429 tests failed on their own
+    assertions with their code knocked out; of the rest, 13 were rewritten to exercise the real code (fn_render,
+    fn_filters, crud_save, crud_fav, perf_search_debounce, feat_refresh_foreground, safety_orphan_sweep, export_bulk,
+    select_bar_compact, ui_owner_contrast, data_normalize, feat_cat_skills, safe_restore_confirms — each then shown to
+    fail with its code knocked out), three AI tests count only AI requests (background ones made them flaky), and the
+    rest are crash-on-nothing unit tests, deliberate source checks, or honest "exists" checks. The backup reminder: a
+    never-backed-up kitchen was told at every opening, over open windows, one word to a line on a phone (`.toast` at
+    `left:50%` had half the screen), and the 60-day "stays" one went after 9 s — fixed (once a day, waits for no window,
+    `width: max-content`, duration 0 honoured); Self Test `backup_reminder_considerate`. Phones: invisible tap margins on
+    small buttons, 12 px text floor (pointer: coarse); `content-visibility` on cards (600 recipes, phone speed: a
+    category tap 410 → 85 ms, the filter bar 423 → 40 ms). tests/phone-fit.js: a notice's words, a tap beside ⚙️ and ❤️.
+    Help: the backup reminder; small buttons. "Needs Tony": Imp/Exp → "📁 Files & backup" without the three items "+ Add Recipe" has; headings in ··· More; the
+    first visit's 1.8 MB (not now).
   - **Released: v39.23 and v39.24 (3 Nov 2026, 02:17 Israel time, on 2af6b8f; Tony: "Yes, release v39.23 and v39.24").**
     Every job success: Deploy to GitHub Pages, pages build, Publish languages, Translate new phrases, Self Tests on main
     and test, Cloudflare Pages for the beta and test.

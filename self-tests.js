@@ -3931,6 +3931,48 @@ window.SELF_TESTS = [
       })(); } finally { _backupRecordRestoreForTest(_bk); }
     } },
 
+  { id:'backup_reminder_considerate', group:'Backup', name:'💾 The backup reminder: once a day at most, never over an open window, and the 60-day one stays until dismissed (v39.25)',
+    test: async()=>{
+      // The audit, 3 Nov 2026: a kitchen never backed up was told at every opening, for 12 s, over the recipe just opened
+      // (its buttons hidden); and the reminder meant to stay after 60 days went away after 9 s.
+      var rec=_backupRecordForTest(), said=[], realR=recipes, real={ ta:window.toastAction, auto:window.autoBackupIfDue, fetch:window.familyBackupFetch, forget:window.backupForgetUnvouched };
+      var t=document.getElementById('toast'), win=null;
+      try{
+        // the 60-day one stays: no timer takes it away
+        real.ta('💾 Last backup was 61 days ago', 'Back up now', function(){}, 0);
+        if(!t.classList.contains('show')) throw new Error('the reminder did not show');
+        await wait(60);
+        if(!t.classList.contains('show') || t._shownFor!==0) throw new Error('the reminder that should stay has a time limit ('+t._shownFor+' ms)');
+        toastHide(t);
+        // once a day
+        window.toastAction=function(m){ said.push(String(m)); };
+        window.autoBackupIfDue=async function(){ return 'no folder connected'; };
+        window.familyBackupFetch=async function(){ return null; };
+        window.backupForgetUnvouched=function(){ return 'kept'; };
+        _backupRecordRestoreForTest({});
+        // more than the five example recipes, or there is nothing worth reminding about
+        recipes=realR.concat([1,2,3,4,5,6].map(function(i){ return normalizeRecipe({ id:888980+i, name:'b'+i, ingredients:[], steps:['x'] }); }));
+        await checkBackupOverdue();
+        if(said.length!==1 || !/No backup has been taken yet/.test(said[0])) throw new Error('a kitchen never backed up was not reminded: '+said.join(' | '));
+        await checkBackupOverdue();
+        if(said.length!==1) throw new Error('reminded twice in one day');
+        // not over an open window: it waits, and goes on once the window is closed
+        win=document.createElement('div'); win.className='modal-overlay open'; win.id='bkNagTestOverlay'; document.body.appendChild(win);
+        window._backupNagUnderTest=true;
+        var free=null; backupNagWhenFree(20).then(function(v){ free=v; });
+        await wait(80);
+        if(free!==null) throw new Error('the reminder did not wait for the open window');
+        win.remove(); win=null;
+        await wait(80);
+        if(free!==true) throw new Error('the reminder did not go on once the window was closed');
+      } finally {
+        window.toastAction=real.ta; window.autoBackupIfDue=real.auto; window.familyBackupFetch=real.fetch; window.backupForgetUnvouched=real.forget;
+        window._backupNagUnderTest=false; if(win) win.remove(); try{ toastHide(t); }catch(e){}
+        recipes=realR; _backupRecordRestoreForTest(rec);
+      }
+      return 'stays when asked to; once a day; waits for an open window';
+    } },
+
   { id:'safety_backup_family', group:'Backup', name:'A backup taken on the PC counts on the phone (v36.61, audit E2)',
     test: ()=>_inFirstLayout(async()=>{
       ['newestBackupAt','familyBackupFetch','familyBackupNote','familyBackupRemember','backupWhereText']
@@ -13980,25 +14022,30 @@ window.SELF_TESTS = [
         window._featureOverride={}; Object.keys(real.ov).forEach(function(k){ window._featureOverride[k]=real.ov[k]; }); applyFeatureFlags();
       }
     } },
-  { id:'safe_restore_confirms', group:'Backup', name:'Restore asks before replacing everything (audit v31.0)',
+  { id:'safe_restore_confirms', group:'Backup', name:'Restore asks before replacing everything (audit v31.0) — and Cancel changes nothing',
     test: async()=>{
       var src=String(backupRestoreFile);
-      if(src.indexOf('askConfirm')===-1)
-        throw new Error('restore replaces the whole collection, and every other device, without asking');
-      // The confirmation has to come BEFORE the data is touched, or it is theatre.
-      if(src.indexOf('askConfirm')>src.indexOf('recipes=migrateRecipes'))
-        throw new Error('the confirmation happens after the collection has already been replaced');
-      // exportedAt was read with .slice() and no guard: a backup without it threw
-      // AFTER the replace had happened and synced, then reported "Restore failed"
-      // for a restore that had in fact succeeded destructively.
+      if(src.indexOf('Math.max.apply(')!==-1) throw new Error('Math.max.apply returns -Infinity for an empty list and can overflow the argument limit on a big one');
       if(typeof backupDateLabel!=='function') throw new Error('backupDateLabel not defined');
       if(backupDateLabel(undefined)!=='') throw new Error('a missing exportedAt throws or prints rubbish');
       if(backupDateLabel('not a date')!=='') throw new Error('a damaged exportedAt is not handled');
       if(!backupDateLabel('2026-08-09T10:00:00Z')) throw new Error('a valid date produced no label');
-      // The call, not the comment explaining why it was removed.
-      if(src.indexOf('Math.max.apply(')!==-1) throw new Error('Math.max.apply returns -Infinity for an empty list and can overflow the argument limit on a big one');
+      // v39.25 — it read the function's text; now a backup file is restored: the question must come, name both ways and
+      // what replacing does, and Cancel must leave every recipe as it was
+      var real={ ask:window.askConfirm, toast:window.toast }, asked=[], toasts=[], before=JSON.stringify(recipes);
+      var file={ text:async function(){ return JSON.stringify({ version:1, exportedAt:'2026-08-09T10:00:00Z',
+        recipes:[{ id:888981, name:'From the backup', ingredients:[{a:'1',n:'x'}], steps:['s'] }] }); } };
+      var ev={ target:{ files:[file], value:'x' } };
+      window.askConfirm=async function(o){ asked.push(o); return false; };
+      window.toast=function(m){ toasts.push(String(m)); };
+      try{
+        await backupRestoreFile(ev);
+        if(asked.length!==1) throw new Error('restoring a backup did not ask first');
+        if(!/Replace everything/.test(asked[0].altLabel||'') || !/no undo/.test(asked[0].message||'')) throw new Error('the question does not say that replacing cannot be undone');
+        if(JSON.stringify(recipes)!==before) throw new Error('Cancel changed the recipes');
+        if(!toasts.some(function(m){ return /nothing changed/.test(m); })) throw new Error('Cancel did not say that nothing changed');
+      } finally { window.askConfirm=real.ask; window.toast=real.toast; }
     } },
-
   { id:'a11y_icon_buttons', group:'UI', name:'Icon-only buttons have an accessible name (audit v31.0)',
     test: async()=>{
       if(typeof labelIconButtons!=='function') throw new Error('labelIconButtons not defined');

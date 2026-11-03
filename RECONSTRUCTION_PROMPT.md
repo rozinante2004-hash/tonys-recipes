@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v39.24` — app. **Worker: v100**, deployed separately and versioned separately
+**Current version:** `v39.25` — app. **Worker: v100**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -801,6 +801,17 @@ visualViewport resize/scroll (keyboard, bars, pan), is let go on a pinch inside 
 wide. The viewport meta has `shrink-to-fit=no` (WebKit). tests/phone-fit.js also opens ten windows and menus with a
 signed-in kitchen at 320, 390 and 390 zoomed 1.25 (CDP `Emulation.setPageScaleFactor`) and requires each inside the
 visual viewport; Self Test `windows_fit_the_screen` stands in for the screen with a stubbed `screenBox`.
+**Touch screens (v39.25):** under `(pointer: coarse)` the small buttons keep their look and get an invisible
+`::after` margin that takes the tap (`inset: -8px -3px` for `.help-icon-btn`, `.fav-btn`, `.tick-box`, `.serv-step`;
+`-5px -2px` for chips and buttons in rows ~11 px apart, so two rows never overlap); labels, pills, Family Access text
+and the header's status line are at least 12 px (`!important`, over inline sizes; category badges 11). A notice
+(`.toast`) is `width: max-content` up to the screen less 24 px — centred with `left: 50%` it had half the screen to
+lay out in, and a notice with a button stood one word to a line. Cards off the screen are not laid out until near
+(`.recipe-card`/`.recipe-list-item { content-visibility: auto; contain-intrinsic-height: auto 250px / 52px }`): with
+600 recipes on a phone's speed a category tap went 410 → 85 ms. **The backup reminder** (`checkBackupOverdue`) comes
+once a day at most at every level (`backupNaggedToday`/`markBackupNagged`), waits until no window is open
+(`backupNagWhenFree`, up to ten minutes, the Self Test window aside), and `toastAction(…, 0)` stays until dismissed
+(the 60-day level; `|| 9000` had made it 9 s).
 A place kept for an address that nobody has signed in with yet says "⏳ hasn’t signed in yet" under it (v38.85): it
 has no 💬 Chat, because there is nobody to chat with until they sign in with that address.
 
@@ -2618,6 +2629,19 @@ live ✅/❌ status, and for failures shows a **detail card** with error, impact
 running session (e.g. re‑inject `:root` CSS vars, define a missing `sortMode`, call
 `renderGrid()`). Network tests ping the Worker health, AI round‑trip, `fetch-url`,
 `photo-search`, and `instagram-fetch` (treat IG 404 as pass, only 500 as fail).
+
+### A test must be able to fail: the knock-out check (v39.25)
+
+`tests/selftest-knockout.js` (Tony, 3 Nov 2026: "make sure all the self test tests are indeed testing what they are
+supposed to test") runs every test, then again with each app function it calls replaced by one that does nothing, one
+at a time; a "passed anyway" is confirmed in a fresh page (one knock-out can leave the page changed for the next), and
+a TypeError in the test's own set-up is told apart from its own assertion failing. `--subject` knocks out the
+functions the test's NAME points to. Tests that reach the app through an event or through manage.js are checked by
+editing the app by hand. Patterns that made tests vacuous, and the cure: reading a grid an earlier call had filled
+(empty it first — `_gridOnly(name, fn)` shows only the probe recipe whatever is filtered, `_cardOf(id)` finds its
+card); flipping a flag by hand instead of calling the app (`toggleFav`); checking that a function exists, or reading
+its source text, instead of running it; measuring CSS of something never shown; counting every request instead of the
+ones under test (the app's background requests land in the window too).
 
 ### There are TWO suites, and passing one proves nothing about the other
 

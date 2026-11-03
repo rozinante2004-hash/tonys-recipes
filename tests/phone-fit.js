@@ -151,6 +151,38 @@ async function windowsFit(page) {
     ['a question', "askConfirm({ icon: '🔑', title: 'Reset their password?', message: 'Sends someone.with.a.long.address@example.com an e-mail.', okLabel: 'Send the e-mail' })", '#askOverlay', "document.getElementById('askOverlay').remove()"],
     ['a Service Error', "showServiceError('PERMISSION: test\\n\\nhttps://console.firebase.google.com/u/0/project/my-kitchen-notes-beta/firestore/databases/-default-/security/rules')", '#serviceErrorOverlay', "document.getElementById('serviceErrorOverlay').remove()"],
   ];
+  // v39.25 — a finger a little off a small button still lands on it (an invisible margin round the header's round
+  // buttons and a card's ❤️, which are drawn 24–28 px)
+  res['a tap just beside a small button'] = await page.evaluate(() => {
+    const out = { page: 0 }, miss = [];
+    if (!matchMedia('(pointer: coarse)').matches) return out;
+    [['the header\u2019s ⚙️', '#settingsBtn'], ['a card\u2019s ❤️', '#recipeGrid .fav-btn']].forEach(([what, sel]) => {
+      const el = document.querySelector(sel); if (!el) { miss.push(what + ' is not there'); return; }
+      if (el.getBoundingClientRect().bottom > innerHeight) el.scrollIntoView({ block: 'center' });   // below the fold on 320 px
+      const r = el.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top - 6;
+      if (y < 0) return;
+      const hit = document.elementFromPoint(x, y);
+      if (!hit || !(hit === el || el.contains(hit))) miss.push(`a tap 6 px above ${what} landed on ${hit ? (hit.id || hit.className || hit.tagName) : 'nothing'}`);
+    });
+    window.scrollTo(0, 0);
+    if (miss.length) out.problem = miss.join('; ');
+    return out;
+  });
+  // v39.25 — a notice with a button: its words beside or above the button, not one word to a line (the backup reminder,
+  // centred with left:50%, had half the screen to lay out in)
+  res['a notice with a button'] = await page.evaluate(async () => {
+    toastAction('💾 No backup has been taken yet', 'Back up now', function () {}, 9000);
+    await new Promise(r => setTimeout(r, 450));
+    const t = document.getElementById('toast'), span = t.querySelector('span'), vv = window.visualViewport;
+    const r = t.getBoundingClientRect(), sr = span.getBoundingClientRect(), out = { page: 0 };
+    const lines = span.getClientRects().length;   // one box per line of an inline element
+    // (a notice is not a window: on a page zoomed in it is not fitted to the screen — checked at the normal zoom only)
+    if (vv && Math.abs(vv.scale - 1) > 0.01) { toastHide(t); return out; }
+    if (sr.width < 100 || lines > 2) out.problem = `its words are ${Math.round(sr.width)} px wide over ${lines} lines`;
+    if (r.left < -1 || r.right > document.documentElement.clientWidth + 1) out.problem = 'it sticks out of the screen';
+    toastHide(t);
+    return out;
+  });
   for (const [label, open, sel, close] of wins) {
     // `void`: a question's window answers only when someone presses a button — not waited for here
     try { await page.evaluate('void (' + open + ')'); } catch (e) { res[label] = { problem: 'could not open: ' + String(e.message || e).slice(0, 80) }; continue; }
