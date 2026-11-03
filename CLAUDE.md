@@ -1437,6 +1437,17 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
   - **Released: v39.09 (29 Oct 2026, 11:17 Israel time, on 0de2dde; Tony: "Yes, release v39.09").** Every job success:
     Deploy to GitHub Pages, pages build, Publish languages, Translate new phrases, Self Tests on main and test,
     Cloudflare Pages for the beta and test.
+  - **v39.32 — the pull-down checks for a new version and says what it found** (Tony, 4 Nov 2026: "Please make pulling
+    the app down check for new versions"). v39.31 already asked on a pull-down, silently when there was nothing newer.
+    Now `checkAppVersion` hands back `{ server, newer }` / `{ error }`, and the pull-down (signed in or not) waits for
+    both answers and gives one notice: "🆕 vX is ready — tap Update now below" (and the notice at the bottom, Later
+    notwithstanding: a pull-down is someone asking), or "✅ Up to date: the recipes, and the app (vX)", "✅ Updated from
+    the cloud — and the app is the newest (vX)", "✅ The app is the newest (vX) — sign in to sync your recipes". The
+    sentences are in separate `toast()` calls, because the translations' scan of the source does not follow `?:` —
+    "✅ Already up to date" (every language) and "✅ Updated from the cloud" (hu, it, pt) had never been translated for
+    that reason. 7 phrases translated into the 11 languages (0 missing after); the Hebrew "✅ עודכן מהעננה" ("from the
+    little cloud") corrected to "מהענן". Self Test `ver_rechecks_while_open`: a pull-down after Later still shows the new
+    version and says so; with nothing newer it says the app is the newest (each fault planted, each caught). Help.
   - **v39.31 — every new phrase translated now; a new version noticed while the app stays open; Israel time in the
     reports** (Tony, 3–4 Nov 2026: "Please translate the "More ..." titles". They cannot be in English only. they should
     be translated to all available languages." — "on iPhone at least, when the app is already opened and a new version

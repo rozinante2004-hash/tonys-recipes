@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.31 -->
+<!-- Tony's Recipes Collection v39.32 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -10695,7 +10695,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.31';
+var APP_VERSION = 'v39.32';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -10738,9 +10738,8 @@ window.versionIsNewer = versionIsNewer;
 var _verCheckedAt = 0, _verServer = '', _verLater = null;
 var VER_RECHECK_MS = 5 * 60 * 1000, VER_POLL_MS = 30 * 60 * 1000, VER_LATER_MS = 2 * 60 * 60 * 1000;
 function checkAppVersionSoon(why, force) {
-  if (!force && Date.now() - _verCheckedAt < VER_RECHECK_MS) return false;
-  try { checkAppVersion(why || 'back'); } catch(e) {}
-  return true;
+  if (!force && Date.now() - _verCheckedAt < VER_RECHECK_MS) return null;
+  try { return checkAppVersion(why || 'back'); } catch(e) { return Promise.resolve({ error: true }); }
 }
 function swUpdateLater() {
   var b = document.getElementById('swUpdateBanner'); if (b) b.style.display = 'none';
@@ -10760,7 +10759,8 @@ function checkAppVersion(why) {
   // Fetch the canonical version from server — bypasses SW cache
   // Relative on purpose: hardcoding /tonys-recipes/ breaks the moment the app is
   // served from anywhere else, and it resolves to exactly the same URL on Pages.
-  fetch('version.json?t=' + Date.now(), {cache: 'no-store'})
+  // v39.32 — the answer is handed back too ({ server, newer } or { error }): a pull-down says what it found
+  return fetch('version.json?t=' + Date.now(), {cache: 'no-store'})
     .then(function(r){ return r.json(); })
     .then(function(data) {
       var serverVersion = data.version || APP_VERSION;
@@ -10793,8 +10793,9 @@ function checkAppVersion(why) {
       if (versionIsNewer(serverVersion, APP_VERSION)) {
         var banner = document.getElementById('swUpdateBanner');
         var msg    = document.getElementById('swUpdateMsg');
-        // v39.31 — asked again while the app stays open: said once, and "Later" honoured for two hours
-        var quiet = why && _verLater && _verLater.v === serverVersion && (Date.now() - _verLater.at) < VER_LATER_MS;
+        // v39.31 — asked again while the app stays open: said once, and "Later" honoured for two hours (not on a pull-down,
+        // which is someone asking)
+        var quiet = why && why !== 'pull' && _verLater && _verLater.v === serverVersion && (Date.now() - _verLater.at) < VER_LATER_MS;
         if (why && !quiet && !(banner && banner.style.display === 'flex')) {
           try { syncLog('system', 'A newer version is on the server: ' + serverVersion + ' (this is ' + APP_VERSION + '; asked ' + ({ back: 'as the app came back', pull: 'on a pull-down', poll: 'while it was open', online: 'as the connection returned' }[why] || why) + ')'); } catch(e) {}
         }
@@ -10806,6 +10807,7 @@ function checkAppVersion(why) {
       }
       // Only remember it once we are genuinely on it.
       try { localStorage.setItem(VERSION_KEY, APP_VERSION); } catch(e) {}
+      return { server: serverVersion, newer: versionIsNewer(serverVersion, APP_VERSION) };
     })
     .catch(function() {
       // Offline or version.json missing — fall back to comparing APP_VERSION
@@ -10816,6 +10818,7 @@ function checkAppVersion(why) {
         if (banner) banner.style.display = 'flex';
       }
       try { localStorage.setItem(VERSION_KEY, APP_VERSION); } catch(e) {}
+      return { error: true };
     });
 }
 window.checkAppVersion = checkAppVersion;
@@ -14135,7 +14138,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.31</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.32</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14223,7 +14226,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.31</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.32</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -21281,12 +21284,26 @@ function initPullToRefresh() {
     var fire = _pull.on;
     _pull = null; hidePullHint();
     if (!fire) return;
-    checkAppVersionSoon('pull', true);   // v39.31 — and for a newer version of the app, signed in or not
-    if (!window._driveMode || !window._fbUser) { toast('Sign in to sync with the cloud'); return; }
-    toast('🔄 Checking for changes…');
-    loadFromFirestore().then(function(changed) {
-      renderFilters(); renderGrid();
-      toast(changed ? '✅ Updated from the cloud' : '✅ Already up to date');
+    // v39.31 — and for a newer version of the app, signed in or not. v39.32 — Tony: "Please make pulling the app down
+    // check for new versions": it did, silently when there was none; now it says what it found, in one notice.
+    var vp = checkAppVersionSoon('pull', true) || Promise.resolve({ error: true });
+    var signedIn = !!(window._driveMode && window._fbUser);
+    // (each sentence in its own call: the translations' reading of the source does not follow a ?: choice)
+    if (signedIn) toast('🔄 Checking for changes…'); else toast('🔄 Checking for a new version…');
+    var cp = signedIn ? loadFromFirestore() : Promise.resolve(null);
+    Promise.all([cp.catch(function(){ return null; }), vp.catch(function(){ return { error: true }; })]).then(function(got) {
+      var changed = got[0], v = got[1] || { error: true };
+      if (signedIn) { renderFilters(); renderGrid(); }
+      if (v.newer) { toast('🆕 ' + v.server + ' is ready — tap Update now below', 8000); return; }
+      if (v.error) {
+        if (!signedIn) toast('Sign in to sync with the cloud');
+        else if (changed) toast('✅ Updated from the cloud');
+        else toast('✅ Already up to date');
+        return;
+      }
+      if (!signedIn) toast('✅ The app is the newest (' + APP_VERSION + ') — sign in to sync your recipes', 6000);
+      else if (changed) toast('✅ Updated from the cloud — and the app is the newest (' + APP_VERSION + ')', 6000);
+      else toast('✅ Up to date: the recipes, and the app (' + APP_VERSION + ')', 6000);
     });
   }, { passive: true });
 }
@@ -33546,6 +33563,7 @@ var HELP_SYSTEM_PROMPT = [
   "- On iPhone: tap Share ⎙ → 'Add to Home Screen'",
   "- Once installed: opens in its own window without browser chrome",
   "- A NEW VERSION is noticed while the app stays open too (v39.31): when you come back to it, when you pull the list down, and every half hour — a notice at the bottom says so, with 🔄 Update now; Later keeps it quiet for two hours. Closing and reopening the app is no longer needed",
+  "- PULLING THE LIST DOWN (at the top of the page) checks for a new version of the app at once — signed in or not — and, signed in, for changes in the cloud; it says what it found: '🆕 vX is ready — tap Update now below', or '✅ Up to date: the recipes, and the app (vX)' (v39.32)",
   "",
   "=== MEASUREMENT CONVERTER ===",
   "- Click ⋯ More → ⚖️ Measurement converter",

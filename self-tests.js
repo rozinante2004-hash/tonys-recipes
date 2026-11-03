@@ -364,7 +364,7 @@ window.SELF_TESTS = [
       if(parseVersion('v1.2').join()!=='1,2,0') throw new Error('a two-part version must imply a .0 patch');
     } },
 
-  { id:'ver_rechecks_while_open', group:'Storage', name:'📲 A new version is noticed while the app stays open: on coming back to it (at most every 5 minutes), on a pull-down, now and then — and "Later" keeps that version quiet (v39.31)',
+  { id:'ver_rechecks_while_open', group:'Storage', name:'📲 A new version is noticed while the app stays open: on coming back to it (at most every 5 minutes), on a pull-down (which says what it found), now and then — and "Later" keeps that version quiet (v39.31, v39.32)',
     test: async()=>{
       // Tony, 3 Nov 2026: "when the app is already opened and a new version arrives, I do not know about it … only if I
       // close the already opened app and reopen it from the shortcut. Pulling the app down does not resolve it."
@@ -397,29 +397,39 @@ window.SELF_TESTS = [
         if(shown()) throw new Error('the same version was announced again right after Later');
         serverHas='v99.91'; _verCheckedAt=0; checkAppVersionSoon('back'); await settle();
         if(!shown()) throw new Error('a still newer version was kept quiet by an earlier Later');
-        // a pull-down asks at once (signed in or not), however recently it last asked
-        banner.style.display='none'; var before=asked.length;
-        window.loadFromFirestore=function(){ return Promise.resolve(false); }; window.toast=function(){};
+        // a pull-down asks at once (signed in or not), however recently it last asked — and says what it found (v39.32:
+        // Tony, "Please make pulling the app down check for new versions")
+        var said=[];
+        window.loadFromFirestore=function(){ return Promise.resolve(false); }; window.toast=function(m){ said.push(String(m)); };
         var ev=function(type, y){ var e=new Event(type, { bubbles:true }); Object.defineProperty(e, 'touches', { value: y==null ? [] : [{ clientY:y }] }); document.dispatchEvent(e); };
         // (a pull-down is ignored while a window is open — this run's own Self Test window included — so it is set
         // aside for the gesture and put back at once)
-        var aside=Array.prototype.slice.call(document.querySelectorAll('.modal-overlay.open, .calc-overlay.open'));
-        var yWas=window.scrollY; window.scrollTo(0, 0);
-        try{
-          aside.forEach(function(o){ o.classList.remove('open'); });
-          ev('touchstart', 10); ev('touchmove', 10+PULL_TRIGGER+30); ev('touchend', null);
-        } finally { aside.forEach(function(o){ o.classList.add('open'); }); }
-        await settle(); window.scrollTo(0, yWas);
+        var pull=async function(){
+          var aside=Array.prototype.slice.call(document.querySelectorAll('.modal-overlay.open, .calc-overlay.open'));
+          var yWas=window.scrollY; window.scrollTo(0, 0);
+          try{
+            aside.forEach(function(o){ o.classList.remove('open'); });
+            ev('touchstart', 10); ev('touchmove', 10+PULL_TRIGGER+30); ev('touchend', null);
+          } finally { aside.forEach(function(o){ o.classList.add('open'); }); }
+          await settle(); await settle(); window.scrollTo(0, yWas);
+        };
+        swUpdateLater();                       // Later was pressed earlier: a pull-down is someone asking, and is told
+        var before=asked.length; await pull();
         if(asked.length!==before+1) throw new Error('a pull-down did not ask the server for its version');
-        // the run is still on what it is running
-        if(APP_VERSION===serverHas) throw new Error('the stand-in version is the running one');
+        if(!shown()) throw new Error('a pull-down did not show the newer version (after an earlier Later)');
+        if(!/v99\.91 is ready/.test(said[said.length-1]||'')) throw new Error('the pull-down did not say the new version is ready: '+said.join(' | '));
+        // nothing newer: it says the app is the newest
+        serverHas=APP_VERSION; banner.style.display='none'; said.length=0;
+        await pull();
+        if(shown()) throw new Error('a notice for the version already running');
+        if(!/the newest \(|and the app \(/.test(said[said.length-1]||'')) throw new Error('with nothing newer, the pull-down did not say the app is the newest: '+said.join(' | '));
       } finally {
         window.fetch=realFetch; window.loadFromFirestore=realLoad; window.toast=realToast;
         banner.style.display=keep.shown; document.getElementById('swUpdateMsg').innerHTML=keep.msg; badge.textContent=keep.badge; badge.title=keep.title;
         _verCheckedAt=keep.at; _verServer=keep.server; _verLater=keep.later;
         try{ if(keep.lastSeen===null) localStorage.removeItem('tonys_last_version'); else localStorage.setItem('tonys_last_version', keep.lastSeen); }catch(e){}
       }
-      return 'coming back asks (once in 5 minutes) and announces it; Later quiets that version, not a newer one; a pull-down asks at once';
+      return 'coming back asks (once in 5 minutes) and announces it; Later quiets that version, not a newer one; a pull-down asks at once and says what it found';
     } },
 
   { id:'ver_manifest',   group:'Storage', name:'version.json matches the build it ships with',

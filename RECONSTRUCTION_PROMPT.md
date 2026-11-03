@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v39.31` — app. **Worker: v100**, deployed separately and versioned separately
+**Current version:** `v39.32` — app. **Worker: v100**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -2640,7 +2640,13 @@ breach its Terms of Service and get numbers banned. The feature therefore reads 
   force)` asks again when the page becomes visible (at most every 5 minutes), on a `pageshow` from the back-forward
   cache, on `online`, every 30 minutes while visible, and on a pull-down (signed in or not). A re-check logs "A newer
   version is on the server" once; **Later** / ✕ (`swUpdateLater`) keep that version quiet for two hours (a newer one
-  still speaks; a fresh start always does). Self Test `ver_rechecks_while_open`.
+  still speaks; a fresh start always does). Self Test `ver_rechecks_while_open`. **The pull-down** (v39.32 — Tony: "Please
+  make pulling the app down check for new versions") asks at once, signed in or not, is not quieted by Later (it is
+  someone asking), waits for both answers (`checkAppVersion` hands back `{ server, newer }` or `{ error }`) and says
+  what it found in one notice: "🆕 vX is ready — tap Update now below", or "✅ Up to date: the recipes, and the app (vX)"
+  / "✅ Updated from the cloud — and the app is the newest (vX)" / "✅ The app is the newest (vX) — sign in to sync your
+  recipes". Each sentence in its own `toast()` call: the translations' reading of the source (`i18nScrapeSource`) does
+  not follow a `?:` choice — two older pull-down notices had never been translated for that reason.
 - **Times in the reports are the device's own** (v39.31, `reportTime`, `reportZone`): the Self Test report's "run at"
   (with the zone's name), its error lines, Sync Health's heading and the last backup — "2026-11-04 00:39:28 UTC+2",
   never bare UTC (Tony: "Please use Israel time. I find it difficult to convert from UTC.").
