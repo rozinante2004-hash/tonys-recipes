@@ -2636,7 +2636,8 @@ running session (e.g. re‑inject `:root` CSS vars, define a missing `sortMode`,
 supposed to test") runs every test, then again with each app function it calls replaced by one that does nothing, one
 at a time; a "passed anyway" is confirmed in a fresh page (one knock-out can leave the page changed for the next), and
 a TypeError in the test's own set-up is told apart from its own assertion failing. `--subject` knocks out the
-functions the test's NAME points to. Tests that reach the app through an event or through manage.js are checked by
+functions the test's NAME points to (on GitHub: Actions → Self Test knock-out check, started by hand, ~20 min).
+Tests that reach the app through an event or through manage.js are checked by
 editing the app by hand. Patterns that made tests vacuous, and the cure: reading a grid an earlier call had filled
 (empty it first — `_gridOnly(name, fn)` shows only the probe recipe whatever is filtered, `_cardOf(id)` finds its
 card); flipping a flag by hand instead of calling the app (`toggleFav`); checking that a function exists, or reading

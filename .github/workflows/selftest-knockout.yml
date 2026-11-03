@@ -1,0 +1,49 @@
+name: Self Test knock-out check
+
+# v39.25 — Tony, 3 Nov 2026: "please make sure all the self test tests are indeed testing what they are supposed to
+# test." tests/selftest-knockout.js runs every Self Test, then again with each app function it calls knocked out (one
+# that does nothing), and lists the tests that pass anyway — they could not catch a fault. About 20 minutes, so it runs
+# only when started by hand (Actions → Self Test knock-out check → Run workflow), e.g. before a large change to the suite.
+# A list is a reason to read those tests, not a failure: the job stays green and prints it.
+
+on:
+  workflow_dispatch:
+    inputs:
+      subject:
+        description: "Also check each test against the functions its NAME points to (--subject)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  knockout:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+
+      - name: Install Playwright (package + Chromium)
+        run: |
+          npm init -y >/dev/null 2>&1 || true
+          npm install --no-audit --no-fund playwright@1.56.1
+          npx playwright install --with-deps chromium
+
+      - name: Serve the app
+        run: |
+          python3 -m http.server 8137 >/dev/null 2>&1 &
+          sleep 2
+
+      - name: Knock out each test's code
+        run: node tests/selftest-knockout.js --port 8137 --workers 3 --ms 20000
+
+      - name: Knock out what each test's name points to
+        if: ${{ inputs.subject }}
+        run: node tests/selftest-knockout.js --subject --port 8137 --workers 3 --ms 20000

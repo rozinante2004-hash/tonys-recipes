@@ -1442,7 +1442,7 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
     usability, functionality, efficiency and visuality" — "please make sure all the self test tests are indeed testing
     what they are supposed to test" — "prepare an execution plan, ordered from most severe to least severe, and
     immediately start executing everything you consider needs fixing. Items that require inputs or decisions from me,
-    leave to the end"). New tests/selftest-knockout.js (and `--subject`): 332 of 429 tests failed on their own
+    leave to the end"). New tests/selftest-knockout.js (and `--subject`; on GitHub by hand: .github/workflows/selftest-knockout.yml): 332 of 429 tests failed on their own
     assertions with their code knocked out; of the rest, 13 were rewritten to exercise the real code (fn_render,
     fn_filters, crud_save, crud_fav, perf_search_debounce, feat_refresh_foreground, safety_orphan_sweep, export_bulk,
     select_bar_compact, ui_owner_contrast, data_normalize, feat_cat_skills, safe_restore_confirms — each then shown to
