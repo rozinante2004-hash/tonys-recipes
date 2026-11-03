@@ -11628,6 +11628,33 @@ window.SELF_TESTS = [
       return 'Files & backup: 5 items, none repeated; More: 5 headings, 14 items each in its place; an empty heading hidden';
     } },
 
+  { id:'selftest_execute_in_view', group:'UI', name:'🧪 The Self Test window keeps ▶ Execute in view on a short screen — the list gives way — and ends above the home bar (v39.29)',
+    test: async()=>{
+      // Tony, 3 Nov 2026, a screenshot of this window on his iPhone: "the Execute button is placed too low on the screen".
+      var ov=document.getElementById('selfTestOverlay'), m=document.getElementById('selfTestModal'), list=document.getElementById('selfTestList'), run=document.getElementById('selfTestRunBtn');
+      var wasOpen=ov.classList.contains('open'), filled=list.children.length>0, lr=null;
+      if(!filled) renderSelfTestList();            // the command-line runner opens the window without drawing the list
+      if(!wasOpen) ov.classList.add('open');
+      try{
+        m.style.setProperty('max-height', '480px', 'important');   // a phone's room for the whole window
+        await new Promise(function(r){ requestAnimationFrame(function(){ requestAnimationFrame(r); }); });
+        var mr=m.getBoundingClientRect(), xr=run.getBoundingClientRect(); lr=list.getBoundingClientRect();
+        if(mr.height>481) throw new Error('the window is '+Math.round(mr.height)+' px tall in 480 px');
+        if(xr.bottom>mr.bottom+0.5) throw new Error('▶ Execute ends '+Math.round(xr.bottom-mr.bottom)+' px below the window\'s edge in 480 px — the list did not give way');
+        if(lr.height<90) throw new Error('the list of tests is only '+Math.round(lr.height)+' px tall');
+      } finally {
+        m.style.removeProperty('max-height');
+        if(!wasOpen) ov.classList.remove('open');
+        if(!filled) list.innerHTML='';
+      }
+      // …and the window ends above the home bar: the overlay keeps the device's own (0 on a computer or an older iPhone)
+      var probe=document.createElement('div'); probe.style.cssText='position:fixed;bottom:0;padding-bottom:env(safe-area-inset-bottom, 0px);visibility:hidden;';
+      document.body.appendChild(probe); var bar=parseFloat(getComputedStyle(probe).paddingBottom)||0; probe.remove();
+      var pad=parseFloat(getComputedStyle(ov).paddingBottom)||0;
+      if(pad<bar+8-0.5) throw new Error('a window\'s overlay keeps '+pad+' px at the bottom, and the home bar takes '+bar);
+      return 'in 480 px: ▶ Execute inside, the list '+Math.round(lr.height)+' px; '+pad+' px kept at the bottom (home bar here: '+bar+' px)';
+    } },
+
   { id:'settings_in_sections', group:'UI', name:'⚙️ Settings in sections: their names first, one open at a time, empty ones not shown, below the bar (v37.74)',
     test: async()=>{
       var m=document.getElementById('settingsDrop');

@@ -211,6 +211,30 @@ async function windowsFit(page) {
     expect('no page errors', !crashes.length, crashes.join(' | '));
     await ctx.close();
   }
+  // v39.29 — the Self Test window's ▶ Execute row on the screen (Tony's iPhone, 3 Nov 2026: "the Execute button is placed
+  // too low on the screen"): Safari tabs on an iPhone 15 and an SE, a small Android, and the installed app on an
+  // iPhone 15 with its notch band and home bar — env() is 0 in Chromium, so --top-safe / --bottom-safe stand in for it.
+  for (const [w, h, label, safe] of [[393, 659, 'an iPhone 15, Safari tab'], [375, 548, 'an iPhone SE, Safari tab'], [360, 640, 'a small Android phone'],
+                                     [393, 852, 'an iPhone 15, the installed app', { top: 83, bottom: 34 }]]) {
+    const ctx = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
+    const page = await ctx.newPage();
+    await page.goto(`http://127.0.0.1:${PORT}/index.html`, { waitUntil: 'networkidle' });
+    if (safe) await page.addStyleTag({ content: `:root { --top-safe: ${safe.top}px; --bottom-safe: ${safe.bottom}px; }` });
+    const r = await page.evaluate(async (bar) => {
+      const l = document.getElementById('loginScreen'); if (l) l.style.display = 'none';
+      try { setSelfTestsEnabled(true); } catch (e) {}
+      await loadSelfTests(); await openSelfTest();
+      await new Promise(res => setTimeout(res, 700));
+      const m = document.getElementById('selfTestModal').getBoundingClientRect(), x = document.getElementById('selfTestRunBtn').getBoundingClientRect();
+      const list = document.getElementById('selfTestList').getBoundingClientRect(), floor = innerHeight - bar, out = {};
+      if (x.bottom > m.bottom + 0.5) out.problem = `▶ Execute ends ${Math.round(x.bottom - m.bottom)} px below the window's edge`;
+      else if (x.bottom > floor + 0.5) out.problem = `▶ Execute ends ${Math.round(x.bottom - floor)} px under the home bar or off the screen`;
+      else if (list.height < 90) out.problem = `the list of tests is only ${Math.round(list.height)} px tall`;
+      return out;
+    }, safe ? safe.bottom : 0);
+    expect(`the Self Test window, ${label} (${w}×${h}): ▶ Execute on the screen`, !r.problem, r.problem);
+    await ctx.close();
+  }
   for (const [w, h, label] of [[390, 844, 'iPhone'], [360, 740, 'a small phone'], [1280, 900, 'a computer']]) {
     for (const scheme of ['dark', 'light']) {
       const ctx = await browser.newContext({ viewport: { width: w, height: h }, colorScheme: scheme, isMobile: w < 600, hasTouch: w < 600 });

@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.28 -->
+<!-- Tony's Recipes Collection v39.29 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -336,6 +336,9 @@
      Not "black-translucent → default": iOS reads that only when the icon is added,
      so every installed copy would have to be removed and added again. */
   :root { --top-safe: env(safe-area-inset-top, 0px); }
+  /* v39.29 — and the bottom: an iPhone without a home button keeps its last 34 pt for the swipe home (the home bar).
+     Tony's Self Test window (3 Nov 2026, a screenshot) ended 8 px from the edge, its ▶ Execute row under the bar. */
+  :root { --bottom-safe: env(safe-area-inset-bottom, 0px); }
   @supports (-webkit-touch-callout: none) {
     /* v38.25 — 24px, not 40: Tony scrolled the reinstalled beta on his iPhone 15 (iOS 27.0.1) until the blur
        began — sharp with the "β BETA" strip's top 88 pt from the screen's top, blurred above. 8 (body margin)
@@ -10678,7 +10681,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.28';
+var APP_VERSION = 'v39.29';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -12411,7 +12414,7 @@ html.setup-first #loginScreen > * { visibility: hidden; }   /* v39.02 — a firs
 @media (prefers-reduced-motion: reduce) { #lineMarker { transition: opacity 0.18s ease; } }
 
 /* MODALS */
-.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(28,26,24,0.6); z-index: 200; align-items: center; justify-content: center; padding: 8px; padding-top: max(8px, var(--top-safe)); }
+.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(28,26,24,0.6); z-index: 200; align-items: center; justify-content: center; padding: 8px; padding-top: max(8px, var(--top-safe)); padding-bottom: calc(8px + var(--bottom-safe)); }
 /* v38.20 — every other window that covers the screen starts below the clock and the
    glass edge too (--top-safe), and its card is never taller than the room left — a
    card taller than its overlay overflows at BOTH ends when centred, which would put
@@ -12422,6 +12425,12 @@ html.setup-first #loginScreen > * { visibility: hidden; }   /* v39.02 — a firs
 #stDetailOverlay, #emailModalOverlay, #helpDetailOverlay { padding-top: max(16px, var(--top-safe)) !important; }
 #importErrorModal { padding-top: max(20px, var(--top-safe)) !important; }
 #serviceErrorOverlay { padding-top: var(--top-safe) !important; }
+/* v39.29 — …and each ends above the home bar (--bottom-safe), its own margin kept */
+.calc-overlay { padding-bottom: calc(1rem + var(--bottom-safe)) !important; }
+.prog-overlay { padding-bottom: calc(20px + var(--bottom-safe)) !important; }
+#stDetailOverlay, #emailModalOverlay, #helpDetailOverlay { padding-bottom: calc(16px + var(--bottom-safe)) !important; }
+#importErrorModal { padding-bottom: calc(20px + var(--bottom-safe)) !important; }
+#serviceErrorOverlay { padding-bottom: var(--bottom-safe) !important; }
 #offlineBanner { padding-top: calc(8px + var(--top-safe)) !important; }
 .modal-overlay > :not(.view-sized) { max-height: min(92vh, 100%) !important; }
 .calc-overlay > *, .prog-overlay > *, #stDetailOverlay > *, #emailModalOverlay > *, #importErrorModal > *,
@@ -12429,6 +12438,15 @@ html.setup-first #loginScreen > * { visibility: hidden; }   /* v39.02 — a firs
 #helpDetailOverlay > * { max-height: min(85vh, 100%) !important; }
 #termsGate > *, #setupWiz > * { max-height: min(94vh, 100%) !important; }
 .modal-overlay.open { display: flex; }
+/* v39.29 — Tony, 3 Nov 2026, a screenshot of the Self Test on his iPhone: "the Execute button is placed too low on the
+   screen". The list had a fixed 55vh; with the note above it and the buttons below, the window was taller than a
+   phone's room, and the part it lost was the ▶ Execute row (70 px of it in a Safari tab on an iPhone 15, 111 on an
+   SE). Now the list takes what is left — up to 55vh as before — and the rows above and below it stay whole. */
+#selfTestModal { display: flex; flex-direction: column; }
+#selfTestModal > * { flex-shrink: 0; }
+#selfTestModal > .modal-body { flex: 0 1 auto; min-height: 0; display: flex; flex-direction: column; }
+#selfTestModal > .modal-body > * { flex-shrink: 0; }
+#selfTestModal > .modal-body > #selfTestList { flex: 0 1 auto; min-height: 96px; max-height: 55vh; }
 /* v39.24 — Tony, 2 Nov 2026: "the opened modals (like a recipe) do not match the screen's size. They often open too
    big, or to the side … In chrome it is even worse and the fonts (under More... for example) are significantly
    smaller … All modals should auto-adjust their sizes to the screen when opened." Three causes, all on phones:
@@ -14074,7 +14092,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.28</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.29</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14162,7 +14180,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.28</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.29</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -38616,7 +38634,7 @@ window.onHeaderScroll = onHeaderScroll;
         <div id="selfTestProgress" style="margin-left:auto;font-size:12px;color:var(--muted);"></div>
       </div>
       <!-- Test list -->
-      <div id="selfTestList" style="max-height:55vh;overflow-y:auto;padding:8px 0;"></div>
+      <div id="selfTestList" style="overflow-y:auto;padding:8px 0;"></div>
       <!-- Summary, shown once a run finishes -->
       <div id="selfTestSummary" style="display:none;padding:10px 16px;border-top:1px solid var(--border);background:var(--bg);"></div>
       <!-- Footer -->

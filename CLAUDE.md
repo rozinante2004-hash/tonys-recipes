@@ -1437,6 +1437,18 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
   - **Released: v39.09 (29 Oct 2026, 11:17 Israel time, on 0de2dde; Tony: "Yes, release v39.09").** Every job success:
     Deploy to GitHub Pages, pages build, Publish languages, Translate new phrases, Self Tests on main and test,
     Cloudflare Pages for the beta and test.
+  - **v39.29 — the Self Test's ▶ Execute row always on the screen; windows end above the home bar** (Tony, 3 Nov 2026,
+    a screenshot of the Self Test on his iPhone, the installed app, at 21:36: "the Execute button is placed too low on
+    the. Screen."). Two causes. The list had a fixed `max-height: 55vh`; with the title, the note and the select row
+    above it and the buttons below, the window was taller than a phone's room, and the part it lost was ▶ Execute —
+    measured: 70 px in a Safari tab on an iPhone 15, 111 px on an SE, 77 px on a small Android. And every window's
+    overlay kept 8 px at the foot, where an iPhone without a home button keeps 34 pt for the home bar — so the last row
+    sat under it. Now `#selfTestModal` is a flex column whose list takes what is left (up to 55vh, at least 96 px), and
+    `--bottom-safe` (`env(safe-area-inset-bottom)`, as `--top-safe`) pads every overlay's foot. tests/phone-fit.js
+    opens the window at 393×659, 375×548, 360×640 and as the installed app at 393×852 with both edges stood in for
+    (`--top-safe: 83px; --bottom-safe: 34px`); all four fail on v39.28, and the last one fails without the bottom
+    padding. Self Test `selftest_execute_in_view` squeezes the window to 480 px (fails on v39.28: 181 px below) and,
+    on a real iPhone, checks the overlay keeps the home bar's room.
   - **v39.28 — 💾 Backup — Save and 📂 Restore on every device** (Tony, 3 Nov 2026, on the test copy: "I do not see an
     option to save a backup. Where is it? It should be under Files and backups"). A rule older than the project's
     history (`/iPhone|iPad|iPod|Android/` → hidden) kept both off phones — though the reminder's 💾 Back up now runs

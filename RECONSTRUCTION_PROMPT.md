@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v39.28` — app. **Worker: v100**, deployed separately and versioned separately
+**Current version:** `v39.29` — app. **Worker: v100**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -475,7 +475,12 @@ AND about 29 pt below it; nothing turns it off. `--top-safe` (`<style id="topSaf
 the first paint), in portrait, `inset + 24px`. Used by the header, the copy's ribbon, every full-screen
 window and overlay, the banners, the pull hint, `safeAreaTopPx()` and `dropPlacement(…, topMin)`.
 A card in a window is capped at `min(its own limit, 100%)`. Measured on an iPhone 15, iOS 27.0.1:
-sharp from 88 pt down. All copies use `black-translucent` (a solid `default` bar was tried: grey,
+sharp from 88 pt down. **The bottom edge (v39.29):** `--bottom-safe` = `env(safe-area-inset-bottom)` — an iPhone
+without a home button keeps its last 34 pt for the home bar — and every window's overlay pads its foot with
+`calc(<its own margin> + var(--bottom-safe))` (`.modal-overlay` 8 px, the converter 1rem, progress and the import
+error 20 px, the detail windows 16 px, the service error 0), so a card ends above the bar. Tony's Self Test window
+(a screenshot, 3 Nov 2026) had its ▶ Execute row under it; tests/phone-fit.js stands in for both edges at 393×852
+(`--top-safe: 83px; --bottom-safe: 34px`: env() is 0 in Chromium). All copies use `black-translucent` (a solid `default` bar was tried: grey,
 and still blurred below). An empty household no longer stays on placeholder cards (redrawn when the
 sync ends; the first-paint placeholders give way after 6 s).
 
@@ -708,7 +713,10 @@ invitation-only (unless adding to the tester's household)."
 - Kitchen names, not the owner's, in exports and shares (`kitchenTitle()`, `kitchenFileStem()`); a new recipe starts
   at Dinner; the terms say "the web app (in all its copies)".
 - The Self Test window cannot be closed while running and shows a meat grinder (`selfTestGrinderHtml`); a run
-  signed in for real puts the sign-in aside and back (`_selfTestPark`, `_selfTestSignInBack`).
+  signed in for real puts the sign-in aside and back (`_selfTestPark`, `_selfTestSignInBack`). It is a flex column
+  (v39.29): the list of tests (`#selfTestList`, up to 55vh, at least 96 px) takes what is left, and the title, the
+  note, the select row, the summary and the ▶ Execute row stay whole — on a phone the fixed 55vh list had pushed
+  ▶ Execute out of the window (Self Test `selftest_execute_in_view` squeezes the window to 480 px).
 - The old family database (recipes-f379d) is cleared: move step 9 checked each document against the community copy
   first (`tools/move-family.mjs clear-check / clear-source / clear-detail`); only the household's own moved-mark
   document is left.
