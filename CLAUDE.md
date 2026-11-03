@@ -1437,6 +1437,15 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
   - **Released: v39.09 (29 Oct 2026, 11:17 Israel time, on 0de2dde; Tony: "Yes, release v39.09").** Every job success:
     Deploy to GitHub Pages, pages build, Publish languages, Translate new phrases, Self Tests on main and test,
     Cloudflare Pages for the beta and test.
+  - **Released: v39.26 to v39.32 (4 Nov 2026, 01:27 Israel time, on 1394aeb; Tony: "Please move the latest version to
+    Family and Beta when all is green").** Green first on test (Self Tests 01:26, Cloudflare Pages for test). Every job
+    success: Deploy to GitHub Pages and pages build (01:28), Translate new phrases and Publish languages (01:32 — it
+    published 9a9b9cb to main and test; that commit's deploy, pages build, Cloudflare usage and Cloudflare Pages for test
+    all success), Self Tests on main (01:46) and test, Cloudflare Pages for the beta and test. The publish wrote the
+    central translations over the files, as designed: every v39.26–v39.32 phrase translated (the release's job added
+    them to the store; several in the same words as the hand ones); the Hebrew "✅ Updated from the cloud" is
+    "✅ עודכן מהעננה" again — the store still holds it; corrected only where translations are edited (🌐 → ✏️ Edit
+    translations… on the beta copy, then 🚀 Publish languages now).
   - **v39.32 — the pull-down checks for a new version and says what it found** (Tony, 4 Nov 2026: "Please make pulling
     the app down check for new versions"). v39.31 already asked on a pull-down, silently when there was nothing newer.
     Now `checkAppVersion` hands back `{ server, newer }` / `{ error }`, and the pull-down (signed in or not) waits for
