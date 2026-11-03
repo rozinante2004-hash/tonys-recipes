@@ -11,6 +11,10 @@
  * still passes whatever is knocked out does not depend on the code it names; it is listed for a person to read and fix.
  * (A knock-out that makes the test fail, or hang, counts as caught. Functions the suite defines itself are not knocked
  * out, nor the browser's own.) Each test gets a freshly loaded page; the page is loaded again after a hang.
+ *
+ * --subject: does a test depend on what its NAME says? The app functions whose names share a word with the test's id or
+ * name ("crud_fav" → toggleFav) are its subject. Each subject it calls is knocked out in a page of its own; a test that
+ * passes with every one of them gone, or that calls none of them although the app has them, is listed for a person.
  */
 const fs = require('fs');
 function loadPlaywright() {
@@ -20,7 +24,7 @@ function loadPlaywright() {
 const { chromium } = loadPlaywright();
 const arg = (k, d) => { const i = process.argv.indexOf('--' + k); return i > -1 && process.argv[i + 1] ? process.argv[i + 1] : d; };
 const PORT = arg('port', '8137'), WORKERS = +arg('workers', '3'), ONLY = arg('only', ''), OUT = arg('out', ''), CAP = +arg('cap', '14');
-const RUN_MS = 8000;
+const RUN_MS = +arg('ms', '8000');   // a test that runs longer (the farm's animals walk for 5-10 s) needs --ms 30000
 const SUITE_SRC = fs.readFileSync(require('path').join(__dirname, '..', 'self-tests.js'), 'utf8');
 const SUITE_FUNCS = new Set(Array.from(SUITE_SRC.matchAll(/function\s+([A-Za-z_$][\w$]*)\s*\(/g)).map(m => m[1]));
 
@@ -83,7 +87,61 @@ function candidatesIn(page, id) {
   }, { id, suiteFuncs: Array.from(SUITE_FUNCS), cap: CAP, text: sourceOf(id) });
 }
 
-(async () => {
+const STOP = new Set(('the and for with not are its one all test tests works work when from into that this what they them then than has have '
+  + 'been can cannot does each every only also its it is be by of to in on at as or an a no yes new old own same other once twice still more less '
+  + 'after before about like just even never never always any some must may should would could will was were how why who where which while '
+  + 'there their here make made makes say says said get gets set sets put use used uses way ways see sees seen keep kept done does doing').split(' '));
+function wordsOf(text) {
+  return Array.from(new Set(String(text).replace(/\\u[0-9a-f]{4}/gi, ' ').toLowerCase().split(/[^a-z]+/).filter(w => w.length >= 3 && !STOP.has(w))));
+}
+async function subjectsOf(page, id) {
+  return page.evaluate(({ id, suiteFuncs, words, text }) => {
+    const tokens = n => n.replace(/^_+/, '').replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/_/g, ' ').toLowerCase().split(' ').filter(Boolean);
+    const matches = (tk, w) => tk === w || (w.length >= 4 && tk.length >= 4 && (tk.startsWith(w) || w.startsWith(tk)));
+    const all = Object.keys(window).filter(n => { try { return typeof window[n] === 'function' && !suiteFuncs.includes(n) && !/\[native code\]/.test(Function.prototype.toString.call(window[n])); } catch (e) { return false; } });
+    const subj = all.filter(n => tokens(n).some(tk => words.some(w => matches(tk, w))));
+    const called = new Set(); for (const m of text.matchAll(/(?<![\w$.])([A-Za-z_$][\w$]*)\s*\(/g)) called.add(m[1]);
+    return { called: subj.filter(n => called.has(n)), uncalled: subj.filter(n => !called.has(n)).slice(0, 8), n: subj.length };
+  }, { id, suiteFuncs: Array.from(SUITE_FUNCS), words: wordsOf(id.replace(/_/g, ' ') + ' ' + (nameOf(id) || '')), text: sourceOf(id) });
+}
+function nameOf(id) { const src = sourceOf(id), m = /name:\s*'((?:[^'\\]|\\.)*)'/.exec(src); return m ? m[1] : ''; }
+
+if (process.argv.includes('--subject')) {
+  (async () => {
+    const browser = await chromium.launch();
+    let { context, page } = await freshPage(browser);
+    let ids = await page.evaluate(() => window.SELF_TESTS.filter(t => !/^net_/.test(t.id) && t.id !== 'stor_firebase').map(t => t.id));
+    await context.close();
+    if (ONLY) { const want = ONLY.split(','); ids = ids.filter(i => want.includes(i)); }
+    const report = {}; let next = 0, done = 0;
+    async function worker() {
+      while (next < ids.length) {
+        const id = ids[next++], r = report[id] = { id, caught: [], missed: [] };
+        try {
+          const f0 = await freshPage(browser); const sj = await subjectsOf(f0.page, id); await f0.context.close();
+          r.subjects = sj.called; r.uncalled = sj.uncalled;
+          for (const k of sj.called.slice(0, 6)) {
+            const f = await freshPage(browser);
+            let res; try { res = await runOne(f.page, id, k); } catch (e) { res = { ok: false, hung: true }; }
+            await f.context.close();
+            (res.ok ? r.missed : r.caught).push(k);
+            if (!res.ok) break;   // it depends on its subject: enough
+          }
+        } catch (e) { r.error = String(e.message || e).slice(0, 120); }
+        if (++done % 25 === 0) console.error(`… ${done}/${ids.length}`);
+      }
+    }
+    await Promise.all(Array.from({ length: WORKERS }, () => worker()));
+    await browser.close();
+    const all = Object.values(report);
+    const passesWithout = all.filter(r => r.subjects && r.subjects.length && !r.caught.length);
+    const neverCalls = all.filter(r => r.subjects && !r.subjects.length && r.uncalled && r.uncalled.length);
+    console.log(`\n${all.length} tests; ${all.filter(r => r.caught.length).length} fail without their subject; ${passesWithout.length} pass without it; ${neverCalls.length} call none of the functions their name points to\n`);
+    if (passesWithout.length) { console.log('PASS WITH THEIR SUBJECT KNOCKED OUT:'); passesWithout.forEach(r => console.log(`  ${r.id}  [${r.subjects.join(', ')}]`)); }
+    if (neverCalls.length) { console.log('\nCALL NONE OF WHAT THEIR NAME POINTS TO (the app has: …):'); neverCalls.forEach(r => console.log(`  ${r.id}  [${r.uncalled.join(', ')}]`)); }
+    if (OUT) fs.writeFileSync(OUT, JSON.stringify(report, null, 1));
+  })();
+} else (async () => {
   const browser = await chromium.launch();
   let { context, page } = await freshPage(browser);
   let ids = await page.evaluate(() => window.SELF_TESTS.filter(t => !/^net_/.test(t.id) && t.id !== 'stor_firebase').map(t => t.id));

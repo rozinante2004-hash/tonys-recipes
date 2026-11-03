@@ -36,6 +36,29 @@ async function _inFirstLayout(fn){
 // fingerprint of a stand-in address, and puts the real one back after.
 var ST_OWNER = 'owner@self-test.example';
 var ST_CONTACT = ['contact', 'mykitchennotes.community'].join('@');
+// v39.25 — a test that looks for its own recipe in the grid sees only that recipe, whatever the person running the
+// suite has filtered or typed: the search box holds the recipe's name, every filter is off — all put back after.
+// (Tony, 3 Nov 2026: "please make sure all the self test tests are indeed testing what they are supposed to test" —
+// "renderGrid() works" passed with renderGrid knocked out: the grid was already full from before.)
+async function _gridOnly(name, fn){
+  var inp=document.getElementById('searchInput'), was={ q:inp?inp.value:'', fav:showFavOnly, clips:showClipsOnly, coll:showCollectionsOnly,
+    recent:showRecentOnly, nophoto:showNoPhotoOnly, oneaway:showOneAwayOnly, cats:new Set(activeCategories), diets:new Set(activeDiets),
+    hidden:new Set(hiddenHouseholds) };
+  showFavOnly=showClipsOnly=showCollectionsOnly=showRecentOnly=showNoPhotoOnly=showOneAwayOnly=false;
+  activeCategories.clear(); activeDiets.clear(); hiddenHouseholds.clear();
+  if(inp) inp.value=name;
+  try{ return await fn(); }
+  finally{
+    if(inp) inp.value=was.q;
+    showFavOnly=was.fav; showClipsOnly=was.clips; showCollectionsOnly=was.coll; showRecentOnly=was.recent; showNoPhotoOnly=was.nophoto; showOneAwayOnly=was.oneaway;
+    activeCategories.clear(); was.cats.forEach(function(x){ activeCategories.add(x); });
+    activeDiets.clear(); was.diets.forEach(function(x){ activeDiets.add(x); });
+    hiddenHouseholds.clear(); was.hidden.forEach(function(x){ hiddenHouseholds.add(x); });
+    renderGrid();
+  }
+}
+function _cardOf(id){ return document.querySelector('#recipeGrid [ontouchstart*="swipeStart(event,'+id+')"]'); }
+
 function stAsOwner(){ var was=APP_OWNER_KEYS; APP_OWNER_KEYS=[ownerKeyOf(ST_OWNER)]; return function(){ APP_OWNER_KEYS=was; }; }
 
 window.SELF_TESTS = [
@@ -57,15 +80,47 @@ window.SELF_TESTS = [
   },
 
   // ── CORE FUNCTIONS ─────────────────────────────────────────────────────────
-  { id:'fn_render',      group:'Core',    name:'renderGrid() works',
-    test: async()=>{ if(typeof renderGrid!=='function') throw new Error('renderGrid not defined'); renderGrid(); const g=document.getElementById('recipeGrid'); if(!g.innerHTML.trim()) throw new Error('renderGrid produced empty output'); } },
-  { id:'fn_filters',     group:'Core',    name:'Filter functions work',
+  { id:'fn_render',      group:'Core',    name:'renderGrid() draws each recipe as a card, with its name',
     test: async()=>{
-      if(typeof renderFilters!=='function') throw new Error('renderFilters not defined');
-      if(typeof resetFilters!=='function') throw new Error('resetFilters not defined');
-      if(typeof toggleFavFilter!=='function') throw new Error('toggleFavFilter not defined');
-      if(typeof toggleClipsFilter!=='function') throw new Error('toggleClipsFilter not defined');
-      renderFilters();
+      if(typeof renderGrid!=='function') throw new Error('renderGrid not defined');
+      // v39.25 — the grid is emptied first: a grid full from before proved nothing about this call
+      var id=888971, name='Grid render probe 7Q';
+      recipes.unshift(normalizeRecipe({ id:id, name:name, ingredients:[{a:'1',n:'x'}], steps:['s'], updatedAt:1 }));
+      try{
+        await _gridOnly(name, function(){
+          var g=document.getElementById('recipeGrid'); g.innerHTML='';
+          renderGrid();
+          if(!g.innerHTML.trim()) throw new Error('renderGrid produced empty output');
+          var c=_cardOf(id);
+          if(!c) throw new Error('renderGrid did not draw the recipe it was given');
+          if(c.textContent.indexOf(name)===-1) throw new Error('the card does not show the recipe’s name');
+        });
+      } finally { recipes=recipes.filter(function(r){ return r.id!==id; }); renderGrid(); }
+    }
+  },
+  { id:'fn_filters',     group:'Core',    name:'Filters work: ❤️ Favourites hides the others and brings them back; Clear filters clears them all',
+    test: async()=>{
+      ['renderFilters','resetFilters','toggleFavFilter','toggleClipsFilter'].forEach(function(f){ if(typeof window[f]!=='function') throw new Error(f+' not defined'); });
+      // v39.25 — it only checked that the functions existed
+      var a=888972, b=888973, tag='Filter probe 3K';
+      recipes.unshift(normalizeRecipe({ id:a, name:tag+' favourite', fav:true, ingredients:[{a:'1',n:'x'}], steps:['s'], updatedAt:1 }),
+                      normalizeRecipe({ id:b, name:tag+' plain', fav:false, ingredients:[{a:'1',n:'x'}], steps:['s'], updatedAt:1 }));
+      try{
+        await _gridOnly(tag, function(){
+          renderGrid();
+          if(!_cardOf(a) || !_cardOf(b)) throw new Error('both recipes should show before filtering');
+          toggleFavFilter();
+          try{
+            if(!showFavOnly) throw new Error('❤️ Favourites did not switch on');
+            if(!_cardOf(a)) throw new Error('the favourite is hidden under ❤️ Favourites');
+            if(_cardOf(b)) throw new Error('a recipe that is not a favourite still shows under ❤️ Favourites');
+          } finally { if(showFavOnly) toggleFavFilter(); }
+          if(!_cardOf(b)) throw new Error('switching ❤️ Favourites off did not bring the others back');
+          showFavOnly=true; activeCategories.add('Soups'); resetFilters();
+          if(showFavOnly || activeCategories.size) throw new Error('Clear filters left a filter on');
+          if(!_cardOf(a) || !_cardOf(b)) throw new Error('after Clear filters the recipes are not all back');
+        });
+      } finally { recipes=recipes.filter(function(r){ return r.id!==a && r.id!==b; }); renderGrid(); }
     }
   },
   { id:'fn_search',      group:'Core',    name:'Search filters recipes',
@@ -95,24 +150,21 @@ window.SELF_TESTS = [
       closeM('editOverlay');
     }
   },
-  { id:'crud_save',      group:'CRUD',    name:'Save & delete test recipe',
+  { id:'crud_save',      group:'CRUD',    name:'Save & delete test recipe — written to this device, and gone from it',
     test: async()=>{
-      const before=recipes.length;
-      // Create test recipe directly
-      const testId=nextId++;
-      const testRecipe={id:testId,name:'🧪 TEST RECIPE — DELETE ME',emoji:'🧪',photo:'',source:'',
-        category:'Dinner',difficulty:'Easy',prep:'1 min',servings:'1',
-        bg:'#FFF0E8',fav:false,ingredients:[{a:'1',n:'test ingredient'}],
-        steps:['Test step'],diets:[],notes:'Auto-generated by Self Test',
-        isClip:false,updatedAt:Date.now()};
-      recipes.unshift(testRecipe);
-      saveLocal();
-      if(recipes.length!==before+1) throw new Error('Recipe not added to array');
-      // Delete it
-      recipes=recipes.filter(r=>r.id!==testId);
-      saveLocal();
-      if(recipes.length!==before) throw new Error('Recipe not deleted properly');
-      renderGrid();
+      // v39.25 — it checked only the list in memory, never what saveLocal wrote
+      const before=recipes.length, testId=888974;
+      const stored=function(){ try{ return (JSON.parse(localStorage.getItem(STORAGE_KEY)||'[]')||[]).some(function(r){ return r && r.id===testId; }); }catch(e){ return false; } };
+      recipes.unshift(normalizeRecipe({ id:testId, name:'🧪 TEST RECIPE — DELETE ME', ingredients:[{a:'1',n:'test ingredient'}], steps:['Test step'],
+        notes:'Auto-generated by Self Test', updatedAt:Date.now() }));
+      try{
+        saveLocal();
+        if(!stored()) throw new Error('saveLocal did not write the new recipe to this device');
+        recipes=recipes.filter(r=>r.id!==testId);
+        saveLocal();
+        if(stored()) throw new Error('the deleted recipe is still saved on this device');
+        if(recipes.length!==before) throw new Error('Recipe not deleted properly');
+      } finally { recipes=recipes.filter(r=>r.id!==testId); saveLocal(); renderGrid(); }
     }
   },
   { id:'crud_view',      group:'CRUD',    name:'View recipe modal opens',
@@ -126,22 +178,23 @@ window.SELF_TESTS = [
       closeM('viewOverlay');
     }
   },
-  { id:'crud_fav',       group:'CRUD',    name:'Favourite toggle works',
+  { id:'crud_fav',       group:'CRUD',    name:'Favourite toggle works — the ❤️ on a card makes a favourite, stamps it, saves it; a second takes it back',
     test: async()=>{
-      // Its OWN recipe (v36.57). This used recipes[0] — Tony's first real
-      // recipe — and "reverted" by stamping it modified now, so the next save
-      // wrote his chestnut collection to the family cloud on every run.
-      const id=888960;
+      // v39.25 — it flipped r.fav by hand and never called the app's ❤️
+      const id=888960, ev={ stopPropagation:function(){} };
       recipes.unshift(normalizeRecipe({id:id,name:'FavTest',ingredients:[{a:'1',n:'x'}],steps:['s'],updatedAt:1}));
       try {
-        const r=recipes[0], was=r.fav;
-        r.fav=!was; r.updatedAt=Date.now(); saveLocal();
-        if(r.fav===was) throw new Error('Fav toggle did not change');
-      } finally { recipes=recipes.filter(function(x){ return x.id!==id; }); saveLocal(); }
+        toggleFav(ev, id);
+        const r=recipes.find(function(x){ return x.id===id; });
+        if(!r.fav) throw new Error('❤️ did not make it a favourite');
+        if(!(r.updatedAt>1)) throw new Error('the change is not stamped, so it would not reach the other devices');
+        var kept=(JSON.parse(localStorage.getItem(STORAGE_KEY)||'[]')||[]).filter(function(x){ return x && x.id===id; })[0];
+        if(!kept || !kept.fav) throw new Error('the favourite was not saved on this device');
+        toggleFav(ev, id);
+        if(r.fav) throw new Error('a second ❤️ did not take it back');
+      } finally { recipes=recipes.filter(r=>r.id!==id); saveLocal(); renderGrid(); }
     }
   },
-
-  // ── MODALS ─────────────────────────────────────────────────────────────────
   { id:'modal_calc',     group:'Modals',  name:'Measurement converter opens',
     test: async()=>{
       if(typeof openCalcModal!=='function') throw new Error('openCalcModal not defined');
@@ -1213,11 +1266,19 @@ window.SELF_TESTS = [
       if(!head.querySelector('#selectedCount') || !/cancelSelectMode/.test((head.querySelector('button')||{}).getAttribute ? head.querySelector('button').getAttribute('onclick') : '')) throw new Error('the count and Cancel are not on the header line');
       var acts=grid.querySelectorAll('button');
       if(acts.length!==7) throw new Error('expected 7 actions in the grid, found '+acts.length);
+      var wasOn=!!selectMode;
+      if(wasOn) cancelSelectMode();
       toggleSelectMode();
       try{
+        // v39.25 — it measured the CSS without the bar on screen; now the bar must actually open
+        if(getComputedStyle(bar).display==='none' || !bar.offsetHeight) throw new Error('select mode did not show the selection bar');
         if(getComputedStyle(grid).display!=='grid') throw new Error('the actions are not laid out as a grid');
         if(getComputedStyle(bar).flexDirection!=='column') throw new Error('the bar is not header-then-grid');
+        var cnt=head.querySelector('#selectedCount').getBoundingClientRect(), cb=head.querySelector('button').getBoundingClientRect();
+        if(Math.abs((cnt.top+cnt.bottom)/2-(cb.top+cb.bottom)/2)>8) throw new Error('the count and Cancel are not on one line');
       } finally { cancelSelectMode(); }
+      if(getComputedStyle(bar).display!=='none') throw new Error('Cancel did not put the selection bar away');
+      if(wasOn) toggleSelectMode();
     } },
 
   { id:'help_in_the_persons_language', group:'UI', name:'Help answers in the person\'s language, naming buttons as they see them (v37.45)',
@@ -4249,18 +4310,30 @@ window.SELF_TESTS = [
         throw new Error('something still tells the user it cannot be undone');
     } },
 
-  { id:'safety_orphan_sweep', group:'Cloud Sync', name:'Orphaned photo documents can be swept (5d.2)',
+  { id:'safety_orphan_sweep', group:'Cloud Sync', name:'Orphaned photo documents can be swept (5d.2) — only those whose recipe is gone',
     test: async()=>{
       if(typeof sweepOrphanPhotos!=='function') throw new Error('sweepOrphanPhotos not defined');
-      // It must only ever target photos whose recipe is gone. Deleting a photo
-      // belonging to a live recipe would be silent, permanent data loss.
-      var src=String(sweepOrphanPhotos);
-      if(src.indexOf('_cloudPhotoIds')===-1) throw new Error('the sweep does not consult the known cloud photo set');
-      if(src.indexOf('live[')===-1) throw new Error('the sweep does not exclude photos belonging to live recipes');
-      if(src.indexOf('permission-denied')===-1) throw new Error('the sweep does not handle an admin-only refusal honestly');
       if(!document.querySelector('#settingsDrop button[onclick*="sweepOrphanPhotos"]')) throw new Error('the sweep is not reachable from Settings');
+      // v39.25 — it read the function's text; now it sweeps. A photo of a live recipe deleted would be silent, permanent
+      // data loss, so: one photo whose recipe exists, one whose recipe is gone — only the second may go.
+      var live=888975, gone=888976, deleted=[], st=_cloudSnapshotForTest();
+      var real={ db:window._fbDb, user:window._fbUser, ask:window.askConfirm, layout:_cloudLayout };
+      recipes.unshift(normalizeRecipe({ id:live, name:'Sweep probe (kept)', ingredients:[{a:'1',n:'x'}], steps:['s'], updatedAt:1 }));
+      try{
+        _cloudLayout='shared';
+        window._fbDb={ collection:function(c){ return { doc:function(d){ return { delete:async function(){ deleted.push(String(d)); } }; } }; } };
+        window._fbUser={ uid:'uST', email:'st@self-test.example' };
+        window.askConfirm=async function(){ return true; };
+        _cloudPhotoIds[live]=true; _cloudPhotoIds[gone]=true;
+        await sweepOrphanPhotos();
+        if(deleted.some(function(d){ return d.indexOf(String(live))>-1; })) throw new Error('the sweep deleted the photo of a recipe that still exists');
+        if(!deleted.some(function(d){ return d.indexOf(String(gone))>-1; })) throw new Error('the orphaned photo was not deleted');
+        if(_cloudPhotoIds[gone]) throw new Error('the swept photo is still counted as being in the cloud');
+      } finally {
+        window._fbDb=real.db; window._fbUser=real.user; window.askConfirm=real.ask; _cloudLayout=real.layout;
+        recipes=recipes.filter(function(r){ return r.id!==live; }); _cloudRestoreForTest(st); renderGrid();
+      }
     } },
-
   { id:'ui_keyboard_cards', group:'UI', name:'Recipe cards are reachable by keyboard (5c.1)',
     test: async()=>{
       // There was not one tabindex in the whole file: the grid could not be
@@ -6156,10 +6229,14 @@ window.SELF_TESTS = [
         var v=['r','g','b'].map(function(k){ var x=c[k]/255; return x<=0.03928?x/12.92:Math.pow((x+0.055)/1.055,2.4); });
         return 0.2126*v[0]+0.7152*v[1]+0.0722*v[2];
       };
-      var prev=getTheme(), worst=null;
+      var prev=getTheme(), worst=null, ov=document.getElementById('accessOverlay'), opened=false;
+      // v39.25 — it never checked that the theme had changed (with setTheme knocked out it measured one theme twice), and
+      // it relied on an earlier test having drawn Family Access
+      if(!document.querySelector('#accessOverlay .access-name') && typeof openAccessControl==='function'){ openAccessControl(); opened=true; }
       try{
         ['light','dark'].forEach(function(t){
           setTheme(t);
+          if(document.documentElement.getAttribute('data-theme')!==t) throw new Error('switching to the '+t+' theme did not change the page');
           var name=document.querySelector('#accessOverlay .access-name');
           var row=name && name.closest('.access-row');
           if(!name||!row) throw new Error('the owner row is gone from Family Access');
@@ -6167,7 +6244,7 @@ window.SELF_TESTS = [
           var ratio=(Math.max(a,b)+0.05)/(Math.min(a,b)+0.05);
           if(worst===null||ratio<worst.ratio) worst={theme:t,ratio:ratio};
         });
-      } finally { setTheme(prev); }
+      } finally { setTheme(prev); if(opened && ov) ov.classList.remove('open'); }
       if(worst.ratio<4.5) throw new Error('owner name contrast is '+worst.ratio.toFixed(2)+':1 in '+worst.theme+' mode (needs 4.5:1) — it is unreadable there');
     } },
 
@@ -11461,8 +11538,9 @@ window.SELF_TESTS = [
       var kR=recipes;
       try{
         recipes=[r];
-        renderFilters();
         var bar=document.getElementById('filterBar')||document.body;
+        bar.innerHTML='';   // v39.25 — read what renderFilters draws now, not what an earlier call left
+        renderFilters();
         if((bar.textContent||'').indexOf('Skills & Methods')===-1)
           throw new Error('the filter bar does not offer Skills & Methods, so recipes filed under it cannot be found');
       } finally { recipes=kR; renderFilters(); renderGrid(); }
@@ -15435,6 +15513,9 @@ window.SELF_TESTS = [
       try{
         window.fetch=function(u, opts){
           var b={}; try{ b=JSON.parse((opts&&opts.body)||'{}'); }catch(e){}
+          // v39.25 — only the AI's own requests (a body with a model) are answered and counted here: the app's own
+          // background requests (the version, the server's health) could land in this window and be counted too
+          if(!b.model) return realFetch.apply(window, arguments);
           sent.push(b.model);
           return Promise.resolve({ ok:true, status:200, json:function(){
             return Promise.resolve({ content:[{ text:'ok' }] }); } });
@@ -15556,6 +15637,9 @@ window.SELF_TESTS = [
       try{
         window.fetch=function(u, opts){
           var b={}; try{ b=JSON.parse((opts&&opts.body)||'{}'); }catch(e){}
+          // v39.25 — only the AI's own requests (a body with a model) are answered and counted here: the app's own
+          // background requests (the version, the server's health) could land in this window and be counted too
+          if(!b.model) return realFetch.apply(window, arguments);
           sent.push(b);
           return Promise.resolve({ ok:true, status:200, json:function(){
             return Promise.resolve({ content:[{ text:'ok' }] }); } });
@@ -15621,7 +15705,9 @@ window.SELF_TESTS = [
       }
       try{
         // Ours: refuse once, immediately, in the Worker's own words.
-        window.fetch=function(){ calls++; return Promise.resolve(resp({
+        // v39.25 — only the AI's own requests are answered and counted (the app's background ones could land here)
+        var aiReq=function(opts){ try{ return !!JSON.parse((opts&&opts.body)||'{}').model; }catch(e){ return false; } };
+        window.fetch=function(u, opts){ if(!aiReq(opts)) return realFetch.apply(window, arguments); calls++; return Promise.resolve(resp({
           error:"SPEND_CAP: this Worker's own daily ceiling for AI calls has been reached (300/300).",
           rateLimited:true, spendCap:'daily' })); };
         var msg='';
@@ -15640,7 +15726,7 @@ window.SELF_TESTS = [
         // failure. The count was identical and the test passed while the
         // behaviour was wrong — so the MESSAGE is asserted too.
         calls=0;
-        window.fetch=function(){ calls++; return Promise.resolve(resp({
+        window.fetch=function(u, opts){ if(!aiReq(opts)) return realFetch.apply(window, arguments); calls++; return Promise.resolve(resp({
           type:'error', error:{ type:'rate_limit_error', message:'overloaded' } })); };
         var busyMsg='';
         try{ await aiCall('busy probe '+Date.now(), 50); } catch(e){ busyMsg=(e&&e.message)||''; }
@@ -18934,7 +19020,12 @@ window.SELF_TESTS = [
       var saved=recipes.slice(), testId=888891;
       try {
         recipes=[normalizeRecipe({id:testId,name:'Sparse'})];
-        renderGrid(); // must not throw
+        await _gridOnly('Sparse', function(){
+          var g=document.getElementById('recipeGrid'); g.innerHTML='';
+          renderGrid(); // must not throw
+          // v39.25 — and must draw it: "not throwing" also passed with renderGrid doing nothing
+          if(!_cardOf(testId)) throw new Error('a recipe with nothing but a name was not drawn');
+        });
         var q=document.getElementById('searchInput'); var old=q.value; q.value='zz'; renderGrid(); q.value=old;
       } finally { recipes=saved; renderGrid(); }
     } },
@@ -19400,19 +19491,43 @@ window.SELF_TESTS = [
       if(!doc.querySelector('h1')) throw new Error('print document has no heading — it would print blank');
       if(!(doc.body.textContent||'').trim()) throw new Error('print document body is empty');
     } },
-  { id:'export_bulk', group:'Import/Export', name:'Bulk export of selected recipes works',
+  { id:'export_bulk', group:'Import/Export', name:'Bulk export of selected recipes works — 📄 Word in the selection bar exports exactly the selected ones',
     test: async()=>{
       ['exportRecipesToWord','exportSelWord','printRecipes'].forEach(function(f){
         if(typeof window[f]!=='function') throw new Error(f+' not defined');
       });
       if(!document.querySelector('#selectBar button[onclick*="exportSelWord"]'))  throw new Error('Word button missing from the select bar');
-      // duplicate recipe names must not collide as Excel sheet names
+      // v39.25 — it checked that the functions and the button existed; now two of three recipes are selected and exported
+      // (the document itself is checked by the export_docx_* tests)
+      var ids=[888977, 888978, 888979], got=null, file=null, real={ make:window.makeDocxBlob, dl:window.downloadBlob };
+      ids.forEach(function(id, i){ recipes.unshift(normalizeRecipe({ id:id, name:'Export probe '+i, ingredients:[{a:'1',n:'x'}], steps:['s'], updatedAt:1 })); });
+      window.makeDocxBlob=function(list){ got=list.map(function(r){ return r.id; }); return new Blob(['x']); };
+      window.downloadBlob=function(b, name){ file=name; };
+      try{
+        selectedIds.clear(); selectedIds.add(ids[0]); selectedIds.add(ids[2]);
+        exportSelWord();
+        if(!got) throw new Error('📄 Word made no document');
+        if(got.length!==2 || got.indexOf(ids[0])<0 || got.indexOf(ids[2])<0) throw new Error('the document holds '+JSON.stringify(got)+', not the two selected recipes');
+        if(!/_Selected\.docx$/.test(file||'')) throw new Error('the file is called "'+file+'"');
+      } finally {
+        window.makeDocxBlob=real.make; window.downloadBlob=real.dl; selectedIds.clear();
+        recipes=recipes.filter(function(r){ return ids.indexOf(r.id)<0; }); renderGrid();
+      }
     } },
-  { id:'perf_search_debounce', group:'Core', name:'Search input is debounced',
+  { id:'perf_search_debounce', group:'Performance', name:'Search input is debounced — typing does not redraw the grid per letter; one redraw after a pause',
     test: async()=>{
       if(typeof onSearchInput!=='function') throw new Error('onSearchInput not defined');
       var inp=document.getElementById('searchInput');
-      if((inp.getAttribute('oninput')||'').indexOf('onSearchInput')===-1) throw new Error('search box still re-renders on every keystroke — typing lags on large collections');
+      if((inp.getAttribute('oninput')||'').indexOf('onSearchInput')===-1) throw new Error('search box still re-renders on every keystroke');
+      // v39.25 — it checked the wiring, never the waiting
+      var real=window.renderGrid, calls=0, was=inp.value;
+      window.renderGrid=function(){ calls++; return real.apply(this, arguments); };
+      try{
+        'chick'.split('').forEach(function(ch){ inp.value+=ch; onSearchInput(); });
+        if(calls) throw new Error('the grid was redrawn while typing ('+calls+' times) — it should wait for a pause');
+        await wait(450);
+        if(calls!==1) throw new Error('after a pause the grid was redrawn '+calls+' times, not once');
+      } finally { window.renderGrid=real; clearTimeout(_searchTimer); inp.value=was; syncSearchClear(); renderGrid(); }
     } },
   { id:'sub_model_and_accessors', group:'Core', name:'A sub-title is neither an ingredient nor a step (v36.4)',
     test: async()=>{
@@ -19819,19 +19934,28 @@ window.SELF_TESTS = [
       } finally { inp.value=old; syncSearchClear(); }
     } },
 
-  { id:'feat_refresh_foreground', group:'Cloud Sync', name:'Cloud re-checks when app returns to foreground',
+  { id:'feat_refresh_foreground', group:'Cloud Sync', name:'Cloud re-checks when app returns to foreground — once, not again within 20 s',
     test: async()=>{
       if(typeof _lastVisibleRefresh==='undefined') throw new Error('_lastVisibleRefresh not defined — foreground refresh not wired up');
       if(typeof loadFromFirestore!=='function') throw new Error('loadFromFirestore not defined');
-      // Just verify the throttle guard resets correctly; a full visibilitychange
-      // integration (with a live _fbDb) is exercised manually, not in this harness.
-      var before=_lastVisibleRefresh;
-      _lastVisibleRefresh=0;
-      if(_lastVisibleRefresh!==0) throw new Error('throttle variable not writable as expected');
-      _lastVisibleRefresh=before;
+      // v39.25 — it only checked that a variable existed. Now the app is brought back: the cloud is read once (counted
+      // here, not done), and not again straight after. Signed in for the moment if it is not.
+      if(document.visibilityState!=='visible') throw new Error('this page is not visible — run the Self Test with the app on screen');
+      var real={ load:window.loadFromFirestore, poll:window.livePoll, user:window._fbUser, drive:window._driveMode, at:_lastVisibleRefresh }, calls=0;
+      window.loadFromFirestore=function(){ calls++; return Promise.resolve(false); };
+      window.livePoll=function(){ return Promise.resolve(false); };
+      if(!window._fbUser) window._fbUser={ uid:'uST', email:'st@self-test.example' };
+      window._driveMode=true;
+      try{
+        _lastVisibleRefresh=0;
+        document.dispatchEvent(new Event('visibilitychange'));
+        if(calls!==1) throw new Error('coming back to the app did not re-read the cloud ('+calls+' reads)');
+        document.dispatchEvent(new Event('visibilitychange'));
+        if(calls!==1) throw new Error('a second return within 20 s read the cloud again — the throttle is gone');
+      } finally {
+        window.loadFromFirestore=real.load; window.livePoll=real.poll; window._fbUser=real.user; window._driveMode=real.drive; _lastVisibleRefresh=real.at;
+      }
     } },
-
-  // ── UI plumbing ─────────────────────────────────────────────────────────────
   { id:'ui_dropdown_reopen', group:'UI', name:'A menu can be reopened right after picking an item',
     test: async()=>{
       if(typeof toggleDrop!=='function'||typeof closeDrop!=='function') throw new Error('toggleDrop/closeDrop not defined');
