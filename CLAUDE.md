@@ -1437,6 +1437,13 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
   - **Released: v39.09 (29 Oct 2026, 11:17 Israel time, on 0de2dde; Tony: "Yes, release v39.09").** Every job success:
     Deploy to GitHub Pages, pages build, Publish languages, Translate new phrases, Self Tests on main and test,
     Cloudflare Pages for the beta and test.
+  - **Released: v39.34 to the beta only (4 Nov 2026, 14:18 Israel time, on bf83b84; Tony: "You can Move it to beta once
+    it's green").** Green first on test on the same commit: Self Tests and Cloudflare Pages for test (14:18). Every job
+    success: Cloudflare Pages for the beta (14:19) — a push to `beta` starts no GitHub workflow. `main` (the family's
+    copy) stays at fb60a89 (v39.33), as asked: so no Deploy to GitHub Pages and no Translate new phrases / Publish
+    languages — the 11 new phrases are in the beta's files, not yet in the shared translations (they go there with the
+    next release to main). The beta site cannot be opened from the session's network (the proxy refuses it, as it does
+    the test copy): the deploy is known by Cloudflare's check.
   - **v39.34 — the translation editor: nothing typed is lost, a Save writes only what changed, a refused Save says
     why.** **It began with a misreading — record it as such.** Tony, 4 Nov 2026, 11:50 Israel time: "I have made these
     changes to the translation. I would like to keep them." — the answer to being asked (after v39.33) to change the two
@@ -1474,7 +1481,7 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
     differs from an earlier one may be the owner's own choice — look at who published it (a "Publish languages" run
     started by Tony's account, workflow_dispatch, carries his edits) and ask before calling it wrong; never "correct"
     it in the files.** In Hebrew, five notices that walk the menu still say "🏡 מטבחים ואנשים" (the store's machine
-    wording, without "על"); told Tony, his call. **Tony, 13:45: "You can Move it to beta once it's green"** — to the
+    wording, without "על"); told Tony, his call. **Tony (after 13:42): "You can Move it to beta once it's green"** — to the
     beta ONLY (`main`, the family's copy, stays at fb60a89: it sends every visit to the community copy since move day,
     and a release needs his word for each copy). 4edb8ce: Self Tests success 13:42 (started by hand — its push event was
     lost too); this note (13:58) is pushed for a full green on test (Self Tests and Cloudflare Pages) on the commit that
