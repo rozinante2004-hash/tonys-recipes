@@ -1450,6 +1450,15 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
     missing. The release's machine translation had made two Hebrew headings wrong — "🏡 על מטבחים ואנשים" ("About
     kitchens and people") and "🧹 סידורים" ("errands"): corrected in the file ("🏡 מטבחים ואנשים", "🧹 סידור"); they
     stay right after a publish only once corrected in the store (✏️ Edit translations on the beta copy).
+  - **Released: v39.33 (4 Nov 2026, 02:23 Israel time, on 89d37dc; Tony: "Please update the Help and share to the
+    family and Beta when done").** Green first on test (Self Tests 02:22, Cloudflare Pages for test 02:06). Every job
+    success: Deploy to GitHub Pages and pages build (02:24), Cloudflare Pages for the beta (02:24), Translate new phrases
+    and Publish languages (02:27 — it published fb60a89 to main and test; that commit's deploy, pages build and
+    Cloudflare Pages for test success, 02:28), Self Tests on main (02:40). The publish wrote the store's translations
+    over the files, as designed: all 9 phrases present in the 11 languages (0 missing; the gift sentences in the
+    store's own machine wording), but the two Hebrew headings are the store's wrong ones again — "🏡 על מטבחים ואנשים"
+    and "🧹 סידורים". Asked Tony to correct them in 🌐 → ✏️ Edit translations… on the beta copy ("🏡 מטבחים ואנשים",
+    "🧹 סידור"), then 🚀 Publish languages now.
   - **Released: v39.26 to v39.32 (4 Nov 2026, 01:27 Israel time, on 1394aeb; Tony: "Please move the latest version to
     Family and Beta when all is green").** Green first on test (Self Tests 01:26, Cloudflare Pages for test). Every job
     success: Deploy to GitHub Pages and pages build (01:28), Translate new phrases and Publish languages (01:32 — it
