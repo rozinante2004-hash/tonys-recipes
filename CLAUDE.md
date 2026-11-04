@@ -1461,8 +1461,11 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
     back a device's own (`i18nEdPendingOff`). `i18n_editor_is_usable`'s Save step now stands in a shared Save (its
     point: the live screen and the button's icon). 11 phrases × 11 languages by hand (the sign-in reasons of v39.21
     were English everywhere too), 0 missing; written without moving the files' `updatedAt`/`count` or index.json, so
-    the publish Tony is about to make merges into test without a conflict. Help: the owner's way to correct a
-    translation, and NEW FEATURES.
+    the publish Tony is about to make merges into test without a conflict (checked: `git merge-tree` of a simulated
+    publish — his two Hebrew values, a new `updatedAt`/`count`, index.json — into this commit: no conflict, both kept).
+    Help: the owner's way to correct a translation, and NEW FEATURES. Pushed to test 12:25 Israel time (b3af5d4); GitHub
+    answered the first push "Internal Server Error", the second went in, and no job started on it (no Self Tests, no
+    Cloudflare Pages build after 23 minutes) — the push event was lost; this note is the push that starts them.
   - **v39.33 — the Help up to date with v39.26–v39.32, and every sentence on its way translated** (Tony, 4 Nov 2026:
     "Please update the Help and share to the family and Beta when done"). The Help (the assistant's description): every
     "⋯ More → item" path goes through its heading now (··· More → 🏡 Kitchens and people → 🤝 Connect…, → 🧰 Tools →
