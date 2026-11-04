@@ -1474,7 +1474,13 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
     differs from an earlier one may be the owner's own choice — look at who published it (a "Publish languages" run
     started by Tony's account, workflow_dispatch, carries his edits) and ask before calling it wrong; never "correct"
     it in the files.** In Hebrew, five notices that walk the menu still say "🏡 מטבחים ואנשים" (the store's machine
-    wording, without "על"); told Tony, his call.
+    wording, without "על"); told Tony, his call. **Tony, 13:45: "You can Move it to beta once it's green"** — to the
+    beta ONLY (`main`, the family's copy, stays at fb60a89: it sends every visit to the community copy since move day,
+    and a release needs his word for each copy). 4edb8ce: Self Tests success 13:42 (started by hand — its push event was
+    lost too); this note (13:58) is pushed for a full green on test (Self Tests and Cloudflare Pages) on the commit that
+    goes to the beta. "Translate new phrases" runs only on a push to main, so the 11 new phrases reach the shared
+    translations with the next release to main; until then the beta serves them from its files (their `updatedAt` is
+    the store's, so devices take the files; a change in the store before then shows those owner-only lines in English).
   - **v39.33 — the Help up to date with v39.26–v39.32, and every sentence on its way translated** (Tony, 4 Nov 2026:
     "Please update the Help and share to the family and Beta when done"). The Help (the assistant's description): every
     "⋯ More → item" path goes through its heading now (··· More → 🏡 Kitchens and people → 🤝 Connect…, → 🧰 Tools →
