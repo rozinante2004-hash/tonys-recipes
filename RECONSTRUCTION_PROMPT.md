@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v39.35` — app. **Worker: v100**, deployed separately and versioned separately
+**Current version:** `v39.36` — app. **Worker: v100**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -405,6 +405,9 @@ under its plain path only (a `?url=` request goes network-first).
   A device's own child voice (Edge's Maisie, Ana: `FARM_VOICE_CHILD_RE`) is the child, not raised again (`farmTune`).
   The owner's farm window names the female voice and its accent, then "Male voice: … Child’s voice: …." for this device
   (the line ends in its stop — a name at the very end of an element is left out of its phrase key by `i18nEdges`).
+  **Pace and pitch (v39.36, Tony's choice "E" from five heard on his phone):** FARM_VOICE_TUNE child speed 0.8, pitch
+  1.8 (the top; above it speech cracks); female 0.74 / 1.4; male 0.7 / 0.7 (only slower: he stays deep, v38.01); each
+  animal adds ±0.3 × (its pitch − 1), kept within 0.55–1.8.
 - **Recipes:** scaling multiplies the method's amounts too; on a computer the recipe window can be
   enlarged (a corner grip); a source with words and a link opens the link.
 - **About** (ℹ️, at the bottom of the ? window): version and update check, ✨ What can this app do

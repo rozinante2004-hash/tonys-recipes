@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.35 -->
+<!-- Tony's Recipes Collection v39.36 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -10695,7 +10695,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.35';
+var APP_VERSION = 'v39.36';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -14138,7 +14138,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.35</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.36</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14226,7 +14226,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.35</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.36</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -31170,7 +31170,11 @@ var FARM_VOICE_PREFER = {
   female: ['Google UK English Female', 'Serena', 'Kate', 'Sonia', 'Libby', 'Stephanie', 'Martha', 'Hazel', 'Susan', 'Amy', 'Emma']
 };
 // v38.01 — Tony: "please make the male's voice deeper" — pitch 0.7 (was 1.0), a touch slower.
-var FARM_VOICE_TUNE = { male: { pitch: 0.7, rate: 0.94 }, female: { pitch: 1.1, rate: 1.0 }, child: { pitch: 1.5, rate: 1.08 } };
+// v39.36 — Tony, 5 Nov 2026: "The animals sound as if they are in a hurry. Could you please make them speak a bit slower,
+// and with a bit of a higher pitch?" — five options heard on his phone; he chose E: the child at 80% speed (was 108%) and
+// pitch 1.8 (was 1.5; the top, where speech starts to crack above it). The female has the same change (speed ×0.74,
+// pitch +0.3); the male only the slower pace — he stays deep (v38.01, "please make the male's voice deeper").
+var FARM_VOICE_TUNE = { male: { pitch: 0.7, rate: 0.7 }, female: { pitch: 1.4, rate: 0.74 }, child: { pitch: 1.8, rate: 0.8 } };
 function farmVoiceKind(kind) {
   if (kind === 'random') return ['male', 'female', 'child'][Math.floor(Math.random() * 3)];
   return FARM_VOICE_TUNE[kind] ? kind : 'female';
@@ -33762,6 +33766,7 @@ var HELP_SYSTEM_PROMPT = [
   "- A new version is noticed while the app stays open, and pulling the list down checks at once and says what it found (v39.31, v39.32)",
   "- The Self Test report and Sync Health give times in this device's own time, its UTC offset after it (v39.31)",
   "- (The app's owner) A correction in ✏️ Edit translations is never lost: it is kept on the device until it is shared, Save writes only what was changed, and a Save that is not shared says why (v39.34)",
+  "- 🐄 The farm visitors speak more slowly, and the child and the female a little higher (v39.36)",
   "- 🐄 The farm visitors speak with the voice chosen for everyone: a child or a female is never a man's voice on a device that has another, Microsoft Edge's own child voice speaks for the child, and the owner's farm window says which voice speaks for each choice on that device (v39.35)",
   "- 🕐 Recently Viewed: a 'Recent' chip appears in the filter bar after you open any recipe — shows your last 8 viewed",
   "- ⇅ Sort: click the Sort button next to Grid/List to sort by Default, Recently viewed, A–Z, Prep time, Difficulty, or Most cooked",

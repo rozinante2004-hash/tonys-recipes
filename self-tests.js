@@ -11120,6 +11120,11 @@ window.SELF_TESTS = [
         var h=farmVoiceHereHtml();
         if(!/Male voice: <b[^>]*>Daniel<\/b>\./.test(h) || !/Child\u2019s voice: <b[^>]*>Samantha<\/b>\./.test(h)) throw new Error('the farm window does not say which voice speaks for the male and the child: '+h);
         if(/British/.test(h) || !/English — this device has no Scottish voice/.test(h)) throw new Error('an American voice is called British: '+h);
+        // v39.36 — Tony: "as if they are in a hurry … a bit slower, and with a bit of a higher pitch" — he chose option E:
+        // the child at 80% speed and pitch 1.8; every voice slower than a normal pace; the male still the deepest (v38.01)
+        if(FARM_VOICE_TUNE.child.rate!==0.8 || FARM_VOICE_TUNE.child.pitch!==1.8) throw new Error('the child is not Tony\u2019s option E: '+JSON.stringify(FARM_VOICE_TUNE.child));
+        ['male','female','child'].forEach(function(k){ if(!(FARM_VOICE_TUNE[k].rate<1)) throw new Error('the '+k+' voice speaks at a normal pace or faster: '+FARM_VOICE_TUNE[k].rate); });
+        if(!(FARM_VOICE_TUNE.male.pitch<=0.8)) throw new Error('the male is no longer deep: '+FARM_VOICE_TUNE.male.pitch);
         // Read afresh: a list that changed is used at once (an app brought back from the background)
         on([{ name:'Microsoft David - English (United States)', lang:'en-US' }]); nm('child');
         on([{ name:'Microsoft David - English (United States)', lang:'en-US' }, { name:'Microsoft Zira - English (United States)', lang:'en-US' }]);

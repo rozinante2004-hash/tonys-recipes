@@ -1437,6 +1437,16 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
   - **Released: v39.09 (29 Oct 2026, 11:17 Israel time, on 0de2dde; Tony: "Yes, release v39.09").** Every job success:
     Deploy to GitHub Pages, pages build, Publish languages, Translate new phrases, Self Tests on main and test,
     Cloudflare Pages for the beta and test.
+  - **v39.36 — the farm visitors speak slower, the child and the female higher** (Tony, 5 Nov 2026: "The animals sound as
+    if the are in a hurry. Could you please make them speak a bit slower, and with a bit of a higher pitch? Let's make it
+    simpler. Don't add it to the app yet, but present me with some options so I could select which works better").
+    A listening page (a private claude.ai artifact, https://claude.ai/artifact/Y89tjogdAxS3kvpQKa5XX7) played "Now" (the
+    child at speed 1.08 — faster than a normal pace — and pitch 1.5) beside A–E, with the app's own voice choice, his
+    animals and sentences. Tony: "For some reason I cannot play it on my PC. However, on the phone, E sounds best." E =
+    the child at 0.8 and 1.8; the female the same change (×0.74 speed, +0.3 pitch: 0.74 / 1.4); the male only slower
+    (0.7 / 0.7 — he asked for a deeper male in v38.01, and farm_visitors holds it at ≤ 0.8). farm_voice_kind_kept checks
+    option E, every voice below a normal pace, and the male still deep. Help: NEW FEATURES. Why the page was silent on
+    his PC is not known (the page says which voice it found, or that none was found).
   - **Released: v39.35 to the family's copy and the beta (5 Nov 2026, 01:07 Israel time, on 699b694; Tony: "Please push
     this build to beta and family when green").** Green first on test on the same commit: Self Tests (01:07) and
     Cloudflare Pages for test (00:51). Every job success: Cloudflare Pages for the beta (01:08); on main (daf3ee4 →
