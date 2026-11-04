@@ -1437,6 +1437,32 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
   - **Released: v39.09 (29 Oct 2026, 11:17 Israel time, on 0de2dde; Tony: "Yes, release v39.09").** Every job success:
     Deploy to GitHub Pages, pages build, Publish languages, Translate new phrases, Self Tests on main and test,
     Cloudflare Pages for the beta and test.
+  - **v39.34 — a translation correction is never lost** (Tony, 4 Nov 2026, 11:50 Israel time: "I have made these changes
+    to the translation. I would like to keep them." — after being asked to correct "🏡 Kitchens and people" and "🧹 Tidy
+    up" in ✏️ Edit translations on the beta copy). **What was found:** the shared translations
+    (my-kitchen-notes-beta `i18n/he`, read over REST) were last written at 02:27 by the release's translate job — no Save
+    of his reached them, and `i18n/publish` was last asked at 01:51 (his earlier, successful fix); the 11:49 scheduled
+    publish found "nothing changed". The editor saves only where `appAdmin()` allows (a sign-in WITH GOOGLE and, the
+    owner's two-step being on, the authenticator's code — v38.23); a Save the rules refused said "✅ Hebrew saved on this
+    device — it could not be shared", the device showed the correction, and the next start read the shared copy over it
+    (`i18nLoadDict` rewrites the cache); a window closed before 💾 Save dropped the changes without a word. (The iPhone's
+    sign-in has been older than his authenticator before: v39.21's `ownerSignInWhy`, 30 Oct.) **Now:** what differs from
+    the copy the editor opened is kept on the device after every change (`tonys_i18n_ed_pending_<lang>`) until a Save is
+    shared — closing, restarting, signing out and back keep it; the editor brings it back ("✏️ Your changes that are not
+    shared yet are back — press 💾 Save"), and closing with changes kept says so. A Save reads the shared copy afresh and
+    writes only the rows changed here (a release's new phrases or another device's correction are not undone). A Save
+    not shared shows no ✅, changes nothing on the screen and says why — `ownerSignInWhy('\n\n')`: the reason and the
+    remedy as two paragraphs, each translated — with "Sign out now" / "Later"; the changes stay. A refused 🚀 publish
+    request says why the same way (it was "❌ Could not ask…: Missing or insufficient permissions"). The automatic
+    translation only adds what is missing (`translate-new.mjs`: `if (!strings[k])`), so a shared correction stays. Self
+    Test `i18n_edits_kept_until_shared` (Tony's case end to end: typed → refused → closed → restarted → back → saved
+    onto a newer shared copy; the publish refusal) fails on v39.33 ("not kept on the device as they are typed") and
+    with each fault planted (a Save that does not merge; a refused Save saying ✅); Self Test runs neither keep nor put
+    back a device's own (`i18nEdPendingOff`). `i18n_editor_is_usable`'s Save step now stands in a shared Save (its
+    point: the live screen and the button's icon). 11 phrases × 11 languages by hand (the sign-in reasons of v39.21
+    were English everywhere too), 0 missing; written without moving the files' `updatedAt`/`count` or index.json, so
+    the publish Tony is about to make merges into test without a conflict. Help: the owner's way to correct a
+    translation, and NEW FEATURES.
   - **v39.33 — the Help up to date with v39.26–v39.32, and every sentence on its way translated** (Tony, 4 Nov 2026:
     "Please update the Help and share to the family and Beta when done"). The Help (the assistant's description): every
     "⋯ More → item" path goes through its heading now (··· More → 🏡 Kitchens and people → 🤝 Connect…, → 🧰 Tools →

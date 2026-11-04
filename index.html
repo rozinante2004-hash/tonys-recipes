@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.33 -->
+<!-- Tony's Recipes Collection v39.34 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -10695,7 +10695,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.33';
+var APP_VERSION = 'v39.34';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -14138,7 +14138,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.33</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.34</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14226,7 +14226,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.33</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.34</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -17731,6 +17731,13 @@ window.i18nPatternsFromDict = i18nPatternsFromDict; window.i18nAsk = i18nAsk;
 // translating a string nobody sees. A `{1}` makes it a shape, matched the same
 // way a built toast is.
 var I18N_EXTRA = [
+  // v39.34 — a translation Save (or a 🚀 publish request) not shared: why, and what to do — each its own paragraph
+  // (ownerSignInWhy('\n\n')); the reasons were English in every language since v39.21
+  'This device is signed in with an e-mail link or a password, and the owner\u2019s tools need a sign-in with Google and your authenticator\u2019s code.',
+  'This device\u2019s sign-in was made without the code from your authenticator app (it may be older than the authenticator), and the owner\u2019s tools need it.',
+  'Sign out (at the top, beside the sync status), then sign in again with Google: the app asks for the 6-digit code from your authenticator app.',
+  'The shared translations did not accept them from this device.',
+  'Your changes are kept on this device. When you open ✏️ Edit translations again, they are back — press 💾 Save.',
   // v39.33 — "A recipe for you" (giftAsk): composed with the kitchen's and the recipe's names, so no reading of the source
   // finds its sentences; every one was English in every language
   '{1} has sent you a recipe for “{2}”.', 'Would you like to save it to your collection?', 'Your kitchen saved it already, on {1}.',
@@ -18358,7 +18365,17 @@ function i18nPublishPage() { return 'https://github.com/' + APP_CONFIG.githubRep
 async function i18nPublishRequest() {
   if (!i18nCanEdit()) { toast('Publishing the languages needs full access.'); return null; }
   try { await cloudDoc('i18n_publish').set({ requestedAt: Date.now(), by: (window._fbUser && window._fbUser.email) || '' }); }
-  catch(e) { toast('\u274c Could not ask for the languages to be published: ' + (e && e.message ? e.message : e), 8000); return null; }
+  catch(e) {
+    // v39.34 — when this device's sign-in is the reason, that is what it says (as a Save the rules refuse)
+    var why = '';
+    try { why = await ownerSignInWhy('\n\n'); } catch(e2) { why = ''; }
+    if (why) {
+      if (await askConfirm({ icon: '⚠️', title: 'The languages were not published', message: why,
+          okLabel: 'Sign out now', cancelLabel: 'Later' }) === true && typeof signOut === 'function') signOut();
+      return null;
+    }
+    toast('\u274c Could not ask for the languages to be published: ' + (e && e.message ? e.message : e), 8000); return null;
+  }
   var idx = await i18nStaticIndex(true);
   var when = idx && idx.publishedAt ? new Date(idx.publishedAt).toLocaleString() : 'never';
   var open = await askConfirm({ icon: '\u2b06\ufe0f', title: 'The languages will be published',
@@ -19383,15 +19400,17 @@ window.ownerTwoStepSwitch = ownerTwoStepSwitch;
 // not be read … this copy's database rules need publishing" and "AI spending could not be read: METER: the owner's tools
 // need a sign-in with the code from your authenticator app" — that Safari's Google sign-in was older than his
 // authenticator; the rules and the server want Google AND the code, v38.23). '' when the sign-in is not the reason.
-async function ownerSignInWhy() {
+// v39.34 — `sep` between the reason and what to do: '\n\n' makes them two paragraphs, each translated (i18nAsk).
+async function ownerSignInWhy(sep) {
+  if (sep == null) sep = ' ';
   if (!window._fbUser || typeof _fbUser.getIdTokenResult !== 'function') return '';
   var f = {};
   try { f = ((await _fbUser.getIdTokenResult()).claims || {}).firebase || {}; } catch(e) { return ''; }
   var how = 'Sign out (at the top, beside the sync status), then sign in again with Google: the app asks for the 6-digit code from your authenticator app.';
   if (f.sign_in_provider && f.sign_in_provider !== 'google.com')
-    return 'This device is signed in with an e-mail link or a password, and the owner\u2019s tools need a sign-in with Google and your authenticator\u2019s code. ' + how;
+    return 'This device is signed in with an e-mail link or a password, and the owner\u2019s tools need a sign-in with Google and your authenticator\u2019s code.' + sep + how;
   if (f.sign_in_provider === 'google.com' && f.sign_in_second_factor !== 'totp')
-    return 'This device\u2019s sign-in was made without the code from your authenticator app (it may be older than the authenticator), and the owner\u2019s tools need it. ' + how;
+    return 'This device\u2019s sign-in was made without the code from your authenticator app (it may be older than the authenticator), and the owner\u2019s tools need it.' + sep + how;
   return '';
 }
 window.ownerSignInWhy = ownerSignInWhy;
@@ -19950,6 +19969,67 @@ var _i18nEdDraft = null;      // { english: translation }, unsaved
 var _i18nEdDocBase = {};    // v37.85 — { document key: shipped wording } for the language being edited
 var _i18nEdDirty = false;
 var I18N_ED_PAGE = 120;       // rows drawn at once; 600 live inputs is a phone tax
+// v39.34 — nothing typed here is lost (Tony, 4 Nov 2026: "I have made these changes to the translation. I would like
+// to keep them." Two Hebrew headings corrected — and the shared translations never had them: no Save of his reached
+// them, nor a 🚀 publish request. A Save the rules refuse — this device's sign-in not Google with the authenticator's
+// code (v38.23) — said "✅ … saved on this device — it could not be shared", and the next start read the shared copy
+// over it; a window closed before 💾 Save dropped them without a word). Now what differs from the copy the editor
+// opened is KEPT on this device, per language, until a Save is shared — through a closed window, a restart, a sign-out
+// and back — and the editor brings it back. A Save writes only those rows, onto the newest shared copy, so it never
+// undoes what came in meanwhile (a release's new translations, a correction from another device); a Save that is not
+// shared says so and why, with no ✅.
+var _i18nEdBase = null;       // { english: translation } as the editor opened it — what a change differs from
+var I18N_ED_PENDING_PREFIX = 'tonys_i18n_ed_pending_';
+function i18nEdDiff() {
+  var base = _i18nEdBase || {}, draft = _i18nEdDraft || {}, changes = {}, removed = [];
+  Object.keys(draft).forEach(function(k){ if (draft[k] !== base[k]) changes[k] = draft[k]; });
+  Object.keys(base).forEach(function(k){ if (!Object.prototype.hasOwnProperty.call(draft, k)) removed.push(k); });
+  return { changes: changes, removed: removed, n: Object.keys(changes).length + removed.length };
+}
+// A Self Test run neither keeps nor puts back (a device's own kept changes are never touched by one) — only the test
+// about this asks for it.
+function i18nEdPendingOff() { return !!(window._selfTestRunning && !window._i18nEdPendingTest); }
+function i18nEdReadPending(lang) {
+  if (i18nEdPendingOff()) return null;
+  try {
+    var o = JSON.parse(localStorage.getItem(I18N_ED_PENDING_PREFIX + lang) || 'null');
+    return (o && o.changes && typeof o.changes === 'object') ? o : null;
+  } catch(e) { return null; }
+}
+function i18nEdClearPending(lang) {
+  if (i18nEdPendingOff()) return;
+  try { localStorage.removeItem(I18N_ED_PENDING_PREFIX + lang); } catch(e) {}
+}
+// After every change: this device keeps what is not shared yet (nothing, once it matches what the editor opened).
+function i18nEdKeepPending() {
+  if (!_i18nEdDraft || !_i18nEdLang || _i18nEdLang === 'en' || i18nEdPendingOff()) return 0;
+  var d = i18nEdDiff();
+  if (!d.n) { i18nEdClearPending(_i18nEdLang); return 0; }
+  try { localStorage.setItem(I18N_ED_PENDING_PREFIX + _i18nEdLang,
+          JSON.stringify({ at: Date.now(), changes: d.changes, removed: d.removed })); } catch(e) {}
+  return d.n;
+}
+// On opening: the changes kept here go back on top of the copy just opened (those it already says are dropped).
+function i18nEdPutBackPending(lang) {
+  var p = i18nEdReadPending(lang);
+  if (!p || !_i18nEdDraft) return 0;
+  Object.keys(p.changes).forEach(function(k){ if (typeof p.changes[k] === 'string') _i18nEdDraft[k] = p.changes[k]; });
+  (Array.isArray(p.removed) ? p.removed : []).forEach(function(k){ delete _i18nEdDraft[k]; });
+  var n = i18nEdDiff().n;
+  if (!n) { i18nEdClearPending(lang); return 0; }
+  _i18nEdDirty = true;
+  return n;
+}
+// The newest shared copy, read just before a Save; null where this device cannot read it (its own copy is written).
+async function i18nEdFresh(lang) {
+  if (!i18nCentralIsOwn() || !window._fbUser) return null;
+  return await i18nReadCloud(lang);
+}
+// The window closed with changes not shared: they are kept, and it says so.
+function i18nEdClosed() {
+  if (_i18nEdLang && i18nEdReadPending(_i18nEdLang))
+    toast('✏️ Your changes are kept on this device until they are shared — open ✏️ Edit translations and press 💾 Save.', 8000);
+}
 
 function i18nEditElsewhereNote() {
   return 'The translations are edited in the family app — every copy shows those.';
@@ -19967,7 +20047,9 @@ async function openI18nEditor() {
   _i18nEdLang = lang;
   _i18nEdDraft = {};
   Object.keys(_i18nDict || {}).forEach(function(k){ _i18nEdDraft[k] = _i18nDict[k]; });
+  _i18nEdBase = Object.assign({}, _i18nEdDraft);   // v39.34
   _i18nEdDirty = false;
+  var back = i18nEdPutBackPending(lang);            // v39.34 — changes not shared yet, kept on this device
   i18nEdInvalidate();
   var t = document.getElementById('i18nEdTitle');
   if (t) t.textContent = 'Edit the ' + i18nLangName(lang) + ' translation';
@@ -19976,12 +20058,16 @@ async function openI18nEditor() {
   document.getElementById('i18nOverlay').classList.add('open');
   _i18nEdDocBase = {};
   i18nEdRender();
+  if (back) toast('✏️ Your changes that are not shared yet are back — press 💾 Save to share them.', 8000);
   // v37.85 — the privacy statement and the terms, passage by passage, with
   // their shipped wording where the dictionary holds no correction.
   var docBase = await legalDocBase(lang);
   if (_i18nEdLang === lang && _i18nEdDraft) {
     _i18nEdDocBase = docBase;
-    Object.keys(docBase).forEach(function(k){ if (!_i18nEdDraft[k]) _i18nEdDraft[k] = docBase[k]; });
+    Object.keys(docBase).forEach(function(k){
+      if (!_i18nEdDraft[k]) _i18nEdDraft[k] = docBase[k];
+      if (_i18nEdBase && !_i18nEdBase[k]) _i18nEdBase[k] = docBase[k];   // v39.34 — shipped wording is no change
+    });
     i18nEdInvalidate(); i18nEdRender();
   }
   // …and again once the unopened panels have been drawn, so the table lists
@@ -20179,6 +20265,7 @@ function i18nEdEdit(el) {
   var v = String(el.value || '').trim();
   if (v) _i18nEdDraft[k] = v; else delete _i18nEdDraft[k];
   if (!_i18nEdDirty) { _i18nEdDirty = true; }
+  i18nEdKeepPending();   // v39.34
   i18nEdInvalidate();
   var cnt = document.getElementById('i18nEdCount');
   if (cnt && cnt.textContent.indexOf('UNSAVED') === -1) {
@@ -20371,7 +20458,7 @@ async function i18nEdAdoptOrphans() {
     okLabel: 'Re-use them' });
   if (!ok) return;
   pairs.forEach(function(p){ _i18nEdDraft[p.to] = p.value; delete _i18nEdDraft[p.from]; });
-  _i18nEdDirty = true; i18nEdInvalidate();
+  _i18nEdDirty = true; i18nEdInvalidate(); i18nEdKeepPending();
   i18nEdRender();
   toast('♻️ ' + pairs.length + ' translation(s) re-used. Press Save to keep them.', 7000);
 }
@@ -20421,7 +20508,7 @@ async function i18nEdRestoreBin() {
   if (!ok) return;
   keys.forEach(function(k){ if (!_i18nEdDraft[k]) _i18nEdDraft[k] = bin[k]; });
   try { localStorage.removeItem(I18N_BIN_PREFIX + _i18nEdLang); } catch(e) {}
-  _i18nEdDirty = true; i18nEdInvalidate(); i18nEdRender();
+  _i18nEdDirty = true; i18nEdInvalidate(); i18nEdKeepPending(); i18nEdRender();
   toast('↩️ ' + keys.length + ' put back. Press Save to keep them.', 7000);
 }
 window.i18nEdRestoreBin = i18nEdRestoreBin; window.i18nEdBin = i18nEdBin;
@@ -20461,7 +20548,7 @@ async function i18nEdDropJunk() {
   if (!ok) return;
   var binJ = {}; junk.forEach(function(k){ binJ[k] = _i18nEdDraft[k]; delete _i18nEdDraft[k]; });
   i18nEdStash(_i18nEdLang, binJ);
-  _i18nEdDirty = true; i18nEdInvalidate();
+  _i18nEdDirty = true; i18nEdInvalidate(); i18nEdKeepPending();
   i18nEdRender();
   toast('🧹 ' + junk.length + ' removed. Press Save to keep the change.', 6000);
 }
@@ -20481,7 +20568,7 @@ async function i18nEdDropOrphans() {
   if (!ok) return;
   var binO = {}; orphans.forEach(function(k){ binO[k] = _i18nEdDraft[k]; delete _i18nEdDraft[k]; });
   i18nEdStash(_i18nEdLang, binO);
-  _i18nEdDirty = true; i18nEdInvalidate();
+  _i18nEdDirty = true; i18nEdInvalidate(); i18nEdKeepPending();
   i18nEdRender();
   toast('🧹 ' + orphans.length + ' removed. Press Save to keep the change.', 6000);
 }
@@ -20491,17 +20578,58 @@ async function i18nEdSave() {
   if (!_i18nEdDraft) return;
   if (!_i18nEdDirty) { toast('Nothing has been changed.'); return; }
   var lang = _i18nEdLang, name = i18nLangName(lang);
+  // v39.34 — only what was changed here, onto the newest shared copy: a Save never undoes what reached the shared
+  // translations after this device read its copy. Where that copy cannot be read, this device's own is written.
+  var diff = i18nEdDiff(), fresh = null;
+  try { fresh = await i18nEdFresh(lang); } catch(e) { fresh = null; }
+  var merged = {};
+  if (fresh && fresh.strings) {
+    Object.keys(fresh.strings).forEach(function(k){ if (typeof fresh.strings[k] === 'string') merged[k] = fresh.strings[k]; });
+    Object.keys(diff.changes).forEach(function(k){ merged[k] = diff.changes[k]; });
+    diff.removed.forEach(function(k){ delete merged[k]; });
+  } else Object.keys(_i18nEdDraft).forEach(function(k){ merged[k] = _i18nEdDraft[k]; });
   // v37.85 — a document passage is kept only when it was corrected: the
   // shipped wording stays in its page, and a later fix there is not masked.
   var strings = {};
-  Object.keys(_i18nEdDraft).forEach(function(k) {
+  Object.keys(merged).forEach(function(k) {
     var base = (_i18nEdDocBase || {})[k];
-    if (base !== undefined && String(_i18nEdDraft[k]).replace(/\s+/g, ' ').trim() === base) return;
-    strings[k] = _i18nEdDraft[k];
+    if (base !== undefined && String(merged[k]).replace(/\s+/g, ' ').trim() === base) return;
+    strings[k] = merged[k];
   });
   var doc = { lang: lang, strings: strings, count: Object.keys(strings).length,
               updatedAt: Date.now(), by: (window._fbUser && window._fbUser.email) || '', edited: true };
+  var had = i18nReadCache(lang);
   var where = await i18nWriteCloud(lang, doc);
+  if (where !== 'cloud') {
+    // v39.34 — not shared is not saved: no ✅, and nothing on this screen pretends otherwise (this device keeps showing
+    // what everyone sees). The changes stay — in this window, and kept on this device for the next Save.
+    try { if (had) i18nWriteCache(lang, had); else localStorage.removeItem(i18nCacheKey(lang)); } catch(e) {}
+    i18nEdKeepPending();
+    syncLog('error', 'The ' + lang + ' corrections were not shared — kept on this device', { changes: diff.n });
+    var why = '';
+    try { why = await ownerSignInWhy('\n\n'); } catch(e) { why = ''; }
+    // Each paragraph is a phrase of its own (I18N_EXTRA), translated as the question is drawn (i18nAsk).
+    var paras = [why || 'The shared translations did not accept them from this device.',
+                 'Your changes are kept on this device. When you open ✏️ Edit translations again, they are back — press 💾 Save.'];
+    if (!why) {
+      await askConfirm({ icon: '⚠️', title: 'Your changes are not shared yet', message: paras.join('\n\n'), okLabel: 'OK', cancelLabel: 'Close' });
+      return;
+    }
+    if (await askConfirm({ icon: '⚠️', title: 'Your changes are not shared yet', message: paras.join('\n\n'),
+        okLabel: 'Sign out now', cancelLabel: 'Later' }) === true && typeof signOut === 'function') {
+      window._i18nEdQuietClose = true;
+      try { closeM('i18nOverlay'); } finally { window._i18nEdQuietClose = false; }
+      signOut();
+    }
+    return;
+  }
+  i18nEdClearPending(lang);
+  // What the editor shows from now on is what was shared (the document passages' shipped wording drawn as before).
+  var shown = {};
+  Object.keys(strings).forEach(function(k){ shown[k] = strings[k]; });
+  Object.keys(_i18nEdDocBase || {}).forEach(function(k){ if (!shown[k]) shown[k] = _i18nEdDocBase[k]; });
+  _i18nEdDraft = shown;
+  _i18nEdBase = Object.assign({}, shown);
   // The live interface follows immediately — the point of an editor you can see
   // the result in is that you can see the result.
   if (_i18nLang === lang) {
@@ -20510,13 +20638,14 @@ async function i18nEdSave() {
     i18nApply(document.body);
   }
   _i18nEdDirty = false;
+  i18nEdInvalidate();
   i18nEdRender();
   renderLangMenu();
-  toast(where === 'cloud'
-    ? '✅ ' + name + ' saved and shared with everyone'
-    : '✅ ' + name + ' saved on this device — it could not be shared', 6000);
+  toast('✅ ' + name + ' saved and shared with everyone', 6000);
 }
 window.i18nEdSave = i18nEdSave;
+window.i18nEdDiff = i18nEdDiff; window.i18nEdReadPending = i18nEdReadPending; window.i18nEdKeepPending = i18nEdKeepPending;
+window.i18nEdFresh = i18nEdFresh; window.i18nEdClosed = i18nEdClosed;
 
 async function pickLanguage(code) {
   try { await i18nSetLanguage(code); }
@@ -25061,6 +25190,8 @@ function closeM(id){
     showUnsavedChanges();
     return;
   }
+  // v39.34 — the translation editor keeps what is not shared yet, and says so as it closes.
+  if (id === 'i18nOverlay' && typeof i18nEdClosed === 'function' && !window._i18nEdQuietClose) setTimeout(i18nEdClosed, 0);
   document.getElementById(id).classList.remove('open');
   releaseFocus(id);   // 5c.1b — hand focus back to whatever opened THIS one (v36.65)
   if(id==='viewOverlay') { releaseWakeLock(); clearCookTimers(); stopVoice(); _ticks = {}; }
@@ -33590,6 +33721,7 @@ var HELP_SYSTEM_PROMPT = [
   "- Importing a file: Excel files work again (v39.27); a saved web page keeps its lines apart",
   "- A new version is noticed while the app stays open, and pulling the list down checks at once and says what it found (v39.31, v39.32)",
   "- The Self Test report and Sync Health give times in this device's own time, its UTC offset after it (v39.31)",
+  "- (The app's owner) A correction in ✏️ Edit translations is never lost: it is kept on the device until it is shared, Save writes only what was changed, and a Save that is not shared says why (v39.34)",
   "- 🕐 Recently Viewed: a 'Recent' chip appears in the filter bar after you open any recipe — shows your last 8 viewed",
   "- ⇅ Sort: click the Sort button next to Grid/List to sort by Default, Recently viewed, A–Z, Prep time, Difficulty, or Most cooked",
   "- 🍳 Cook count: open any recipe and tap '🍳 Cooked!' to track how many times you've made it. Recipes cooked 3+ times show a 🔥 badge. Sort by 'Most cooked' to find your favourites",
@@ -33685,6 +33817,7 @@ var HELP_SYSTEM_PROMPT = [
   "- Diet tags on recipes help the diet filters work correctly — use Auto-tag to set them",
   "- The Self Test (⚙️ → 🔧 Troubleshooting → 🧪 Self Test) is useful for diagnosing if something stops working",
   "- The interface language: tap 🌐 next to ? — the app's words change; recipes stay as written. The app speaks English, Hebrew, Arabic, Russian, French, Spanish, German, Italian, Portuguese, Chinese, Japanese and Hungarian, and any language someone adds (🌐 → Add another language — translated once, then everyone has it). On a new device whose own language the app speaks, it asks once, before the setup: that language or English (a Hungarian phone is asked Magyar or English) — so the setup, the kitchen rules and the welcome come in that language too",
+  "- (The app's owner) Correcting a translation: in My Kitchen Notes (the copy that holds the translations), switch the interface to that language, then 🌐 → ✏️ Edit translations…, change the words and press 💾 Save — it must say '✅ <language> saved and shared with everyone' — then 🌐 → 🚀 Publish languages now (every copy has it within about ten minutes). What you change is kept on this device until it is shared: closing the window, restarting the app or signing out does not lose it, and the editor brings it back. If Save cannot share it, it says why — usually this device's sign-in: sign out, sign in again with Google and your authenticator's 6-digit code, open the editor and press Save. A Save writes only what you changed, onto the newest shared copy, and the automatic translation of new phrases only fills in what is missing — it never replaces a correction",
   "- The sort and filter settings reset when you tap 'All'"
 ].join("\n");
 

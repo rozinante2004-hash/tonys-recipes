@@ -17649,6 +17649,104 @@ window.SELF_TESTS = [
       }
     } },
 
+  { id:'i18n_edits_kept_until_shared', group:'UI', name:'✏️ A translation correction is never lost: kept on the device until it is shared, back when the editor opens again; a Save writes only what was changed, onto the newest shared copy; a Save or a 🚀 publish request that is not shared says why, with no ✅ (v39.34)',
+    test: async()=>{
+      // Tony, 4 Nov 2026: "I have made these changes to the translation. I would like to keep them." — two Hebrew headings
+      // corrected on a device whose sign-in the shared translations refuse; the app said "✅ … saved on this device", and
+      // the shared copy never had them.
+      var LANG='he', KEY='tonys_i18n_ed_pending_'+LANG;
+      var K1='🏡 Kitchens and people', K2='🧹 Tidy up', K3='A phrase the release added', K4='A correction from another device';
+      var real={ lang:_i18nLang, dict:_i18nDict, edLang:_i18nEdLang, draft:_i18nEdDraft, base:window._i18nEdBase, docBase:_i18nEdDocBase,
+        dirty:_i18nEdDirty, own:window.i18nCentralIsOwn, user:window._fbUser, write:window.i18nWriteCloud, read:window.i18nReadCloud,
+        why:window.ownerSignInWhy, toast:window.toast, ask:window.askConfirm, legal:window.legalDocBase, harvest:window.i18nHarvest,
+        forget:window.i18nForgetSelfTestWords, activate:window.i18nActivate, apply:window.i18nApply, cloudDoc:window.cloudDoc,
+        flag:window._i18nEdPendingTest, pending:null };
+      try{ real.pending=localStorage.getItem(KEY); }catch(e){}
+      var undoOwner=null, said=[], asked=[], wrote=[], shared=null, refuse=false, why='';
+      var WHY='This device is signed in with an e-mail link or a password, and the owner’s tools need a sign-in with Google and your authenticator’s code.';
+      function rowOf(k){
+        var se=document.getElementById('i18nEdSearch'); se.value=k; i18nEdRender();
+        return Array.prototype.filter.call(document.querySelectorAll('#i18nEdRows .i18n-ed-row'), function(r){ return r.getAttribute('data-key')===k; })[0];
+      }
+      function keptHere(){ try{ var o=JSON.parse(localStorage.getItem(KEY)||'null'); return (o && o.changes) ? o : null; }catch(e){ return null; } }
+      function type(k, v){
+        var row=rowOf(k); if(!row) throw new Error('the editor has no row for '+JSON.stringify(k));
+        var ta=row.querySelector('.i18n-ed-to'); ta.value=v; ta.dispatchEvent(new Event('input', { bubbles:true }));
+      }
+      try{
+        window._i18nEdPendingTest=true;
+        try{ localStorage.removeItem(KEY); }catch(e){}
+        window.i18nCentralIsOwn=function(){ return true; };
+        window._fbUser={ uid:'uST', email:ST_OWNER }; undoOwner=stAsOwner();
+        window.toast=function(m){ said.push(String(m||'')); };
+        window.askConfirm=function(o){ asked.push(o||{}); return Promise.resolve(false); };
+        window.legalDocBase=async function(){ return {}; }; window.i18nHarvest=async function(){}; window.i18nForgetSelfTestWords=async function(){};
+        window.i18nActivate=function(){}; window.i18nApply=function(){};      // the screen's own language is not this test's
+        window.ownerSignInWhy=async function(sep){ return why ? why+(sep||' ')+'Sign out (at the top, beside the sync status), then sign in again with Google: the app asks for the 6-digit code from your authenticator app.' : ''; };
+        window.i18nReadCloud=async function(l){ return shared ? { lang:l, strings:Object.assign({}, shared) } : null; };
+        window.i18nWriteCloud=async function(l, d){ wrote.push(JSON.parse(JSON.stringify(d))); if(refuse) return 'refused'; shared=Object.assign({}, d.strings); return 'cloud'; };
+        // The device read its copy: the wrong headings. The shared copy has one phrase more (the release's).
+        _i18nLang=LANG; _i18nDict={}; _i18nDict[K1]='🏡 על מטבחים ואנשים'; _i18nDict[K2]='🧹 סידורים'; _i18nDict['Tools']='כלים';
+        shared=Object.assign({}, _i18nDict); shared[K3]='ביטוי חדש';
+        await openI18nEditor();
+        if(!document.getElementById('i18nOverlay').classList.contains('open')) throw new Error('the editor did not open for the owner');
+        type(K1, '🏡 מטבחים ואנשים'); type(K2, '🧹 סידור');
+        var kept=keptHere();
+        if(!kept || kept.changes[K1]!=='🏡 מטבחים ואנשים' || kept.changes[K2]!=='🧹 סידור') throw new Error('the corrections are not kept on the device as they are typed: '+JSON.stringify(kept));
+        // 1. Saved where the shared translations refuse this sign-in (Tony's case).
+        refuse=true; why=WHY; said=[]; asked=[];
+        await i18nEdSave();
+        if(wrote.length!==1) throw new Error('Save did not try to share the corrections');
+        if(said.some(function(m){ return m.indexOf('✅')!==-1; })) throw new Error('a Save that was not shared said ✅: '+JSON.stringify(said));
+        var dlg=asked[asked.length-1]||{};
+        if(!/not shared/i.test(dlg.title||'') || String(dlg.message||'').indexOf(WHY)===-1 || !/kept on this device/.test(dlg.message||''))
+          throw new Error('a Save that was not shared did not say so and why: '+JSON.stringify({ title:dlg.title, message:dlg.message }));
+        if(String(dlg.message).indexOf(WHY+'\n\n')===-1) throw new Error('the reason and what to do are not separate paragraphs (each is translated on its own)');
+        if(!_i18nEdDirty) throw new Error('after a Save that was not shared, the window says nothing is left to save');
+        if(!keptHere()) throw new Error('after a Save that was not shared, the corrections are not kept on the device');
+        // 2. The window closed: kept, and said.
+        said=[]; closeM('i18nOverlay'); await wait(30);
+        if(!said.some(function(m){ return /kept on this device/.test(m); })) throw new Error('closing with corrections not shared said nothing: '+JSON.stringify(said));
+        // 3. The app starts again (its copy read afresh — still the wrong headings); the editor brings them back.
+        _i18nDict=Object.assign({}, shared); said=[];
+        await openI18nEditor();
+        if(_i18nEdDraft[K1]!=='🏡 מטבחים ואנשים' || _i18nEdDraft[K2]!=='🧹 סידור') throw new Error('the kept corrections did not come back in the editor');
+        if(!_i18nEdDirty || !said.some(function(m){ return /are back/.test(m); })) throw new Error('the editor did not say the kept corrections are back: '+JSON.stringify(said));
+        // 4. Meanwhile another device corrects a word and adds one; then a Save from a sign-in that is accepted.
+        shared['Tools']='כלים ✓'; shared[K4]='תיקון';
+        refuse=false; why=''; said=[];
+        await i18nEdSave();
+        var doc=wrote[wrote.length-1].strings;
+        if(doc[K1]!=='🏡 מטבחים ואנשים' || doc[K2]!=='🧹 סידור') throw new Error('the corrections were not shared');
+        if(doc['Tools']!=='כלים ✓' || doc[K4]!=='תיקון' || doc[K3]!=='ביטוי חדש')
+          throw new Error('the Save undid what reached the shared copy meanwhile: '+JSON.stringify({ Tools:doc['Tools'], k4:doc[K4], k3:doc[K3] }));
+        if(!said.some(function(m){ return /✅/.test(m) && /shared with everyone/.test(m); })) throw new Error('a shared Save did not say so: '+JSON.stringify(said));
+        if(keptHere()) throw new Error('once shared, the corrections are still kept as not shared');
+        if(_i18nEdDirty) throw new Error('once shared, the window still says there is something to save');
+        // 5. A 🚀 publish request the rules refuse: why, not a bare "permissions" error.
+        window.cloudDoc=function(){ return { set:function(){ return Promise.reject(new Error('Missing or insufficient permissions.')); } }; };
+        why=WHY; asked=[]; said=[];
+        await i18nPublishRequest();
+        var pd=asked[asked.length-1]||{};
+        if(!/not published/i.test(pd.title||'') || String(pd.message||'').indexOf(WHY)===-1)
+          throw new Error('a refused publish request did not say why: '+JSON.stringify({ asked:pd.title, said:said }));
+      } finally {
+        window._i18nEdQuietClose=true;
+        try{ var ov=document.getElementById('i18nOverlay'); if(ov && ov.classList.contains('open')) closeM('i18nOverlay'); }catch(e){}
+        window._i18nEdQuietClose=false;
+        if(undoOwner) undoOwner();
+        window.i18nCentralIsOwn=real.own; window._fbUser=real.user; window.i18nWriteCloud=real.write; window.i18nReadCloud=real.read;
+        window.ownerSignInWhy=real.why; window.toast=real.toast; window.askConfirm=real.ask; window.legalDocBase=real.legal;
+        window.i18nHarvest=real.harvest; window.i18nForgetSelfTestWords=real.forget; window.i18nActivate=real.activate; window.i18nApply=real.apply;
+        window.cloudDoc=real.cloudDoc;
+        _i18nLang=real.lang; _i18nDict=real.dict; _i18nEdLang=real.edLang; _i18nEdDraft=real.draft; window._i18nEdBase=real.base;
+        _i18nEdDocBase=real.docBase; _i18nEdDirty=real.dirty; i18nEdInvalidate();
+        try{ if(real.pending==null) localStorage.removeItem(KEY); else localStorage.setItem(KEY, real.pending); }catch(e){}
+        window._i18nEdPendingTest=real.flag;
+        try{ var se=document.getElementById('i18nEdSearch'); if(se) se.value=''; renderLangMenu(); }catch(e){}
+      }
+    } },
+
   { id:'i18n_editor_is_usable', group:'UI', name:'A translation can be corrected by hand (v36.33)',
     test: async()=>{
       // v37.87 — editing happens only in the copy that holds the translations; this test is that copy
@@ -17816,9 +17914,13 @@ window.SELF_TESTS = [
 
         // Saving changes the LIVE interface, which is why the editor is worth
         // having — and must not eat the button's icon on the way.
-        window._fbDb=null;                     // no cloud here: it falls back to the device
+        // v39.34 — a Save that is shared does; one that is not changes nothing on the screen and says why, keeping the
+        // changes for the next Save (i18n_edits_kept_until_shared) — "saved on this device" is what misled Tony.
+        window._fbDb=null;                     // no cloud here: the shared copy's answer is stood in for
+        var realWriteU5=window.i18nWriteCloud; window.i18nWriteCloud=async function(){ return 'cloud'; };
         said='';
-        await i18nEdSave();
+        try { await i18nEdSave(); } finally { window.i18nWriteCloud=realWriteU5; }
+        if(!/shared with everyone/.test(said)) throw new Error('a shared Save did not say so: '+JSON.stringify(said));
         var live=document.getElementById('mobileClipBtn');
         if(live.textContent.trim()!=='סרטונים')
           throw new Error('the app still shows '+JSON.stringify(live.textContent.trim())+' after saving');

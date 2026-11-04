@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v39.33` — app. **Worker: v100**, deployed separately and versioned separately
+**Current version:** `v39.34` — app. **Worker: v100**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -428,11 +428,18 @@ under its plain path only (a `?url=` request goes network-first).
   Worker's `trends` (sums by copy, month and name for 24 months, with how many households) and shows
   sections with months as columns, shares in %, collection sizes, and a copy-as-table button. Privacy
   statement 1.5 lists all of it.
-- **Languages:** the central translations are in ONE project (`APP_CONFIG.languageSource`, today
-  `recipes-f379d` `i18n/…`; it becomes `my-kitchen-notes-beta` on the family's move), read by every
+- **Languages:** the central translations are in ONE project (`APP_CONFIG.languageSource`:
+  `my-kitchen-notes-beta` `i18n/…` since the family's move, 13 Oct 2026; `recipes-f379d` before), read by every
   copy and signed-out visitors over plain REST, published as files in the repository, and new
-  phrases are translated by the job after each release. The owner edits them only in the copy that
-  holds them. **No e-mail address is ever a phrase** (`I18N_ADDRESS` in `i18nTranslatable`; the translate
+  phrases are translated by the job after each release (it only ADDS what is missing — never replaces a
+  correction). The owner edits them only in the copy that holds them (the community copy). **v39.34 — nothing typed in
+  ✏️ Edit translations is lost:** what differs from the copy the editor opened (`_i18nEdBase`, `i18nEdDiff`) is kept on
+  the device after every change (`tonys_i18n_ed_pending_<lang>`: changes and removals) until a Save is shared — a closed
+  window, a restart, a sign-out and back keep it, and the editor puts it back on opening ("are back"); a Save writes only
+  those rows onto a fresh read of the shared copy (`i18nEdFresh`), so it never undoes what came in meanwhile; a Save
+  the rules refuse (`appAdmin()`: Google + the authenticator's code) says why (`ownerSignInWhy('\n\n')`, reason and
+  remedy as two translated paragraphs, "Sign out now" / "Later"), shows no ✅ and changes nothing on the screen; a
+  refused 🚀 publish request says why the same way. Self Test runs neither keep nor put back (`i18nEdPendingOff`). **No e-mail address is ever a phrase** (`I18N_ADDRESS` in `i18nTranslatable`; the translate
   and publish jobs strip any): the files are public, and a member's address once reached them through a
   tooltip. **Nor a person's name (v38.90):** the status line takes the name apart (`setDriveStatus(state, text,
   who)`: translated quietly with "☁️ Shared · {1}" / "✓ Synced — {1}", marked data-no-i18n), and the translate job
@@ -472,7 +479,11 @@ English only") show on the test copy at once and are still added centrally at th
 job writes them from there. A hand edit moves each file's `updatedAt`/`count` and `i18n/index.json`'s `at`/`count`
 forward (a device takes the file only when it is as new as its own copy: `i18nReadBest`), keeps the publisher's format
 (`JSON.stringify(doc, null, 1)`, keys in JavaScript's sort order) and is checked with the app's own `i18nGapList`
-against `i18nFullCatalogue()` (24 phrases × 11 languages in v39.31, 0 missing after). **A path through ··· More names
+against `i18nFullCatalogue()` (24 phrases × 11 languages in v39.31, 0 missing after). **v39.34:** with a publish
+expected before the release (the owner correcting a translation), the hand edit leaves each file's header lines
+(`updatedAt`/`count`) and `i18n/index.json` as they are — the publishing job's merge of main into test rewrites those
+lines, and a change on both sides is a conflict that fails the job; a device still takes the file, its `updatedAt` being
+the one it knows (`i18nReadBest` takes a file as new as its own copy). **A path through ··· More names
 its heading** (v39.33): "··· More → 🏡 Kitchens and people → 📤 Recipes I sent", in the Help and in the notices alike — the
 headings are the menu since v39.30. A sentence composed with names or a date (the "A recipe for you" question, `giftAsk`)
 goes into `I18N_EXTRA` as a shape (`{1} has sent you a recipe for “{2}”.`); Self Test `gift_question_translated` builds
