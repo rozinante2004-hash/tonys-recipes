@@ -17651,9 +17651,9 @@ window.SELF_TESTS = [
 
   { id:'i18n_edits_kept_until_shared', group:'UI', name:'✏️ A translation correction is never lost: kept on the device until it is shared, back when the editor opens again; a Save writes only what was changed, onto the newest shared copy; a Save or a 🚀 publish request that is not shared says why, with no ✅ (v39.34)',
     test: async()=>{
-      // Tony, 4 Nov 2026: "I have made these changes to the translation. I would like to keep them." — two Hebrew headings
-      // corrected on a device whose sign-in the shared translations refuse; the app said "✅ … saved on this device", and
-      // the shared copy never had them.
+      // v39.34 — on v39.33 a Save the shared translations refused (a sign-in without Google and the authenticator's code)
+      // said "✅ … saved on this device", and the next start read the shared copy over it; a window closed before 💾 Save
+      // dropped the changes; a Save wrote the device's whole copy over what had reached the shared one since.
       var LANG='he', KEY='tonys_i18n_ed_pending_'+LANG;
       var K1='🏡 Kitchens and people', K2='🧹 Tidy up', K3='A phrase the release added', K4='A correction from another device';
       var real={ lang:_i18nLang, dict:_i18nDict, edLang:_i18nEdLang, draft:_i18nEdDraft, base:window._i18nEdBase, docBase:_i18nEdDocBase,
@@ -17686,13 +17686,13 @@ window.SELF_TESTS = [
         window.i18nReadCloud=async function(l){ return shared ? { lang:l, strings:Object.assign({}, shared) } : null; };
         window.i18nWriteCloud=async function(l, d){ wrote.push(JSON.parse(JSON.stringify(d))); if(refuse) return 'refused'; shared=Object.assign({}, d.strings); return 'cloud'; };
         // The device read its copy: the wrong headings. The shared copy has one phrase more (the release's).
-        _i18nLang=LANG; _i18nDict={}; _i18nDict[K1]='🏡 על מטבחים ואנשים'; _i18nDict[K2]='🧹 סידורים'; _i18nDict['Tools']='כלים';
+        _i18nLang=LANG; _i18nDict={}; _i18nDict[K1]='🏡 נוסח ישן'; _i18nDict[K2]='🧹 נוסח ישן'; _i18nDict['Tools']='כלים';
         shared=Object.assign({}, _i18nDict); shared[K3]='ביטוי חדש';
         await openI18nEditor();
         if(!document.getElementById('i18nOverlay').classList.contains('open')) throw new Error('the editor did not open for the owner');
-        type(K1, '🏡 מטבחים ואנשים'); type(K2, '🧹 סידור');
+        type(K1, '🏡 נוסח חדש'); type(K2, '🧹 נוסח חדש');
         var kept=keptHere();
-        if(!kept || kept.changes[K1]!=='🏡 מטבחים ואנשים' || kept.changes[K2]!=='🧹 סידור') throw new Error('the corrections are not kept on the device as they are typed: '+JSON.stringify(kept));
+        if(!kept || kept.changes[K1]!=='🏡 נוסח חדש' || kept.changes[K2]!=='🧹 נוסח חדש') throw new Error('the corrections are not kept on the device as they are typed: '+JSON.stringify(kept));
         // 1. Saved where the shared translations refuse this sign-in (Tony's case).
         refuse=true; why=WHY; said=[]; asked=[];
         await i18nEdSave();
@@ -17710,14 +17710,14 @@ window.SELF_TESTS = [
         // 3. The app starts again (its copy read afresh — still the wrong headings); the editor brings them back.
         _i18nDict=Object.assign({}, shared); said=[];
         await openI18nEditor();
-        if(_i18nEdDraft[K1]!=='🏡 מטבחים ואנשים' || _i18nEdDraft[K2]!=='🧹 סידור') throw new Error('the kept corrections did not come back in the editor');
+        if(_i18nEdDraft[K1]!=='🏡 נוסח חדש' || _i18nEdDraft[K2]!=='🧹 נוסח חדש') throw new Error('the kept corrections did not come back in the editor');
         if(!_i18nEdDirty || !said.some(function(m){ return /are back/.test(m); })) throw new Error('the editor did not say the kept corrections are back: '+JSON.stringify(said));
         // 4. Meanwhile another device corrects a word and adds one; then a Save from a sign-in that is accepted.
         shared['Tools']='כלים ✓'; shared[K4]='תיקון';
         refuse=false; why=''; said=[];
         await i18nEdSave();
         var doc=wrote[wrote.length-1].strings;
-        if(doc[K1]!=='🏡 מטבחים ואנשים' || doc[K2]!=='🧹 סידור') throw new Error('the corrections were not shared');
+        if(doc[K1]!=='🏡 נוסח חדש' || doc[K2]!=='🧹 נוסח חדש') throw new Error('the corrections were not shared');
         if(doc['Tools']!=='כלים ✓' || doc[K4]!=='תיקון' || doc[K3]!=='ביטוי חדש')
           throw new Error('the Save undid what reached the shared copy meanwhile: '+JSON.stringify({ Tools:doc['Tools'], k4:doc[K4], k3:doc[K3] }));
         if(!said.some(function(m){ return /✅/.test(m) && /shared with everyone/.test(m); })) throw new Error('a shared Save did not say so: '+JSON.stringify(said));

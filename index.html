@@ -19969,11 +19969,10 @@ var _i18nEdDraft = null;      // { english: translation }, unsaved
 var _i18nEdDocBase = {};    // v37.85 — { document key: shipped wording } for the language being edited
 var _i18nEdDirty = false;
 var I18N_ED_PAGE = 120;       // rows drawn at once; 600 live inputs is a phone tax
-// v39.34 — nothing typed here is lost (Tony, 4 Nov 2026: "I have made these changes to the translation. I would like
-// to keep them." Two Hebrew headings corrected — and the shared translations never had them: no Save of his reached
-// them, nor a 🚀 publish request. A Save the rules refuse — this device's sign-in not Google with the authenticator's
-// code (v38.23) — said "✅ … saved on this device — it could not be shared", and the next start read the shared copy
-// over it; a window closed before 💾 Save dropped them without a word). Now what differs from the copy the editor
+// v39.34 — nothing typed here is lost. Until then a Save the rules refuse — this device's sign-in not Google with the
+// authenticator's code (v38.23) — said "✅ … saved on this device — it could not be shared", and the next start read
+// the shared copy over it; a window closed before 💾 Save dropped the changes without a word; and a Save wrote this
+// device's whole copy over whatever had reached the shared one since. Now what differs from the copy the editor
 // opened is KEPT on this device, per language, until a Save is shared — through a closed window, a restart, a sign-out
 // and back — and the editor brings it back. A Save writes only those rows, onto the newest shared copy, so it never
 // undoes what came in meanwhile (a release's new translations, a correction from another device); a Save that is not

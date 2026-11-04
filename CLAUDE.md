@@ -1437,16 +1437,20 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
   - **Released: v39.09 (29 Oct 2026, 11:17 Israel time, on 0de2dde; Tony: "Yes, release v39.09").** Every job success:
     Deploy to GitHub Pages, pages build, Publish languages, Translate new phrases, Self Tests on main and test,
     Cloudflare Pages for the beta and test.
-  - **v39.34 — a translation correction is never lost** (Tony, 4 Nov 2026, 11:50 Israel time: "I have made these changes
-    to the translation. I would like to keep them." — after being asked to correct "🏡 Kitchens and people" and "🧹 Tidy
-    up" in ✏️ Edit translations on the beta copy). **What was found:** the shared translations
-    (my-kitchen-notes-beta `i18n/he`, read over REST) were last written at 02:27 by the release's translate job — no Save
-    of his reached them, and `i18n/publish` was last asked at 01:51 (his earlier, successful fix); the 11:49 scheduled
-    publish found "nothing changed". The editor saves only where `appAdmin()` allows (a sign-in WITH GOOGLE and, the
-    owner's two-step being on, the authenticator's code — v38.23); a Save the rules refused said "✅ Hebrew saved on this
-    device — it could not be shared", the device showed the correction, and the next start read the shared copy over it
-    (`i18nLoadDict` rewrites the cache); a window closed before 💾 Save dropped the changes without a word. (The iPhone's
-    sign-in has been older than his authenticator before: v39.21's `ownerSignInWhy`, 30 Oct.) **Now:** what differs from
+  - **v39.34 — the translation editor: nothing typed is lost, a Save writes only what changed, a refused Save says
+    why.** **It began with a misreading — record it as such.** Tony, 4 Nov 2026, 11:50 Israel time: "I have made these
+    changes to the translation. I would like to keep them." — the answer to being asked (after v39.33) to change the two
+    Hebrew headings to "🏡 מטבחים ואנשים" and "🧹 סידור". It meant: KEEP HIS wording. He had set "🏡 על מטבחים ואנשים" and
+    "🧹 סידורים" himself, in ✏️ Edit translations on his computer, at 01:51, and published them (5ea0e46, 01:52 — the same
+    publish as "מהענן"); v39.33 overwrote them in the files with the earlier wording and called his "the machine's"; the
+    02:27 publish put his back. Tony, 13:10: "What I meant is that we should keep על מטבחים ואנשים and סידורים. I've done
+    them from the pc And even triggered the workflow." His wording was in the shared translations and on every copy all
+    along — nothing of his was lost. **The editor's faults found on the way are real, each shown on v39.33 by the Self
+    Test below:** the editor saves only where `appAdmin()` allows (a sign-in WITH GOOGLE and, the owner's two-step being
+    on, the authenticator's code — v38.23), and a Save the rules refused said "✅ Hebrew saved on this device — it could
+    not be shared", the device showed the change, and the next start read the shared copy over it (`i18nLoadDict`
+    rewrites the cache); a window closed before 💾 Save dropped the changes without a word; a Save wrote the device's
+    whole copy, undoing what reached the shared copy since the device read it. **Now:** what differs from
     the copy the editor opened is kept on the device after every change (`tonys_i18n_ed_pending_<lang>`) until a Save is
     shared — closing, restarting, signing out and back keep it; the editor brings it back ("✏️ Your changes that are not
     shared yet are back — press 💾 Save"), and closing with changes kept says so. A Save reads the shared copy afresh and
@@ -1455,17 +1459,22 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
     remedy as two paragraphs, each translated — with "Sign out now" / "Later"; the changes stay. A refused 🚀 publish
     request says why the same way (it was "❌ Could not ask…: Missing or insufficient permissions"). The automatic
     translation only adds what is missing (`translate-new.mjs`: `if (!strings[k])`), so a shared correction stays. Self
-    Test `i18n_edits_kept_until_shared` (Tony's case end to end: typed → refused → closed → restarted → back → saved
-    onto a newer shared copy; the publish refusal) fails on v39.33 ("not kept on the device as they are typed") and
+    Test `i18n_edits_kept_until_shared` (end to end: typed → refused → closed → restarted → back → saved onto a newer
+    shared copy; the publish refusal) fails on v39.33 ("not kept on the device as they are typed") and
     with each fault planted (a Save that does not merge; a refused Save saying ✅); Self Test runs neither keep nor put
     back a device's own (`i18nEdPendingOff`). `i18n_editor_is_usable`'s Save step now stands in a shared Save (its
     point: the live screen and the button's icon). 11 phrases × 11 languages by hand (the sign-in reasons of v39.21
     were English everywhere too), 0 missing; written without moving the files' `updatedAt`/`count` or index.json, so
-    the publish Tony is about to make merges into test without a conflict (checked: `git merge-tree` of a simulated
-    publish — his two Hebrew values, a new `updatedAt`/`count`, index.json — into this commit: no conflict, both kept).
+    a publish made before the release merges into test without a conflict (checked: `git merge-tree` of a simulated
+    publish — two Hebrew values, a new `updatedAt`/`count`, index.json — into this commit: no conflict, both kept).
     Help: the owner's way to correct a translation, and NEW FEATURES. Pushed to test 12:25 Israel time (b3af5d4); GitHub
     answered the first push "Internal Server Error", the second went in, and no job started on it (no Self Tests, no
-    Cloudflare Pages build after 23 minutes) — the push event was lost; this note is the push that starts them.
+    Cloudflare Pages build after 23 minutes) — the push event was lost; a13bf35 (a note) started them: Self Tests on
+    test and Cloudflare Pages for test success (13:08). **Rule from this: a translation in the shared store that
+    differs from an earlier one may be the owner's own choice — look at who published it (a "Publish languages" run
+    started by Tony's account, workflow_dispatch, carries his edits) and ask before calling it wrong; never "correct"
+    it in the files.** In Hebrew, five notices that walk the menu still say "🏡 מטבחים ואנשים" (the store's machine
+    wording, without "על"); told Tony, his call.
   - **v39.33 — the Help up to date with v39.26–v39.32, and every sentence on its way translated** (Tony, 4 Nov 2026:
     "Please update the Help and share to the family and Beta when done"). The Help (the assistant's description): every
     "⋯ More → item" path goes through its heading now (··· More → 🏡 Kitchens and people → 🤝 Connect…, → 🧰 Tools →
@@ -1476,18 +1485,17 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
     by no reading of the source: now in `I18N_EXTRA`, translated, and Self Test `gift_question_translated` (fails on
     v39.32). ✨ What can this app do: "It tells you when a new version is out — and pulling the list down checks at once."
     9 phrases × 11 languages (the four path notices from each language's own translation, its heading put in); 0
-    missing. The release's machine translation had made two Hebrew headings wrong — "🏡 על מטבחים ואנשים" ("About
-    kitchens and people") and "🧹 סידורים" ("errands"): corrected in the file ("🏡 מטבחים ואנשים", "🧹 סידור"); they
-    stay right after a publish only once corrected in the store (✏️ Edit translations on the beta copy).
+    missing. **Wrong, corrected under v39.34:** it called the Hebrew headings "🏡 על מטבחים ואנשים" and "🧹 סידורים" the
+    machine's mistakes and put the earlier wording back in the files ("🏡 מטבחים ואנשים", "🧹 סידור") — they were Tony's
+    own, set at 01:51 and published at 01:52; the 02:27 publish restored them, and they stay.
   - **Released: v39.33 (4 Nov 2026, 02:23 Israel time, on 89d37dc; Tony: "Please update the Help and share to the
     family and Beta when done").** Green first on test (Self Tests 02:22, Cloudflare Pages for test 02:06). Every job
     success: Deploy to GitHub Pages and pages build (02:24), Cloudflare Pages for the beta (02:24), Translate new phrases
     and Publish languages (02:27 — it published fb60a89 to main and test; that commit's deploy, pages build and
     Cloudflare Pages for test success, 02:28), Self Tests on main (02:40). The publish wrote the store's translations
     over the files, as designed: all 9 phrases present in the 11 languages (0 missing; the gift sentences in the
-    store's own machine wording), but the two Hebrew headings are the store's wrong ones again — "🏡 על מטבחים ואנשים"
-    and "🧹 סידורים". Asked Tony to correct them in 🌐 → ✏️ Edit translations… on the beta copy ("🏡 מטבחים ואנשים",
-    "🧹 סידור"), then 🚀 Publish languages now.
+    store's own machine wording), and Tony's two Hebrew headings ("🏡 על מטבחים ואנשים", "🧹 סידורים") back in place of
+    v39.33's. (Asking him to change them back was a mistake — see v39.34; he keeps his.)
   - **Released: v39.26 to v39.32 (4 Nov 2026, 01:27 Israel time, on 1394aeb; Tony: "Please move the latest version to
     Family and Beta when all is green").** Green first on test (Self Tests 01:26, Cloudflare Pages for test). Every job
     success: Deploy to GitHub Pages and pages build (01:28), Translate new phrases and Publish languages (01:32 — it
@@ -1498,7 +1506,8 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
     "✅ עודכן מהעננה" again — the store still held it; corrected only where translations are edited (🌐 → ✏️ Edit
     translations… on the beta copy, then 🚀 Publish languages now). **Tony did (4 Nov, "I fixed the Hebrew translation and
     published the languages"): published 01:52 Israel time (5ea0e46 on main, merged into test); "✅ עודכן מהענן" in
-    i18n/he.json; its deploy, pages build and Cloudflare Pages for test success.**
+    i18n/he.json — and his own wording of two headings, "🏡 על מטבחים ואנשים" and "🧹 סידורים"; its deploy, pages build
+    and Cloudflare Pages for test success.**
   - **v39.32 — the pull-down checks for a new version and says what it found** (Tony, 4 Nov 2026: "Please make pulling
     the app down check for new versions"). v39.31 already asked on a pull-down, silently when there was nothing newer.
     Now `checkAppVersion` hands back `{ server, newer }` / `{ error }`, and the pull-down (signed in or not) waits for
