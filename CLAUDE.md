@@ -1437,6 +1437,14 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
   - **Released: v39.09 (29 Oct 2026, 11:17 Israel time, on 0de2dde; Tony: "Yes, release v39.09").** Every job success:
     Deploy to GitHub Pages, pages build, Publish languages, Translate new phrases, Self Tests on main and test,
     Cloudflare Pages for the beta and test.
+  - **Released: v39.35 to the family's copy and the beta (5 Nov 2026, 01:07 Israel time, on 699b694; Tony: "Please push
+    this build to beta and family when green").** Green first on test on the same commit: Self Tests (01:07) and
+    Cloudflare Pages for test (00:51). Every job success: Cloudflare Pages for the beta (01:08); on main (daf3ee4 →
+    699b694): Deploy to GitHub Pages and pages build (01:08), Translate new phrases (01:09 — the farm window's 2 new
+    phrases × 11 languages into the shared translations), Publish languages (01:10 — a550c82 on main; test, with nothing
+    of its own since, simply moved to it; that commit's Deploy to GitHub Pages and pages build 01:10, Cloudflare Pages for
+    test 01:11), Self Tests on main (01:26). The published Hebrew keeps Tony's "🏡 על מטבחים ואנשים", "🧹 סידורים" and
+    "✅ עודכן מהענן"; the farm window's two lines are in every language (the store's wording now, as designed).
   - **v39.35 — the farm visitors' child (or female) voice is never a man's while the device has another** (Tony, 5 Nov
     2026: "The animals' voice in the Admin settings is set to child. However, I just got an animal that used a man's
     voice. Something is not right..."). The shared choice was right: `i18n/_farm` says `voice: child` (saved 17 Oct,
