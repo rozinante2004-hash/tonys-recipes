@@ -1,7 +1,7 @@
 {
  "lang": "ja",
- "updatedAt": 1793796000632,
- "count": 3069,
+ "updatedAt": 1793833758413,
+ "count": 3071,
  "strings": {
   "\"Add to Home Screen\"": "ホーム画面に追加",
   "\"One item away\" filter ({1}f.{2})": "「あと1品」フィルター（{1}f.{2}）",
@@ -960,7 +960,7 @@
   "On a phone, a tablet or a computer: it installs like an app and works offline.": "スマホでもタブレットでもパソコンでも、アプリのようにインストールでき、オフラインでも使えます。",
   "On this device: no English voice found yet": "この端末ではまだ英語の音声が見つかりません",
   "On this device: {1} — British — this device has no Scottish voice": "この端末では: {1}（イギリス）— この端末にはスコットランドの音声がありません",
-  "On this device: {1} — English — this device has no Scottish voice": "この端末では: {1}（英語）— この端末にはスコットランドの音声がありません",
+  "On this device: {1} — English — this device has no Scottish voice": "このデバイス: {1} — 英語 — このデバイスにはスコットランドの声がありません",
   "On your own other devices: open {1} there and sign in with the same account.": "他のデバイスでは：{1}を開いて同じアカウントでサインインしてください。",
   "On {1} press {2} → Console, run {3}, then paste it here.": "{1}で{2}を押してコンソールを開き、{3}を実行してここに貼り付けてください。",
   "Once more": "もう一度",

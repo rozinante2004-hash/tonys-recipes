@@ -1,7 +1,7 @@
 {
  "lang": "zh",
- "updatedAt": 1793796000632,
- "count": 2756,
+ "updatedAt": 1793833758413,
+ "count": 2758,
  "strings": {
   "\"Add to Home Screen\"": "添加到主屏幕",
   "\"Open Bring!\"": "打开 Bring!",
@@ -808,7 +808,7 @@
   "On a phone, a tablet or a computer: it installs like an app and works offline.": "无论手机、平板还是电脑：像App一样安装，离线也能用。",
   "On this device: no English voice found yet": "此设备上：尚未找到英语语音",
   "On this device: {1} — British — this device has no Scottish voice": "在此设备上：{1} — 英式 — 此设备没有苏格兰语音",
-  "On this device: {1} — English — this device has no Scottish voice": "在此设备上：{1} — 英语 — 此设备没有苏格兰语音",
+  "On this device: {1} — English — this device has no Scottish voice": "此设备上：{1} — 英语 — 此设备没有苏格兰语音",
   "On your own other devices: open {1} there and sign in with the same account.": "在你自己的其他设备上：打开 {1}，用同一个账号登录。",
   "On {1} press {2} → Console, run {3}, then paste it here.": "在 {1} 上按 {2} → 控制台，运行 {3}，然后粘贴到这里。",
   "Once more": "再输入一次",

@@ -1,7 +1,7 @@
 {
  "lang": "ar",
- "updatedAt": 1793796000632,
- "count": 2729,
+ "updatedAt": 1793833758413,
+ "count": 2731,
  "strings": {
   "\"Add to Home Screen\"": "إضافة إلى الشاشة الرئيسية",
   "\"Open Bring!\"": "فتح Bring!",
@@ -666,7 +666,7 @@
   "Make up a password — at least 8 characters": "اختر كلمة سر — 8 أحرف على الأقل",
   "Make “{1}” its own recipe?": "هل تريد جعل ”{1}“ وصفة مستقلة؟",
   "Male": "ذكر",
-  "Male voice: {1}. Child’s voice: {2}.": "صوت الذكر: {1}. صوت الطفل: {2}.",
+  "Male voice: {1}. Child’s voice: {2}.": "صوت رجل: {1}. صوت طفل: {2}.",
   "Manage who can access your recipe collection": "إدارة من يمكنه الوصول إلى مجموعة وصفاتك",
   "Manage ↗": "إدارة ↗",
   "Mark a dish as cooked, rate it, and keep notes for next time.": "سجّل الطبق كمطبوخ، قيّمه، واحتفظ بملاحظات للمرة القادمة.",
@@ -804,7 +804,7 @@
   "On a phone, a tablet or a computer: it installs like an app and works offline.": "على الهاتف أو الجهاز اللوحي أو الكمبيوتر: يُثبَّت كتطبيق ويعمل بلا إنترنت.",
   "On this device: no English voice found yet": "على هذا الجهاز: لم يتم العثور على صوت إنجليزي بعد",
   "On this device: {1} — British — this device has no Scottish voice": "على هذا الجهاز: {1} — بريطاني — لا يوجد صوت اسكتلندي على هذا الجهاز",
-  "On this device: {1} — English — this device has no Scottish voice": "على هذا الجهاز: {1} — إنجليزي — لا يوجد صوت اسكتلندي على هذا الجهاز",
+  "On this device: {1} — English — this device has no Scottish voice": "على هذا الجهاز: {1} — الإنجليزية — لا يتوفر صوت اسكتلندي على هذا الجهاز",
   "On your own other devices: open {1} there and sign in with the same account.": "على أجهزتك الأخرى: افتح {1} هناك وسجّل الدخول بنفس الحساب.",
   "On {1} press {2} → Console, run {3}, then paste it here.": "على {1} اضغط {2} ← Console، وشغّل {3}، ثم الصقه هنا.",
   "Once more": "مرة أخرى",

@@ -1,7 +1,7 @@
 {
  "lang": "he",
- "updatedAt": 1793796000632,
- "count": 3443,
+ "updatedAt": 1793833758413,
+ "count": 3445,
  "strings": {
   "\"Add to Home Screen\"": "הוספה למסך הבית",
   "\"One item away\" filter ({1}f.{2})": "פילטר \"פריט אחד חסר\" ({1}f.{2})",
@@ -848,7 +848,7 @@
   "Make up a password — at least 8 characters": "בחרו סיסמה – לפחות 8 תווים",
   "Make “{1}” its own recipe?": "להפוך את {1} למתכון עצמאי?",
   "Male": "זכר",
-  "Male voice: {1}. Child’s voice: {2}.": "קול גבר: {1}. קול ילד: {2}.",
+  "Male voice: {1}. Child’s voice: {2}.": "קול גברי: {1}. קול ילד: {2}.",
   "Malformed recipes cannot break the grid": "מתכונים פגומים לא יכולים לשבור את הרשת",
   "Manage who can access your recipe collection": "נהלו מי יכול לגשת לאוסף המתכונים שלכם",
   "Manage ↗": "ניהול ↗",
@@ -1000,7 +1000,7 @@
   "On a phone, a tablet or a computer: it installs like an app and works offline.": "בטלפון, בטאבלט או במחשב: זה מתקין כמו אפליקציה ועובד גם בלי אינטרנט.",
   "On this device: no English voice found yet": "במכשיר הזה: עדיין לא נמצא קול באנגלית",
   "On this device: {1} — British — this device has no Scottish voice": "במכשיר זה: {1} — בריטי — במכשיר זה אין קול סקוטי",
-  "On this device: {1} — English — this device has no Scottish voice": "במכשיר זה: {1} — אנגלי — במכשיר זה אין קול סקוטי",
+  "On this device: {1} — English — this device has no Scottish voice": "במכשיר הזה: {1} — אנגלית — במכשיר הזה אין קול סקוטי",
   "On your own other devices: open {1} there and sign in with the same account.": "במכשירים אחרים שלך: פתחו שם את {1} והתחברו עם אותו חשבון.",
   "On {1} press {2} → Console, run {3}, then paste it here.": "ב-{1} לחצו {2} ← מסוף (Console), הריצו {3}, ואז הדביקו את זה כאן.",
   "Once more": "עוד פעם",

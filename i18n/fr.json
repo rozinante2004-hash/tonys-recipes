@@ -1,7 +1,7 @@
 {
  "lang": "fr",
- "updatedAt": 1793796000632,
- "count": 2727,
+ "updatedAt": 1793833758413,
+ "count": 2729,
  "strings": {
   "\"Add to Home Screen\"": "Ajouter à l'écran d'accueil",
   "\"Open Bring!\"": "Ouvrir Bring!",
@@ -665,7 +665,7 @@
   "Make up a password — at least 8 characters": "Choisissez un mot de passe — 8 caractères minimum",
   "Make “{1}” its own recipe?": "Faire de « {1} » une recette à part ?",
   "Male": "Masculine",
-  "Male voice: {1}. Child’s voice: {2}.": "Voix masculine : {1}. Voix d’enfant : {2}.",
+  "Male voice: {1}. Child’s voice: {2}.": "Voix masculine : {1}. Voix d'enfant : {2}.",
   "Manage who can access your recipe collection": "Gérer qui peut accéder à ta collection de recettes",
   "Manage ↗": "Gérer ↗",
   "Mark a dish as cooked, rate it, and keep notes for next time.": "Marquez un plat comme cuisiné, notez-le, et gardez des notes pour la prochaine fois.",
