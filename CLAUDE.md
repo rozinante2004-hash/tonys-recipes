@@ -1437,6 +1437,25 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
   - **Released: v39.09 (29 Oct 2026, 11:17 Israel time, on 0de2dde; Tony: "Yes, release v39.09").** Every job success:
     Deploy to GitHub Pages, pages build, Publish languages, Translate new phrases, Self Tests on main and test,
     Cloudflare Pages for the beta and test.
+  - **v39.35 — the farm visitors' child (or female) voice is never a man's while the device has another** (Tony, 5 Nov
+    2026: "The animals' voice in the Admin settings is set to child. However, I just got an animal that used a man's
+    voice. Something is not right..."). The shared choice was right: `i18n/_farm` says `voice: child` (saved 17 Oct,
+    read by every copy at start; the Self Tests put a device's copy back). The fault was the device's voice: the child is
+    the female voice raised, and `farmVoice('female')`, with no Scottish voice and none of a dozen names, took the first
+    British, else English, voice — Microsoft David on Windows without British voices (Firefox; Chrome before its own),
+    Apple's Daniel on a device without Fiona or Martha, many Android phones' default: men — and kept it for the session.
+    Now the common voices' sex is known by name (Apple, Windows, Edge, Google); female and child take a woman's voice,
+    else one whose sex is not said, a man's only when there is nothing else; Edge's own child voices (Maisie, British;
+    Ana) speak for the child, not raised again (`farmTune`); the voices are read afresh each time. The owner's farm window
+    adds "Male voice: … Child’s voice: …." and says "English" (not "British") for a voice that is neither Scottish nor
+    British. Self Test `farm_voice_kind_kept` (Windows, Apple without Fiona, Edge, Android, Fiona, the window, a changed
+    list) fails on v39.34 ("Windows: the child / the female speak with Microsoft David"). A wait for voices not yet
+    loaded was tried and dropped: speech after a delay can be refused on an iPhone, and the test browser has no voices.
+    The window's two lines are in `I18N_EXTRA` (drawn only when the owner opens it, so no harvest reads them) and
+    translated into the 11 languages (header lines untouched); checked in Hebrew: "קול גבר: Daniel. קול ילד: Samantha."
+    — the first wording, "Male: {1} · Child: {2}", was never matched: a name at the very end of an element is left out
+    of its key (`i18nEdges`: "Male: {1} · Child:"), so a line with names ends in its stop. Help: the farm line and NEW
+    FEATURES. Which of Tony's devices it was is not known yet: the farm window there now says which voice speaks.
   - **Released: v39.34 to the beta (14:18 Israel time) and the family's copy (14:37), 4 Nov 2026, on bf83b84.** Tony:
     "You can Move it to beta once it's green" — taken literally, it went to the beta only; then Tony: "I meant both family
     and beta. It should have been released for both beta and family. Has it been?" **Rule: a release goes to both

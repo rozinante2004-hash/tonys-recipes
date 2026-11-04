@@ -11083,6 +11083,50 @@ window.SELF_TESTS = [
       }
     } },
 
+  { id:'farm_voice_kind_kept', group:'UI', name:'🐄 The farm visitors speak with the voice chosen: a child or a female is never a man’s voice while the device has another (Windows, an Apple device without Fiona, Android); Edge’s own child voice is the child; the voices read afresh; the farm window names each (v39.35)',
+    test: async()=>{
+      // Tony, 5 Nov 2026: "The animals' voice in the Admin settings is set to child. However, I just got an animal that
+      // used a man's voice." The female (and the child, raised) was the first British, else English, voice when none of a
+      // few names was there: Microsoft David, Apple's Daniel, an Android phone's default — men.
+      if(!window.speechSynthesis) return 'this browser cannot speak';
+      var realGV=speechSynthesis.getVoices, realFV=Object.assign({}, _farmVoices);
+      function on(list){ speechSynthesis.getVoices=function(){ return list; }; }
+      function nm(k){ var v=farmVoice(k); return v ? v.name : null; }
+      try{
+        // Windows with no British voices (Firefox; Chrome before its own voices are read)
+        on([{ name:'Microsoft David - English (United States)', lang:'en-US' }, { name:'Microsoft Mark - English (United States)', lang:'en-US' },
+            { name:'Microsoft Zira - English (United States)', lang:'en-US' }]);
+        if(nm('child')!=='Microsoft Zira - English (United States)' || nm('female')!=='Microsoft Zira - English (United States)')
+          throw new Error('Windows: the child / the female speak with '+nm('child')+' / '+nm('female')+', not Zira');
+        if(!/David|Mark/.test(nm('male'))) throw new Error('Windows: the male speaks with '+nm('male'));
+        // An Apple device without Fiona or Martha
+        on([{ name:'Daniel', lang:'en-GB' }, { name:'Arthur', lang:'en-GB' }, { name:'Aaron', lang:'en-US' }, { name:'Samantha', lang:'en-US' }, { name:'Karen', lang:'en-AU' }]);
+        if(nm('child')!=='Samantha' || nm('female')!=='Samantha') throw new Error('Apple without Fiona: the child / the female speak with '+nm('child')+' / '+nm('female'));
+        if(nm('male')!=='Daniel') throw new Error('Apple: the male speaks with '+nm('male'));
+        // Microsoft Edge: a British girl's own voice is the child, not raised again
+        on([{ name:'Microsoft Ryan Online (Natural) - English (United Kingdom)', lang:'en-GB' }, { name:'Microsoft Maisie Online (Natural) - English (United Kingdom)', lang:'en-GB' },
+            { name:'Microsoft Sonia Online (Natural) - English (United Kingdom)', lang:'en-GB' }, { name:'Microsoft Thomas Online (Natural) - English (United Kingdom)', lang:'en-GB' }]);
+        if(!/Maisie/.test(nm('child')) || !/Sonia/.test(nm('female')) || !/Ryan/.test(nm('male'))) throw new Error('Edge: the child / female / male speak with '+nm('child')+' / '+nm('female')+' / '+nm('male'));
+        if(farmTune('child', farmVoice('child')).pitch!==FARM_VOICE_TUNE.female.pitch) throw new Error('Edge’s child voice is raised again');
+        // Android: names that do not say — and a man known by name is passed over
+        on([{ name:'Google UK English Male', lang:'en-GB' }, { name:'English United Kingdom', lang:'en-GB' }, { name:'English United States', lang:'en-US' }]);
+        if(nm('child')!=='English United Kingdom') throw new Error('a voice known to be a man’s speaks for the child: '+nm('child'));
+        // Fiona, where the device has her, is every voice (v38.79) — the child higher than the female
+        on([{ name:'Daniel', lang:'en-GB' }, { name:'Fiona', lang:'en-GB-u-sd-gbsct' }, { name:'Samantha', lang:'en-US' }]);
+        if(nm('child')!=='Fiona' || nm('female')!=='Fiona' || nm('male')!=='Fiona') throw new Error('Fiona is not every voice: '+nm('child')+' / '+nm('female')+' / '+nm('male'));
+        if(!(farmTune('child', farmVoice('child')).pitch > farmTune('female', farmVoice('female')).pitch)) throw new Error('the child is not higher than the female');
+        // The farm window names the voice for each choice on this device, and its accent
+        on([{ name:'Daniel', lang:'en-GB' }, { name:'Samantha', lang:'en-US' }]);
+        var h=farmVoiceHereHtml();
+        if(!/Male voice: <b[^>]*>Daniel<\/b>\./.test(h) || !/Child\u2019s voice: <b[^>]*>Samantha<\/b>\./.test(h)) throw new Error('the farm window does not say which voice speaks for the male and the child: '+h);
+        if(/British/.test(h) || !/English — this device has no Scottish voice/.test(h)) throw new Error('an American voice is called British: '+h);
+        // Read afresh: a list that changed is used at once (an app brought back from the background)
+        on([{ name:'Microsoft David - English (United States)', lang:'en-US' }]); nm('child');
+        on([{ name:'Microsoft David - English (United States)', lang:'en-US' }, { name:'Microsoft Zira - English (United States)', lang:'en-US' }]);
+        if(nm('child')!=='Microsoft Zira - English (United States)') throw new Error('an old list of voices was kept: '+nm('child'));
+      } finally { speechSynthesis.getVoices=realGV; _farmVoices=realFV; }
+    } },
+
   { id:'farm_choice_kept', group:'UI', name:'🐄 The farm visitors keep what the owner saved: not lost to a Self Test or a new version, and the window shows it (v37.99)',
     test: async()=>{
       // Tony: "the selection of the animals are reset with each new version".

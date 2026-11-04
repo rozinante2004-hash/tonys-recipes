@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.34 -->
+<!-- Tony's Recipes Collection v39.35 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -10695,7 +10695,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.34';
+var APP_VERSION = 'v39.35';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -14138,7 +14138,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.34</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.35</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14226,7 +14226,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.34</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.35</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -17731,6 +17731,9 @@ window.i18nPatternsFromDict = i18nPatternsFromDict; window.i18nAsk = i18nAsk;
 // translating a string nobody sees. A `{1}` makes it a shape, matched the same
 // way a built toast is.
 var I18N_EXTRA = [
+  // v39.35 — the farm window (the owner's, drawn only when opened, so no harvest reads it): which voice speaks for the
+  // male and the child on this device, and a female voice that is neither Scottish nor British
+  'Male voice: {1}. Child’s voice: {2}.', 'On this device: {1} — English — this device has no Scottish voice',
   // v39.34 — a translation Save (or a 🚀 publish request) not shared: why, and what to do — each its own paragraph
   // (ownerSignInWhy('\n\n')); the reasons were English in every language since v39.21
   'This device is signed in with an e-mail link or a password, and the owner\u2019s tools need a sign-in with Google and your authenticator\u2019s code.',
@@ -31178,23 +31181,54 @@ function farmVoiceKind(kind) {
 // male and the child speak with it too, deeper or higher (FARM_VOICE_TUNE). The farm window says which voice this
 // device uses. (eSpeak's en-gb-x-gbclan is Lancashire, not Scotland.)
 function farmScottish(v) { return !!v && (/scot/i.test(v.lang || '') || /scot|\bfiona\b/i.test(v.name || '')); }
-var _farmVoices = {};
+// v39.35 — Tony, 5 Nov 2026: "The animals' voice in the Admin settings is set to child. However, I just got an animal that
+// used a man's voice. Something is not right..." The child is the female voice raised, and the female voice was the
+// first British (else English) voice whenever none of a few names was on the device — Microsoft David on Windows with no
+// British voices, Daniel on an Apple device without Fiona or Martha, the default voice of many Android phones: men, all
+// of them. Now the choice knows the common voices' sex by name: a female or a child is a voice known to be a woman's
+// (or a child's), else one whose sex is not known, and a man's only when the device has nothing else; a device's own
+// child voice (Microsoft Edge's Maisie, British, and Ana) speaks for the child, not raised again. The voices are read
+// afresh each time (an app brought back from the background can hold old ones), and the farm window names the voice
+// that speaks for each choice on that device.
+var FARM_VOICE_MALE_RE = /\b(male|man|daniel|arthur|oliver|ryan|george|thomas|aaron|alex|fred|gordon|rishi|lee|tom|evan|nathan|eddy|grandpa|reed|rocko|ralph|junior|albert|bruce|david|mark|james|richard|sean|ravi|guy|alfie|elliot|ethan|noah|christopher|eric|roger|steffan|brian|andrew|davis|jason|william|darren|duncan|ken|liam|mitchell|connor|prabhat|luke)\b/i;
+var FARM_VOICE_FEMALE_RE = /\b(female|woman|girl|fiona|samantha|karen|moira|tessa|victoria|allison|ava|susan|vicki|kathy|martha|serena|kate|stephanie|catherine|nicky|flo|grandma|sandy|shelley|veena|isha|zira|hazel|heera|linda|aria|jenny|ana|michelle|sonia|libby|maisie|abbi|bella|hollie|olivia|natasha|clara|emily|neerja|molly|leah|amy|emma|sara|jane|nancy|amber|ashley|cora|elizabeth|annette|carly|elsie|freya|joanne|kim|tina|imani)\b/i;
+var FARM_VOICE_CHILD_RE = /\b(maisie|ana)\b/i;      // children's voices some devices have (Microsoft Edge)
+// 'f', 'm', or '' when the name does not say
+function farmVoiceSex(v) {
+  var n = String((v && v.name) || '');
+  return FARM_VOICE_FEMALE_RE.test(n) ? 'f' : FARM_VOICE_MALE_RE.test(n) ? 'm' : '';
+}
+var _farmVoices = {};                                 // the last choice for each, as the farm window shows it
 function farmVoice(kind) {
-  var key = kind === 'male' ? 'male' : 'female';            // a child speaks with the female voice
-  if (_farmVoices[key] || !window.speechSynthesis) return _farmVoices[key] || null;
+  if (!window.speechSynthesis || typeof speechSynthesis.getVoices !== 'function') return null;
+  var key = kind === 'male' ? 'male' : kind === 'child' ? 'child' : 'female';
   var vs = speechSynthesis.getVoices() || [];
   var scots = vs.filter(farmScottish);
-  if (scots.length) {
-    var want = key === 'male' ? /\bmale\b|man\b/i : /fiona|female|woman/i;
-    return (_farmVoices[key] = scots.filter(function(v){ return want.test(v.name); })[0]
-      || scots.filter(function(v){ return /fiona/i.test(v.name); })[0] || scots[0]);
+  var gb = vs.filter(function(v){ return /en[-_]GB/i.test(v.lang || ''); }), en = vs.filter(function(v){ return /^en/i.test(v.lang || ''); });
+  function first(test) { return gb.filter(test)[0] || en.filter(test)[0] || null; }
+  function named(names) {
+    for (var i = 0; i < names.length; i++) { var n = names[i], f = first(function(v){ return String(v.name).indexOf(n) !== -1; }); if (f) return f; }
+    return null;
   }
-  var gb = vs.filter(function(v){ return /en[-_]GB/i.test(v.lang); }), en = vs.filter(function(v){ return /^en/i.test(v.lang); });
-  var prefer = FARM_VOICE_PREFER[key], found = null;
-  [gb, en].forEach(function(list) {
-    for (var i = 0; i < prefer.length && !found; i++) found = list.filter(function(v){ return v.name.indexOf(prefer[i]) !== -1; })[0] || null;
-  });
-  return (_farmVoices[key] = found || gb[0] || en[0] || null);
+  var found = null;
+  if (scots.length) {
+    // Fiona is the only Scottish voice most devices have: the male speaks with it too, deeper (v38.79)
+    if (key === 'male') found = scots.filter(function(v){ return farmVoiceSex(v) === 'm'; })[0] || scots.filter(function(v){ return /fiona/i.test(v.name); })[0] || scots[0];
+    else found = scots.filter(function(v){ return farmVoiceSex(v) === 'f'; })[0] || scots.filter(function(v){ return farmVoiceSex(v) !== 'm'; })[0] || null;
+  }
+  if (!found && key === 'child') found = first(function(v){ return FARM_VOICE_CHILD_RE.test(v.name); });
+  var sex = key === 'male' ? 'm' : 'f';
+  if (!found) found = named(FARM_VOICE_PREFER[key === 'male' ? 'male' : 'female'])
+    || first(function(v){ return farmVoiceSex(v) === sex; })
+    || first(function(v){ return farmVoiceSex(v) === ''; })
+    || gb[0] || en[0] || null;
+  _farmVoices[key] = found;
+  return found;
+}
+// The pitch and pace: a device's own child voice is a child already — not raised again (v39.35).
+function farmTune(kind, v) {
+  var k = FARM_VOICE_TUNE[kind] ? kind : 'female';
+  return FARM_VOICE_TUNE[(k === 'child' && v && FARM_VOICE_CHILD_RE.test(v.name || '')) ? 'female' : k];
 }
 try { if (window.speechSynthesis && speechSynthesis.addEventListener) speechSynthesis.addEventListener('voiceschanged', function(){ _farmVoices = {}; farmVoice('female'); farmVoice('male'); }); } catch(e) {}
 // v37.94 — Tony: the first time an animal (or 🔊) speaks, nothing is heard;
@@ -31217,17 +31251,24 @@ document.addEventListener('keydown', farmWarm, true);
 function farmUtterLang(v) { return (v && farmScottish(v) && v.lang) || 'en-GB'; }
 // The farm window: which voice THIS device speaks with (v38.79).
 function farmVoiceHereHtml() {
-  var v = null; try { v = farmVoice('female'); } catch(e) {}
+  var v = null, m = null, c = null;
+  try { v = farmVoice('female'); m = farmVoice('male'); c = farmVoice('child'); } catch(e) {}
   return '<div class="fv-note" id="farmVoiceHere">On this device: '
-    + (v ? '<b data-no-i18n>' + escH(v.name) + '</b> — ' + (farmScottish(v) ? 'Scottish' : 'British — this device has no Scottish voice')
-         : 'no English voice found yet') + '</div>';
+    + (v ? '<b data-no-i18n>' + escH(v.name) + '</b> — ' + (farmScottish(v) ? 'Scottish'
+           : /en[-_]GB/i.test(v.lang || '') ? 'British — this device has no Scottish voice' : 'English — this device has no Scottish voice')
+         : 'no English voice found yet') + '</div>'
+    // v39.35 — which voice speaks for each choice here (the line above is the female's)
+    // (a sentence that ends in its stop: a name at the very end is left out of the phrase's key — i18nEdges)
+    + (m && c ? '<div class="fv-note" id="farmVoiceKinds">Male voice: <b data-no-i18n>' + escH(m.name) + '</b>. Child’s voice: <b data-no-i18n>'
+         + escH(c.name) + '</b>.</div>' : '');
 }
 // kind: male | female | child (already chosen — see farmSay). Each animal keeps
 // a little of its own pitch around the voice's (v37.88), never above 1.8.
 function farmUtterance(text, pitch, kind) {
-  var k = FARM_VOICE_TUNE[kind] ? kind : 'female', t = FARM_VOICE_TUNE[k];
+  var k = FARM_VOICE_TUNE[kind] ? kind : 'female';
   var u = new SpeechSynthesisUtterance(text);
   var v = farmVoice(k); if (v) u.voice = v;
+  var t = farmTune(k, v);
   u.lang = farmUtterLang(v); u.rate = t.rate; u.pitch = Math.max(0.55, Math.min(1.8, t.pitch + ((pitch || 1) - 1) * .3));
   return u;
 }
@@ -33721,6 +33762,7 @@ var HELP_SYSTEM_PROMPT = [
   "- A new version is noticed while the app stays open, and pulling the list down checks at once and says what it found (v39.31, v39.32)",
   "- The Self Test report and Sync Health give times in this device's own time, its UTC offset after it (v39.31)",
   "- (The app's owner) A correction in ✏️ Edit translations is never lost: it is kept on the device until it is shared, Save writes only what was changed, and a Save that is not shared says why (v39.34)",
+  "- 🐄 The farm visitors speak with the voice chosen for everyone: a child or a female is never a man's voice on a device that has another, Microsoft Edge's own child voice speaks for the child, and the owner's farm window says which voice speaks for each choice on that device (v39.35)",
   "- 🕐 Recently Viewed: a 'Recent' chip appears in the filter bar after you open any recipe — shows your last 8 viewed",
   "- ⇅ Sort: click the Sort button next to Grid/List to sort by Default, Recently viewed, A–Z, Prep time, Difficulty, or Most cooked",
   "- 🍳 Cook count: open any recipe and tap '🍳 Cooked!' to track how many times you've made it. Recipes cooked 3+ times show a 🔥 badge. Sort by 'Most cooked' to find your favourites",
@@ -33774,7 +33816,7 @@ var HELP_SYSTEM_PROMPT = [
   "- 📲 The share icon next to the language picker (and ··· More → 🏡 Kitchens and people → Share this app): while the app takes newcomers by invitation only it is called 'Share this app with family' and invites someone to your kitchen (see the household section) instead of sending the app's link; otherwise it sends a link to the app",
   "",
   "=== THE FARM VISITORS ===",
-  "- Now and then a cartoon farm animal strolls across the screen. Tap it and it turns to you and says something — in a Scottish voice where the device has one (an iPhone, an iPad or a Mac has Fiona), otherwise a British one; then, still looking at you, it vanishes in a puff of smoke",
+  "- Now and then a cartoon farm animal strolls across the screen. Tap it and it turns to you and says something — in a Scottish voice where the device has one (an iPhone, an iPad or a Mac has Fiona), otherwise a British one; then, still looking at you, it vanishes in a puff of smoke. The voice is the one the app's owner chose for everyone (male, female, child, or a different one each time): a female or a child speaks with a woman's voice raised — or the device's own child voice where it has one (Microsoft Edge's Maisie) — and never with a man's while the device has another; the owner's farm window says which voice speaks for each choice on that device (v39.35)",
   "- You can pick an animal up and move it (press and drag)",
   "- Switch them off or on: ⚙️ → 🎨 How it looks → 🐑 Farm guests? (this device only)",
   "",

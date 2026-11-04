@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v39.34` — app. **Worker: v100**, deployed separately and versioned separately
+**Current version:** `v39.35` — app. **Worker: v100**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -396,7 +396,15 @@ under its plain path only (a `?url=` request goes network-first).
   tapped, it turns, speaks a saying in a Scottish voice where the device has one (Apple’s Fiona, eSpeak’s English (Scotland); v38.79), else a British one (Male / Female / Child / random), then
   vanishes in a puff of smoke; it can be grabbed and moved. The owner chooses the sayings, animals,
   look, voice and how often (`i18n/_farm`, read by every copy); everyone has "🐑 Farm guests?" on
-  their device. Never while typing, never in a Self Test.
+  their device. Never while typing, never in a Self Test. **The voice (v39.35):** browsers can only use the device's own
+  voices, and a child is the female voice raised (FARM_VOICE_TUNE). `farmVoice(kind)` reads the voices afresh each
+  time and knows the common ones' sex by name (`FARM_VOICE_MALE_RE` / `FARM_VOICE_FEMALE_RE`: Apple, Windows, Edge,
+  Google): Scottish first (Fiona for all three; the male deeper), then for the female and the child a voice known to be a
+  woman's, else one whose sex the name does not say, and a man's only when there is nothing else — never "the first
+  British voice", which was Microsoft David, Apple's Daniel or an Android default (Tony heard a man for "child").
+  A device's own child voice (Edge's Maisie, Ana: `FARM_VOICE_CHILD_RE`) is the child, not raised again (`farmTune`).
+  The owner's farm window names the female voice and its accent, then "Male voice: … Child’s voice: …." for this device
+  (the line ends in its stop — a name at the very end of an element is left out of its phrase key by `i18nEdges`).
 - **Recipes:** scaling multiplies the method's amounts too; on a computer the recipe window can be
   enlarged (a corner grip); a source with words and a link opens the link.
 - **About** (ℹ️, at the bottom of the ? window): version and update check, ✨ What can this app do
