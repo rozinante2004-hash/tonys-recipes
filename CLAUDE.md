@@ -1437,6 +1437,19 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
   - **Released: v39.09 (29 Oct 2026, 11:17 Israel time, on 0de2dde; Tony: "Yes, release v39.09").** Every job success:
     Deploy to GitHub Pages, pages build, Publish languages, Translate new phrases, Self Tests on main and test,
     Cloudflare Pages for the beta and test.
+  - **v39.33 — the Help up to date with v39.26–v39.32, and every sentence on its way translated** (Tony, 4 Nov 2026:
+    "Please update the Help and share to the family and Beta when done"). The Help (the assistant's description): every
+    "⋯ More → item" path goes through its heading now (··· More → 🏡 Kitchens and people → 🤝 Connect…, → 🧰 Tools →
+    ⚖️ Measurement converter, → 🧹 Tidy up → 📸 Auto-fetch…, → 💡 Ideas for Explore / Suggest / What can I make), and
+    NEW FEATURES names Files & backup, the five headings, Excel import, the new-version notice and the pull-down, and the
+    reports' own time. The same paths in five notices (the empty chats window; three after sending a recipe; "A recipe
+    for you"). That question was English in every language — composed with names and a date, its sentences were found
+    by no reading of the source: now in `I18N_EXTRA`, translated, and Self Test `gift_question_translated` (fails on
+    v39.32). ✨ What can this app do: "It tells you when a new version is out — and pulling the list down checks at once."
+    9 phrases × 11 languages (the four path notices from each language's own translation, its heading put in); 0
+    missing. The release's machine translation had made two Hebrew headings wrong — "🏡 על מטבחים ואנשים" ("About
+    kitchens and people") and "🧹 סידורים" ("errands"): corrected in the file ("🏡 מטבחים ואנשים", "🧹 סידור"); they
+    stay right after a publish only once corrected in the store (✏️ Edit translations on the beta copy).
   - **Released: v39.26 to v39.32 (4 Nov 2026, 01:27 Israel time, on 1394aeb; Tony: "Please move the latest version to
     Family and Beta when all is green").** Green first on test (Self Tests 01:26, Cloudflare Pages for test). Every job
     success: Deploy to GitHub Pages and pages build (01:28), Translate new phrases and Publish languages (01:32 — it

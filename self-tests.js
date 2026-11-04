@@ -5379,6 +5379,34 @@ window.SELF_TESTS = [
     } },
 
   // v39.16 — Tony, 29 Oct 2026: "Can we use the same Resend .com mailing mechanism when sharing between kitchens via email?"
+  { id:'gift_question_translated', group:'Sync', name:'📨 "A recipe for you" — every sentence it is built from is in the translations, and its path to ··· More → 🏡 Kitchens and people → 📨 Recipes sent to me is the menu\'s (v39.33)',
+    test: async()=>{
+      // v39.33 — the question a recipe brings was English in every language: composed with the kitchen's and the recipe's
+      // names, no reading of the source found its sentences. And it pointed to "⋯ More → 📨 Recipes sent to me", a step
+      // short since ··· More opens on its headings (v39.30).
+      var realAsk=window.askChoice, said=[], realHH=window._household;
+      var fits=function(par){
+        if(I18N_EXTRA.indexOf(par)!==-1) return true;
+        return I18N_EXTRA.some(function(k){ if(k.indexOf('{1}')===-1) return false; var rx=i18nPatternRegex(k); return !!rx && rx.test(par); });
+      };
+      try{
+        window.askChoice=async function(msg){ said.push(String(msg)); return null; };
+        await giftAsk({ d:{ fromName:'Dana’s Kitchen', name:'Lentil soup', to:'', expireAt:Date.now()+7*864e5 } });
+        window._household={ hid:'hGiftTest', role:'owner', name:'Test kitchen', links:[], asking:[] };
+        var sv={}; sv.hGiftTest=Date.now()-864e5;
+        await giftAsk({ d:{ fromName:'Dana’s Kitchen', name:'Lentil soup', to:'', saved:sv, expireAt:Date.now()+7*864e5 } });
+        if(said.length!==2) throw new Error('the question was not asked ('+said.length+')');
+        said.forEach(function(m){
+          m.split(/\n\s*\n/).forEach(function(par){
+            if(!fits(par.trim())) throw new Error('not in the translations: '+JSON.stringify(par.trim()));
+          });
+        });
+        if(said[0].indexOf('··· More → 🏡 Kitchens and people → 📨 Recipes sent to me')===-1) throw new Error('the way to the recipe is not the menu\'s: '+said[0].split('\n\n').pop());
+        if(!/saved it already/.test(said[1])) throw new Error('a recipe the kitchen saved does not say so');
+      } finally { window.askChoice=realAsk; window._household=realHH; }
+      return 'both forms of the question: every sentence translated; the path through 🏡 Kitchens and people';
+    } },
+
   { id:'gift_email_by_server', group:'Sync', name:'📨 Send to another kitchen → ✉️ Via Email: the app sends it — its address, a note, nothing for a mail program; your own mail only when the app cannot (v39.16)',
     test: async()=>{
       if(typeof giftMailByServer!=='function') throw new Error('giftMailByServer not defined');

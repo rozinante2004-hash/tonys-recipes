@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v39.32` — app. **Worker: v100**, deployed separately and versioned separately
+**Current version:** `v39.33` — app. **Worker: v100**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -472,7 +472,11 @@ English only") show on the test copy at once and are still added centrally at th
 job writes them from there. A hand edit moves each file's `updatedAt`/`count` and `i18n/index.json`'s `at`/`count`
 forward (a device takes the file only when it is as new as its own copy: `i18nReadBest`), keeps the publisher's format
 (`JSON.stringify(doc, null, 1)`, keys in JavaScript's sort order) and is checked with the app's own `i18nGapList`
-against `i18nFullCatalogue()` (24 phrases × 11 languages in v39.31, 0 missing after).
+against `i18nFullCatalogue()` (24 phrases × 11 languages in v39.31, 0 missing after). **A path through ··· More names
+its heading** (v39.33): "··· More → 🏡 Kitchens and people → 📤 Recipes I sent", in the Help and in the notices alike — the
+headings are the menu since v39.30. A sentence composed with names or a date (the "A recipe for you" question, `giftAsk`)
+goes into `I18N_EXTRA` as a shape (`{1} has sent you a recipe for “{2}”.`); Self Test `gift_question_translated` builds
+the question and requires each paragraph to be on the list.
 
 ### 1b.9 The iPhone's top edge (iOS 26/27 "Liquid Glass")
 

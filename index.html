@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.32 -->
+<!-- Tony's Recipes Collection v39.33 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -5219,7 +5219,7 @@ window.toggleAppRequests = toggleAppRequests; window.hhSetAppRequests = hhSetApp
 // ─── LINKED HOUSEHOLDS (v37.53) ──────────────────────────────────────────────
 // Tony: households that know each other LINK, and each then sees the other's
 // recipes, read-only — each keeps its own collection; nothing is copied or
-// changed. ⋯ More → 🤝 Connect with another household asks, by identifier
+// changed. ··· More → 🏡 Kitchens and people → 🤝 Connect with another household asks, by identifier
 // (straight into their app, if they take requests through it) or by the e-mail
 // address of ANYONE in that household (whoever signs in with it passes it on
 // to their household, unseen). Only the owner or an admin asks and answers:
@@ -5721,7 +5721,7 @@ function renderLinkRequestsPage() {
   var asking = (_household && _household.asking) || [];
   h += '<div style="font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);margin:14px 0 6px;">Sent by your household</div>';
   // Tony looked here for how to ask a household he knows only by its identifier
-  // (it was only under ⋯ More → 🤝 Connect with another household).
+  // (it was only under ··· More → 🏡 Kitchens and people → 🤝 Connect with another household).
   if (manage) h += '<button type="button" id="lrAskBtn" onclick="openConnectHousehold().then(renderLinkRequestsPage)" style="' + btn + 'background:var(--terracotta-fill);color:#fff;border:none;margin-bottom:8px;">\u2795 Ask a household to link\u2026</button>'
     + '<div style="font-size:12px;color:var(--muted);margin:-2px 0 8px;">By their identifier (MKN-\u2026) or the e-mail address of anyone in it.</div>';
   h += asking.length ? asking.map(function(a, i){
@@ -5930,7 +5930,7 @@ async function talkSend(other, given) {
 // Tony: "Do we have a way to chat with a joined household? … Please remind me, where can I find the chats I already
 // had? I can't seem to find them." They were there — under ⚙️ → 🏠 My household → 📬 Link requests, one fold per
 // household — but nobody looks for a chat in a page about requests. Now a window of their own, like a messaging app:
-// ⋯ More → 💬 Chats with linked kitchens (and 💬 Chat beside a linked kitchen's name in the list and in Family
+// ··· More → 🏡 Kitchens and people → 💬 Chats with linked kitchens (and 💬 Chat beside a linked kitchen's name in the list and in Family
 // Access). Every conversation with its last line and what is new; one opens to the whole thread and a box to write
 // (Enter sends). The same conversations as on 📬 Link requests (linkTalk), live (v38.49), signed with the
 // household's name only — never a person's.
@@ -5996,7 +5996,7 @@ function renderKitchenChats(focus) {
                    : '<span style="display:block;font-size:12.5px;color:var(--muted);margin-top:4px;">No messages yet — say hello.</span>')
             + '</button>';
         }).join('')
-        : '<div style="font-size:13px;line-height:1.6;padding:6px 0 4px;">No conversations yet. Link your kitchen with another household — ⋯ More → \u{1F91D} Connect with another household — or answer one that asks you, and you can write to each other here.</div>');
+        : '<div style="font-size:13px;line-height:1.6;padding:6px 0 4px;">No conversations yet. Link your kitchen with another household — ··· More → 🏡 Kitchens and people → \u{1F91D} Connect with another household — or answer one that asks you, and you can write to each other here.</div>');
     return;
   }
   var other = _chatWith, msgs = _talk[talkPair(me, other)] || [];
@@ -7114,8 +7114,8 @@ window.openLinkedRecipe = openLinkedRecipe; window.saveLinkedCopy = saveLinkedCo
 // changes. `recipeGifts/<long random id>` — the id is the key: firestore.rules lets whoever has it read it, signed out
 // too, and nobody list them but the two kitchens — and its photo in `recipeGiftPhotos/<id>`. Kept 4 weeks (`expireAt`:
 // the database's TTL policy, and the sending kitchen's app, clear them after). Sent through the app to a kitchen by
-// its identifier (it pops up there with the kitchen's sound and waits in ⋯ More → 📨 Recipes sent to me), or as a
-// link by e-mail, WhatsApp or copied (anyone with the link may save it). ⋯ More → 📤 Recipes I sent says what became
+// its identifier (it pops up there with the kitchen's sound and waits in ··· More → 🏡 Kitchens and people → 📨 Recipes sent to me), or as a
+// link by e-mail, WhatsApp or copied (anyone with the link may save it). ··· More → 🏡 Kitchens and people → 📤 Recipes I sent says what became
 // of each, and withdraws one. During the closed beta, someone without an account who opens the link sees the recipe
 // and may ask the app's owner for an invitation (Tony: "Closed Beta. Ask for an Invitation").
 var GIFT_DAYS = 28, GIFT_MS = GIFT_DAYS * 864e5;
@@ -7281,7 +7281,7 @@ async function openSendRecipe(rid) {
     }
     if (how === 'email' && !mailHow) {                            // v39.16 — sent by the server, like ✉️ Email (Worker v99)
       var sent = await giftMailByServer(made, toMail);
-      if (sent.ok) { toast('✉️ E-mailed to ' + toMail + ', with its photo and a button to save it. ⋯ More → \u{1F4E4} Recipes I sent shows when it is saved.', 9000, openGiftsOut); return made; }
+      if (sent.ok) { toast('✉️ E-mailed to ' + toMail + ', with its photo and a button to save it. ··· More → 🏡 Kitchens and people → \u{1F4E4} Recipes I sent shows when it is saved.', 9000, openGiftsOut); return made; }
       await askConfirm({ icon: '✉️', title: 'Not e-mailed', message: 'The app could not send the e-mail: ' + sent.why + '\n\nThe link is ready — you can send it from your own mail instead.', okLabel: 'Next ›' });
       step = 3; continue;
     }
@@ -7291,8 +7291,8 @@ async function openSendRecipe(rid) {
       + '\n\nOpen it to see it, and save it to your recipes with one tap (the link keeps for 4 weeks):\n' + giftUrl(made.id, mailTo);
     var did = await shareDo(how === 'email' ? mailHow : how, { to: mailTo, subject: 'A recipe for you: ' + made.name, text: text, copyText: text });
     if (did === ASK_BACK) { step = 3; continue; }                 // no mail program: the e-mail choices again (sent once)
-    if (!did) { toast('Not sent. The link is kept: ⋯ More → \u{1F4E4} Recipes I sent copies it or sends it again.', 8000, openGiftsOut); return made; }   // v39.16
-    if (how !== 'copy' && did !== 'copy') toast('\u{1F517} The link is on its way. ⋯ More → \u{1F4E4} Recipes I sent shows who saved it.', 8000, openGiftsOut);
+    if (!did) { toast('Not sent. The link is kept: ··· More → 🏡 Kitchens and people → \u{1F4E4} Recipes I sent copies it or sends it again.', 8000, openGiftsOut); return made; }   // v39.16
+    if (how !== 'copy' && did !== 'copy') toast('\u{1F517} The link is on its way. ··· More → 🏡 Kitchens and people → \u{1F4E4} Recipes I sent shows who saved it.', 8000, openGiftsOut);
     return made;
   }
   return made;
@@ -7391,7 +7391,7 @@ async function giftAsk(g) {
   var a = await askChoice((d.fromName || 'A kitchen') + ' has sent you a recipe for “' + d.name + '”.'
       + (d.note ? '\n\n\u{1F4AC} “' + d.note + '”' : '')
       + (mineSaved ? '\n\nYour kitchen saved it already, on ' + giftDay(mineSaved) + '.' : '\n\nWould you like to save it to your collection?')
-      + '\n\nIt waits in ⋯ More → \u{1F4E8} Recipes sent to me until ' + giftDay(d.expireAt) + '.',
+      + '\n\nIt waits in ··· More → 🏡 Kitchens and people → \u{1F4E8} Recipes sent to me until ' + giftDay(d.expireAt) + '.',
     opts, { icon: '\u{1F4E8}', title: 'A recipe for you', cancelLabel: 'Not now' });
   if (a === 'save') return await giftSave(g);
   if (a === 'look') return await giftLook(g);
@@ -7577,7 +7577,7 @@ async function giftAskInvitation() {
     message: 'Thank you! The app’s owner will write to ' + em + ' with an invitation. Keep this link: once you are in, it saves the recipe to your new kitchen (for 4 weeks).', okLabel: 'OK' });
   return true;
 }
-// ── ⋯ More → 📨 Recipes sent to me ──────────────────────────────────────────
+// ── ··· More → 🏡 Kitchens and people → 📨 Recipes sent to me ──────────────────────────────────────────
 async function openGiftsIn() {
   if (!_household || !window._fbUser || !hhDb()) { toast('Sign in first.', 5000); return null; }
   var prev = document.getElementById('giftsInOverlay'); if (prev) prev.remove();
@@ -7640,7 +7640,7 @@ async function giftAct(i, what) {
   if (await askConfirm({ icon: '\u{1F4E8}', title: 'Remove “' + g.d.name + '”?', message: 'It goes from this list, unsaved.', okLabel: 'Remove', cancelLabel: 'Cancel' }) !== true) return false;
   return giftDecline(g);
 }
-// ── ⋯ More → 📤 Recipes I sent ──────────────────────────────────────────────
+// ── ··· More → 🏡 Kitchens and people → 📤 Recipes I sent ──────────────────────────────────────────────
 async function giftSentList() {
   var out = [];
   try { (await hhDb().collection('recipeGifts').where('from', '==', _household.hid).get()).forEach(function(d){ out.push({ id: d.id, d: d.data() || {} }); }); } catch(e) {}
@@ -10695,7 +10695,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.32';
+var APP_VERSION = 'v39.33';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -14138,7 +14138,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.32</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.33</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14226,7 +14226,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.32</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.33</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -17731,6 +17731,10 @@ window.i18nPatternsFromDict = i18nPatternsFromDict; window.i18nAsk = i18nAsk;
 // translating a string nobody sees. A `{1}` makes it a shape, matched the same
 // way a built toast is.
 var I18N_EXTRA = [
+  // v39.33 — "A recipe for you" (giftAsk): composed with the kitchen's and the recipe's names, so no reading of the source
+  // finds its sentences; every one was English in every language
+  '{1} has sent you a recipe for “{2}”.', 'Would you like to save it to your collection?', 'Your kitchen saved it already, on {1}.',
+  'It waits in ··· More → 🏡 Kitchens and people → 📨 Recipes sent to me until {1}.',
   // v39.26 — the backup reminder, built from a choice and a place (checkBackupOverdue): every new tester's first notice,
   // and it was English in the Hebrew walk
   '\u{1F4BE} No backup has been taken yet',
@@ -31879,6 +31883,7 @@ function appFeatureSections(all) {
       .concat(['Print a recipe, or export recipes to Word.']) },
     { icon: '\u{1F30D}', title: 'Everywhere', items: [
       'On a phone, a tablet or a computer: it installs like an app and works offline.',
+      'It tells you when a new version is out — and pulling the list down checks at once.',   // v39.31, v39.32
       'In many languages, in light or dark.',
       'Colours for red–green colour blindness, and a ring that makes new messages easy to spot — ⚙️ → ♿ Accessibility.',   // v38.83
       'A notice about something elsewhere takes you there with one tap — a new message, a recipe just saved, a kitchen just linked.',   // v38.86
@@ -33512,10 +33517,11 @@ var HELP_SYSTEM_PROMPT = [
   "- All imports preserve the original language (no auto-translation)",
   "",
   "=== AI FEATURES ===",
-  "- 🔭 Explore: tell the AI what ingredients you have — get meal ideas",
-  "- ✨ Suggest: choose diet/meal/cuisine filters — AI suggests full recipes",
+  "- 🔭 Explore (··· More → 💡 Ideas): tell the AI what ingredients you have — get meal ideas",
+  "- ✨ Suggest (··· More → 💡 Ideas): choose diet/meal/cuisine filters — AI suggests full recipes",
+  "- 🥫 What can I make with what I have? (··· More → 💡 Ideas): recipes from your collection you can cook with what is in the house",
   "- 🌐 Translate: translate a recipe between English and Hebrew",
-  "- 🏷️ Auto-tag diet types: AI analyses all untagged recipes and assigns diet tags",
+  "- 🏷️ Auto-tag diet types (··· More → 🧹 Tidy up): AI analyses all untagged recipes and assigns diet tags",
   "- ✨ Calculate nutrition: AI estimates per-serving nutrition from ingredients",
   "- All AI features require internet connection",
   "",
@@ -33566,7 +33572,7 @@ var HELP_SYSTEM_PROMPT = [
   "- PULLING THE LIST DOWN (at the top of the page) checks for a new version of the app at once — signed in or not — and, signed in, for changes in the cloud; it says what it found: '🆕 vX is ready — tap Update now below', or '✅ Up to date: the recipes, and the app (vX)' (v39.32)",
   "",
   "=== MEASUREMENT CONVERTER ===",
-  "- Click ⋯ More → ⚖️ Measurement converter",
+  "- ··· More → 🧰 Tools → ⚖️ Measurement converter",
   "- Supports Weight (g/kg/oz/lb), Volume (ml/l/tsp/tbsp/cup/fl oz), Temperature (°C/°F), Length (mm/cm/m/in/ft)",
   "- Bidirectional: enter either field to convert",
   "",
@@ -33579,10 +33585,15 @@ var HELP_SYSTEM_PROMPT = [
   "- A full run takes up to 3 minutes. Keep the window open and the tab in front (the tests pause when the tab is behind another). Cancel and ✕ wait until the run is over — stopping half-way could leave test data behind. The meat grinder beside the counter shows how far it has got",
   "",
   "=== NEW FEATURES ===",
+  "- 📁 FILES & BACKUP ▾ (v39.26, was ⇅ Imp/Exp): From File, Drop File Here (on a computer), All to Word, Backup — Save and Restore — the backups on a phone too (v39.28). Adding from a link, text or a photo is in + Add Recipe",
+  "- ··· MORE IN FIVE HEADINGS (v39.30): 💡 Ideas, 🧰 Tools, 🏡 Kitchens and people, 📱 WhatsApp, 🧹 Tidy up — tap one to open what is under it, in the menu itself; tap again to close",
+  "- Importing a file: Excel files work again (v39.27); a saved web page keeps its lines apart",
+  "- A new version is noticed while the app stays open, and pulling the list down checks at once and says what it found (v39.31, v39.32)",
+  "- The Self Test report and Sync Health give times in this device's own time, its UTC offset after it (v39.31)",
   "- 🕐 Recently Viewed: a 'Recent' chip appears in the filter bar after you open any recipe — shows your last 8 viewed",
   "- ⇅ Sort: click the Sort button next to Grid/List to sort by Default, Recently viewed, A–Z, Prep time, Difficulty, or Most cooked",
   "- 🍳 Cook count: open any recipe and tap '🍳 Cooked!' to track how many times you've made it. Recipes cooked 3+ times show a 🔥 badge. Sort by 'Most cooked' to find your favourites",
-  "- 📸 Auto-fetch missing photos: ··· More → 📸 Auto-fetch missing photos — AI translates Hebrew names to English and finds a matching photo (Pexels, Unsplash, Pixabay or Wikimedia Commons) for every recipe that has none; a library that asks for a pause (\"too many searches\") is waited for and asked again; Undo puts things back",
+  "- 📸 Auto-fetch missing photos: ··· More → 🧹 Tidy up → 📸 Auto-fetch missing photos — AI translates Hebrew names to English and finds a matching photo (Pexels, Unsplash, Pixabay or Wikimedia Commons) for every recipe that has none; a library that asks for a pause (\"too many searches\") is waited for and asked again; Undo puts things back",
   "- 🏅 The recipe counter: the rosette next to your household's name counts its recipes (a collection counts as its recipes). Its metal rises with the count — First steps, then Bronze at 10, Silver 25, Gold 50, Platinum 100, Ruby 250, Diamond 500 and Legendary at 1000 — and each new rank is celebrated once. Tap it to see all the ranks and how far the next one is",
   "- 📏 Scaling memory: the app remembers the last serving size multiplier you used for each recipe",
   "- 🌙 Screen stay-on (Wake Lock): when you open a recipe, the screen stays on automatically so your hands can stay clean while cooking. It goes back to normal sleep when you close the recipe. Works in Chrome and Edge on Android; not supported in Safari.",
@@ -33600,17 +33611,17 @@ var HELP_SYSTEM_PROMPT = [
   "- A new person is asked whether to start their own collection or join one they were invited to (paste the link).",
   "- DURING THE BETA, MY KITCHEN NOTES IS BY INVITATION ONLY: a new kitchen can be started only by someone the app's owner invited, signed in with the very address the invitation was sent to (forwarding the invitation lets nobody else in). Invited at another address? Sign out and sign in with that one.",
   "- To cook together with family or friends, invite them to YOUR kitchen: the 📲 share icon next to the language picker (or ⚙️ → 🏠 My household → 🔗 Invitation link…) makes a link that works for 14 days and lets them in with 👁 Read only; give them more once they have joined. Only the kitchen's owner and its managers can invite. Someone can also be added by e-mail in 👥 Family Access, or ask to join with your kitchen's identifier.",
-  "- LINK WITH ANOTHER HOUSEHOLD: ⋯ More → 🤝 Connect with another household (the owner, or someone with full access). Type that household's identifier (MKN-…; yours is at the top of the main screen — 🪪 MKN-…, a click copies it — and in ⚙️ → 🏠 My household → 🪪 Display my personal identifier) or the e-mail address of anyone in it. Its owner or an admin is asked at once if the app is open (otherwise the next time they open it): Accept, Reject or Remind me later — with the note that came with it. By e-mail address the request also goes through the app — it pops up for that person if they use My Kitchen Notes, or waits until they join with that address (the app never says whether an address has an account); you may also tell them yourself: Via Email (your default mail app, Gmail or Outlook — if no mail app opens, choose your e-mail on the web), Via WhatsApp, or Copy message to Clipboard. The message has a link that opens the request in their app, to accept it. Every step has ‹ Back, with what you typed kept. A refusal is never shown to the sender.",
+  "- LINK WITH ANOTHER HOUSEHOLD: ··· More → 🏡 Kitchens and people → 🤝 Connect with another household (the owner, or someone with full access). Type that household's identifier (MKN-…; yours is at the top of the main screen — 🪪 MKN-…, a click copies it — and in ⚙️ → 🏠 My household → 🪪 Display my personal identifier) or the e-mail address of anyone in it. Its owner or an admin is asked at once if the app is open (otherwise the next time they open it): Accept, Reject or Remind me later — with the note that came with it. By e-mail address the request also goes through the app — it pops up for that person if they use My Kitchen Notes, or waits until they join with that address (the app never says whether an address has an account); you may also tell them yourself: Via Email (your default mail app, Gmail or Outlook — if no mail app opens, choose your e-mail on the web), Via WhatsApp, or Copy message to Clipboard. The message has a link that opens the request in their app, to accept it. Every step has ‹ Back, with what you typed kept. A refusal is never shown to the sender.",
   "- A REQUEST SENT TO YOUR E-MAIL ADDRESS shows in 📬 Link requests only once that address is CONFIRMED (an account made with e-mail and a password must confirm it from the e-mail sent to it). Not confirmed yet? The Link requests page says so (\"is NOT confirmed yet\"), sends the confirmation e-mail again, and notices by itself, when opened, that it has been confirmed.",
   "- Once linked, each household sees the other's recipes, read-only — and live: a change in their kitchen shows in yours within seconds, the changed card glowing for a moment: after its own in the main list, under that household's name, on a faint blue (hover one: 'A recipe from …'). 🏠 Kitchens ▾ in the filter bar chooses whose recipes show — tick one, several or all. 📥 Save a copy to my recipes makes one your own. Links do not chain: a third household linked to theirs is not seen. Links are listed, and removed, in ⚙️ → 🏠 My household → 👥 Family Access. ⚙️ → 🏠 My household → 🤝 Link requests through the app: blocked stops requests by identifier; requests by e-mail always arrive.",
   "- 📬 LINK REQUESTS: ⚙️ → 🏠 My household → 📬 Link requests — the number in brackets beside it is how many wait for an answer. Every request in one place: Waiting (Accept / Reject / 🚫 Block), Sent by your household (Withdraw), Linked now (Revoke access), and earlier answers. A request may carry a note, and the two households can write to each other there — the latest message shows, highlighted, with ↩ Reply; earlier ones are under 💬 Conversation. Only the household's name is shown, never a person's. Reject is for now: if they ask again — by identifier or by e-mail — their request is back under Waiting. 🚫 Block is for good, until you Unblock it under the earlier answers; they are never told, and on their side it reads “waiting”. A new message or request arrives while the app is open: a red dot (and a short notice with Open) within seconds, no reload needed. A red dot on ⚙️ leads to anything new. The switch there decides whether other households may ask through the app at all.",
-  "- 👪 CHAT WITH FAMILY MEMBERS (the people in YOUR household only): ⋯ More → 👪 Chat with family members — or 💬 Chat beside a person in 👥 Family Access (someone added by address who has not signed in yet says ⏳ hasn’t signed in yet: their 💬 Chat comes once they do). 📣 Everyone in <your kitchen> is the room for announcements: everyone in the household reads it. Or choose one person: only the two of you read that conversation. Everyone in the household can write, readers too. Messages arrive live: a short notice with Open, and a red dot on ⋯ More until you have read them. Nothing is changed or deleted afterwards; deleting the household deletes them.",
+  "- 👪 CHAT WITH FAMILY MEMBERS (the people in YOUR household only): ··· More → 🏡 Kitchens and people → 👪 Chat with family members — or 💬 Chat beside a person in 👥 Family Access (someone added by address who has not signed in yet says ⏳ hasn’t signed in yet: their 💬 Chat comes once they do). 📣 Everyone in <your kitchen> is the room for announcements: everyone in the household reads it. Or choose one person: only the two of you read that conversation. Everyone in the household can write, readers too. Messages arrive live: a short notice with Open, and a red dot on ⋯ More until you have read them. Nothing is changed or deleted afterwards; deleting the household deletes them.",
   "- 🧑‍🍳 FIRST VISIT: a one-time setup on a notebook page — your account (your e-mail and a password you make up; or 'I already have an account', or Continue offline), this device's Save button (the iPhone shortcut, the Android app in the Share menu, or the computer's browser extension — each new device asks this once; later from ⚙️ Settings), the kitchen rules, then a quick tour.",
-  "- 📨 SEND A RECIPE TO ANOTHER KITCHEN: open the recipe → 📤 Share → 📨 Send to another kitchen. Via My Kitchen Notes: type their kitchen's identifier (MKN-…) — it pops up in their app, with a sound, and waits in ⋯ More → 📨 Recipes sent to me. Or ✉️ Via Email (type their address: the app e-mails them its photo, your note and a button to save it — no mail program needed; your own mail is offered only if the app cannot send it), Via WhatsApp, 📤 Via another app (on a phone or a tablet: its share menu, with the link — if the phone asks for one more tap, press 📤 Open the share menu), or Copy the link: anyone with the link can open it, even without an account. It is a copy of the recipe as it is now — photo, bold words, notes and all; not your cooking log, ratings or the heart — with a note from you if you like. They tap 📥 Save to my recipes and it is theirs, no AI involved. It keeps for 4 weeks. ⋯ More → 📤 Recipes I sent shows whether it was saved, copies a link again, sends it again, and takes one back — tick several (or Select all) to do it for all of them at once: ↩️ Take back, 📨 Send again (to a kitchen: it pops up in their app again for 4 more weeks, the earlier one taken back; a link: new links, good for 4 more weeks, in one message — the earlier ones keep working until they expire), 🔗 Copy the links. A kitchen that gets unwanted recipes can 🚫 Block the sender (the owner or an admin). During the closed beta, someone without an account who opens the link sees the recipe and can ask for an invitation — with their address already filled in when it came by e-mail.",
+  "- 📨 SEND A RECIPE TO ANOTHER KITCHEN: open the recipe → 📤 Share → 📨 Send to another kitchen. Via My Kitchen Notes: type their kitchen's identifier (MKN-…) — it pops up in their app, with a sound, and waits in ··· More → 🏡 Kitchens and people → 📨 Recipes sent to me. Or ✉️ Via Email (type their address: the app e-mails them its photo, your note and a button to save it — no mail program needed; your own mail is offered only if the app cannot send it), Via WhatsApp, 📤 Via another app (on a phone or a tablet: its share menu, with the link — if the phone asks for one more tap, press 📤 Open the share menu), or Copy the link: anyone with the link can open it, even without an account. It is a copy of the recipe as it is now — photo, bold words, notes and all; not your cooking log, ratings or the heart — with a note from you if you like. They tap 📥 Save to my recipes and it is theirs, no AI involved. It keeps for 4 weeks. ··· More → 🏡 Kitchens and people → 📤 Recipes I sent shows whether it was saved, copies a link again, sends it again, and takes one back — tick several (or Select all) to do it for all of them at once: ↩️ Take back, 📨 Send again (to a kitchen: it pops up in their app again for 4 more weeks, the earlier one taken back; a link: new links, good for 4 more weeks, in one message — the earlier ones keep working until they expire), 🔗 Copy the links. A kitchen that gets unwanted recipes can 🚫 Block the sender (the owner or an admin). During the closed beta, someone without an account who opens the link sees the recipe and can ask for an invitation — with their address already filled in when it came by e-mail.",
   "- ✉️ E-MAIL A RECIPE (📤 Share → ✉️ Email): type their address and press 📨 Send — the app e-mails the recipe, laid out with its photo, from your kitchen's name via My Kitchen Notes; their reply comes to your own address. Nothing to paste, and no mail program needed (signed in, your address confirmed; up to 15 e-mails a day). On a phone, 📤 Share menu hands the photo and the recipe to the mail app you pick. 📋 Copy copies it, photo and all, to paste anywhere else. (To send a recipe that another kitchen saves with one tap, use 📨 Send to another kitchen.)",
   "- 🔒 SECRET RECIPES: in the editor, tick 🔒 Secret — the recipe (and its photo) is then kept where only your own kitchen can read it; the kitchens you link with do not see it, nor know it exists. Untick it to share it again. A 🔒 shows on its card.",
   "- 🔄 RELOAD A LINKED KITCHEN: beside a linked kitchen's name in your recipe list, 🔄 Reload reads its recipes and photos again from the start — for when something looks missing or out of date.",
-  "- 💬 CHATS WITH LINKED KITCHENS: ⋯ More → 💬 Chats with linked kitchens — or 💬 Chat beside a linked kitchen's name in your recipe list, or in 👥 Family Access. Every conversation, newest first, with what is new; open one to read it all and write (Enter sends, Shift+Enter starts a new line). The same conversations are also on 📬 Link requests. A red dot on ⋯ More and on ⚙️ says something new arrived.",
+  "- 💬 CHATS WITH LINKED KITCHENS: ··· More → 🏡 Kitchens and people → 💬 Chats with linked kitchens — or 💬 Chat beside a linked kitchen's name in your recipe list, or in 👥 Family Access. Every conversation, newest first, with what is new; open one to read it all and write (Enter sends, Shift+Enter starts a new line). The same conversations are also on 📬 Link requests. A red dot on ⋯ More and on ⚙️ says something new arrived.",
   "- ♿ ACCESSIBILITY: ⚙️ → ♿ Accessibility, on this device: 🎨 Colours for red–green colour blindness (the most common colour blindness, where reds and greens look alike, brownish): wherever a colour says something, green becomes blue and red becomes a deep orange — all right / a problem, the sync dot, Easy and Hard, the Self Test's results, delete buttons — and a notification dot turns blue inside its ring; and the recipe photos are colour-corrected, so a red tomato and a green pepper no longer look alike (they look a little different to everyone else). For the whole phone, an iPhone has its own: Settings → Accessibility → Display & Text Size → Color Filters → Red/Green Filter; Android: Settings → Accessibility → Color correction. 🟡 A yellow ring round the notification dots (on unless turned off) so a new message or request catches the eye, on ⋯ More and in ⚙️. 🌗 Theme: light, dark, or as the device. 🔔 the sound when something arrives, and 🎵 which sound.",
   "- 👉 NOTICES THAT TAKE YOU THERE: a notice at the bottom of the screen with a › at its end is a button — tap or click it (or Enter) to go where it points: a new message opens its chat; a kitchen linked or accepted shows only that kitchen's recipes; a recipe saved, imported, copied, translated or added opens it; a note from a tester opens 👑 → 📊 Households → 💬 Feedback; someone asking to add recipes, or joining, opens 👥 Family Access; a link request sent opens 📬 Link requests; a backup opens 💾 Backups; a failed sync or the AI allowance opens Sync Health; an error opens the log. The place it leads to is marked with a yellow ring for a moment. Such a notice stays up at least 6 seconds; a notice about what is already on the screen has no › and goes nowhere. On a notice with a button (Open, ↩︎ Undo, Back up now) the button does its own thing — tapping the words of an Undo notice never undoes.",
   "- 🔔 A SOUND WHEN SOMETHING ARRIVES: a message (from a linked kitchen, from your family, an answer to your note) taps twice; a request to link kitchens taps three times. Choose the sound — 🥂 Spoon on a wine glass, 🛎️ The kitchen’s service bell, 🥄 Wooden spoon on a pot, each with ▶ to hear it — in ⚙️ → ♿ Accessibility → 🎵 The sound; untick 🔔 Sound for messages and requests to mute it. On this device only. Browsers keep a page silent until it has been touched once since opening, so a message that arrives before that is not heard. On a phone it plays at the media volume; an iPhone on silent (the switch on its side) plays no sound.",
@@ -33629,7 +33640,7 @@ var HELP_SYSTEM_PROMPT = [
   "- ? → ℹ️ About: the version (and Update now when a newer one is out), ✨ What can this app do, ✉️ Contact us, the Privacy Statement and the Terms of Use",
   "- ✉️ Contact us: write to us by e-mail, or leave a note inside the app",
   "- Where a 💬 button shows (bottom-left), it sends a note about the app with a screenshot; answers arrive in the app (⚙️ → 💬 Help and feedback → 📨 Answers to my notes)",
-  "- 📲 The share icon next to the language picker (and ⋯ More → Share this app): while the app takes newcomers by invitation only it is called 'Share this app with family' and invites someone to your kitchen (see the household section) instead of sending the app's link; otherwise it sends a link to the app",
+  "- 📲 The share icon next to the language picker (and ··· More → 🏡 Kitchens and people → Share this app): while the app takes newcomers by invitation only it is called 'Share this app with family' and invites someone to your kitchen (see the household section) instead of sending the app's link; otherwise it sends a link to the app",
   "",
   "=== THE FARM VISITORS ===",
   "- Now and then a cartoon farm animal strolls across the screen. Tap it and it turns to you and says something — in a Scottish voice where the device has one (an iPhone, an iPad or a Mac has Fiona), otherwise a British one; then, still looking at you, it vanishes in a puff of smoke",
