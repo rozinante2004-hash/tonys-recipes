@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.36 -->
+<!-- Tony's Recipes Collection v39.37 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -10695,7 +10695,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.36';
+var APP_VERSION = 'v39.37';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -11298,6 +11298,14 @@ async function getGmailToken(opts) {
   // (the e-mail window fetched it — gmailPreload), or an iPhone blocks that window.
   if (!(window.google && window.google.accounts)) { try { await loadScriptOnce(GSI_CLIENT_URL, 'google'); } catch (e) {} }
   if (!window._gmailOAuthClientId) await gmailClientIdFind();   // v38.42
+  // v39.37 — Tony, 5 Nov 2026: "Is there a way to remove Google's scare screens every time I invite a new tester … I have
+  // to go through 5 screens each time". Every first send since the app opened asked with prompt 'consent', which makes
+  // Google show its whole sequence again (the account, "Google hasn't verified this app", the permission) although he
+  // had allowed it before; and each address of a batch asked again. Now Google is asked to show its screens only when
+  // it needs to (prompt '' — the first time, or after the permission was withdrawn), and a permission under 50 minutes
+  // old (Google's last an hour) is used again without asking.
+  if (window._googleAccessToken && window._googleAccessTokenAt && Date.now() - window._googleAccessTokenAt < 50 * 60e3)
+    return window._googleAccessToken;
   return new Promise(function(resolve, reject) {
     if(!window.google || !window.google.accounts) {
       reject(new Error('Google Identity Services not loaded. Please refresh the page.'));
@@ -11316,6 +11324,7 @@ async function getGmailToken(opts) {
           reject(new Error('Gmail auth error: ' + response.error));
         } else {
           window._googleAccessToken = response.access_token;
+          window._googleAccessTokenAt = Date.now();
           resolve(response.access_token);
         }
       },
@@ -11324,7 +11333,7 @@ async function getGmailToken(opts) {
         reject(new Error('Gmail auth error: ' + ((e && e.type) || 'the window was closed')));
       }
     });
-    client.requestAccessToken({prompt: window._googleAccessToken ? '' : 'consent'});
+    client.requestAccessToken({ prompt: '' });          // v39.37 — Google's screens only when it needs them
   });
 }
 window.getGmailToken = getGmailToken;
@@ -11387,7 +11396,7 @@ async function sendViaGmailApi(to, subject, htmlBody, plainText, opts) {
   if(!resp.ok) {
     var err = await resp.json().catch(function(){ return {}; });
     if(resp.status === 401) {
-      window._googleAccessToken = null; // Clear stale token
+      window._googleAccessToken = null; window._googleAccessTokenAt = 0; // Clear stale token
       throw new Error('Gmail access expired. Press Send Email again and allow access when Google asks.');
     }
     throw new Error('Gmail API error ' + resp.status + ': ' + (err.error ? err.error.message : 'Unknown error'));
@@ -14138,7 +14147,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.36</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.37</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14226,7 +14235,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.36</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.37</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -33766,6 +33775,7 @@ var HELP_SYSTEM_PROMPT = [
   "- A new version is noticed while the app stays open, and pulling the list down checks at once and says what it found (v39.31, v39.32)",
   "- The Self Test report and Sync Health give times in this device's own time, its UTC offset after it (v39.31)",
   "- (The app's owner) A correction in ✏️ Edit translations is never lost: it is kept on the device until it is shared, Save writes only what was changed, and a Save that is not shared says why (v39.34)",
+  "- (The app's owner) 📧 Send with Gmail, for the testers' invitations: Google asks for permission only the first time (or after it was withdrawn), and once allowed, a batch of invitations goes out without Google's screens for the next 50 minutes (v39.37)",
   "- 🐄 The farm visitors speak more slowly, and the child and the female a little higher (v39.36)",
   "- 🐄 The farm visitors speak with the voice chosen for everyone: a child or a female is never a man's voice on a device that has another, Microsoft Edge's own child voice speaks for the child, and the owner's farm window says which voice speaks for each choice on that device (v39.35)",
   "- 🕐 Recently Viewed: a 'Recent' chip appears in the filter bar after you open any recipe — shows your last 8 viewed",

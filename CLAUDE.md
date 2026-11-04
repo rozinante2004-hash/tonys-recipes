@@ -1437,6 +1437,18 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
   - **Released: v39.09 (29 Oct 2026, 11:17 Israel time, on 0de2dde; Tony: "Yes, release v39.09").** Every job success:
     Deploy to GitHub Pages, pages build, Publish languages, Translate new phrases, Self Tests on main and test,
     Cloudflare Pages for the beta and test.
+  - **v39.37 — 📧 Send with Gmail asks Google only when it must** (Tony, 5 Nov 2026: "Is there a way to remove Google's
+    scare screens every time I invite a new tester to join the Beta? I'm not concerned about them, it's just that I have to
+    go through 5 screens each time, and it is very time consuming."). The invitations' 📧 Send with Gmail asked Google's
+    token client with prompt 'consent' at the first send after the app opened — Google then shows its whole sequence
+    again (account, "Google hasn't verified this app" → Advanced → Go to…, the permission, continue), though he had
+    allowed it before; and every address of a batch requested a token again. Now `prompt: ''` (Google asks only the first
+    time, or after the permission was withdrawn) and a token under 50 minutes old is reused (`_googleAccessTokenAt`).
+    Self Test `gmail_asks_google_once` (fails on v39.36: prompt "consent"). Cannot be tried from here (no Google sign-in);
+    if Google still asks on the iPhone (the installed app's Google window may not keep his Google sign-in), the way
+    without any Google screen is sending the invitations from the app's own address (contact@…, as 📨 Send does) — a
+    Worker change, offered to Tony. Google verifying the app (gmail.send is a sensitive scope: a demo video and weeks of
+    review) would remove the warning screen only; not worth it for one person.
   - **v39.36 — the farm visitors speak slower, the child and the female higher** (Tony, 5 Nov 2026: "The animals sound as
     if the are in a hurry. Could you please make them speak a bit slower, and with a bit of a higher pitch? Let's make it
     simpler. Don't add it to the app yet, but present me with some options so I could select which works better").

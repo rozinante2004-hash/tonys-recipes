@@ -11083,6 +11083,31 @@ window.SELF_TESTS = [
       }
     } },
 
+  { id:'gmail_asks_google_once', group:'Security', name:'📧 Send with Gmail asks Google for permission only when Google needs to ask, and uses a permission under 50 minutes old again without asking (v39.37)',
+    test: async()=>{
+      // Tony, 5 Nov 2026: "Is there a way to remove Google's scare screens every time I invite a new tester to join the
+      // Beta? … I have to go through 5 screens each time". prompt 'consent' made Google show them all at every first send.
+      var real={ google:window.google, owner:window.isAppOwner, id:window._gmailOAuthClientId, tok:window._googleAccessToken, at:window._googleAccessTokenAt };
+      var asked=[], configs=[];
+      try{
+        window.isAppOwner=function(){ return true; };
+        window._gmailOAuthClientId='123-test.apps.googleusercontent.com';
+        window._googleAccessToken=null; window._googleAccessTokenAt=0;
+        window.google={ accounts:{ oauth2:{ initTokenClient:function(cfg){ configs.push(cfg); return { requestAccessToken:function(o){ asked.push(o||{}); setTimeout(function(){ cfg.callback({ access_token:'tok'+asked.length }); }, 0); } }; } } } };
+        var t1=await getGmailToken({ owner:true });
+        if(asked.length!==1 || asked[0].prompt!=='') throw new Error('Google is asked to show its screens every time: prompt '+JSON.stringify(asked[0] && asked[0].prompt));
+        if(configs[0].scope.indexOf('gmail.send')===-1) throw new Error('the permission asked for is not gmail.send');
+        var t2=await getGmailToken({ owner:true });
+        if(asked.length!==1 || t2!==t1) throw new Error('the next invitation of the batch asked Google again');
+        window._googleAccessTokenAt=Date.now()-51*60e3;
+        var t3=await getGmailToken({ owner:true });
+        if(asked.length!==2 || asked[1].prompt!=='' || t3===t1) throw new Error('a permission close to expiring was used, or Google was asked for every screen');
+      } finally {
+        window.google=real.google; window.isAppOwner=real.owner; window._gmailOAuthClientId=real.id;
+        window._googleAccessToken=real.tok; window._googleAccessTokenAt=real.at;
+      }
+    } },
+
   { id:'farm_voice_kind_kept', group:'UI', name:'🐄 The farm visitors speak with the voice chosen: a child or a female is never a man’s voice while the device has another (Windows, an Apple device without Fiona, Android); Edge’s own child voice is the child; the voices read afresh; the farm window names each (v39.35)',
     test: async()=>{
       // Tony, 5 Nov 2026: "The animals' voice in the Admin settings is set to child. However, I just got an animal that
