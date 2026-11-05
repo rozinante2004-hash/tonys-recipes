@@ -1,7 +1,7 @@
 {
  "lang": "hu",
- "updatedAt": 1793910856819,
- "count": 2531,
+ "updatedAt": 1793915003794,
+ "count": 2533,
  "strings": {
   "\"Add to Home Screen\"": "Hozzáadás a kezdőképernyőhöz",
   "\"Open Bring!\"": "Bring! megnyitása",
@@ -557,6 +557,7 @@
   "Kitchens to show": "Megjelenítendő konyhák",
   "Kosher": "Kóser",
   "Last backup": "Legutóbbi mentés",
+  "Last backup: today": "Utolsó mentés: ma",
   "Last backup: {1} days ago": "Legutóbbi mentés: {1} napja",
   "Last successful save": "Legutóbbi sikeres mentés",
   "Last successful sync": "Legutóbbi sikeres szinkronizálás",
@@ -2367,6 +2368,7 @@
   "🔄 Update all supported languages": "🔄 Minden támogatott nyelv frissítése",
   "🔄 Update now": "🔄 Frissítés most",
   "🔄 synced Aug {1}, {2}, {3} PM · {4} messages · {5} → {6}": "🔄 szinkronizálva: aug. {1}., {2}, {3} du. · {4} üzenet · {5} → {6}",
+  "🔄 synced Nov {1}, {2}, {3} PM · {4} messages · {5} → {6}": "🔄 szinkronizálva: nov. {1}, {2}, {3} du. · {4} üzenet · {5} → {6}",
   "🔇 Mute — no sound when something arrives": "🔇 Némítás — nincs hang, ha érkezik valami",
   "🔍 Auto-detect": "🔍 Automatikus felismerés",
   "🔍 Details": "🔍 Részletek",

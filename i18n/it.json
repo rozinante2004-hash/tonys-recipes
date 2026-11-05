@@ -1,7 +1,7 @@
 {
  "lang": "it",
- "updatedAt": 1793910856819,
- "count": 2673,
+ "updatedAt": 1793915002638,
+ "count": 2675,
  "strings": {
   "\"Add to Home Screen\"": "Aggiungi a Home",
   "\"Open Bring!\"": "Apri Bring!",
@@ -590,6 +590,7 @@
   "Kitchens to show": "Cucine da mostrare",
   "Kosher": "Kosher",
   "Last backup": "Ultimo backup",
+  "Last backup: today": "Ultimo backup: oggi",
   "Last backup: {1} days ago": "Ultimo backup: {1} giorni fa",
   "Last successful save": "Ultimo salvataggio riuscito",
   "Last successful sync": "Ultima sincronizzazione riuscita",
@@ -2504,6 +2505,7 @@
   "🔄 Update all supported languages": "🔄 Aggiorna tutte le lingue supportate",
   "🔄 Update now": "🔄 Aggiorna ora",
   "🔄 synced Aug {1}, {2}, {3} PM · {4} messages · {5} → {6}": "🔄 sincronizzato {1} ago {2}, {3} PM · {4} messaggi · {5} → {6}",
+  "🔄 synced Nov {1}, {2}, {3} PM · {4} messages · {5} → {6}": "🔄 sincronizzato nov {1}, {2}, {3} PM · {4} messaggi · {5} → {6}",
   "🔄 synced Oct {1}, {2}, {3} PM · {4} messages · ? → ?": "🔄 sincronizzato il {1} ott, {2}, {3} PM · {4} messaggi · ? → ?",
   "🔇 Mute — no sound when something arrives": "🔇 Silenzioso — nessun suono quando arriva qualcosa",
   "🔍 Auto-detect": "🔍 Rilevamento automatico",

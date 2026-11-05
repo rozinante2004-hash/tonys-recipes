@@ -1,7 +1,7 @@
 {
  "lang": "pt",
- "updatedAt": 1793910856819,
- "count": 2514,
+ "updatedAt": 1793915005866,
+ "count": 2516,
  "strings": {
   "\"Add to Home Screen\"": "Adicionar à tela inicial",
   "\"Open Bring!\"": "Abrir Bring!",
@@ -554,6 +554,7 @@
   "Kitchens to show": "Cozinhas a mostrar",
   "Kosher": "Kosher",
   "Last backup": "Última cópia de segurança",
+  "Last backup: today": "Último backup: hoje",
   "Last backup: {1} days ago": "Última cópia de segurança: há {1} dias",
   "Last successful save": "Última gravação com sucesso",
   "Last successful sync": "Última sincronização com sucesso",
@@ -2350,6 +2351,7 @@
   "🔄 Update all supported languages": "🔄 Atualizar todos os idiomas compatíveis",
   "🔄 Update now": "🔄 Atualizar agora",
   "🔄 synced Aug {1}, {2}, {3} PM · {4} messages · {5} → {6}": "🔄 sincronizado em {1} de ago., {2}, {3} PM · {4} mensagens · {5} → {6}",
+  "🔄 synced Nov {1}, {2}, {3} PM · {4} messages · {5} → {6}": "🔄 sincronizado em {1} de nov, {2}, {3} PM · {4} mensagens · {5} → {6}",
   "🔇 Mute — no sound when something arrives": "🔇 Silenciar — sem som quando algo chegar",
   "🔍 Auto-detect": "🔍 Detectar automaticamente",
   "🔍 Details": "🔍 Detalhes",

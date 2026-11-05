@@ -1,7 +1,7 @@
 {
  "lang": "de",
- "updatedAt": 1793910856819,
- "count": 2785,
+ "updatedAt": 1793915004241,
+ "count": 2786,
  "strings": {
   "\"Add to Home Screen\"": "Zum Home-Bildschirm hinzufügen",
   "\"Open Bring!\"": "Bring! öffnen",
@@ -2610,6 +2610,7 @@
   "🔄 Update all supported languages": "🔄 Alle unterstützten Sprachen aktualisieren",
   "🔄 Update now": "🔄 Jetzt aktualisieren",
   "🔄 synced Aug {1}, {2}, {3} PM · {4} messages · {5} → {6}": "🔄 synchronisiert Aug {1}, {2}, {3} PM · {4} Nachrichten · {5} → {6}",
+  "🔄 synced Nov {1}, {2}, {3} PM · {4} messages · {5} → {6}": "🔄 synchronisiert am Nov {1}, {2}, {3} PM · {4} Nachrichten · {5} → {6}",
   "🔄 synced Oct {1}, {2}, {3} PM · {4} messages · ? → ?": "🔄 synchronisiert Okt. {1}, {2}, {3} Uhr · {4} Nachrichten · ? → ?",
   "🔄 synced {1} Aug {2}, {3} · {4} messages · {5} → {6}": "🔄 synchronisiert {1} Aug {2}, {3} · {4} Nachrichten · {5} → {6}",
   "🔇 Mute — no sound when something arrives": "🔇 Stumm — kein Ton bei neuen Nachrichten",

@@ -1,7 +1,7 @@
 {
  "lang": "fr",
- "updatedAt": 1793910856819,
- "count": 2787,
+ "updatedAt": 1793915006799,
+ "count": 2788,
  "strings": {
   "\"Add to Home Screen\"": "Ajouter à l'écran d'accueil",
   "\"Open Bring!\"": "Ouvrir Bring!",
@@ -2612,6 +2612,7 @@
   "🔄 Update all supported languages": "🔄 Mettre à jour toutes les langues prises en charge",
   "🔄 Update now": "🔄 Mettre à jour",
   "🔄 synced Aug {1}, {2}, {3} PM · {4} messages · {5} → {6}": "🔄 synchronisé le {1} août, {2}, {3} PM · {4} messages · {5} → {6}",
+  "🔄 synced Nov {1}, {2}, {3} PM · {4} messages · {5} → {6}": "🔄 synchronisé le {1} nov. {2} à {3} PM · {4} messages · {5} → {6}",
   "🔄 synced Oct {1}, {2}, {3} PM · {4} messages · ? → ?": "🔄 synchronisé le {1} oct., {2}, {3} PM · {4} messages · ? → ?",
   "🔄 synced {1} Aug {2}, {3} · {4} messages · {5} → {6}": "🔄 synchronisé le {1} août {2}, {3} · {4} messages · {5} → {6}",
   "🔇 Mute — no sound when something arrives": "🔇 Muet — aucun son à l'arrivée",
