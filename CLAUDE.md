@@ -1454,6 +1454,21 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
     line's 3 phrases translated), Publish languages (00:55 — 3065b02 on main; test fast-forwarded; its Deploy to
     GitHub Pages, pages build and Cloudflare Pages for test 00:56), Self Tests on main (01:11). The published
     Hebrew keeps Tony's headings.
+  - **Released: v39.46 + Worker v102 to the family's copy and the beta (6 Nov 2026, 01:29 Israel time, on 41830ee;
+    Tony: "Release v39.46 to family and beta when green").** Green first on test: 04c6775 (Cloudflare Pages for test
+    and Deploy the Worker 01:09 — Worker v102 live from then; Self Tests success), then 41830ee (Self Tests 01:29).
+    Every job success: Cloudflare Pages for the beta (01:30); on main: Deploy to GitHub Pages and pages build (01:30),
+    Deploy the Worker (01:30, v102 already live), Translate new phrases (01:32 — the 4 new phrases in each of the 11
+    languages; AI 11 calls), Publish languages (01:33 — f29b23c on main, test fast-forwarded; its Deploy to GitHub
+    Pages, pages build and Cloudflare Pages for test 01:33–01:34), Self Tests on main (01:48). The published Hebrew
+    keeps Tony's headings ("🏡 על מטבחים ואנשים", "🧹 סידורים", "👑 מנהל האפליקציה"); "🌐 Also searching:" is
+    "🌐 מחפש גם:". **Then at 01:50 a publish from the app (d1680a5, "Languages: published from the app") added 72
+    Hebrew entries** — Tony's 3 rewordings of the new privacy lines (kept: his choice), a few real phrases ("🥗 Omnivore
+    ▾", "❤️ Favourite", "🔍 Searching Pixabay…", "{1} from Pixabay — tap to select"), and junk the guard let through:
+    photo credits ("© <photographer>", "<name> from <city>, <country>", "Photo: {1} · CC BY {2} ·"), recipe-card lines
+    ("Dinner · {1} · serves - · …"), a recipe's name, the version-compare lines ("notes differ") and a status line
+    listing languages with counts. Its jobs all success (Deploy to GitHub Pages 01:50, pages build 01:51, Cloudflare
+    Pages for test 01:51). Taken up as v39.47.
   - **v39.46 + Worker v102 — 🌐 a search finds recipes in every language they are written in** (Tony, 6 Nov 2026, ~01:00
     Israel time: "When searching for an item in the main search box, it should search for translations of the same
     meaning in all the languages there are recipes in… if I search for \"Mushrooms\" … for \"פטריות\" as well… The list
