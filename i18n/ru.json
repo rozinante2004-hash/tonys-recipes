@@ -1,7 +1,7 @@
 {
  "lang": "ru",
- "updatedAt": 1793921512805,
- "count": 3117,
+ "updatedAt": 1793921884518,
+ "count": 3119,
  "strings": {
   "\"Add to Home Screen\"": "Добавить на главный экран",
   "\"One item away\" filter ({1}f.{2})": "Фильтр «Не хватает одного» ({1}ф.{2})",
@@ -2148,6 +2148,7 @@
   "{1} and everything that was only yours are gone, and this device has been cleared.": "{1} и всё, что было только вашим, исчезло, это устройство очищено.",
   "{1} chats · {2} messages": "{1} чатов · {2} сообщений",
   "{1} check{2} did not pass": "проверка {1}{2} не пройдена",
+  "{1} day ago": "{1} день назад",
   "{1} days ago": "{1} дн. назад",
   "{1} error recorded": "Записано ошибок: {1}",
   "{1} errors recorded": "зафиксировано ошибок: {1}",
@@ -2923,6 +2924,7 @@
   "📸 Take a photo now": "📸 Сделать фото сейчас",
   "📸 Using the caption you shared — Instagram won't give it to us any other way": "📸 По подписи, которой вы поделились — иначе Instagram её не отдаёт",
   "🔁 Switch household…": "🔁 Сменить семью…",
+  "🔄 Arabic +{1} · Russian +{2} · French +{3} · Spanish +{4} · German +{5} · Italian +{6} · Portuguese +{7} · Chinese (Simplified) +{8} · Hungarian +{9} — shared with everyone": "🔄 Арабский +{1} · Русский +{2} · Французский +{3} · Испанский +{4} · Немецкий +{5} · Итальянский +{6} · Португальский +{7} · Китайский (упрощённый) +{8} · Венгерский +{9} — доступно всем",
   "🔄 Checking for a new version…": "🔄 Проверка обновлений…",
   "🔄 Checking for changes…": "🔄 Проверка изменений…",
   "🔄 Hebrew +{1} · Arabic +{2} · Russian +{3} · French +{4} · Spanish +{5} · German +{6} · Italian +{7} · Chinese (Simplified) +{8} · Japanese +{9} — shared with everyone": "🔄 Иврит +{1} · Арабский +{2} · Русский +{3} · Французский +{4} · Испанский +{5} · Немецкий +{6} · Итальянский +{7} · Китайский (упрощённый) +{8} · Японский +{9} — доступно всем",

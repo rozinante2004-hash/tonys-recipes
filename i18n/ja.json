@@ -1,7 +1,7 @@
 {
  "lang": "ja",
- "updatedAt": 1793921512805,
- "count": 3128,
+ "updatedAt": 1793921885162,
+ "count": 3129,
  "strings": {
   "\"Add to Home Screen\"": "ホーム画面に追加",
   "\"One item away\" filter ({1}f.{2})": "「あと1品」フィルター（{1}f.{2}）",
@@ -2930,6 +2930,7 @@
   "📸 Take a photo now": "📸 今すぐ写真を撮る",
   "📸 Using the caption you shared — Instagram won't give it to us any other way": "📸 共有されたキャプションを使用 — Instagramはこの方法でしかキャプションを渡してくれません",
   "🔁 Switch household…": "🔁 世帯を切り替える…",
+  "🔄 Arabic +{1} · Russian +{2} · French +{3} · Spanish +{4} · German +{5} · Italian +{6} · Portuguese +{7} · Chinese (Simplified) +{8} · Hungarian +{9} — shared with everyone": "🔄 アラビア語 +{1}・ロシア語 +{2}・フランス語 +{3}・スペイン語 +{4}・ドイツ語 +{5}・イタリア語 +{6}・ポルトガル語 +{7}・中国語(簡体字) +{8}・ハンガリー語 +{9} — 全員と共有",
   "🔄 Checking for a new version…": "🔄 新しいバージョンを確認中…",
   "🔄 Checking for changes…": "🔄 変更を確認中…",
   "🔄 Hebrew +{1} · Arabic +{2} · Russian +{3} · French +{4} · Spanish +{5} · German +{6} · Italian +{7} · Chinese (Simplified) +{8} · Japanese +{9} — shared with everyone": "🔄 ヘブライ語 +{1} ・アラビア語 +{2} ・ロシア語 +{3} ・フランス語 +{4} ・スペイン語 +{5} ・ドイツ語 +{6} ・イタリア語 +{7} ・中国語(簡体字) +{8} ・日本語 +{9} — 全員と共有済み",

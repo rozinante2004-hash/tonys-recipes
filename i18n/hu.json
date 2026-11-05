@@ -1,7 +1,7 @@
 {
  "lang": "hu",
- "updatedAt": 1793921512805,
- "count": 2536,
+ "updatedAt": 1793921884684,
+ "count": 2539,
  "strings": {
   "\"Add to Home Screen\"": "Hozzáadás a kezdőképernyőhöz",
   "\"Open Bring!\"": "Bring! megnyitása",
@@ -558,6 +558,7 @@
   "Kosher": "Kóser",
   "Last backup": "Legutóbbi mentés",
   "Last backup: today": "Utolsó mentés: ma",
+  "Last backup: yesterday": "Utolsó biztonsági mentés: tegnap",
   "Last backup: {1} days ago": "Legutóbbi mentés: {1} napja",
   "Last successful save": "Legutóbbi sikeres mentés",
   "Last successful sync": "Legutóbbi sikeres szinkronizálás",
@@ -1667,6 +1668,7 @@
   "{1} a day, {2} a month on the free plan": "{1} naponta, {2} havonta az ingyenes csomagban",
   "{1} and everything that was only yours are gone, and this device has been cleared.": "{1} és minden, ami csak a tiéd volt, eltűnt, és ez az eszköz törölve lett.",
   "{1} check{2} did not pass": "{1} ellenőrzés{2} nem sikerült",
+  "{1} day ago": "{1} napja",
   "{1} days ago": "{1} napja",
   "{1} error recorded": "{1} hiba rögzítve",
   "{1} errors recorded": "{1} hiba rögzítve",
@@ -2356,6 +2358,7 @@
   "📸 Take a photo": "📸 Fotó készítése",
   "📸 Take a photo now": "📸 Fotó készítése most",
   "📸 Using the caption you shared — Instagram won't give it to us any other way": "📸 A megosztott feliratot használjuk — az Instagram másként nem adja ki",
+  "🔄 Arabic +{1} · Russian +{2} · French +{3} · Spanish +{4} · German +{5} · Italian +{6} · Portuguese +{7} · Chinese (Simplified) +{8} · Hungarian +{9} — shared with everyone": "🔄 Arab +{1} · Orosz +{2} · Francia +{3} · Spanyol +{4} · Német +{5} · Olasz +{6} · Portugál +{7} · Kínai (egyszerűsített) +{8} · Magyar +{9} — mindenkivel megosztva",
   "🔄 Checking for a new version…": "🔄 Új verzió keresése…",
   "🔄 Checking for changes…": "🔄 Változások keresése…",
   "🔄 Hebrew +{1} · Arabic +{2} · Russian +{3} · French +{4} · Spanish +{5} · German +{6} · Italian +{7} · Portuguese +{8} · Chinese (Simplified) +{9} · Japanese +{10} · Hungarian +{11} — shared with everyone": "🔄 Héber +{1} · Arab +{2} · Orosz +{3} · Francia +{4} · Spanyol +{5} · Német +{6} · Olasz +{7} · Portugál +{8} · Kínai (egyszerűsített) +{9} · Japán +{10} · Magyar +{11} — mindenkivel megosztva",

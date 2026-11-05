@@ -1,7 +1,7 @@
 {
  "lang": "it",
- "updatedAt": 1793921512805,
- "count": 2675,
+ "updatedAt": 1793921884247,
+ "count": 2678,
  "strings": {
   "\"Add to Home Screen\"": "Aggiungi a Home",
   "\"Open Bring!\"": "Apri Bring!",
@@ -591,6 +591,7 @@
   "Kosher": "Kosher",
   "Last backup": "Ultimo backup",
   "Last backup: today": "Ultimo backup: oggi",
+  "Last backup: yesterday": "Ultimo backup: ieri",
   "Last backup: {1} days ago": "Ultimo backup: {1} giorni fa",
   "Last successful save": "Ultimo salvataggio riuscito",
   "Last successful sync": "Ultima sincronizzazione riuscita",
@@ -1767,6 +1768,7 @@
   "{1} and everything that was only yours are gone, and this device has been cleared.": "{1} e tutto ciò che era solo tuo sono spariti, e questo dispositivo è stato ripulito.",
   "{1} chats · {2} messages": "{1} chat · {2} messaggi",
   "{1} check{2} did not pass": "{1} controllo{2} non superato",
+  "{1} day ago": "{1} giorno fa",
   "{1} days ago": "{1} giorni fa",
   "{1} error recorded": "{1} errore registrato",
   "{1} errors recorded": "{1} errori registrati",
@@ -2488,6 +2490,7 @@
   "📸 Take a photo now": "📸 Scatta subito una foto",
   "📸 Using the caption you shared — Instagram won't give it to us any other way": "📸 Usiamo la didascalia che hai condiviso — Instagram non ce la fornisce altrimenti",
   "🔁 Switch household…": "🔁 Cambia famiglia…",
+  "🔄 Arabic +{1} · Russian +{2} · French +{3} · Spanish +{4} · German +{5} · Italian +{6} · Portuguese +{7} · Chinese (Simplified) +{8} · Hungarian +{9} — shared with everyone": "🔄 Arabo +{1} · Russo +{2} · Francese +{3} · Spagnolo +{4} · Tedesco +{5} · Italiano +{6} · Portoghese +{7} · Cinese (semplificato) +{8} · Ungherese +{9} — condiviso con tutti",
   "🔄 Checking for a new version…": "🔄 Controllo nuova versione…",
   "🔄 Checking for changes…": "🔄 Controllo modifiche…",
   "🔄 Hebrew +{1} · Arabic +{2} · Russian +{3} · French +{4} · Spanish +{5} · German +{6} · Chinese (Simplified) +{7} · Japanese +{8} — shared with everyone": "🔄 Ebraico +{1} · Arabo +{2} · Russo +{3} · Francese +{4} · Spagnolo +{5} · Tedesco +{6} · Cinese (semplificato) +{7} · Giapponese +{8} — condiviso con tutti",

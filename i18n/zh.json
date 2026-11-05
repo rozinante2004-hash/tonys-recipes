@@ -1,7 +1,7 @@
 {
  "lang": "zh",
- "updatedAt": 1793921512805,
- "count": 2816,
+ "updatedAt": 1793921884829,
+ "count": 2818,
  "strings": {
   "\"Add to Home Screen\"": "添加到主屏幕",
   "\"Open Bring!\"": "打开 Bring!",
@@ -1860,6 +1860,7 @@
   "{1} and everything that was only yours are gone, and this device has been cleared.": "{1}以及仅属于你的所有内容都已消失，此设备已被清空。",
   "{1} chats · {2} messages": "{1} 个对话·{2} 条消息",
   "{1} check{2} did not pass": "{1} 项检查未通过{2}",
+  "{1} day ago": "{1} 天前",
   "{1} days ago": "{1} 天前",
   "{1} error recorded": "{1} 条错误已记录",
   "{1} errors recorded": "记录了 {1} 个错误",
@@ -2619,6 +2620,7 @@
   "📸 Take a photo now": "📸 现在拍照",
   "📸 Using the caption you shared — Instagram won't give it to us any other way": "📸 使用你分享的说明文字——Instagram 只能这样提供",
   "🔁 Switch household…": "🔁 切换家庭…",
+  "🔄 Arabic +{1} · Russian +{2} · French +{3} · Spanish +{4} · German +{5} · Italian +{6} · Portuguese +{7} · Chinese (Simplified) +{8} · Hungarian +{9} — shared with everyone": "🔄 阿拉伯语 +{1} · 俄语 +{2} · 法语 +{3} · 西班牙语 +{4} · 德语 +{5} · 意大利语 +{6} · 葡萄牙语 +{7} · 简体中文 +{8} · 匈牙利语 +{9} — 与所有人共享",
   "🔄 Checking for a new version…": "🔄 正在检查新版本…",
   "🔄 Checking for changes…": "🔄 正在检查更改…",
   "🔄 Hebrew +{1} · Arabic +{2} · Russian +{3} · French +{4} · Spanish +{5} · German +{6} · Italian +{7} · Chinese (Simplified) +{8} · Japanese +{9} — shared with everyone": "🔄 希伯来语 +{1} · 阿拉伯语 +{2} · 俄语 +{3} · 法语 +{4} · 西班牙语 +{5} · 德语 +{6} · 意大利语 +{7} · 简体中文 +{8} · 日语 +{9} — 已与所有人共享",

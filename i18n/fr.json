@@ -1,7 +1,7 @@
 {
  "lang": "fr",
- "updatedAt": 1793921512805,
- "count": 2787,
+ "updatedAt": 1793921885013,
+ "count": 2789,
  "strings": {
   "\"Add to Home Screen\"": "Ajouter à l'écran d'accueil",
   "\"Open Bring!\"": "Ouvrir Bring!",
@@ -1850,6 +1850,7 @@
   "{1} and everything that was only yours are gone, and this device has been cleared.": "{1} et tout ce qui n'appartenait qu'à vous a disparu, et cet appareil a été réinitialisé.",
   "{1} chats · {2} messages": "{1} discussions · {2} messages",
   "{1} check{2} did not pass": "{1} vérification{2} a échoué",
+  "{1} day ago": "il y a {1} jour",
   "{1} days ago": "il y a {1} jours",
   "{1} error recorded": "{1} erreur enregistrée",
   "{1} errors recorded": "{1} erreurs enregistrées",
@@ -2596,6 +2597,7 @@
   "📸 Take a photo now": "📸 Prendre une photo maintenant",
   "📸 Using the caption you shared — Instagram won't give it to us any other way": "📸 D'après la légende que tu as partagée — Instagram ne nous la donne que comme ça",
   "🔁 Switch household…": "🔁 Changer de foyer…",
+  "🔄 Arabic +{1} · Russian +{2} · French +{3} · Spanish +{4} · German +{5} · Italian +{6} · Portuguese +{7} · Chinese (Simplified) +{8} · Hungarian +{9} — shared with everyone": "🔄 Arabe +{1} · Russe +{2} · Français +{3} · Espagnol +{4} · Allemand +{5} · Italien +{6} · Portugais +{7} · Chinois (simplifié) +{8} · Hongrois +{9} — partagé avec tout le monde",
   "🔄 Checking for a new version…": "🔄 Recherche d'une nouvelle version…",
   "🔄 Checking for changes…": "🔄 Recherche de modifications…",
   "🔄 Hebrew +{1} · Arabic +{2} · Russian +{3} · French +{4} · Spanish +{5} · German +{6} · Italian +{7} · Chinese (Simplified) +{8} · Japanese +{9} — shared with everyone": "🔄 Hébreu +{1} · Arabe +{2} · Russe +{3} · Français +{4} · Espagnol +{5} · Allemand +{6} · Italien +{7} · Chinois (simplifié) +{8} · Japonais +{9} — partagé avec tout le monde",

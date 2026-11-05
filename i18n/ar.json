@@ -1,7 +1,7 @@
 {
  "lang": "ar",
- "updatedAt": 1793921512805,
- "count": 2789,
+ "updatedAt": 1793921884337,
+ "count": 2791,
  "strings": {
   "\"Add to Home Screen\"": "إضافة إلى الشاشة الرئيسية",
   "\"Open Bring!\"": "فتح Bring!",
@@ -1851,6 +1851,7 @@
   "{1} and everything that was only yours are gone, and this device has been cleared.": "{1} وكل ما كان خاصًا بك فقط قد اختفى، وتم مسح هذا الجهاز.",
   "{1} chats · {2} messages": "{1} محادثة · {2} رسالة",
   "{1} check{2} did not pass": "لم ينجح {1} فحص{2}",
+  "{1} day ago": "منذ {1} يوم",
   "{1} days ago": "قبل {1} يوم",
   "{1} error recorded": "تم تسجيل {1} خطأ",
   "{1} errors recorded": "{1} أخطاء مسجّلة",
@@ -2599,6 +2600,7 @@
   "📸 Take a photo now": "📸 التقط صورة الآن",
   "📸 Using the caption you shared — Instagram won't give it to us any other way": "📸 باستخدام الوصف الذي شاركته — Instagram لن يعطينا إياه بطريقة أخرى",
   "🔁 Switch household…": "🔁 تبديل الأسرة…",
+  "🔄 Arabic +{1} · Russian +{2} · French +{3} · Spanish +{4} · German +{5} · Italian +{6} · Portuguese +{7} · Chinese (Simplified) +{8} · Hungarian +{9} — shared with everyone": "🔄 العربية +{1} · الروسية +{2} · الفرنسية +{3} · الإسبانية +{4} · الألمانية +{5} · الإيطالية +{6} · البرتغالية +{7} · الصينية (المبسطة) +{8} · المجرية +{9} — مشتركة مع الجميع",
   "🔄 Checking for a new version…": "🔄 جارٍ التحقق من وجود تحديث…",
   "🔄 Checking for changes…": "🔄 جارٍ التحقق من التغييرات…",
   "🔄 Hebrew +{1} · Arabic +{2} · Russian +{3} · French +{4} · Spanish +{5} · German +{6} · Italian +{7} · Chinese (Simplified) +{8} · Japanese +{9} — shared with everyone": "🔄 العبرية +{1} · العربية +{2} · الروسية +{3} · الفرنسية +{4} · الإسبانية +{5} · الألمانية +{6} · الإيطالية +{7} · الصينية (المبسطة) +{8} · اليابانية +{9} — تمت المشاركة مع الجميع",
