@@ -1437,6 +1437,26 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
   - **Released: v39.09 (29 Oct 2026, 11:17 Israel time, on 0de2dde; Tony: "Yes, release v39.09").** Every job success:
     Deploy to GitHub Pages, pages build, Publish languages, Translate new phrases, Self Tests on main and test,
     Cloudflare Pages for the beta and test.
+  - **v39.39 — 🚀 Deployments brought up to date** (Tony, 5 Nov 2026: "Thanks. I've paid pushover. Is it mentioned in the
+    Deployments modal? Let's review it and make sure all is updated in that page."). **Pushover bought** (US$4.99 once,
+    the iPhone) — it was not in Deployments. The window, section by section now: **🏡 My Kitchen Notes** (new, first — the
+    community copy, where the family and every tester are: open it, its Cloudflare Pages builds, its Firebase project,
+    database, accounts, its domain in Cloudflare, and Email Routing for contact@); **🧪 Test copy** (as it was);
+    **🐙 GitHub** (▶️ Jobs, Repository, 🔐 Secrets, 📥 the testers' reports in kitchen-reports, and the family's old address
+    "sends everyone on" — no more "📄 Deploy index.html: upload new version", a hand upload to main that would skip test);
+    **☁️ Cloudflare — the app's server** (what it does now — e-mails, phone alerts, AI use, notes; ▶️ Deploy the Worker
+    first; its D1 database; 📋 Copy Worker code kept, "only if the deploy cannot run"); **✉️ Resend — the app's e-mails**
+    (the invitations too, from contact@, 40 a day); **📲 Pushover — phone alerts** (new: account and user key, the
+    application's token, licenses, the two GitHub secrets; ⚙️ → 👑 → 📲 Phone alerts to choose and test); **🤖 Anthropic**
+    (the app's own languages too); **🖼️ Photo Sources** (as it was); **☁️ Google Cloud** (the Gmail API for the Gmail
+    backup, and Google's sign-in screen, in the community project); **🧩 The browser extension** (new: Chrome Web Store,
+    Firefox Add-ons, Edge Partner Center — not listed yet — and the "Submit the extension" job). Gone: the 🔥 Firebase
+    section, whose {projectId} was each copy's own (the community project in the beta, the emptied recipes-f379d in the
+    family's old copy). New address placeholders, all from APP_CONFIG: communitySiteUrl, communityDomain (betaCopy),
+    communityProjectId (languageSource), githubOwner — cfg_identifiers_in_one_place: nothing hard-wired, every link
+    filled (46 links). Checked on a 393 px phone: one hint was cut off (two long secret names) — shortened, and marked
+    data-no-i18n. Help: what Deployments holds. Translations: 51 phrases — Hebrew by hand now; the other ten languages
+    by the release's "Translate new phrases" (the window is the owner's).
   - **Released: v39.36, v39.37 and v39.38 with Worker v101 to the family's copy and the beta (5 Nov 2026, 02:25 Israel time,
     on fe0b5b5; Tony: "I've checked on test and the new Send works well. Please move the build to the family and beta once
     all is green").** Green first on test on the same commit: Deploy the Worker (02:08 — v101 live; "RESEND_API_KEY is

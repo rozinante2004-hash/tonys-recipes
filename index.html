@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.38 -->
+<!-- Tony's Recipes Collection v39.39 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -307,7 +307,12 @@
       githubRepo: c.githubRepo, workerUrl: c.workerUrl,
       liveSiteUrl: c.liveSiteUrl,
       testSiteUrl: c.testCopy && c.testCopy.siteUrl, testPagesProject: c.testCopy && c.testCopy.pagesProject,
-      testProjectId: c.testCopy && c.testCopy.firebaseProjectId
+      testProjectId: c.testCopy && c.testCopy.firebaseProjectId,
+      // v39.39 — the community copy (My Kitchen Notes), where the family and the testers are, for 🚀 Deployments
+      communitySiteUrl: c.betaCopy && c.betaCopy.siteUrl,
+      communityDomain: c.betaCopy && c.betaCopy.siteUrl && c.betaCopy.siteUrl.replace(/^https?:\/\//, '').replace(/\/.*$/, ''),
+      communityProjectId: c.languageSource && c.languageSource.projectId,   // its Firebase project, and its Pages project's name
+      githubOwner: c.githubRepo && c.githubRepo.split('/')[0]
     }[key];
     return v === undefined ? '' : String(v);
   };
@@ -10695,7 +10700,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.38';
+var APP_VERSION = 'v39.39';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -14147,7 +14152,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.38</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.39</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14235,7 +14240,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.38</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.39</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -33914,7 +33919,7 @@ var HELP_SYSTEM_PROMPT = [
   "- Every item in ⚙️ explains itself when you point at it.",
   "",
   "=== FOR THE APP'S OWNER ===",
-  "- ⚙️ → 👑 App owner is shown only to the app's owner: 📊 Households, 🩺 Server allowances, 📲 Phone alerts (which alerts also ring on the phone in the Pushover app, each on or off, and a test — among them the recipe e-mails: Resend refusing or not answering, a quota at 70% or used up), ✉️ Invite testers, 💳 Payments, 🚀 Deployments (a link to every console — Resend, which sends the recipe e-mails, too: its sent e-mails, domain, key, usage and plan), 🔑 Check the app's key, 🔐 Two-step sign-in for the owner, 🧑‍🍳 Preview the first-visit setup (every page of it, nothing recorded), 📧 Gmail Setup, 🛒 Bring!",
+  "- ⚙️ → 👑 App owner is shown only to the app's owner: 📊 Households, 🩺 Server allowances, 📲 Phone alerts (which alerts also ring on the phone in the Pushover app, each on or off, and a test — among them the recipe e-mails: Resend refusing or not answering, a quota at 70% or used up), ✉️ Invite testers, 💳 Payments, 🚀 Deployments (a link to every console the app runs on: My Kitchen Notes itself — its site, builds, Firebase project, database, accounts, domain and the mail to contact@ —; the test copy; GitHub's jobs, secrets and the testers' reports; the server and its database; Resend, which sends the recipe e-mails and the invitations; Pushover, the phone alerts; Anthropic; the photo sources; Google Cloud — YouTube and the Gmail API —; and the browser extension's stores), 🔑 Check the app's key, 🔐 Two-step sign-in for the owner, 🧑‍🍳 Preview the first-visit setup (every page of it, nothing recorded), 📧 Gmail Setup, 🛒 Bring!",
   "- 📊 Households (the owner's): every household — in the family app and My Kitchen Notes, every copy's — with its owner, members, 📚 Recipes (how many it keeps, counted by its own app once a day; rest the mouse on the number for when), AI this month against its AI cap, AI in the two months before (e.g. 'AI in Sep · Oct' in November), links, who shared the app, last active. Click a heading (on a phone: Sort by) to sort — by Recipes for the biggest collections first; ⬇ CSV has the recipe counts too. 📈 Use adds every household up, month by month, in sections side by side (one under the other on a phone; one column when there are many months), with how big the collections are. Click a row for its details: the AI allowance, the members, the Extras, and What they use — two narrow tables side by side (one under the other on a phone), a column for each month, in sections (how often, signing in, recipes added and from where, the farm, devices and settings, then every feature and how many times). In The farm, 'Taps on a visitor (each one)' counts every tap and 'Visits with a farm visitor tapped' counts a visit once, however many taps. Extras: 📧 E-mail recipes from their own Gmail makes that household's ✉️ Email send from each member's own Gmail (Google asks each once) instead of the app's 📨 Send — best left off. If the page says this device's sign-in was made without the code from your authenticator app (or with a password): sign out (at the top, beside the sync status) and sign in again with Google — the app asks for the 6-digit code; the owner's tools need both. 🔑 Reset password, beside the owner and beside each member (in the details), e-mails that person a link to choose a new password — for someone who wrote to you that they can't sign in; you never see their password, and the app doesn't say whether the address has an account. For a household of another copy, the button opens that copy, which sends it after you sign in there.",
   "- 📊 Households → 💬 Feedback (the owner's): a request for an invitation has ✉️ Send invitation — ✉️ Invite testers opens with that address in To (a request from another copy opens that copy's app, where its invitations belong).",
   "- 📊 Households → 💬 Feedback and ⚠️ Errors (the owner's): tick several (or Select all shown), then 👀 Seen (n), ✅ Done (n) or 🗑 Delete selected (n) for all of them at once. 👀 Seen = read, off the ⚙️ red dot, still under 'Not done yet'; ✅ Done = also off that list (still under All). Deleting several asks once and sends one alert",
@@ -39323,15 +39328,23 @@ window.onHeaderScroll = onHeaderScroll;
     </div>
     <div class="modal-body" style="padding:0 16px 16px;">
 
-      <!-- GitHub -->
+      <!-- v39.39 — Tony, 5 Nov 2026: "I've paid pushover. Is it mentioned in the Deployments modal? Let's review it and make
+           sure all is updated in that page." Pushover was missing; "Live App" was the family's old address (it forwards
+           everyone since move day); the community copy, where the family and the testers are, had no section; pasting
+           the Worker by hand had become the exception (GitHub deploys it); Resend sends the invitations too. -->
+      <!-- the community copy -->
       <div style="margin:12px 0 6px;">
-        <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:0.8px;text-transform:uppercase;">🐙 GitHub</div>
-        <div style="font-size:12px;color:var(--muted);margin-top:2px;">Hosts the app — the <code>index.html</code> file lives here and is served to users via GitHub Pages</div>
+        <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:0.8px;text-transform:uppercase;">🏡 My Kitchen Notes</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:2px;">Where the family’s kitchen and every tester’s are — since the move on 13 October 2026. Each release is built here by Cloudflare Pages.</div>
       </div>
       <div style="display:flex;flex-direction:column;gap:4px;">
-        <a href="#" data-cfg-href="https://github.com/{githubRepo}/upload/main" target="_blank" rel="noopener noreferrer" class="deploy-link">📄 Deploy index.html <span class="deploy-hint">Upload new version</span></a>
-        <a href="#" data-cfg-href="https://github.com/{githubRepo}" target="_blank" rel="noopener noreferrer" class="deploy-link">📁 Repository <span class="deploy-hint">View source files</span></a>
-        <a href="#" data-cfg-href="{liveSiteUrl}" target="_blank" rel="noopener noreferrer" class="deploy-link">🌐 Live App <span class="deploy-hint">Open deployed app</span></a>
+        <a href="#" data-cfg-href="{communitySiteUrl}" id="deployCommunitySite" target="_blank" rel="noopener noreferrer" class="deploy-link">🌐 Open it <span class="deploy-hint" data-no-i18n data-cfg-text="{communitySiteUrl}"></span></a>
+        <a href="#" data-cfg-href="https://dash.cloudflare.com/{cloudflareAccountId}/pages/view/{communityProjectId}" target="_blank" rel="noopener noreferrer" class="deploy-link">🏗️ Its builds <span class="deploy-hint">Cloudflare Pages — each release, and whether it built</span></a>
+        <a href="#" data-cfg-href="https://console.firebase.google.com/project/{communityProjectId}/overview" target="_blank" rel="noopener noreferrer" class="deploy-link">🔥 Its Firebase project <span class="deploy-hint" data-no-i18n data-cfg-text="{communityProjectId}"></span></a>
+        <a href="#" data-cfg-href="https://console.firebase.google.com/project/{communityProjectId}/firestore/databases/-default-/data" target="_blank" rel="noopener noreferrer" class="deploy-link">🗄️ Its database <span class="deploy-hint">every household’s recipes, and the app’s languages</span></a>
+        <a href="#" data-cfg-href="https://console.firebase.google.com/project/{communityProjectId}/authentication/users" target="_blank" rel="noopener noreferrer" class="deploy-link">👤 Its accounts <span class="deploy-hint">who signed in, and how</span></a>
+        <a href="#" data-cfg-href="https://dash.cloudflare.com/{cloudflareAccountId}/{communityDomain}" target="_blank" rel="noopener noreferrer" class="deploy-link">🌍 Its domain <span class="deploy-hint" data-no-i18n data-cfg-text="{communityDomain}"></span></a>
+        <a href="#" data-cfg-href="https://dash.cloudflare.com/{cloudflareAccountId}/{communityDomain}/email/routing/routes" target="_blank" rel="noopener noreferrer" class="deploy-link">📮 Mail to contact@ <span class="deploy-hint">forwarded to you: replies to invitations, and notes</span></a>
       </div>
 
       <div style="height:1px;background:var(--border);margin:12px 0;"></div>
@@ -39352,28 +39365,42 @@ window.onHeaderScroll = onHeaderScroll;
 
       <div style="height:1px;background:var(--border);margin:12px 0;"></div>
 
-      <!-- Cloudflare -->
+      <!-- GitHub -->
       <div style="margin-bottom:6px;">
-        <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:0.8px;text-transform:uppercase;">☁️ Cloudflare Workers</div>
-        <div style="font-size:12px;color:var(--muted);margin-top:2px;">Secure API proxy — routes all AI calls, photo search, URL imports, Bring! and YouTube through a server so API keys stay private, and sends the recipe e-mails (through Resend, below)</div>
+        <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:0.8px;text-transform:uppercase;">🐙 GitHub</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:2px;">The app’s code, and the jobs that check and publish it: each change goes to the test copy first; a release puts the same version on My Kitchen Notes and on the family’s old address.</div>
       </div>
       <div style="display:flex;flex-direction:column;gap:4px;">
-        <!-- v36.68 — the whole file, checked, on the clipboard. Tony's first paste
-             stopped a sixth of the way in ("Unexpected end of input"). -->
-        <button type="button" class="deploy-link" id="copyWorkerBtn" onclick="copyWorkerCode()" style="width:100%;text-align:start;cursor:pointer;font:inherit;">📋 Copy Worker code <span class="deploy-hint">the whole file, checked — then paste it into the editor below</span></button>
-        <a href="#" data-cfg-href="https://dash.cloudflare.com/{cloudflareAccountId}/workers/services/edit/{workerName}/production" target="_blank" rel="noopener noreferrer" class="deploy-link">✏️ Edit Worker code <span class="deploy-hint" data-no-i18n data-cfg-text="{workerName}"></span></a>
-        <a href="#" data-cfg-href="https://dash.cloudflare.com/{cloudflareAccountId}/workers/services/view/{workerName}/production/settings" target="_blank" rel="noopener noreferrer" class="deploy-link">⚙️ Worker settings & secrets <span class="deploy-hint">API keys, KV bindings</span></a>
-        <a href="#" data-cfg-href="https://dash.cloudflare.com/{cloudflareAccountId}/workers" target="_blank" rel="noopener noreferrer" class="deploy-link">📊 Workers dashboard <span class="deploy-hint">Usage & analytics</span></a>
+        <a href="#" data-cfg-href="https://github.com/{githubRepo}/actions" target="_blank" rel="noopener noreferrer" class="deploy-link">▶️ Jobs <span class="deploy-hint">tests, deploys, translations — green or red</span></a>
+        <a href="#" data-cfg-href="https://github.com/{githubRepo}" target="_blank" rel="noopener noreferrer" class="deploy-link">📁 Repository <span class="deploy-hint">View source files</span></a>
+        <a href="#" data-cfg-href="https://github.com/{githubRepo}/settings/secrets/actions" target="_blank" rel="noopener noreferrer" class="deploy-link">🔐 Secrets <span class="deploy-hint">the keys the jobs pass on to the server</span></a>
+        <a href="#" data-cfg-href="https://github.com/{githubOwner}/kitchen-reports/issues" target="_blank" rel="noopener noreferrer" class="deploy-link">📥 Testers’ reports <span class="deploy-hint">their notes and errors, sorted — private</span></a>
+        <a href="#" data-cfg-href="{liveSiteUrl}" target="_blank" rel="noopener noreferrer" class="deploy-link">🌐 The family’s old address <span class="deploy-hint">sends everyone on to My Kitchen Notes</span></a>
       </div>
 
       <div style="height:1px;background:var(--border);margin:12px 0;"></div>
 
-      <!-- v39.16 — Resend: the recipe e-mails the server sends (Worker v98, v99). Tony, 29 Oct 2026: "Please add the
-           relevant information to the Deployment area". Set up that day: the domain verified there, the key a GitHub
-           secret, passed on by "Deploy the Worker". -->
+      <!-- Cloudflare -->
       <div style="margin-bottom:6px;">
-        <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:0.8px;text-transform:uppercase;">✉️ Resend — recipe e-mails</div>
-        <div style="font-size:12px;color:var(--muted);margin-top:2px;">Sends the e-mails the app sends for its members: 📤 Share → ✉️ Email → 📨 Send, and 📨 Send to another kitchen → ✉️ Via Email. They come from “the kitchen’s name via My Kitchen Notes” at the community domain, and replies go to the member who sent them. The free plan sends 100 a day and 3,000 a month (e-mails received count too); the app sends at most 90 a day, 15 for each person. You are warned at 70%, when a quota runs out, and whenever Resend refuses or does not answer (📲 Phone alerts → Recipe e-mails); 🩺 Server allowances shows the counts. The key is the GitHub secret <strong>RESEND_API_KEY</strong> — after changing it, re-run “Deploy the Worker”.</div>
+        <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:0.8px;text-transform:uppercase;">☁️ Cloudflare — the app’s server</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:2px;">AI, photo search, link imports, Bring! and YouTube go through it, so the keys stay private; it also sends the e-mails (Resend) and the phone alerts (Pushover), and keeps each household’s AI use and the testers’ notes. GitHub deploys it after every change.</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px;">
+        <a href="#" data-cfg-href="https://github.com/{githubRepo}/actions/workflows/deploy-worker.yml" target="_blank" rel="noopener noreferrer" class="deploy-link">▶️ Deploy the Worker <span class="deploy-hint">runs by itself; run it again after changing a secret</span></a>
+        <a href="#" data-cfg-href="https://dash.cloudflare.com/{cloudflareAccountId}/workers/services/view/{workerName}/production/settings" target="_blank" rel="noopener noreferrer" class="deploy-link">⚙️ Worker settings & secrets <span class="deploy-hint">API keys, KV bindings</span></a>
+        <a href="#" data-cfg-href="https://dash.cloudflare.com/{cloudflareAccountId}/workers" target="_blank" rel="noopener noreferrer" class="deploy-link">📊 Workers dashboard <span class="deploy-hint">Usage & analytics</span></a>
+        <a href="#" data-cfg-href="https://dash.cloudflare.com/{cloudflareAccountId}/workers/d1" target="_blank" rel="noopener noreferrer" class="deploy-link">🗄️ Its database (D1) <span class="deploy-hint">AI use, notes, reports</span></a>
+        <!-- v36.68 — the whole file, checked, on the clipboard (Tony's first paste stopped a sixth of the way in). Only if the deploy cannot run. -->
+        <button type="button" class="deploy-link" id="copyWorkerBtn" onclick="copyWorkerCode()" style="width:100%;text-align:start;cursor:pointer;font:inherit;">📋 Copy Worker code <span class="deploy-hint">only if the deploy cannot run — the whole file, checked, for the editor below</span></button>
+        <a href="#" data-cfg-href="https://dash.cloudflare.com/{cloudflareAccountId}/workers/services/edit/{workerName}/production" target="_blank" rel="noopener noreferrer" class="deploy-link">✏️ Edit Worker code <span class="deploy-hint" data-no-i18n data-cfg-text="{workerName}"></span></a>
+      </div>
+
+      <div style="height:1px;background:var(--border);margin:12px 0;"></div>
+
+      <!-- v39.16 — Resend (Worker v98, v99); v39.38 — the owner's invitations too (Worker v101). -->
+      <div style="margin-bottom:6px;">
+        <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:0.8px;text-transform:uppercase;">✉️ Resend — the app’s e-mails</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:2px;">Sends the e-mails the app sends: a member’s 📨 Send of a recipe — from “the kitchen’s name via My Kitchen Notes”, replies going to that member — and your ✉️ Invite testers → 📨 Send, from contact@ at the community domain, replies coming back to it (40 a day).</div>
       </div>
       <div style="display:flex;flex-direction:column;gap:4px;">
         <a href="https://resend.com/emails" target="_blank" rel="noopener noreferrer" class="deploy-link">📬 Sent e-mails <span class="deploy-hint">each one: delivered, bounced, or marked as spam</span></a>
@@ -39384,6 +39411,36 @@ window.onHeaderScroll = onHeaderScroll;
         <a href="#" data-cfg-href="https://github.com/{githubRepo}/settings/secrets/actions" target="_blank" rel="noopener noreferrer" class="deploy-link">🔐 GitHub secrets <span class="deploy-hint">RESEND_API_KEY; MAIL_FROM (optional, the sending address)</span></a>
         <a href="#" data-cfg-href="https://github.com/{githubRepo}/actions/workflows/deploy-worker.yml" target="_blank" rel="noopener noreferrer" class="deploy-link">▶️ Deploy the Worker <span class="deploy-hint">run it again after changing a secret</span></a>
       </div>
+
+      <div style="height:1px;background:var(--border);margin:12px 0;"></div>
+
+      <!-- v39.39 — Pushover, the phone alerts (Worker v95; bought 5 Nov 2026) -->
+      <div style="margin-bottom:6px;">
+        <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:0.8px;text-transform:uppercase;">📲 Pushover — phone alerts</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:2px;">Rings your phone when the server needs you: the e-mails failing or a quota reached, an allowance running out. Choose which alerts ring, and send a test, in ⚙️ → 👑 App owner → 📲 Phone alerts. Bought once (US$4.99) in November 2026.</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px;">
+        <a href="https://pushover.net/" target="_blank" rel="noopener noreferrer" class="deploy-link">📱 Your account <span class="deploy-hint">your user key, and your devices</span></a>
+        <a href="https://pushover.net/apps" target="_blank" rel="noopener noreferrer" class="deploy-link">🧩 The app’s application <span class="deploy-hint">its API token</span></a>
+        <a href="https://pushover.net/licensing" target="_blank" rel="noopener noreferrer" class="deploy-link">🧾 Licenses <span class="deploy-hint">the iPhone’s, bought once</span></a>
+        <a href="#" data-cfg-href="https://github.com/{githubRepo}/settings/secrets/actions" target="_blank" rel="noopener noreferrer" class="deploy-link">🔐 GitHub secrets <span class="deploy-hint" data-no-i18n>PUSHOVER_TOKEN, PUSHOVER_USER</span></a>
+      </div>
+
+      <div style="height:1px;background:var(--border);margin:12px 0;"></div>
+
+      <!-- Anthropic -->
+      <div style="margin-bottom:6px;">
+        <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:0.8px;text-transform:uppercase;">🤖 Anthropic</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:2px;">AI engine — recipe import, translation (the app’s own languages too, after each release), suggestions, nutrition, the help assistant and diet tags</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px;">
+        <a href="https://console.anthropic.com/settings/billing" target="_blank" rel="noopener noreferrer" class="deploy-link">💳 Billing & API credits <span class="deploy-hint">Top up credits</span></a>
+        <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener noreferrer" class="deploy-link">🔑 API keys <span class="deploy-hint">Regenerate if compromised</span></a>
+      </div>
+
+      <div style="height:1px;background:var(--border);margin:12px 0;"></div>
+
+
 
       <div style="height:1px;background:var(--border);margin:12px 0;"></div>
 
@@ -39402,45 +39459,35 @@ window.onHeaderScroll = onHeaderScroll;
 
       <div style="height:1px;background:var(--border);margin:12px 0;"></div>
 
-      <!-- Firebase -->
-      <div style="margin-bottom:6px;">
-        <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:0.8px;text-transform:uppercase;">🔥 Firebase</div>
-        <div style="font-size:12px;color:var(--muted);margin-top:2px;">Cloud database & authentication — stores your recipes in the cloud so they sync across all devices, and handles Google sign-in</div>
-      </div>
-      <div style="display:flex;flex-direction:column;gap:4px;">
-        <a href="#" data-cfg-href="https://console.firebase.google.com/u/0/project/{projectId}/firestore/databases/-default-/data" target="_blank" rel="noopener noreferrer" class="deploy-link">🗄️ Firestore database <span class="deploy-hint" data-no-i18n data-cfg-text="{projectId}"></span></a>
-        <a href="#" data-cfg-href="https://console.firebase.google.com/u/0/project/{projectId}/overview" target="_blank" rel="noopener noreferrer" class="deploy-link">📋 Project overview <span class="deploy-hint">Auth, usage, settings</span></a>
-      </div>
-
-      <div style="height:1px;background:var(--border);margin:12px 0;"></div>
-
-      <!-- Anthropic -->
-      <div style="margin-bottom:6px;">
-        <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:0.8px;text-transform:uppercase;">🤖 Anthropic</div>
-        <div style="font-size:12px;color:var(--muted);margin-top:2px;">AI engine — powers recipe import, translation, suggestions, nutrition calculation, help assistant, and diet auto-tagging</div>
-      </div>
-      <div style="display:flex;flex-direction:column;gap:4px;">
-        <a href="https://console.anthropic.com/settings/billing" target="_blank" rel="noopener noreferrer" class="deploy-link">💳 Billing & API credits <span class="deploy-hint">Top up credits</span></a>
-        <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener noreferrer" class="deploy-link">🔑 API keys <span class="deploy-hint">Regenerate if compromised</span></a>
-      </div>
-
-      <div style="height:1px;background:var(--border);margin:12px 0;"></div>
-
       <!-- Google Cloud -->
       <div style="margin-bottom:6px;">
         <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:0.8px;text-transform:uppercase;">☁️ Google Cloud</div>
-        <div style="font-size:12px;color:var(--muted);margin-top:2px;">YouTube Data API — fetches video descriptions when you import a recipe from a YouTube URL</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:2px;">YouTube Data API — the descriptions of the YouTube videos you import; and the Gmail API, for ✉️ Invite testers → 📧 Backup: send with Gmail.</div>
       </div>
       <div style="display:flex;flex-direction:column;gap:4px;">
         <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer" class="deploy-link">🔑 API credentials <span class="deploy-hint">YouTube & other keys</span></a>
         <a href="https://console.cloud.google.com/apis/api/youtube.googleapis.com/quotas" target="_blank" rel="noopener noreferrer" class="deploy-link">▶️ YouTube API quota <span class="deploy-hint">10,000 units/day free</span></a>
+        <a href="#" data-cfg-href="https://console.cloud.google.com/apis/library/gmail.googleapis.com?project={communityProjectId}" target="_blank" rel="noopener noreferrer" class="deploy-link">📧 Gmail API <span class="deploy-hint">switched on, for the Gmail backup</span></a>
+        <a href="#" data-cfg-href="https://console.cloud.google.com/apis/credentials/consent?project={communityProjectId}" target="_blank" rel="noopener noreferrer" class="deploy-link">🔒 Google’s sign-in screen <span class="deploy-hint">the app’s name and logo that Google shows</span></a>
       </div>
 
+      <div style="height:1px;background:var(--border);margin:12px 0;"></div>
+
+      <!-- v39.39 — the browser extension's stores (v37.80, v38.06) -->
+      <div style="margin-bottom:6px;">
+        <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:0.8px;text-transform:uppercase;">🧩 The browser extension</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:2px;">“My Kitchen Notes — Save recipes from any site”: the job “Submit the extension to the stores” uploads each new version.</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px;">
+        <a href="https://chrome.google.com/webstore/devconsole" target="_blank" rel="noopener noreferrer" class="deploy-link">🟡 Chrome Web Store <span class="deploy-hint">its developer dashboard</span></a>
+        <a href="https://addons.mozilla.org/developers/addons" target="_blank" rel="noopener noreferrer" class="deploy-link">🦊 Firefox Add-ons <span class="deploy-hint">its developer hub</span></a>
+        <a href="https://partner.microsoft.com/dashboard/microsoftedge/overview" target="_blank" rel="noopener noreferrer" class="deploy-link">🔷 Microsoft Edge Add-ons <span class="deploy-hint">Partner Center — not listed yet</span></a>
+        <a href="#" data-cfg-href="https://github.com/{githubRepo}/actions/workflows/deploy-extension.yml" target="_blank" rel="noopener noreferrer" class="deploy-link">▶️ Submit the extension <span class="deploy-hint">the job, and each run</span></a>
+      </div>
 
     </div>
   </div>
 </div>
-
 
 <!-- SHARE RECIPE MODAL -->
 <div class="modal-overlay" id="shareRecipeOverlay" onclick="bgClose(event,'shareRecipeOverlay')">
