@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.44 -->
+<!-- Tony's Recipes Collection v39.45 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -10714,7 +10714,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.44';
+var APP_VERSION = 'v39.45';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -14186,7 +14186,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.44</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.45</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14274,7 +14274,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.44</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.45</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -17948,6 +17948,8 @@ var I18N_EXTRA = [
   Object.keys(HH_WELCOME).map(function(k){ return HH_WELCOME[k]; }), TOUR_STEPS.map(function(st){ return st.text; }),
   setupPhrases(), ['\u{1F9ED} Show me around', 'I’ll look around by myself'],   // v38.95 — the wizard
   Object.keys(SORT_LABELS).map(function(k){ return SORT_LABELS[k]; }),   // v39.41 — the ⇅ button's words
+  // v39.45 — the 💬 WhatsApp Groups list's line, its dates data (drawn only with chats, so no harvest finds it)
+  ['🔄 synced {1} · {2} messages · {3} →', '📱 this device {1} · {2} messages · {3} →', '☁️ folder · {1} messages · {2} →'],
   ['Secret — linked kitchens do not see it',
    '🔒 Secret recipes are not switched on for this copy yet — the {1} you marked stay as they were (linked kitchens still see them) until they are.']);   // v38.96, v38.99   // v38.18 — 📝 the end-of-beta question   // v38.17 — ✨ What can this app do, ✉️ Contact us
 function i18nRegisterExtra() {
@@ -18064,8 +18066,52 @@ function i18nLooksLikeCode(s) {
   for (var j = 0; j < I18N_CODE_HINTS.length; j++) if (I18N_CODE_HINTS[j].test(s)) hits++;
   return hits >= 2;
 }
+// v39.45 — A DATE OR A TIME IS NEVER A PHRASE (Tony, 6 Nov 2026: "Let's make sure it doesn't happen again, as junk
+// tends to accumulate"). The 💬 WhatsApp Groups list printed "🔄 synced Nov 5, 2026, 9:30 PM · 1,234 messages", the
+// numbers became {1}… but the month and the PM stayed, so every month (and every device's own date format) made one
+// more key — eleven of them in the shared translations, each translated into eleven languages. Judged on the KEY (its
+// numbers already {1}), not on the screen: a sentence whose date is a placeholder ("…saved it already, on {1}.") is
+// fine; one where the browser's date is part of the words is not. Written dates in the app's own sentences use the
+// month's full name ("in November {2}") and are left alone; only the browser's shapes count — a short month beside a
+// number ("Aug 9", "9 Aug"), a clock ("10:42"), AM/PM after a number, 年/月/日 after a number, or a month name in one
+// of the app's languages (or this device's) beside a number.
+var I18N_MON_EN = /\b(?:Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)\.?\s+(?:\d|\{\d+\})|(?:\d|\{\d+\})\.?\s+(?:Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)\b/;
+var I18N_CLOCK = /(?:^|[^\d])\d{1,2}:\d{2}(?!\d)|(?:\d|\}) ?(?:AM|PM|a\.m\.|p\.m\.)(?![A-Za-z])|(?:\d|\})(?:年|月|日)/;
+var _i18nMonthNames = null;
+function i18nMonthNames() {
+  if (_i18nMonthNames) return _i18nMonthNames;
+  var locs = ['he', 'ar', 'ru', 'fr', 'es', 'de', 'it', 'pt', 'hu'], seen = Object.create(null), out = [];
+  try { (navigator.languages || [navigator.language]).slice(0, 3).forEach(function(l){ if (l) locs.push(l); }); } catch(e) {}
+  locs.forEach(function(loc) {
+    ['short', 'long'].forEach(function(w) {
+      for (var m = 0; m < 12; m++) {
+        var n = '';
+        try { n = new Intl.DateTimeFormat(loc, { month: w }).format(new Date(2026, m, 15)); } catch(e) { n = ''; }
+        n = String(n).replace(/[.\s]+$/, '');
+        if (n.length >= 3 && !/\d/.test(n) && !/^[A-Za-z]+$/.test(n) && !seen[n]) { seen[n] = 1; out.push(n); }
+      }
+    });
+  });
+  return (_i18nMonthNames = out);
+}
+function i18nLooksLikeDate(s) {
+  s = String(s || '');
+  if (!/\d|\{\d+\}/.test(s)) return false;
+  if (I18N_MON_EN.test(s) || I18N_CLOCK.test(s)) return true;
+  // Another language's month beside a number: "9 באוג׳ 2026", "5 нояб. 2026 г." — within a few characters of one.
+  var names = i18nMonthNames();
+  for (var i = 0; i < names.length; i++) {
+    var at = s.indexOf(names[i]);
+    while (at !== -1) {
+      var near = s.slice(Math.max(0, at - 5), at) + ' ' + s.slice(at + names[i].length, at + names[i].length + 5);
+      if (/\d|\{\d+\}/.test(near)) return true;
+      at = s.indexOf(names[i], at + 1);
+    }
+  }
+  return false;
+}
 function i18nKeepable(s) {
-  return !!s && i18nTranslatable(s) && !i18nLooksLikeCode(s);
+  return !!s && i18nTranslatable(s) && !i18nLooksLikeCode(s) && !i18nLooksLikeDate(s);
 }
 function i18nLoadMissing(lang) {
   _i18nMissing = Object.create(null);
@@ -18086,7 +18132,7 @@ function i18nLoadMissing(lang) {
     syncLog('system', dropped + ' unusable entr(ies) dropped from the missing list for ' + lang, '');
   }
 }
-window.i18nLooksLikeCode = i18nLooksLikeCode; window.i18nKeepable = i18nKeepable;
+window.i18nLooksLikeCode = i18nLooksLikeCode; window.i18nKeepable = i18nKeepable; window.i18nLooksLikeDate = i18nLooksLikeDate;
 function i18nMissingList() { return Object.keys(_i18nMissing).sort(); }
 function i18nMissingCount() { return Object.keys(_i18nMissing).length; }
 function i18nNoteMissing(src) {
@@ -36786,8 +36832,11 @@ function renderWaSources(){
     return '<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);">'
       + '<div style="flex:1;min-width:0;">'
       + '<div dir="auto" style="unicode-bidi:plaintext;font-size:13px;color:var(--ink);font-weight:600;">' + escH(e.group) + '</div>'
-      + '<div style="font-size:11px;color:var(--muted);">' + (LABEL[e.source] || LABEL.local) + waWhen(e) + ' · '
-      + (e.count||0).toLocaleString() + ' messages · ' + escH(e.first||'?') + ' → ' + escH(e.last||'?') + '</div>'
+      // v39.45 — the dates are data (data-no-i18n), so the line is one phrase whatever the day: it had made a new key
+      // every month ("🔄 synced Nov {1}, {2}, {3} PM · …").
+      + '<div style="font-size:11px;color:var(--muted);">' + (LABEL[e.source] || LABEL.local)
+      + (waWhen(e) ? ' <span data-no-i18n>' + waWhen(e).trim() + '</span>' : '') + ' · '
+      + (e.count||0).toLocaleString() + ' messages · <span data-no-i18n>' + escH(e.first||'?') + '</span> → <span data-no-i18n>' + escH(e.last||'?') + '</span></div>'
       + '</div>'
       // Only offered where it does something: a chat already in the cloud has
       // nowhere to be pushed to.

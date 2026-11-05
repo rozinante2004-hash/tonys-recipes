@@ -3336,6 +3336,9 @@
   "🪵 Keeping {1} day{2} of log": "🪵 שומר {1} יום{2} של יומן",
   "🪵 Logging & debugging": "🪵 רישום ואיתור תקלות",
   "🪵 The log has something worth reporting": "🪵 יש ביומן משהו שכדאי לבדוק",
-  "🫙 Low FODMAP": "🫙 דל FODMAP"
+  "🫙 Low FODMAP": "🫙 דל FODMAP",
+  "🔄 synced {1} · {2} messages · {3} →": "🔄 סונכרן {1} · {2} הודעות · {3} →",
+  "📱 this device {1} · {2} messages · {3} →": "📱 במכשיר הזה {1} · {2} הודעות · {3} →",
+  "☁️ folder · {1} messages · {2} →": "☁️ תיקייה · {1} הודעות · {2} →"
  }
 }

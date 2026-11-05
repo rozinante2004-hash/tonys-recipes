@@ -3132,6 +3132,9 @@
   "🪵 Keeping {1} day{2} of log": "🪵 ログを{1}日{2}分保持",
   "🪵 Logging & debugging": "🪵 ログとデバッグ",
   "🪵 The log has something worth reporting": "🪵 ログに報告すべき内容があります",
-  "🫙 Low FODMAP": "🫙 低FODMAP"
+  "🫙 Low FODMAP": "🫙 低FODMAP",
+  "🔄 synced {1} · {2} messages · {3} →": "🔄 同期済み {1} · {2} 件のメッセージ · {3} →",
+  "📱 this device {1} · {2} messages · {3} →": "📱 この端末 {1} · {2} 件のメッセージ · {3} →",
+  "☁️ folder · {1} messages · {2} →": "☁️ フォルダー · {1} 件のメッセージ · {2} →"
  }
 }

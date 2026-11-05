@@ -20018,6 +20018,39 @@ window.SELF_TESTS = [
         try{ if(realLog==null) localStorage.removeItem(LOG_KEY); else localStorage.setItem(LOG_KEY, realLog); }catch(e){}
       }
     } },
+  { id:'i18n_no_dates_as_phrases', group:'UI', name:'A date or a time on the screen never becomes a phrase to translate — and the app\'s own sentences, dates in placeholders, still do (v39.45)',
+    test: async()=>{
+      // v39.45 — Tony: "Let's make sure it doesn't happen again, as junk tends to accumulate". The 💬 WhatsApp Groups
+      // list printed the browser's date into its line, so every month made a new key ("🔄 synced Nov {1}, {2}, {3} PM ·
+      // {4} messages · {5} → {6}") — twelve such entries were in the shared translations.
+      if(typeof i18nLooksLikeDate!=='function') throw new Error('i18nLooksLikeDate is not defined');
+      var junk=['🔄 synced Nov {1}, {2}, {3} PM · {4} messages · {5} → {6}', '🔄 synced {1} Aug {2}, {3} · {4} messages · {5} → {6}',
+        '📱 this device Aug 9, 2026, 08:04 PM · 5,799 messages · 22/10/2025 → 31/07/2026', '{1}, {2} AM', 'Last seen 10:42',
+        '🔄 synced {1} בנוב׳ {2}', '保存 {1}年{2}月{3}日'];
+      var lost=junk.filter(function(k){ return !i18nLooksLikeDate(k) || i18nKeepable(k); });
+      if(lost.length) throw new Error('these would still become phrases: '+JSON.stringify(lost));
+      // The app's own sentences are untouched — every one it can show, and those with a written month or a date in a placeholder.
+      var mine=i18nFullCatalogue().concat(I18N_EXTRA, ['Your kitchen saved it already, on {1}.', 'May I help?']).filter(function(k){ return i18nLooksLikeDate(k); });
+      if(mine.length) throw new Error('the app\'s own phrases are taken for dates: '+JSON.stringify(mine.slice(0,5)));
+      // Never recorded as missing, whatever shows it.
+      var probe='🔄 synced Dec {1}, {2}, {3} PM · {4} messages · {5} → {6}';
+      i18nNoteMissing(probe);
+      if(i18nMissingList().indexOf(probe)!==-1){ i18nClearMissing([probe]); throw new Error('a date line was recorded as a missing phrase'); }
+      // The WhatsApp list's line: its dates are data, and its words are the phrases the app lists (I18N_EXTRA).
+      var el=document.getElementById('waSourceList'), realIdx=window.waIndex, keys=[];
+      try{
+        window.waIndex=function(){ return [
+          { id:'c1', group:'G', source:'cloud', updatedAt:Date.UTC(2026,10,5,19,30), count:1234, first:'22/10/2025', last:'05/11/2026' },
+          { id:'l1', group:'L', source:'local', addedAt:Date.UTC(2026,7,9,18,4), count:5799, first:'22/10/2025', last:'31/07/2026' },
+          { id:'r1', group:'R', source:'remote', count:10, first:'?', last:'?' }]; };
+        renderWaSources();
+        keys=i18nUnits(el).map(function(u){ return u.key; });
+      } finally { window.waIndex=realIdx; try{ renderWaSources(); }catch(e){} }
+      var lines=keys.filter(function(k){ return /messages/.test(k); });
+      if(lines.length!==3) throw new Error('the WhatsApp list\'s lines are not one phrase each: '+JSON.stringify(keys));
+      var off=lines.filter(function(k){ return I18N_EXTRA.indexOf(k)===-1 || i18nLooksLikeDate(k); });
+      if(off.length) throw new Error('a WhatsApp list line is not the listed phrase: '+JSON.stringify(off));
+    } },
   { id:'feat_units', group:'Features', name:'Metric keeps tsp/tbsp/cup, converts imperial',
     test: async()=>{
       // Kitchen measures used in metric kitchens must NOT become millilitres

@@ -1446,6 +1446,25 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
     Pages for test), Self Tests on main (22:13). The published Hebrew keeps Tony's headings ("🏡 על מטבחים ואנשים",
     "🧹 סידורים") and "מהענן"; the sort words are the store's ("🆕 חדשים", "🔤 א–ת", "⏱ הכנה", "📊 רמה", "🔥 פופולרי",
     "📋 סדר שמור").
+  - **v39.45 — a date or a time is never a phrase** (Tony, 6 Nov 2026, on the junk key the v39.44 release published —
+    "🔄 synced Nov {1}, {2}, {3} PM · {4} messages · {5} → {6}": "Don't bother. Let's make sure it doesn't happen again,
+    as junk tends to accumulate ..."). The shared translations held 12 such keys (the 💬 WhatsApp Groups list's line in
+    Aug/Sep/Oct/Nov and en-GB order, three with the raw date, and "{1}, {2} AM/PM" pieces), each translated into eleven
+    languages. **`i18nLooksLikeDate(key)`**, in `i18nKeepable` — so no unit, no missing-list entry, no gap, no harvest
+    entry can be one, the device's missing list drops them on load (`i18nLoadMissing`), and the editor files them under
+    "remove N unusable": judged on the KEY (numbers already {1}), only the browser's shapes — a short English month
+    beside a number ("Aug 9", "9 Aug"; not May), a clock (\d{1,2}:\d{2}), AM/PM after a number, 年/月/日 after a
+    number, or a month name (Intl, short and long) of the app's languages or this device's within 5 characters of a
+    number. The app's own sentences with a written month ("in November {2}", "on {1} October {2}") and dates inside
+    placeholders are untouched: of 3,367 stored keys exactly the 12 junk ones match, and nothing in the app's catalogue.
+    **The source:** `renderWaSources` puts its dates (`waWhen`, first and last message) in data-no-i18n spans, so each
+    line is one phrase — "🔄 synced {1} · {2} messages · {3} →", "📱 this device …", "☁️ folder · {1} messages · {2} →"
+    (I18N_EXTRA: drawn only with chats, no harvest finds them), translated by hand in all 11 languages. **The stored
+    junk:** `tools/translate-new.mjs` (the release's "Translate new phrases") takes out, with the addresses and names,
+    every key the app no longer asks for that `i18nLooksLikeDate` matches — at the next release the 12 go, and any
+    later one with it ("…addresses, names and dates taken out"). Self Test **i18n_no_dates_as_phrases** (the junk
+    shapes refused, in other languages too; every phrase the app can show kept; a date line never recorded as missing;
+    the WhatsApp lines are the listed phrases) — fails without the rule and with the dates back as plain text.
   - **Released: v39.44 to the family's copy and the beta (5 Nov 2026, 23:53 Israel time, on 65388f6; Tony: "Yes, release
     v39.44 to family and beta when green").** Green first on test on the same commit: Cloudflare Pages for test (23:35),
     Self Tests (23:52). Every job success: Cloudflare Pages for the beta (23:53); on main: Deploy to GitHub Pages and

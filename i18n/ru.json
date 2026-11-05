@@ -3121,6 +3121,9 @@
   "🪵 Keeping {1} day{2} of log": "🪵 Храним лог за последние {1} дн{2}",
   "🪵 Logging & debugging": "🪵 Логирование и отладка",
   "🪵 The log has something worth reporting": "🪵 В логе есть, что стоит сообщить",
-  "🫙 Low FODMAP": "🫙 Низкий FODMAP"
+  "🫙 Low FODMAP": "🫙 Низкий FODMAP",
+  "🔄 synced {1} · {2} messages · {3} →": "🔄 синхронизировано {1} · {2} сообщений · {3} →",
+  "📱 this device {1} · {2} messages · {3} →": "📱 это устройство {1} · {2} сообщений · {3} →",
+  "☁️ folder · {1} messages · {2} →": "☁️ папка · {1} сообщений · {2} →"
  }
 }

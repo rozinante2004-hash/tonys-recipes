@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v39.44` — app. **Worker: v101**, deployed separately and versioned separately
+**Current version:** `v39.45` — app. **Worker: v101**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -469,7 +469,7 @@ under its plain path only (a `?url=` request goes network-first).
   that would alter the `{n}` set or empty a translation is listed with the reason and not made. 🔁 Replace in N
   changes the draft as typing would (dirty, `i18nEdKeepPending`, until 💾 Save shares it); ↩️ Undo puts back the rows
   that still say what the Replace wrote; opening the editor again shuts the panel and forgets the undo
-  (`i18nEdReplReset`). The panel is inside #i18nOverlay, so it stays English like the rest of the editor. **No e-mail address is ever a phrase** (`I18N_ADDRESS` in `i18nTranslatable`; the translate
+  (`i18nEdReplReset`). The panel is inside #i18nOverlay, so it stays English like the rest of the editor. **No date or time is ever a phrase (v39.45):** `i18nLooksLikeDate` in `i18nKeepable` refuses a key holding the browser's date shapes (a short month beside a number, a clock, AM/PM, 年/月/日, another language's month beside a number); a line that shows a date puts it in a data-no-i18n span; the translate job takes stored ones out. **No e-mail address is ever a phrase** (`I18N_ADDRESS` in `i18nTranslatable`; the translate
   and publish jobs strip any): the files are public, and a member's address once reached them through a
   tooltip. **Nor a person's name (v38.90):** the status line takes the name apart (`setDriveStatus(state, text,
   who)`: translated quietly with "☁️ Shared · {1}" / "✓ Synced — {1}", marked data-no-i18n), and the translate job

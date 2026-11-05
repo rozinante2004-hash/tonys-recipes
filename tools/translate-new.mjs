@@ -191,14 +191,18 @@ try {
       const d = await readDoc(prefix + lang);
       const strings = (d && d.data && d.data.strings) || null;
       if (!strings) break;
-      const bad = Object.keys(strings).filter(k => ADDRESS.test(k) || ADDRESS.test(String(strings[k])) || named(k, strings[k]));
+      // v39.45 — nor a date or a time: a browser's date printed into a line ("🔄 synced Nov {1}, {2}, {3} PM · …") made a
+      // new key every month. Judged by the app's own rule (i18nLooksLikeDate), and only for what the app no longer asks for.
+      const dated = new Set(await page.evaluate(ks => (typeof i18nLooksLikeDate === 'function') ? ks.filter(k => i18nLooksLikeDate(k)) : [],
+        Object.keys(strings).filter(k => !inApp.has(k))));
+      const bad = Object.keys(strings).filter(k => ADDRESS.test(k) || ADDRESS.test(String(strings[k])) || named(k, strings[k]) || dated.has(k));
       if (!bad.length) break;
       if (DRY) { scrubbed.push(lang + ' ' + bad.length + ' (dry run: kept)'); break; }
       const kept = Object.assign({}, strings);
       bad.forEach(k => { delete kept[k]; });
       const at = Date.now();
       const fields = { strings: { mapValue: { fields: Object.fromEntries(Object.entries(kept).map(([k, v]) => [k, fsString(v)])) } },
-        count: fsInt(Object.keys(kept).length), updatedAt: fsInt(at), by: fsString('GitHub, after ' + version + ' (addresses and names taken out)') };
+        count: fsInt(Object.keys(kept).length), updatedAt: fsInt(at), by: fsString('GitHub, after ' + version + ' (addresses, names and dates taken out)') };
       const w = await patchDoc(prefix + lang, fields, d.updateTime);
       if (w === 'changed') { console.log(`  ${lang}: changed meanwhile — reading it again`); continue; }
       await patchDoc(indexPath, { langs: { mapValue: { fields: { [lang]: { mapValue: { fields: { at: fsInt(at), count: fsInt(Object.keys(kept).length) } } } } } } }, null, ['langs.' + lang]);
@@ -206,7 +210,7 @@ try {
       break;
     }
   }
-  if (scrubbed.length) console.log('::notice::Languages: entries holding an e-mail address or a name taken out — ' + scrubbed.join(', '));
+  if (scrubbed.length) console.log('::notice::Languages: entries holding an e-mail address, a name or a date taken out — ' + scrubbed.join(', '));
 
   const plan = [];
   for (const lang of langs) {
