@@ -17846,6 +17846,110 @@ window.SELF_TESTS = [
       }
     } },
 
+  { id:'i18n_bulk_replace', group:'UI', name:'🔁 One wording replaced in many translations at once: each change shown first, a row unticked is left, a {1} is never broken, ↩️ Undo puts it back, and 💾 Save shares only the rows changed (v39.40)',
+    test: async()=>{
+      // v39.40 — Tony: "Please add to the translation editor an option to bulk-replace a string." The release had put
+      // "👑 בעל האפליקציה" in sentences whose menu says "👑 בעל הבית" — one wording, many rows, until now one edit each.
+      var LANG='he', KEY='tonys_i18n_ed_pending_'+LANG, FIND='בעל האפליקציה', TO='בעל הבית';
+      var A='Choose which alerts ring in ⚙️ → 👑 App owner → 📲 Phone alerts.', B='{1} new notes — ⚙️ → 👑 App owner → 📊 Households',
+          C='For the app owner only', G='{1} recipes', E='Tools', X='A correction from another device';
+      var real={ lang:_i18nLang, dict:_i18nDict, edLang:_i18nEdLang, draft:_i18nEdDraft, base:window._i18nEdBase, docBase:_i18nEdDocBase,
+        dirty:_i18nEdDirty, own:window.i18nCentralIsOwn, user:window._fbUser, write:window.i18nWriteCloud, read:window.i18nReadCloud,
+        toast:window.toast, legal:window.legalDocBase, harvest:window.i18nHarvest, forget:window.i18nForgetSelfTestWords,
+        activate:window.i18nActivate, apply:window.i18nApply, flag:window._i18nEdPendingTest, pending:null };
+      try{ real.pending=localStorage.getItem(KEY); }catch(e){}
+      var undoOwner=null, said=[], wrote=[], shared=null;
+      var $=function(id){ return document.getElementById(id); };
+      function put(id, v){ var e=$(id); e.value=v; e.dispatchEvent(new Event('input', { bubbles:true })); }
+      function listed(){ return Array.prototype.map.call(document.querySelectorAll('#i18nEdReplList .i18n-ed-repl-row'), function(r){ return r.getAttribute('data-key'); }); }
+      function boxOf(k){ var r=Array.prototype.filter.call(document.querySelectorAll('#i18nEdReplList .i18n-ed-repl-row'), function(x){ return x.getAttribute('data-key')===k; })[0]; return r && r.querySelector('input'); }
+      try{
+        window._i18nEdPendingTest=true;
+        try{ localStorage.removeItem(KEY); }catch(e){}
+        window.i18nCentralIsOwn=function(){ return true; };
+        window._fbUser={ uid:'uST', email:ST_OWNER }; undoOwner=stAsOwner();
+        window.toast=function(m){ said.push(String(m||'')); };
+        window.legalDocBase=async function(){ return {}; }; window.i18nHarvest=async function(){}; window.i18nForgetSelfTestWords=async function(){};
+        window.i18nActivate=function(){}; window.i18nApply=function(){};
+        window.i18nReadCloud=async function(l){ return shared ? { lang:l, strings:Object.assign({}, shared) } : null; };
+        window.i18nWriteCloud=async function(l, d){ wrote.push(JSON.parse(JSON.stringify(d))); shared=Object.assign({}, d.strings); return 'cloud'; };
+        _i18nLang=LANG; _i18nDict={};
+        _i18nDict[A]='בחרו אילו התראות יצלצלו ב-⚙️ ← 👑 בעל האפליקציה ← 📲 התראות בטלפון.';
+        _i18nDict[B]='{1} הערות חדשות — ⚙️ ← 👑 בעל האפליקציה ← 📊 משקי בית';
+        _i18nDict[C]='לבעל האפליקציה בלבד';
+        _i18nDict[G]='{1} מתכונים'; _i18nDict[E]='כלים';
+        shared=Object.assign({}, _i18nDict);
+        await openI18nEditor();
+        var btn=$('i18nEdReplBtn'), panel=$('i18nEdRepl');
+        if(!btn || !btn.offsetWidth) throw new Error('the editor has no 🔁 Replace… button to see');
+        if(!panel || panel.style.display!=='none') throw new Error('the replace panel is open before it is asked for');
+        // 1. What is searched for is offered as the words to find.
+        put('i18nEdSearch', FIND); btn.click();
+        if(panel.style.display==='none' || !panel.offsetHeight) throw new Error('🔁 Replace… did not open its panel');
+        if($('i18nEdReplFind').value!==FIND) throw new Error('the search was not offered as the words to find: '+JSON.stringify($('i18nEdReplFind').value));
+        put('i18nEdReplWith', TO);
+        var keys=listed();
+        if(keys.length!==3 || [A,B,C].some(function(k){ return keys.indexOf(k)===-1; })) throw new Error('the list is not every translation holding the words (a prefixed ל included): '+JSON.stringify(keys));
+        var shown=document.querySelector('#i18nEdReplList .i18n-ed-repl-row ins');
+        if(!shown || shown.textContent!==TO) throw new Error('the change is not drawn in the row');
+        if(!/3 translations hold/.test($('i18nEdReplSummary').textContent)) throw new Error('the list does not say how many: '+$('i18nEdReplSummary').textContent);
+        if($('i18nEdReplGo').disabled || !/Replace in 3/.test($('i18nEdReplGo').textContent)) throw new Error('the button does not offer to replace in 3: '+$('i18nEdReplGo').textContent);
+        // 2. A row unticked is left as it is.
+        var bc=boxOf(C); bc.checked=false; bc.dispatchEvent(new Event('change', { bubbles:true }));
+        if(!/Replace in 2/.test($('i18nEdReplGo').textContent)) throw new Error('unticking a row did not take it out: '+$('i18nEdReplGo').textContent);
+        $('i18nEdReplGo').click();
+        if(_i18nEdDraft[A].indexOf('👑 בעל הבית ←')===-1 || _i18nEdDraft[B]!=='{1} הערות חדשות — ⚙️ ← 👑 בעל הבית ← 📊 משקי בית')
+          throw new Error('the ticked rows were not replaced: '+JSON.stringify([_i18nEdDraft[A], _i18nEdDraft[B]]));
+        if(_i18nEdDraft[C]!=='לבעל האפליקציה בלבד' || _i18nEdDraft[E]!=='כלים') throw new Error('a row unticked, or not holding the words, was changed');
+        if(!_i18nEdDirty) throw new Error('after replacing, the window does not say there is something to save');
+        var kept=null; try{ kept=JSON.parse(localStorage.getItem(KEY)||'null'); }catch(e){}
+        if(!kept || !kept.changes || Object.keys(kept.changes).sort().join('|')!==[A,B].sort().join('|')) throw new Error('the replaced rows are not kept on the device until shared: '+JSON.stringify(kept));
+        if(!/Replaced in 2/.test($('i18nEdReplSummary').textContent) || !/💾 Save/.test($('i18nEdReplSummary').textContent)) throw new Error('replacing did not say what it did and that 💾 Save shares it');
+        var row=Array.prototype.filter.call(document.querySelectorAll('#i18nEdRows .i18n-ed-row'), function(r){ return r.getAttribute('data-key')===A; })[0];
+        if(row && row.querySelector('.i18n-ed-to').value!==_i18nEdDraft[A]) throw new Error('the table still shows the old wording');
+        // 3. ↩️ Undo — a row corrected by hand since is left as it is.
+        _i18nEdDraft[B]='{1} הערות — תוקן ביד';
+        if($('i18nEdReplUndo').style.display==='none') throw new Error('there is no ↩️ Undo after replacing');
+        $('i18nEdReplUndo').click();
+        if(_i18nEdDraft[A]!=='בחרו אילו התראות יצלצלו ב-⚙️ ← 👑 בעל האפליקציה ← 📲 התראות בטלפון.') throw new Error('↩️ Undo did not put the row back');
+        if(_i18nEdDraft[B]!=='{1} הערות — תוקן ביד') throw new Error('↩️ Undo overwrote a row corrected by hand since');
+        // 4. A {1} is never broken, and a translation is never emptied.
+        put('i18nEdReplFind', '{1} מתכונים'); put('i18nEdReplWith', 'מתכונים');
+        var bg=boxOf(G);
+        if(!bg || !bg.disabled || !/\{1\}/.test(document.querySelector('#i18nEdReplList .i18n-ed-repl-why').textContent) || !$('i18nEdReplGo').disabled)
+          throw new Error('a change that drops the {1} is offered');
+        put('i18nEdReplFind', 'כלים'); put('i18nEdReplWith', '');
+        if(!$('i18nEdReplGo').disabled || !/empty/.test($('i18nEdReplList').textContent)) throw new Error('a change that empties a translation is offered');
+        if(i18nEdReplApply()!==0 || _i18nEdDraft[G]!=='{1} מתכונים' || _i18nEdDraft[E]!=='כלים') throw new Error('a row that must not change was changed');
+        // 5. Replaced again, then 💾 Save: only the rows changed, onto the newest shared copy.
+        put('i18nEdReplFind', FIND); put('i18nEdReplWith', TO);
+        if(i18nEdReplApply()!==2) throw new Error('replacing again did not change the two rows still holding the words');
+        shared[X]='תיקון';
+        said=[]; await i18nEdSave();
+        var doc=(wrote[wrote.length-1]||{}).strings||{};
+        if(doc[A].indexOf('בעל הבית')===-1 || doc[C]!=='לבעל הבית בלבד' || doc[B]!=='{1} הערות — תוקן ביד') throw new Error('the replaced rows were not shared: '+JSON.stringify([doc[A], doc[B], doc[C]]));
+        if(doc[X]!=='תיקון' || doc[E]!=='כלים' || doc[G]!=='{1} מתכונים') throw new Error('the Save undid or changed rows it should not have');
+        // 6. Opened again: the panel shut, nothing to undo.
+        await openI18nEditor();
+        if($('i18nEdRepl').style.display!=='none' || $('i18nEdReplFind').value) throw new Error('the replace panel kept its words into a fresh opening');
+        if(i18nEdReplUndo()!==0) throw new Error('↩️ Undo reached back into an earlier opening');
+      } finally {
+        window._i18nEdQuietClose=true;
+        try{ var ov=document.getElementById('i18nOverlay'); if(ov && ov.classList.contains('open')) closeM('i18nOverlay'); }catch(e){}
+        window._i18nEdQuietClose=false;
+        try{ i18nEdReplReset(); }catch(e){}
+        if(undoOwner) undoOwner();
+        window.i18nCentralIsOwn=real.own; window._fbUser=real.user; window.i18nWriteCloud=real.write; window.i18nReadCloud=real.read;
+        window.toast=real.toast; window.legalDocBase=real.legal; window.i18nHarvest=real.harvest; window.i18nForgetSelfTestWords=real.forget;
+        window.i18nActivate=real.activate; window.i18nApply=real.apply;
+        _i18nLang=real.lang; _i18nDict=real.dict; _i18nEdLang=real.edLang; _i18nEdDraft=real.draft; window._i18nEdBase=real.base;
+        _i18nEdDocBase=real.docBase; _i18nEdDirty=real.dirty; i18nEdInvalidate();
+        try{ if(real.pending==null) localStorage.removeItem(KEY); else localStorage.setItem(KEY, real.pending); }catch(e){}
+        window._i18nEdPendingTest=real.flag;
+        try{ var se=document.getElementById('i18nEdSearch'); if(se) se.value=''; renderLangMenu(); }catch(e){}
+      }
+    } },
+
   { id:'i18n_editor_is_usable', group:'UI', name:'A translation can be corrected by hand (v36.33)',
     test: async()=>{
       // v37.87 — editing happens only in the copy that holds the translations; this test is that copy

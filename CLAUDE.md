@@ -1437,6 +1437,26 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
   - **Released: v39.09 (29 Oct 2026, 11:17 Israel time, on 0de2dde; Tony: "Yes, release v39.09").** Every job success:
     Deploy to GitHub Pages, pages build, Publish languages, Translate new phrases, Self Tests on main and test,
     Cloudflare Pages for the beta and test.
+  - **v39.40 — 🔁 Replace… in ✏️ Edit translations** (Tony, 5 Nov 2026, after v39.39's release left "👑 בעל האפליקציה" in
+    sentences whose menu says "👑 בעל הבית": "Please add to the translation editor an option to bulk-replace a string.").
+    A **🔁 Replace…** button beside the editor's search opens a panel: Find → Replace with (the search box's text is
+    offered as the words to find). Every translation of the language being edited that holds the words is listed — its
+    English, and the translation with the change drawn (struck / green) — each ticked; "tick all · untick all".
+    **🔁 Replace in N** changes the ticked rows as typing would: the window says unsaved, the change is kept on the device
+    until 💾 Save shares it (v39.34), and Save writes only those rows onto the newest shared copy. **↩️ Undo** puts back
+    the rows that still say what the Replace wrote (a row corrected by hand since is left). Matched exactly as typed —
+    Hebrew's ל/ה/ו/ב/מ/ש cling to the word, so "whole words" would miss most; on Tony's Hebrew, "בעל האפליקציה" is in 10
+    translations. A change that would alter a {1} or empty a translation is listed with the reason, unticked, and not
+    made. Opening the editor again shuts the panel and forgets the undo. The panel is inside #i18nOverlay — English like
+    the rest of the editor, so no new phrases to translate (the app's gap list: 0 in every language). The found words
+    sit in `<bdi>` in the summary (Hebrew in the English line had dragged the numbers to its side — seen on the phone).
+    The button's label is set through innerHTML: as `.textContent = n ? '…in ' + n : '…'` the phrase scanner made it a sentence to
+    translate ("{1}🔁 Replace in {2}🔁 Replace" — the gap list caught it, 1 in every language; 0 after).
+    The arrow between the two boxes is hidden under 700 px, where they stack. Self Test **i18n_bulk_replace** (the
+    list, untick, replace, kept on the device, the table redrawn, undo sparing a hand edit, {1} and empty refused, Save
+    sharing only the changed rows onto a fresh copy, a fresh opening); a knock-out of five parts (the {1} guard, undo's
+    guard, untick, keeping, reset) — each made it fail. AI help knows it (APP_KNOWLEDGE ×2). Local: Self Tests 440 passed,
+    0 failed; phone fit, phone chrome, ✕ in view, double-click, contrast (dark, light), axe, Worker — all clean.
   - **Released: v39.39 to the family's copy and the beta (5 Nov 2026, 10:36 Israel time, on 664f7e4; Tony: "Yes. Please
     do").** Green first on test on the same commit: Cloudflare Pages for test (10:08), Self Tests (10:23). Every job
     success: Cloudflare Pages for the beta (10:36); on main: Deploy to GitHub Pages (10:36) and pages build (10:37),

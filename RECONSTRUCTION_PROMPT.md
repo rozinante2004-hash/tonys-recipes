@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v39.39` — app. **Worker: v101**, deployed separately and versioned separately
+**Current version:** `v39.40` — app. **Worker: v101**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -462,7 +462,14 @@ under its plain path only (a `?url=` request goes network-first).
   those rows onto a fresh read of the shared copy (`i18nEdFresh`), so it never undoes what came in meanwhile; a Save
   the rules refuse (`appAdmin()`: Google + the authenticator's code) says why (`ownerSignInWhy('\n\n')`, reason and
   remedy as two translated paragraphs, "Sign out now" / "Later"), shows no ✅ and changes nothing on the screen; a
-  refused 🚀 publish request says why the same way. Self Test runs neither keep nor put back (`i18nEdPendingOff`). **No e-mail address is ever a phrase** (`I18N_ADDRESS` in `i18nTranslatable`; the translate
+  refused 🚀 publish request says why the same way. Self Test runs neither keep nor put back (`i18nEdPendingOff`). **v39.40 — 🔁 Replace… (beside the editor's search):** one wording changed in many translations at once
+  (`i18nEdReplPlan(find, to)`): every translation of the language being edited holding the words, matched exactly as
+  typed (Hebrew's ל/ה/ו/ב/מ/ש cling to the word — "whole words" would miss them), listed with the change drawn
+  (`<del>`/`<ins>`), each ticked; untick what stays; the search box's text is offered as the words to find. A change
+  that would alter the `{n}` set or empty a translation is listed with the reason and not made. 🔁 Replace in N
+  changes the draft as typing would (dirty, `i18nEdKeepPending`, until 💾 Save shares it); ↩️ Undo puts back the rows
+  that still say what the Replace wrote; opening the editor again shuts the panel and forgets the undo
+  (`i18nEdReplReset`). The panel is inside #i18nOverlay, so it stays English like the rest of the editor. **No e-mail address is ever a phrase** (`I18N_ADDRESS` in `i18nTranslatable`; the translate
   and publish jobs strip any): the files are public, and a member's address once reached them through a
   tooltip. **Nor a person's name (v38.90):** the status line takes the name apart (`setDriveStatus(state, text,
   who)`: translated quietly with "☁️ Shared · {1}" / "✓ Synced — {1}", marked data-no-i18n), and the translate job

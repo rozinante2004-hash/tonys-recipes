@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.39 -->
+<!-- Tony's Recipes Collection v39.40 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -10700,7 +10700,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.39';
+var APP_VERSION = 'v39.40';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -12833,7 +12833,23 @@ li.line-sub-indent { padding-inline-start: 22px; }
   font-family: 'DM Sans', 'Heebo', sans-serif; font-size: 12px;
 }
 .i18n-ed-opt:hover { background: var(--terracotta); color: #fff; }
+/* v39.40 — 🔁 Replace: one wording changed in many rows at once, each change shown before it is made. */
+#i18nEdRepl { text-align: left; }
+.i18n-ed-repl-row {
+  display: grid; grid-template-columns: 22px 1fr; gap: 6px; align-items: start;
+  padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 12.5px; line-height: 1.5;
+}
+.i18n-ed-repl-row input { margin-top: 3px; }
+.i18n-ed-repl-en { color: var(--muted); font-size: 11.5px; direction: ltr; text-align: left; word-break: break-word; }
+.i18n-ed-repl-to { color: var(--ink); word-break: break-word; }
+.i18n-ed-repl-to del { color: var(--muted); }
+.i18n-ed-repl-to ins { text-decoration: none; background: #E3F1DC; color: #1F4D12; border-radius: 3px; padding: 0 2px; margin-inline-start: 3px; }
+:root[data-theme="dark"] .i18n-ed-repl-to ins { background: #2C4424; color: #D8F0CC; }
+.i18n-ed-repl-why { color: #A1481A; font-size: 11.5px; }
+.i18n-ed-repl-off { opacity: 0.55; }
+.i18n-ed-link { background: none; border: none; padding: 0; cursor: pointer; font: inherit; color: var(--terracotta); text-decoration: underline; }
 @media (max-width: 700px) {
+  .i18n-ed-repl-arrow { display: none; }
   .i18n-ed-row { grid-template-columns: 1fr 34px; }
   .i18n-ed-en { grid-column: 1 / -1; padding-top: 0; font-weight: 600; }
 }
@@ -14152,7 +14168,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.39</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.40</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14240,7 +14256,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.39</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.40</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -15144,6 +15160,10 @@ body.banner-shown .header {
     <div style="flex-shrink:0;padding:0 20px 10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
       <input id="i18nEdSearch" class="form-input" dir="auto" style="flex:1;min-width:170px;"
              placeholder="Search in English or in the translation…" oninput="i18nEdRender()">
+      <!-- v39.40 — Tony, 5 Nov 2026: "Please add to the translation editor an option to bulk-replace a string." -->
+      <button class="btn-secondary" id="i18nEdReplBtn" style="padding:8px 12px;font-size:12px;background:transparent;
+              color:var(--terracotta);border:1px solid var(--terracotta);box-shadow:none;"
+              onclick="i18nEdReplToggle()" aria-expanded="false" data-no-i18n>🔁 Replace…</button>
       <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);white-space:nowrap;">
         <input type="checkbox" id="i18nEdOnlyGaps" onchange="i18nEdRender()"> Only untranslated
       </label>
@@ -15160,6 +15180,24 @@ body.banner-shown .header {
            translucent white, which is legible on the brown header and 1.06:1 on
            a cream modal. The contrast scan caught it the same hour. -->
       <button class="btn-primary" style="padding:8px 14px;font-size:12px;" onclick="i18nEdSave()">💾 Save</button>
+    </div>
+    <!-- v39.40 — 🔁 Replace: every translation holding the words, the change shown in each, ticked; untick what stays. -->
+    <div id="i18nEdRepl" class="tint-box" style="display:none;flex-shrink:0;margin:0 20px 10px;padding:10px 12px;border-radius:10px;">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+        <input id="i18nEdReplFind" class="form-input" dir="auto" style="flex:1;min-width:150px;"
+               placeholder="Find in the translations…" oninput="i18nEdReplPreview()" autocomplete="off">
+        <span class="i18n-ed-repl-arrow" aria-hidden="true" style="color:var(--muted);">→</span>
+        <input id="i18nEdReplWith" class="form-input" dir="auto" style="flex:1;min-width:150px;"
+               placeholder="Replace with…" oninput="i18nEdReplPreview()" autocomplete="off">
+      </div>
+      <div id="i18nEdReplSummary" style="font-size:12px;color:var(--muted);margin:8px 0 4px;" aria-live="polite"></div>
+      <div id="i18nEdReplList" style="max-height:32vh;overflow-y:auto;"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;align-items:center;">
+        <button class="btn-primary" id="i18nEdReplGo" style="padding:8px 14px;font-size:12px;" onclick="i18nEdReplApply()" disabled>🔁 Replace</button>
+        <button class="btn-secondary" id="i18nEdReplUndo" style="display:none;padding:8px 12px;font-size:12px;background:transparent;
+                color:var(--terracotta);border:1px solid var(--terracotta);box-shadow:none;" onclick="i18nEdReplUndo()">↩️ Undo</button>
+        <button class="i18n-ed-link" style="font-size:12px;margin-inline-start:auto;" onclick="i18nEdReplToggle(false)">Close</button>
+      </div>
     </div>
     <div id="i18nEdCount" style="flex-shrink:0;padding:0 20px 8px;font-size:11px;color:var(--muted);"></div>
     <div id="i18nEdRows" style="overflow-y:auto;padding:0 20px 20px;flex:1;"></div>
@@ -20071,6 +20109,7 @@ async function openI18nEditor() {
   if (t) t.textContent = 'Edit the ' + i18nLangName(lang) + ' translation';
   var s = document.getElementById('i18nEdSearch'); if (s) s.value = '';
   var g = document.getElementById('i18nEdOnlyGaps'); if (g) g.checked = false;
+  i18nEdReplReset();                                // v39.40
   document.getElementById('i18nOverlay').classList.add('open');
   _i18nEdDocBase = {};
   i18nEdRender();
@@ -20283,6 +20322,8 @@ function i18nEdEdit(el) {
   if (!_i18nEdDirty) { _i18nEdDirty = true; }
   i18nEdKeepPending();   // v39.34
   i18nEdInvalidate();
+  var rp = document.getElementById('i18nEdRepl');   // v39.40 — 🔁 Replace's list follows a row typed by hand
+  if (rp && rp.style.display !== 'none') i18nEdReplPreview(true);
   var cnt = document.getElementById('i18nEdCount');
   if (cnt && cnt.textContent.indexOf('UNSAVED') === -1) {
     cnt.textContent += ' · UNSAVED CHANGES';
@@ -20290,6 +20331,157 @@ function i18nEdEdit(el) {
   }
 }
 window.i18nEdEdit = i18nEdEdit;
+
+// ─── 🔁 REPLACE (v39.40) ─────────────────────────────────────────────────────
+// Tony, 5 Nov 2026: "Please add to the translation editor an option to bulk-replace a string." The release had just
+// put "👑 בעל האפליקציה" into sentences whose menu says "👑 בעל הבית" — one wording, wrong in many rows, and until now
+// each row was its own edit. Every translation of the language being edited that holds the words is listed, the change
+// drawn in each, every row ticked; untick what should stay. 🔁 Replace changes the ticked rows exactly as typing in them
+// would — kept on this device until 💾 Save shares them (v39.34) — and ↩️ Undo puts them back.
+// The words are matched exactly as typed: in Hebrew ה, ו, ב, ל, מ and ש cling to the front of a word, so "whole words
+// only" would miss most of the rows that matter. A row where the change would add, drop or alter a {1} (where a number
+// or a name goes) or leave the translation empty is listed with the reason and not changed.
+var _i18nEdReplOff = Object.create(null);   // rows unticked in the list
+var _i18nEdReplLast = null;                 // the last 🔁 Replace: { lang, rows: { key: [before, after] } }, for ↩️ Undo
+var _i18nEdReplDone = '';                   // what the last 🔁 Replace or ↩️ Undo did, until the words change
+var I18N_ED_REPL_SHOW = 200;                // rows drawn in the list (all of them are replaced)
+
+function i18nEdSlots(s) { return (String(s).match(/\{\d+\}/g) || []).sort().join(','); }
+function i18nEdReplWords() {
+  var f = document.getElementById('i18nEdReplFind'), w = document.getElementById('i18nEdReplWith');
+  return { find: f ? String(f.value || '') : '', to: w ? String(w.value || '') : '' };
+}
+// Every translation holding `find`, with what it would become, and why not where it would not change.
+function i18nEdReplPlan(find, to) {
+  var out = [];
+  if (!find || !find.trim() || !_i18nEdDraft) return out;
+  Object.keys(_i18nEdDraft).sort().forEach(function(k) {
+    var t = _i18nEdDraft[k];
+    if (typeof t !== 'string' || t.indexOf(find) === -1) return;
+    var after = t.split(find).join(to).trim(), why = '';
+    if (after === t) return;
+    if (!after) why = 'not changed: it would be left empty';
+    else if (i18nEdSlots(after) !== i18nEdSlots(t)) why = 'not changed: it would alter a {1} — where a number or a name goes';
+    out.push({ key: k, before: t, after: after, why: why });
+  });
+  return out;
+}
+function i18nEdReplToggle(on) {
+  var p = document.getElementById('i18nEdRepl'), b = document.getElementById('i18nEdReplBtn');
+  if (!p) return;
+  if (on === undefined) on = p.style.display === 'none';
+  p.style.display = on ? '' : 'none';
+  if (b) b.setAttribute('aria-expanded', on ? 'true' : 'false');
+  if (!on) return;
+  // What is in the search box is usually what is to be replaced: it is offered, and the cursor waits in "Replace with".
+  var f = document.getElementById('i18nEdReplFind'), w = document.getElementById('i18nEdReplWith');
+  var s = document.getElementById('i18nEdSearch');
+  if (f && !f.value && s && s.value.trim()) f.value = s.value.trim();
+  i18nEdReplPreview(true);
+  try { ((f && f.value) ? w : f).focus(); } catch(e) {}
+}
+function i18nEdReplPreview(keepDone) {
+  var sum = document.getElementById('i18nEdReplSummary'), list = document.getElementById('i18nEdReplList');
+  var go = document.getElementById('i18nEdReplGo'), undo = document.getElementById('i18nEdReplUndo');
+  if (!sum || !list) return;
+  if (keepDone !== true) { _i18nEdReplDone = ''; _i18nEdReplOff = Object.create(null); }
+  if (undo) undo.style.display = (_i18nEdReplLast && _i18nEdReplLast.lang === _i18nEdLang) ? '' : 'none';
+  var w = i18nEdReplWords(), name = i18nLangName(_i18nEdLang);
+  var plan = i18nEdReplPlan(w.find, w.to);
+  var can = plan.filter(function(r){ return !r.why; });
+  var ticked = can.filter(function(r){ return !_i18nEdReplOff[r.key]; }).length;
+  var parts = [];
+  if (_i18nEdReplDone) parts.push('<b style="color:var(--ink);">' + escH(_i18nEdReplDone) + '</b>');
+  if (!w.find.trim()) parts.push(escH('Type the words to find — every ' + name + ' translation holding them is listed here, with the change in each.'));
+  // The words found sit in <bdi>: Hebrew in an English line otherwise drags the numbers beside it to its own side.
+  else if (!plan.length) parts.push(escH('No ' + name + ' translation holds ') + '“<bdi>' + escH(w.find) + '</bdi>”'
+    + (w.find === w.to ? ' to change.' : '.'));
+  else {
+    var line = escH(plan.length + ' translation' + (plan.length === 1 ? '' : 's') + ' hold' + (plan.length === 1 ? 's' : '') + ' ')
+      + '“<bdi>' + escH(w.find) + '</bdi>”' + escH(' · ' + ticked + ' ticked');
+    if (plan.length > can.length) line += escH(' · ' + (plan.length - can.length) + ' left as ' + (plan.length - can.length === 1 ? 'it is' : 'they are'));
+    if (plan.length > I18N_ED_REPL_SHOW) line += escH(' · the first ' + I18N_ED_REPL_SHOW + ' are shown; every ticked one is replaced');
+    parts.push(line + (can.length > 1
+      ? ' · <button class="i18n-ed-link" onclick="i18nEdReplTickAll(true)">tick all</button> · '
+        + '<button class="i18n-ed-link" onclick="i18nEdReplTickAll(false)">untick all</button>' : ''));
+  }
+  sum.innerHTML = parts.join('<br>');
+  if (go) {
+    go.disabled = !ticked;
+    // Through innerHTML: the phrase scanner reads a `.textContent = 'a' + n : 'b'` as a sentence to translate, and
+    // this window stays English.
+    go.innerHTML = escH('🔁 Replace' + (ticked ? ' in ' + ticked : ''));
+  }
+  var dir = (I18N_LANGS[_i18nEdLang] || {}).rtl ? 'rtl' : 'auto';
+  var mark = '<del>' + escH(w.find) + '</del><ins>' + escH(w.to) + '</ins>';
+  list.innerHTML = plan.slice(0, I18N_ED_REPL_SHOW).map(function(r) {
+    var on = !r.why && !_i18nEdReplOff[r.key];
+    return '<label class="i18n-ed-repl-row' + (on ? '' : ' i18n-ed-repl-off') + '" data-key="' + escA(r.key) + '">'
+      + '<input type="checkbox"' + (on ? ' checked' : '') + (r.why ? ' disabled' : '') + ' onchange="i18nEdReplTick(this)">'
+      + '<span><span class="i18n-ed-repl-en">' + escH(r.key) + '</span><br>'
+      + '<span class="i18n-ed-repl-to" dir="' + dir + '">' + r.before.split(w.find).map(escH).join(mark) + '</span>'
+      + (r.why ? '<br><span class="i18n-ed-repl-why">' + escH(r.why) + '</span>' : '')
+      + '</span></label>';
+  }).join('');
+}
+function i18nEdReplTick(box) {
+  var row = box && box.closest('.i18n-ed-repl-row');
+  if (!row) return;
+  var k = row.getAttribute('data-key');
+  if (box.checked) delete _i18nEdReplOff[k]; else _i18nEdReplOff[k] = 1;
+  i18nEdReplPreview(true);
+}
+function i18nEdReplTickAll(on) {
+  if (on) _i18nEdReplOff = Object.create(null);
+  else { var w = i18nEdReplWords(); i18nEdReplPlan(w.find, w.to).forEach(function(r){ _i18nEdReplOff[r.key] = 1; }); }
+  i18nEdReplPreview(true);
+}
+// What a change by hand does (i18nEdEdit): the window marked unsaved, the change kept on this device, the rows redrawn.
+function i18nEdReplChanged() {
+  _i18nEdDirty = i18nEdDiff().n > 0;
+  i18nEdKeepPending();
+  i18nEdInvalidate();
+  i18nEdRender();
+}
+function i18nEdReplApply() {
+  if (!_i18nEdDraft) return 0;
+  var w = i18nEdReplWords();
+  var rows = i18nEdReplPlan(w.find, w.to).filter(function(r){ return !r.why && !_i18nEdReplOff[r.key]; });
+  if (!rows.length) return 0;
+  var undo = {};
+  rows.forEach(function(r){ undo[r.key] = [r.before, r.after]; _i18nEdDraft[r.key] = r.after; });
+  _i18nEdReplLast = { lang: _i18nEdLang, rows: undo };
+  i18nEdReplChanged();
+  _i18nEdReplDone = '✅ Replaced in ' + rows.length + ' translation' + (rows.length === 1 ? '' : 's')
+    + ' — not shared yet: press 💾 Save to share ' + (rows.length === 1 ? 'it.' : 'them.');
+  _i18nEdReplOff = Object.create(null);
+  i18nEdReplPreview(true);
+  return rows.length;
+}
+// Puts back what the last 🔁 Replace changed — each row only while it still says what the Replace wrote, so a row
+// corrected by hand since is left as it is.
+function i18nEdReplUndo() {
+  var last = _i18nEdReplLast;
+  if (!last || last.lang !== _i18nEdLang || !_i18nEdDraft) return 0;
+  var n = 0;
+  Object.keys(last.rows).forEach(function(k) {
+    if (_i18nEdDraft[k] === last.rows[k][1]) { _i18nEdDraft[k] = last.rows[k][0]; n++; }
+  });
+  _i18nEdReplLast = null;
+  i18nEdReplChanged();
+  _i18nEdReplDone = '↩️ Put back ' + n + ' translation' + (n === 1 ? '' : 's') + '.';
+  i18nEdReplPreview(true);
+  return n;
+}
+// A language opened afresh starts with the panel shut and nothing to undo.
+function i18nEdReplReset() {
+  _i18nEdReplOff = Object.create(null); _i18nEdReplLast = null; _i18nEdReplDone = '';
+  ['i18nEdReplFind', 'i18nEdReplWith'].forEach(function(id){ var e = document.getElementById(id); if (e) e.value = ''; });
+  i18nEdReplToggle(false);
+}
+window.i18nEdReplToggle = i18nEdReplToggle; window.i18nEdReplPreview = i18nEdReplPreview; window.i18nEdReplTick = i18nEdReplTick;
+window.i18nEdReplTickAll = i18nEdReplTickAll; window.i18nEdReplApply = i18nEdReplApply; window.i18nEdReplUndo = i18nEdReplUndo;
+window.i18nEdReplPlan = i18nEdReplPlan; window.i18nEdReplReset = i18nEdReplReset;
 
 // Alternatives, not a replacement: three options shown as chips, and nothing
 // changes until one is clicked. The English and the current translation both go
@@ -33846,6 +34038,7 @@ var HELP_SYSTEM_PROMPT = [
   "- A new version is noticed while the app stays open, and pulling the list down checks at once and says what it found (v39.31, v39.32)",
   "- The Self Test report and Sync Health give times in this device's own time, its UTC offset after it (v39.31)",
   "- (The app's owner) A correction in ✏️ Edit translations is never lost: it is kept on the device until it is shared, Save writes only what was changed, and a Save that is not shared says why (v39.34)",
+  "- (The app's owner) 🔁 Replace… in ✏️ Edit translations changes one wording in many translations at once: type the words to find and what replaces them; every translation of that language holding them is listed with the change drawn in it, each ticked — untick what should stay; 🔁 Replace in N changes them (kept on the device until 💾 Save shares them), and ↩️ Undo puts them back. The words are matched exactly as typed, so in Hebrew a ל or ה in front of them is found too; a change that would break a {1} or empty a translation is shown but not made (v39.40)",
   "- (The app's owner) ✉️ Invite testers → 📨 Send: the invitations go out by the app's own e-mail service, from the app's address — no Google windows at all; a small 📧 Backup: send with Gmail stays below it, and asks Google's permission only the first time (v39.37, v39.38)",
   "- 🐄 The farm visitors speak more slowly, and the child and the female a little higher (v39.36)",
   "- 🐄 The farm visitors speak with the voice chosen for everyone: a child or a female is never a man's voice on a device that has another, Microsoft Edge's own child voice speaks for the child, and the owner's farm window says which voice speaks for each choice on that device (v39.35)",
@@ -33944,7 +34137,7 @@ var HELP_SYSTEM_PROMPT = [
   "- Diet tags on recipes help the diet filters work correctly — use Auto-tag to set them",
   "- The Self Test (⚙️ → 🔧 Troubleshooting → 🧪 Self Test) is useful for diagnosing if something stops working",
   "- The interface language: tap 🌐 next to ? — the app's words change; recipes stay as written. The app speaks English, Hebrew, Arabic, Russian, French, Spanish, German, Italian, Portuguese, Chinese, Japanese and Hungarian, and any language someone adds (🌐 → Add another language — translated once, then everyone has it). On a new device whose own language the app speaks, it asks once, before the setup: that language or English (a Hungarian phone is asked Magyar or English) — so the setup, the kitchen rules and the welcome come in that language too",
-  "- (The app's owner) Correcting a translation: in My Kitchen Notes (the copy that holds the translations), switch the interface to that language, then 🌐 → ✏️ Edit translations…, change the words and press 💾 Save — it must say '✅ <language> saved and shared with everyone' — then 🌐 → 🚀 Publish languages now (every copy has it within about ten minutes). What you change is kept on this device until it is shared: closing the window, restarting the app or signing out does not lose it, and the editor brings it back. If Save cannot share it, it says why — usually this device's sign-in: sign out, sign in again with Google and your authenticator's 6-digit code, open the editor and press Save. A Save writes only what you changed, onto the newest shared copy, and the automatic translation of new phrases only fills in what is missing — it never replaces a correction",
+  "- (The app's owner) Correcting a translation: in My Kitchen Notes (the copy that holds the translations), switch the interface to that language, then 🌐 → ✏️ Edit translations…, change the words and press 💾 Save — it must say '✅ <language> saved and shared with everyone' — then 🌐 → 🚀 Publish languages now (every copy has it within about ten minutes). What you change is kept on this device until it is shared: closing the window, restarting the app or signing out does not lose it, and the editor brings it back. If Save cannot share it, it says why — usually this device's sign-in: sign out, sign in again with Google and your authenticator's 6-digit code, open the editor and press Save. A Save writes only what you changed, onto the newest shared copy, and the automatic translation of new phrases only fills in what is missing — it never replaces a correction. The same wording wrong in many places (e.g. a menu's name inside many sentences): 🔁 Replace… beside the search — what is in the search box is offered as the words to find; untick the rows that should stay, press 🔁 Replace in N, then 💾 Save",
   "- The sort and filter settings reset when you tap 'All'"
 ].join("\n");
 
