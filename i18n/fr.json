@@ -1,7 +1,7 @@
 {
  "lang": "fr",
- "updatedAt": 1793833758413,
- "count": 2729,
+ "updatedAt": 1793838416653,
+ "count": 2730,
  "strings": {
   "\"Add to Home Screen\"": "Ajouter à l'écran d'accueil",
   "\"Open Bring!\"": "Ouvrir Bring!",
@@ -98,7 +98,7 @@
   "All Recipes": "Toutes les recettes",
   "All recipes already have diet tags!": "Toutes les recettes ont déjà des étiquettes de régime !",
   "Already invited by Gmail from this device: {1}.": "Déjà invité·e par Gmail depuis cet appareil : {1}.",
-  "Already invited from this device: {1}.": "Déjà invité·e depuis cet appareil : {1}.",
+  "Already invited from this device: {1}.": "Déjà invité depuis cet appareil : {1}.",
   "Also sync imported chats": "Synchroniser aussi les discussions importées",
   "Also sync imported chats to my other devices": "Synchroniser aussi les discussions importées sur mes autres appareils",
   "Always allow relay services for imports": "Toujours autoriser les services relais pour les imports",

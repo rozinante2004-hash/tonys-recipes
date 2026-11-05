@@ -1,7 +1,7 @@
 {
  "lang": "ru",
- "updatedAt": 1793833758413,
- "count": 3060,
+ "updatedAt": 1793838416653,
+ "count": 3061,
  "strings": {
   "\"Add to Home Screen\"": "Добавить на главный экран",
   "\"One item away\" filter ({1}f.{2})": "Фильтр «Не хватает одного» ({1}ф.{2})",
@@ -149,7 +149,7 @@
   "All recipes already have diet tags!": "У всех рецептов уже есть теги диеты!",
   "All {1} passed": "Все {1} пройдены",
   "Already invited by Gmail from this device: {1}.": "Уже приглашены через Gmail с этого устройства: {1}.",
-  "Already invited from this device: {1}.": "Уже приглашены с этого устройства: {1}.",
+  "Already invited from this device: {1}.": "Уже приглашено с этого устройства: {1}.",
   "Also sync imported chats": "Синхронизировать и импортированные чаты",
   "Also sync imported chats to my other devices": "Также синхронизировать импортированные чаты на другие устройства",
   "Always allow relay services for imports": "Всегда разрешать сервисы-посредники для импорта",

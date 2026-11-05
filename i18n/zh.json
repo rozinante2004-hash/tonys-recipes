@@ -1,7 +1,7 @@
 {
  "lang": "zh",
- "updatedAt": 1793833758413,
- "count": 2758,
+ "updatedAt": 1793838416653,
+ "count": 2759,
  "strings": {
   "\"Add to Home Screen\"": "添加到主屏幕",
   "\"Open Bring!\"": "打开 Bring!",
@@ -98,7 +98,7 @@
   "All Recipes": "所有菜谱",
   "All recipes already have diet tags!": "所有菜谱都已标记饮食类型！",
   "Already invited by Gmail from this device: {1}.": "已用这台设备上的 Gmail 邀请过：{1}。",
-  "Already invited from this device: {1}.": "已从这台设备邀请过：{1}。",
+  "Already invited from this device: {1}.": "此设备已发送过邀请：{1}。",
   "Also sync imported chats": "同时同步导入的对话",
   "Also sync imported chats to my other devices": "同时将导入的对话同步到我的其他设备",
   "Always allow relay services for imports": "导入时始终允许使用中转服务",
