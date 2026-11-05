@@ -1027,6 +1027,56 @@ console.log('\nAI per household (v60):');
     expect('v66: a long answer (24000 tokens, Haiku) goes through', r.status === 200 && anthropicCalls === callsNow + 1, JSON.stringify(r));
     r = await ai({}, TEST_ORIGIN, { ANTHROPIC_API_KEY: 'sk-test', ALLOWED_ORIGINS: TEST_ORIGIN });
     expect('without METER_DB nothing changes (the test copy works unsigned)', r.status === 200, JSON.stringify(r));
+    // v102 — the kitchen dictionary: a search word in the languages the recipes are written in; the AI once per new word.
+    {
+      const realFetchW = globalThis.fetch;
+      let wordAsks = 0, wordSent = null;
+      globalThis.fetch = async (url, init) => {
+        if (String(url) === 'https://api.anthropic.com/v1/messages') {
+          const b = JSON.parse(init.body);
+          if (/search box of a recipe app/.test(JSON.stringify(b.messages))) {
+            wordAsks++; wordSent = b;
+            const ans = {};
+            if (/Hebrew \(he\)/.test(b.messages[0].content)) ans.he = ['פטריות', 'פטרייה', 'פטריה', 'פטריות'];
+            if (/French \(fr\)/.test(b.messages[0].content)) ans.fr = ['Champignons', 'champignon'];
+            return new Response(JSON.stringify({ content: [{ type: 'text', text: 'Here: ' + JSON.stringify(ans) }],
+              usage: { input_tokens: 300, output_tokens: 60 } }), { status: 200 });
+          }
+        }
+        return realFetchW(url, init);
+      };
+      const sw = async (extra) => {
+        const rr = await worker.fetch(post(Object.assign({ action: 'search-words' }, extra), TEST_ORIGIN), envM);
+        let d = null; try { d = await rr.json(); } catch (e) {}
+        return { status: rr.status, d };
+      };
+      try {
+        const tW = await token({ sub: 'uN' });   // hN: a household with allowance left
+        let s = await sw({ idToken: tW, hid: 'hN', term: '  Mushrooms ', langs: ['he'] });
+        expect('v102: a new word: the AI once, in the small model, and the Hebrew forms come back (lower case, no repeats)',
+          s.status === 200 && wordAsks === 1 && wordSent.model === 'claude-haiku-4-5' && s.d.term === 'mushrooms'
+          && JSON.stringify(s.d.forms.he) === JSON.stringify(['פטריות', 'פטרייה', 'פטריה']) && s.d.asked.join() === 'he', JSON.stringify(s));
+        expect('v102: …counted against the household like any AI answer', s.d._meter && s.d._meter.usd > 2.0, JSON.stringify(s.d && s.d._meter));
+        const row = db.raw.prepare("SELECT * FROM kitchen_words WHERE term = 'mushrooms' AND lang = 'he'").get();
+        expect('v102: …kept in the kitchen dictionary — the word and its forms, nothing about who asked',
+          row && JSON.parse(row.forms).length === 3 && Object.keys(row).sort().join() === 'at,forms,lang,term', JSON.stringify(row));
+        s = await sw({ idToken: await token({ sub: 'uA' }), hid: 'hA', term: 'MUSHROOMS', langs: ['he'] });
+        expect('v102: the same word again, by another household (one with no allowance left): read from the dictionary, no AI, no charge',
+          s.status === 200 && wordAsks === 1 && s.d.forms.he.length === 3 && s.d.asked.length === 0 && !s.d._meter, JSON.stringify(s));
+        s = await sw({ idToken: tW, hid: 'hN', term: 'mushrooms', langs: ['he', 'fr', 'xx'] });
+        expect('v102: a language it lacks is asked for, only that one (an unknown code is ignored)',
+          s.status === 200 && wordAsks === 2 && s.d.asked.join() === 'fr' && s.d.forms.fr.join() === 'champignons,champignon'
+          && !/Hebrew \(he\)/.test(wordSent.messages[0].content), JSON.stringify(s));
+        s = await sw({ term: 'mushrooms', langs: ['he'] });
+        expect('v102: without a sign-in: refused', s.status === 401 && wordAsks === 2, JSON.stringify(s));
+        s = await sw({ idToken: tW, hid: 'hN', term: 'https://evil.example/x', langs: ['he'] });
+        expect('v102: an address is not a word', s.status === 400 && wordAsks === 2, JSON.stringify(s));
+        s = await sw({ idToken: tW, hid: 'hN', term: 'onion', langs: ['fr'] });
+        const s2 = await sw({ idToken: await token({ sub: 'uA' }), hid: 'hA', term: 'garlic', langs: ['fr'] });
+        expect('v102: a NEW word for a household past its allowance is refused, before any cost',
+          s.status === 200 && s2.status === 429 && /AI_ALLOWANCE/.test(s2.d.error) && wordAsks === 3, JSON.stringify([s.status, s2]));
+      } finally { globalThis.fetch = realFetchW; }
+    }
     // meter-me and meter-admin
     let m = await (await worker.fetch(post({ action: 'meter-me', idToken: tA, hid: 'hA' }, TEST_ORIGIN), envM)).json();
     expect('meter-me: the household\'s month so far', Math.abs(m.usd - 2.0) < 1e-9 && m.cap === 2 && m.calls === 5, JSON.stringify(m));
@@ -2305,7 +2355,7 @@ console.log('\nA recipe e-mailed by the server (v98), the owner warned when it r
     a = await mail({ idToken: t }, Object.assign({}, env, { RESEND_API_KEY: '' }));
     expect('v98: no key on the server: "not set up yet"', a.status === 503 && a.d.needsConfig === true, JSON.stringify(a));
     const h = await (await worker.fetch(post({ action: 'health' }), env)).json();
-    expect('v98: health says e-mail can be sent', h.mail === true && h.version === 'v101', JSON.stringify([h.mail, h.version]));
+    expect('v98: health says e-mail can be sent', h.mail === true && h.version === 'v102', JSON.stringify([h.mail, h.version]));
 
     // v99 — the owner hears of it (Tony: "make sure I get a warning if quota is exceeded or if any issues arise")
     let nt = notice('mail-down');

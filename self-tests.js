@@ -15929,8 +15929,12 @@ window.SELF_TESTS = [
         if (!window.MknStrip) throw new Error('the page carries its comments and tools/strip-comments.js could not be loaded to measure it without them');
         lean = window.MknStrip.stripHtml(src);
       }
+      // Raised to 2000 in v39.46, the same way: v39.16–v39.46 added ~100 KB (without comments) of real features (the
+      // translation editor that keeps edits and 🔁 Replace, the help assistant's knowledge of every menu item and of
+      // WhatsApp, 🚀 Deployments rewritten, invitations sent by the server, the farm voices, the date and log-noise
+      // guards, and 🌐 the search in every language the recipes are in) and the page reached 1902 KB.
       kb = Math.round(lean.length/1024);
-      if(kb > 1900) throw new Error('index.html is '+kb+' KB without its comments (what a device downloads). The suite itself is NOT inlined — that is '
+      if(kb > 2000) throw new Error('index.html is '+kb+' KB without its comments (what a device downloads). The suite itself is NOT inlined — that is '
         + 'checked above — so this is the app growing. Either something large went in that should not '
         + 'have, or the budget needs raising on purpose rather than by accident.');
 
@@ -20050,6 +20054,77 @@ window.SELF_TESTS = [
       if(lines.length!==3) throw new Error('the WhatsApp list\'s lines are not one phrase each: '+JSON.stringify(keys));
       var off=lines.filter(function(k){ return I18N_EXTRA.indexOf(k)===-1 || i18nLooksLikeDate(k); });
       if(off.length) throw new Error('a WhatsApp list line is not the listed phrase: '+JSON.stringify(off));
+    } },
+  { id:'search_every_language', group:'Features', name:'🌐 A search finds recipes in every language the recipes are in — linked kitchens\' too — each word looked up once, the words it added shown (v39.46)',
+    test: async()=>{
+      // v39.46 — Tony: "if I have recipes in English and Hebrew, and I search for \"Mushrooms\", then the search should
+      // search for \"פטריות\" as well… The list of languages should also cover recipes from joined kitchens" — and each
+      // new word goes into the kitchen dictionary, so the same word costs nothing again.
+      var real={ recipes:recipes, user:window._fbUser, hh:window._household, fetch:window.fetch, cache:null, link:_linkCache['hST'],
+        hidden:hiddenHouseholds.has('hST') };
+      try{ real.cache=localStorage.getItem(SEARCH_ALSO_KEY); }catch(e){}
+      var asked=[], inp=document.getElementById('searchInput'), wasQ=inp.value;
+      function shown(){ return Array.prototype.map.call(document.querySelectorAll('#recipeGrid .recipe-card, #recipeGrid .recipe-list-item'), function(el){ return el.textContent; }).join(' | '); }
+      async function search(q){ inp.value=q; onSearchInput(); await wait(SEARCH_ALSO_PAUSE+250); }
+      try{
+        try{ localStorage.removeItem(SEARCH_ALSO_KEY); }catch(e){}
+        for(var k in _searchAlsoTerms) delete _searchAlsoTerms[k];
+        for(var a in _searchAlsoAsked) delete _searchAlsoAsked[a];
+        window._fbUser={ uid:'uST', getIdToken:async function(){ return 'st-token'; } };
+        window._household={ hid:'hOwn', links:[{ hid:'hST', name:'ST kitchen', code:'MKN-ST' }] };
+        hiddenHouseholds.delete('hST');
+        _linkCache['hST']={ at:Date.now(), live:true, list:[normalizeRecipe({ id:9300003, uid:'stFr', name:'ST Velouté aux champignons', ingredients:['200 g de champignons','1 oignon'], steps:['Faire revenir l’oignon avec les champignons dans une casserole'] })], photos:{} };
+        window.fetch=function(url, init){
+          var b={}; try{ b=JSON.parse(init && init.body || '{}'); }catch(e){}
+          if(b.action!=='search-words') return real.fetch.apply(this, arguments);
+          asked.push(b.term+':'+(b.langs||[]).join(','));
+          var forms={};
+          (b.langs||[]).forEach(function(l){
+            if(b.term==='mushrooms') forms[l]= l==='he' ? ['פטריות','פטרייה'] : l==='fr' ? ['champignons','champignon'] : ['mushrooms','mushroom'];
+            else if(b.term==='פטריות') forms[l]= l==='en' ? ['mushrooms','mushroom'] : l==='fr' ? ['champignons'] : [];
+            else forms[l]=[];
+          });
+          return Promise.resolve(new Response(JSON.stringify({ term:b.term, forms:forms, asked:b.langs }), { status:200, headers:{ 'Content-Type':'application/json' } }));
+        };
+        recipes=[normalizeRecipe({ id:9300001, uid:'stEn', name:'ST Creamy mushroom soup', ingredients:['200 g mushrooms','1 onion'], steps:['Cook the onion until soft, then add the mushrooms'] }),
+                 normalizeRecipe({ id:9300002, uid:'stHe', name:'ST קיש פטריות', ingredients:['300 גרם פטריות','בצל'], steps:['מטגנים את הבצל ומוסיפים את הפטריות'] })];
+        var langs=searchLangsInView();
+        if(langs.join()!=='en,fr,he') throw new Error('the languages in view are not this kitchen\'s and the linked one\'s: '+langs.join());
+        // 1. An English word: the Hebrew and French recipes join a moment later.
+        await search('Mushrooms');
+        if(asked.length!==1 || asked[0]!=='mushrooms:en,fr,he') throw new Error('the word was not looked up in the recipes\' languages: '+JSON.stringify(asked));
+        var s=shown();
+        if(s.indexOf('ST Creamy mushroom soup')===-1 || s.indexOf('ST קיש פטריות')===-1) throw new Error('the Hebrew recipe was not found for "Mushrooms": '+s);
+        if(!linkedMatches(_linkCache['hST'].list[0], inp.value)) throw new Error('the linked kitchen\'s French recipe was not found for "Mushrooms"');
+        var line=document.getElementById('searchAlso');
+        if(line.hidden || !/פטריות/.test(line.textContent) || !/champignons/.test(line.textContent)) throw new Error('the line does not say which words it also searched for: '+line.textContent);
+        // 2. The same word again: from this device, nothing asked.
+        clearSearch(); await search('mushrooms');
+        if(asked.length!==1) throw new Error('the same word was asked for again: '+JSON.stringify(asked));
+        if(shown().indexOf('ST קיש פטריות')===-1) throw new Error('the remembered word did not find the Hebrew recipe');
+        // 3. A Hebrew word: not looked up in Hebrew, and the English recipe is found.
+        await search('פטריות');
+        if(asked[1]!=='פטריות:en,fr') throw new Error('a Hebrew word was looked up in Hebrew too, or not in the others: '+JSON.stringify(asked));
+        if(shown().indexOf('ST Creamy mushroom soup')===-1) throw new Error('the English recipe was not found for "פטריות": '+shown());
+        // 4. Signed out: nothing asked; what this device already knows still works.
+        window._fbUser=null; clearSearch(); await search('Mushrooms');
+        if(asked.length!==2) throw new Error('a signed-out search asked the server: '+JSON.stringify(asked));
+        if(shown().indexOf('ST קיש פטריות')===-1) throw new Error('signed out, the remembered word stopped working');
+        await search('onion soup'); 
+        if(asked.length!==2) throw new Error('a signed-out search asked the server for a new word');
+        // 5. One language only: nothing to look up.
+        window._fbUser={ uid:'uST', getIdToken:async function(){ return 'st-token'; } };
+        hiddenHouseholds.add('hST'); recipes=[recipes[0]]; clearSearch(); await search('carrots');
+        if(asked.length!==2) throw new Error('with every recipe in one language, a word was still looked up: '+JSON.stringify(asked));
+        if(!document.getElementById('searchAlso').hidden) throw new Error('the line shows with nothing added');
+      } finally {
+        window.fetch=real.fetch; recipes=real.recipes; window._fbUser=real.user; window._household=real.hh;
+        if(real.link) _linkCache['hST']=real.link; else delete _linkCache['hST'];
+        if(real.hidden) hiddenHouseholds.add('hST'); else hiddenHouseholds.delete('hST');
+        try{ if(real.cache==null) localStorage.removeItem(SEARCH_ALSO_KEY); else localStorage.setItem(SEARCH_ALSO_KEY, real.cache); }catch(e){}
+        for(var k2 in _searchAlsoTerms) delete _searchAlsoTerms[k2];
+        inp.value=wasQ; syncSearchClear(); renderGrid();
+      }
     } },
   { id:'feat_units', group:'Features', name:'Metric keeps tsp/tbsp/cup, converts imperial',
     test: async()=>{

@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v39.45` — app. **Worker: v101**, deployed separately and versioned separately
+**Current version:** `v39.46` — app. **Worker: v102**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -408,6 +408,12 @@ under its plain path only (a `?url=` request goes network-first).
   **Pace and pitch (v39.36, Tony's choice "E" from five heard on his phone):** FARM_VOICE_TUNE child speed 0.8, pitch
   1.8 (the top; above it speech cracks); female 0.74 / 1.4; male 0.7 / 0.7 (only slower: he stays deep, v38.01); each
   animal adds ±0.3 × (its pitch − 1), kept within 0.55–1.8.
+- **🌐 Search in every language (v39.46, Worker v102):** when the recipes in view (this kitchen's and the shown linked
+  kitchens') are in more than one language (`recipeLangOf`: by script, Latin by everyday words), each word typed is
+  also matched as recipes in those languages write it (`searchAlsoForms` inside `recipeMatchesQuery`), 750 ms after
+  typing stops; the forms come from this device's `tonys_kitchen_words`, else the Worker's `search-words` — a shared D1
+  kitchen dictionary (`kitchen_words`), the AI (Haiku, counted per household) only for a word new in a language, once
+  for everyone; "🌐 Also searching: …" under the heading says what was added. Privacy Statement 1.14 says so.
 - **✉️ Invite testers → 📨 Send (v39.38, Worker v101):** each invitation goes to the server (`mail-recipe` with
   `invite: { subject, text, rtl }`, no `hid`), which sends it through Resend (`mailInvite` → `mailOut` with options) from
   "My Kitchen Notes" <contact@ the app's domain> (MAIL_INVITE_FROM to change it), replies to the same address; the owner

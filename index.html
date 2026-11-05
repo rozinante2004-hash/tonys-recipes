@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.45 -->
+<!-- Tony's Recipes Collection v39.46 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -10714,7 +10714,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.45';
+var APP_VERSION = 'v39.46';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -12278,6 +12278,9 @@ html.setup-first #loginScreen > * { visibility: hidden; }   /* v39.02 — a firs
 /* GRID */
 .grid-section { padding: 1rem 1.5rem 3rem; }
 .section-label { font-family: 'Playfair Display', 'Frank Ruhl Libre', serif; font-size: 20px; margin-bottom: 1rem; color: var(--heading); }
+/* v39.46 — "🌐 Also searching: פטריות, פטרייה" under the heading */
+.search-also { font-size: 13px; color: var(--muted); margin: -0.5rem 0 0.9rem; line-height: 1.5; }
+.search-also bdi { color: var(--ink); }
 .recipe-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
 
 /* CARD */
@@ -14186,7 +14189,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.45</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.46</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14274,7 +14277,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.45</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.46</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -14627,6 +14630,8 @@ body.banner-shown .header {
     <span style="flex:1;min-width:180px;font-size:13px;color:#7A5C00;"></span>
     <button onclick="autoFetchMissingPhotos()" style="padding:9px 16px;border-radius:9px;border:none;background:var(--terracotta-fill);color:#fff;font-family:'DM Sans','Heebo',sans-serif;font-size:13px;font-weight:600;cursor:pointer;">📸 Auto-fetch photos</button>
   </div>
+  <!-- v39.46 — Tony: a search finds recipes in every language they are written in; this says which words it also searched for -->
+  <div id="searchAlso" class="search-also" hidden aria-live="polite"><span>🌐 Also searching:</span> <bdi id="searchAlsoWords" data-no-i18n></bdi></div>
   <div id="recipeGrid"></div>
   <div id="linkedAll" style="display:none;"></div>
 </div>
@@ -15675,12 +15680,15 @@ function recipeIngredientNames(r) {
 function recipeMatchesQuery(r, raw) {
   var parsed = parseSearchQuery(raw);
   var lc = function(v){ return String(v == null ? '' : v).toLowerCase(); };
+  // v39.46 — a word, or how recipes in the collection's other languages write it (searchAlsoForms: "mushrooms" also
+  // finds "פטריות"); the forms arrive from the kitchen dictionary a moment after the typing stops.
+  var asWritten = function(t){ return [t].concat(searchAlsoForms(t)); };
   if (parsed.must.length) {
     var names = recipeIngredientNames(r);
     // ALL of them, each matched as a substring so Hebrew prefixes (ה/ו/ב/ל)
     // still work without a stemmer — the same reasoning as waSearch.
     var all = parsed.must.every(function(t){
-      return names.some(function(n){ return n.indexOf(t) !== -1; });
+      return asWritten(t).some(function(w){ return names.some(function(n){ return n.indexOf(w) !== -1; }); });
     });
     if (!all) return false;
     if (!parsed.text) return true;
@@ -15688,14 +15696,17 @@ function recipeMatchesQuery(r, raw) {
   var q = parsed.text;
   if (!q) return true;
   // Defensive: a recipe with a missing field must never break the whole grid.
-  return recipeSearchText(r).some(function(t){ return t.includes(q); })
-    || recipeIngredientNames(r).some(function(n){ return n.includes(q); })
+  var text = recipeSearchText(r), ings = recipeIngredientNames(r), steps = null;
+  return asWritten(q).some(function(w) {
+    if (text.some(function(t){ return t.includes(w); }) || ings.some(function(n){ return n.includes(w); })) return true;
     // allSteps, not r.steps: a collection's flat steps are empty and the text
     // lives in its parts, so the method of every collected recipe was
     // unsearchable. It also maps {t,ind} step objects back to their text —
     // String({t:'…'}) is "[object Object]", so indented steps never matched
     // either (v36.12).
-    || allSteps(r).some(function(st){ return lc(noBold(st)).includes(q); });
+    if (!steps) steps = allSteps(r).map(function(st){ return lc(noBold(st)); });
+    return steps.some(function(st){ return st.includes(w); });
+  });
 }
 // Every short field a search may legitimately hit, the collection's parts
 // included. A recipe inside a collection has its own name, meal type and
@@ -21334,8 +21345,174 @@ function onSearchInput() {
   syncSearchClear();
   clearTimeout(_searchTimer);
   _searchTimer = setTimeout(function(){ renderGrid(); }, 180);
+  searchAlsoSoon();   // v39.46 — the same words in the collection's other languages, once the typing pauses
 }
 window.onSearchInput = onSearchInput;
+
+// ─── 🌐 A SEARCH IN EVERY LANGUAGE THE RECIPES ARE IN (v39.46) ───────────────
+// Tony, 6 Nov 2026: "When searching for an item in the main search box, it should search for translations of the same
+// meaning in all the languages there are recipes in… if I search for \"Mushrooms\" … the search should search for
+// \"פטריות\" as well… The list of languages should also cover recipes from joined kitchens." And: "AI, remembered —
+// each new word should go into a Built-in kitchen dictionary, so asking for the same word will not incur additional AI
+// charges." So: which languages the recipes in view are written in (yours and the linked kitchens' shown), and for each
+// word typed (3 letters or more, or 2 in a script of its own), how recipes in those languages write it — from this
+// device's copy of the kitchen dictionary, else from the server's (Worker v102 `search-words`: shared by everyone; the
+// AI only for a word new in a language, once, ever). The ordinary search runs at once; these join after a pause.
+var SEARCH_ALSO_KEY = 'tonys_kitchen_words', SEARCH_ALSO_MAX = 800, SEARCH_ALSO_PAUSE = 750;
+var _searchAlsoTerms = Object.create(null);   // a word typed → its forms in the other languages (this session)
+var _searchAlsoTimer = null, _searchAlsoAsked = Object.create(null);
+var _recipeLangOf = (typeof WeakMap === 'function') ? new WeakMap() : null;
+// A Latin-script recipe's language by its everyday words; any other script by the script.
+var RECIPE_LANG_WORDS = {
+  en: 'the and with cup cups tbsp tsp add until minutes into salt oil water bake mix stir pepper sugar flour',
+  fr: 'le la les et avec dans pour une des du cuillère cuillères sel eau huile jusqu ajouter four sucre farine',
+  es: 'el los las y con para una del cucharada cucharadas sal agua aceite hasta añadir horno azúcar harina',
+  de: 'und mit der die das ein eine bis salz wasser öl esslöffel zucker mehl ofen dazu',
+  it: 'il lo gli e con per una del cucchiaio cucchiai sale acqua olio fino aggiungere forno zucchero farina',
+  pt: 'o os e com para uma do colher colheres sal água azeite até adicionar forno açúcar farinha',
+  hu: 'és az egy evőkanál só víz olaj amíg hozzá cukor liszt sütő'
+};
+var _recipeLangSets = null;
+function recipeLangOf(r) {
+  if (!r) return '';
+  if (_recipeLangOf && _recipeLangOf.has(r)) return _recipeLangOf.get(r);
+  var parts = [r.name || ''];
+  try { allIngredients(r).slice(0, 25).forEach(function(i){ parts.push((i && i.n) || ''); }); } catch(e) {}
+  try { allSteps(r).slice(0, 4).forEach(function(s){ parts.push(noBold(s)); }); } catch(e) {}
+  var s = parts.join(' ').slice(0, 1500), lang = textLangOf(s);
+  if (_recipeLangOf) _recipeLangOf.set(r, lang);
+  return lang;
+}
+function textLangOf(s) {
+  s = String(s || '');
+  var count = function(re){ var m = s.match(re); return m ? m.length : 0; };
+  var by = { he: count(/[\u0590-\u05FF]/g), ar: count(/[\u0600-\u06FF]/g), ru: count(/[\u0400-\u04FF]/g),
+             ja: count(/[\u3040-\u30FF]/g), zh: count(/[\u4E00-\u9FFF]/g), el: count(/[\u0370-\u03FF]/g),
+             ko: count(/[\uAC00-\uD7AF]/g), latin: count(/[A-Za-zÀ-ÿŐőŰű]/g) };
+  if (by.ja) by.ja += by.zh, by.zh = 0;   // kana and kanji together are Japanese
+  var best = 'latin', n = by.latin;
+  ['he', 'ar', 'ru', 'ja', 'zh', 'el', 'ko'].forEach(function(k){ if (by[k] > n) { best = k; n = by[k]; } });
+  if (!n) return '';
+  if (best !== 'latin') return best;
+  if (!_recipeLangSets) {
+    _recipeLangSets = {};
+    Object.keys(RECIPE_LANG_WORDS).forEach(function(l){ _recipeLangSets[l] = Object.create(null); RECIPE_LANG_WORDS[l].split(' ').forEach(function(w){ _recipeLangSets[l][w] = 1; }); });
+  }
+  var words = s.toLowerCase().split(/[^\p{L}]+/u), score = {};
+  words.forEach(function(w){ if (!w) return; Object.keys(_recipeLangSets).forEach(function(l){ if (_recipeLangSets[l][w]) score[l] = (score[l] || 0) + 1; }); });
+  var top = 'en', topN = 0;
+  Object.keys(score).forEach(function(l){ if (score[l] > topN) { top = l; topN = score[l]; } });
+  return top;
+}
+// The languages of the recipes in view: this kitchen's, and the linked kitchens' that are shown.
+function searchLangsInView() {
+  var seen = Object.create(null);
+  (typeof recipes !== 'undefined' && Array.isArray(recipes) ? recipes : []).forEach(function(r){ var l = recipeLangOf(r); if (l) seen[l] = 1; });
+  try {
+    hhLinks().filter(function(l){ return hhShown(l.hid); }).forEach(function(l) {
+      var c = _linkCache[l.hid];
+      (c && Array.isArray(c.list) ? c.list : []).forEach(function(r){ var x = recipeLangOf(r); if (x) seen[x] = 1; });
+    });
+  } catch(e) {}
+  return Object.keys(seen).sort();
+}
+// The words of a search worth looking up: the words typed, and each +word / ing: word.
+function searchAlsoWordsOf(raw) {
+  var p = parseSearchQuery(raw), out = [];
+  [p.text].concat(p.must).forEach(function(w) {
+    w = searchAlsoNorm(w);
+    if (!w || w.length > 40 || out.indexOf(w) !== -1) return;
+    var letters = (w.match(/\p{L}/gu) || []).length, latin = /^[\p{Script=Latin}\s'’-]+$/u.test(w);
+    if (letters < (latin ? 3 : 2)) return;
+    out.push(w);
+  });
+  return out.slice(0, 4);
+}
+// The languages a word is looked up in: every language of the recipes in view, but not the word's own (by its
+// script) — and nothing when there is only the one language the word is already in.
+function searchAlsoTargets(word, langs) {
+  var latin = Object.keys(RECIPE_LANG_WORDS);
+  var own = textLangOf(word);                       // 'he', 'ru', … by its script; a Latin word gives a Latin language
+  var ownIsLatin = !own || latin.indexOf(own) !== -1;
+  var targets = ownIsLatin ? langs.slice() : langs.filter(function(l){ return l !== own; });
+  // One Latin language only, and the word is in that script: nothing to look up (a Latin word's language is a guess,
+  // so with two Latin languages both are asked — the word's own one gives its singular and plural).
+  if (ownIsLatin && targets.length === 1 && latin.indexOf(targets[0]) !== -1) return [];
+  return targets;
+}
+function searchAlsoCache() {
+  try { var o = JSON.parse(localStorage.getItem(SEARCH_ALSO_KEY) || 'null'); return (o && typeof o === 'object') ? o : {}; } catch(e) { return {}; }
+}
+function searchAlsoKeep(word, forms) {
+  try {
+    var c = searchAlsoCache(), was = c[word] || {};
+    Object.keys(forms || {}).forEach(function(l){ if (Array.isArray(forms[l])) was[l] = forms[l].slice(0, 6); });
+    was._at = Date.now(); c[word] = was;
+    var keys = Object.keys(c);
+    if (keys.length > SEARCH_ALSO_MAX) keys.sort(function(a, b){ return (c[a]._at || 0) - (c[b]._at || 0); })
+      .slice(0, keys.length - SEARCH_ALSO_MAX).forEach(function(k){ delete c[k]; });
+    localStorage.setItem(SEARCH_ALSO_KEY, JSON.stringify(c));
+  } catch(e) {}
+}
+// The forms of a word known now — what recipeMatchesQuery also looks for.
+function searchAlsoNorm(w) { return String(w || '').normalize('NFC').toLocaleLowerCase().replace(/\s+/g, ' ').trim(); }
+function searchAlsoForms(word) {
+  var f = _searchAlsoTerms[searchAlsoNorm(word)];
+  return Array.isArray(f) ? f : [];
+}
+function searchAlsoSoon() {
+  clearTimeout(_searchAlsoTimer);
+  _searchAlsoTimer = setTimeout(function(){ searchAlsoRun().catch(function(e){ dlog('[searchAlso]', e && e.message); }); }, SEARCH_ALSO_PAUSE);
+  renderSearchAlso();
+}
+async function searchAlsoRun() {
+  var inp = document.getElementById('searchInput');
+  var raw = inp ? inp.value : '';
+  var words = searchAlsoWordsOf(raw), langs = searchLangsInView(), changed = false;
+  for (var i = 0; i < words.length; i++) {
+    var w = words[i], targets = searchAlsoTargets(w, langs);
+    if (!targets.length) { if (_searchAlsoTerms[w]) { delete _searchAlsoTerms[w]; changed = true; } continue; }
+    var have = searchAlsoCache()[w] || {};
+    var missing = targets.filter(function(l){ return !Array.isArray(have[l]); });
+    var askKey = w + '|' + missing.join(',');
+    if (missing.length && !_searchAlsoAsked[askKey] && window._fbUser && typeof _fbUser.getIdToken === 'function'
+        && navigator.onLine !== false && window._household && window._household.hid) {
+      _searchAlsoAsked[askKey] = 1;   // once a session: a refusal is not asked again on every keystroke
+      try {
+        var resp = await fetch(WORKER_ENDPOINT, { method: 'POST', headers: workerHeaders(), signal: AbortSignal.timeout(20000),
+          body: workerBody({ action: 'search-words', idToken: await _fbUser.getIdToken(), hid: window._household.hid, term: w, langs: missing }) });
+        var d = {}; try { d = await resp.json(); } catch(e) {}
+        if (resp.ok && d && d.forms) {
+          searchAlsoKeep(w, d.forms);
+          have = searchAlsoCache()[w] || {};
+          if (d._meter && typeof aiMeterNote === 'function') aiMeterNote(d._meter);
+          if (d.asked && d.asked.length) syncLog('ai', 'Search words looked up for the first time', { languages: d.asked.join(', ') });
+        } else dlog('[searchAlso] not answered', resp.status, d && d.error);
+      } catch(e) { dlog('[searchAlso] could not ask', e && e.message); }
+    }
+    var forms = [];
+    targets.forEach(function(l){ (Array.isArray(have[l]) ? have[l] : []).forEach(function(f){ if (f && f !== w && forms.indexOf(f) === -1) forms.push(f); }); });
+    if (JSON.stringify(forms) !== JSON.stringify(_searchAlsoTerms[w] || [])) { _searchAlsoTerms[w] = forms; changed = true; }
+  }
+  // Only for what is still in the box: a search that moved on keeps its own.
+  if (inp && inp.value === raw && changed) renderGrid();
+  else renderSearchAlso();
+}
+// "🌐 Also searching: …" — the forms that took part in the search now on the screen.
+function renderSearchAlso() {
+  var box = document.getElementById('searchAlso'), words = document.getElementById('searchAlsoWords');
+  if (!box || !words) return;
+  var inp = document.getElementById('searchInput');
+  var all = [];
+  searchAlsoWordsOf(inp ? inp.value : '').forEach(function(w){ searchAlsoForms(w).forEach(function(f){ if (all.indexOf(f) === -1) all.push(f); }); });
+  if (!all.length) { box.hidden = true; words.textContent = ''; return; }
+  words.textContent = all.slice(0, 12).join(', ');
+  box.hidden = false;
+}
+window.recipeLangOf = recipeLangOf; window.textLangOf = textLangOf; window.searchLangsInView = searchLangsInView;
+window.searchAlsoWordsOf = searchAlsoWordsOf; window.searchAlsoTargets = searchAlsoTargets; window.searchAlsoForms = searchAlsoForms;
+window.searchAlsoRun = searchAlsoRun; window.searchAlsoSoon = searchAlsoSoon; window.renderSearchAlso = renderSearchAlso;
+window.searchAlsoKeep = searchAlsoKeep; window.searchAlsoCache = searchAlsoCache;
 
 // The ✕ only exists while there is something to clear — a permanent one on an
 // empty box is a button that does nothing, and the search box is narrow enough
@@ -21429,6 +21606,7 @@ function gridBadgesHtml(r) {
 window.listBadgesHtml = listBadgesHtml; window.gridBadgesHtml = gridBadgesHtml;
 function renderGrid() {
   if (typeof recipeBadgeUpdate === 'function') try { recipeBadgeUpdate(); } catch(e) {}   // v38.40
+  if (typeof renderSearchAlso === 'function') try { renderSearchAlso(); } catch(e) {}     // v39.46 — 🌐 Also searching
   const q = document.getElementById('searchInput').value.toLowerCase();
   var linkedN = (typeof renderLinkedInAll === 'function') ? renderLinkedInAll(q) : 0;   // v38.49 — theirs, after yours
   var showOwn = ownShown();                                        // v38.49 — the 🏠 / 🤝 chips
@@ -34013,6 +34191,7 @@ var HELP_SYSTEM_PROMPT = [
   "=== BROWSING & FILTERING ===",
   "- Recipes are shown in List or Grid view (toggle top-right)",
   "- Search bar in the header searches recipe names, ingredients, and steps",
+  "- 🌐 SEARCH IN EVERY LANGUAGE (v39.46): when your recipes — or a linked kitchen's shown in your list — are written in more than one language, a word you search for is also looked for as recipes in those languages write it: 'Mushrooms' also finds 'פטריות', and 'פטריות' also finds 'mushrooms'. Your own-language results show at once; the others join a moment after you stop typing, and a line under the heading says '🌐 Also searching: …' with the words it added. Each word is looked up once in the app's shared kitchen dictionary — the AI translates a word only the first time anyone searches it in a language, so searching it again costs nothing. It needs to be signed in and online; signed out or offline, words already looked up on this device still work. +word and ing: searches are translated too.",
   "- On a computer, the filter bar's first row: All, Favourites, Clips, 🕐 Recent, 📚 Collections, 📷 No photo, 🛒 One item away (recipes you could cook with one more thing); then Meal type and Diet type",
   "- On a phone: All / Fav / Clips buttons, Meal ▾ and Diet ▾ panels, and 🗂 Show ▾ — tick 🕐 Recent, 📚 Collections, 📷 No photo or 🛒 One item away; the button then names what is on (or 'Show (2)' for two); ✦ All clears them",
   "- Meal filters: Breakfast, Lunch, Dinner, Snack, Dessert, Soup, Skills \u0026 Methods (multi-select)",
@@ -37098,6 +37277,9 @@ function privacyEntries() {
       sends: 'The address you import, the words you search photos for, your AI request on its way, and the notes and reports you choose to send.'
         // v38.15 — the beta and the test copy report by themselves (Worker v69).
         + (insightsOn() ? ' In this test copy it also sends, by itself, the app\u2019s own error messages and how the app is used \u2014 which features and how often, when, on what kind of device, how you signed in and how you first found the app: names and numbers, never your recipes.' : '') },
+    // v39.46 — a search in every language the recipes are in (Privacy Statement 1.14)
+    { who: 'The kitchen dictionary (the app\u2019s own server)', when: 'only when you search and your recipes are in more than one language', on: true,
+      sends: 'The word you searched for and the languages your recipes are in, to find how they write it. Each word and its translations are kept for everyone, without who searched; a word new to the dictionary goes to the AI (Anthropic) once.' },
     { who: 'Photo libraries (Pixabay, Pexels, Unsplash, Wikimedia Commons)', when: 'only when you search for a photo', on: true,
       sends: 'The search words, never your recipes. Your device then loads the pictures it shows from them, so they see its internet address, as any website does.' },
     { who: 'Public relay services', when: 'only when a page cannot be fetched any other way', on: true,

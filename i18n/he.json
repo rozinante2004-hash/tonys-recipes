@@ -3339,6 +3339,10 @@
   "🫙 Low FODMAP": "🫙 דל FODMAP",
   "🔄 synced {1} · {2} messages · {3} →": "🔄 סונכרן {1} · {2} הודעות · {3} →",
   "📱 this device {1} · {2} messages · {3} →": "📱 במכשיר הזה {1} · {2} הודעות · {3} →",
-  "☁️ folder · {1} messages · {2} →": "☁️ תיקייה · {1} הודעות · {2} →"
+  "☁️ folder · {1} messages · {2} →": "☁️ תיקייה · {1} הודעות · {2} →",
+  "🌐 Also searching:": "🌐 מחפש גם:",
+  "The kitchen dictionary (the app’s own server)": "מילון המטבח (השרת של האפליקציה)",
+  "only when you search and your recipes are in more than one language": "רק כשאתם מחפשים והמתכונים שלכם כתובים ביותר משפה אחת",
+  "The word you searched for and the languages your recipes are in, to find how they write it. Each word and its translations are kept for everyone, without who searched; a word new to the dictionary goes to the AI (Anthropic) once.": "המילה שחיפשתם והשפות שבהן כתובים המתכונים שלכם, כדי למצוא איך הם כותבים אותה. כל מילה ותרגומיה נשמרים לכולם, בלי מי שחיפש; מילה חדשה במילון נשלחת לבינה המלאכותית (Anthropic) פעם אחת."
  }
 }

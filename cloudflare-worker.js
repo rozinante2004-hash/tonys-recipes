@@ -1,4 +1,12 @@
-// Tony's Recipes — Cloudflare Worker v101
+// Tony's Recipes — Cloudflare Worker v102
+// v102: THE KITCHEN DICTIONARY — A SEARCH FINDS RECIPES IN EVERY LANGUAGE THEY ARE WRITTEN IN (Tony, 6 Nov 2026: "When
+//   searching for an item in the main search box, it should search for translations of the same meaning in all the
+//   languages there are recipes in… if I search for "Mushrooms" … the search should search for "פטריות" as well" —
+//   and "each new word should go into a Built-in kitchen dictionary, so asking for the same word will not incur
+//   additional AI charges"). `search-words` { term, langs }: the words a recipe in each language would use for it,
+//   from D1 `kitchen_words` (one row per word and language, shared by every household and copy); only the languages it
+//   lacks go to the AI (the small model, counted against the asking household like any AI call, within the server's
+//   ceilings), and the answer is kept there for everyone. Signed in only; nothing about who asked is kept (searchWords).
 // v101: THE OWNER'S TESTER INVITATIONS ARE SENT HERE, THROUGH RESEND (Tony, 5 Nov 2026: "Is there a way to remove
 //   Google's scare screens every time I invite a new tester … I have to go through 5 screens each time" — "Can we use
 //   Resend instead of gmail?"). mail-recipe with `invite: { subject, text, rtl }`: the owner only, signed in as his
@@ -464,7 +472,7 @@
 //   AI_MAX_TOKENS   – the longest answer one call may ask for (32000; the
 //                     app's largest, reading several recipes at once, asks 8000).
 
-const WORKER_VERSION = 'v101';
+const WORKER_VERSION = 'v102';
 const VIDEO_MAX_MB_DEFAULT = 50;
 const GEMINI_API = 'https://generativelanguage.googleapis.com';
 const GEMINI_MODEL_DEFAULT = 'gemini-2.5-flash';
@@ -1771,6 +1779,7 @@ async function handleRequest(request, env, ctx) {
       return ir;
     }
     if (body.action === 'mail-recipe') return await mailRecipe(request, env, body);   // v98 — 📤 Share → ✉️ Email, sent here
+    if (body.action === 'search-words') return await searchWords(request, env, body);   // v102 — the kitchen dictionary
     if (body.action === 'household-report') return await householdReport(request, env, body);   // v62
     if (body.action === 'app-signals') {   // v69; v90 — a new error report on to the reports repository
       const sr = await appSignals(request, env, body);
@@ -2757,6 +2766,88 @@ async function mailOut(env, claims, kitchen, to, subject, htmlFor, text, img, op
 // (escaped, its links made links) — HTML from the app is never used; 40 a day, inside the app's 90. Nothing is kept but
 // the day's counts.
 const MAIL_INVITES_DAY = 40, MAIL_INVITE_FROM_DEFAULT = ['contact', 'mykitchennotes.community'].join('@');
+// ── v102 — THE KITCHEN DICTIONARY ────────────────────────────────────────────
+// A search word, and the words recipes in other languages use for the same thing ("mushrooms" → he: פטריות, פטרייה,
+// פטריה). Kept once for everyone: the first household to search a word in a language pays for one small AI answer,
+// every later search of it — by anyone, on any copy — is read from here. The row holds the word and its translations
+// only, never who searched.
+const KITCHEN_WORDS_MODEL = 'claude-haiku-4-5';
+const KITCHEN_LANG_NAMES = { en: 'English', he: 'Hebrew', ar: 'Arabic', ru: 'Russian', fr: 'French', es: 'Spanish', de: 'German',
+  it: 'Italian', pt: 'Portuguese', zh: 'Chinese (Simplified)', ja: 'Japanese', hu: 'Hungarian', nl: 'Dutch', el: 'Greek',
+  ko: 'Korean', pl: 'Polish', ro: 'Romanian', sv: 'Swedish', tr: 'Turkish', uk: 'Ukrainian', yi: 'Yiddish' };
+function kitchenTerm(s) {
+  const t = String(s == null ? '' : s).normalize('NFC').toLocaleLowerCase().replace(/\s+/g, ' ').trim();
+  if (!t || t.length > 40 || !/\p{L}/u.test(t) || /[<>{}\\@]|https?:/i.test(t)) return '';
+  return t;
+}
+function kitchenForms(list) {
+  if (!Array.isArray(list)) return [];
+  const out = [];
+  list.forEach(function (w) {
+    const f = kitchenTerm(w);
+    if (f && out.indexOf(f) === -1 && out.length < 6) out.push(f);
+  });
+  return out;
+}
+async function searchWords(request, env, body) {
+  const term = kitchenTerm(body.term);
+  const langs = (Array.isArray(body.langs) ? body.langs : []).map(function (l) { return String(l || '').toLowerCase(); })
+    .filter(function (l, i, a) { return KITCHEN_LANG_NAMES[l] && a.indexOf(l) === i; }).slice(0, 12);
+  if (!term || !langs.length) return jsonResp({ error: 'SEARCH_WORDS: a word (letters, up to 40) and at least one known language.' }, 400);
+  if (!env.METER_DB) return jsonResp({ error: 'SEARCH_WORDS: not set up on this Worker (METER_DB).', needsConfig: true }, 503);
+  // Signed in to the app — the dictionary is for its households, not for anyone with the address.
+  try { await verifyIdToken(body.idToken, env); }
+  catch (e) { return jsonResp({ error: 'SEARCH_WORDS: sign in to search in other languages (' + (e && e.message) + ').' }, 401); }
+  const db = await meterDb(env);
+  await tableOnce(db, 'kitchen_words', 'CREATE TABLE IF NOT EXISTS kitchen_words (term TEXT NOT NULL, lang TEXT NOT NULL, '
+    + 'forms TEXT NOT NULL, at INTEGER, PRIMARY KEY (term, lang))');
+  const forms = {};
+  const rows = (await db.prepare('SELECT lang, forms FROM kitchen_words WHERE term = ?1').bind(term).all()).results || [];
+  rows.forEach(function (r) { if (langs.indexOf(r.lang) !== -1) { try { forms[r.lang] = JSON.parse(r.forms); } catch (e) { forms[r.lang] = []; } } });
+  const missing = langs.filter(function (l) { return !forms[l]; });
+  if (!missing.length) return jsonResp({ term, forms, asked: [] });
+  // A word new in some language: one small AI answer, counted against the household like any other, within the ceilings.
+  const apiKey = env.ANTHROPIC_API_KEY;
+  if (!apiKey) return jsonResp({ term, forms, asked: [], error: 'SEARCH_WORDS: the AI is not set up on this Worker.' }, 503);
+  const limited = await rateLimited(request, env, 'ai');
+  if (limited) return limited;
+  const metered = await meterStart(request, env, body);
+  if (metered.resp) return metered.resp;
+  const names = missing.map(function (l) { return KITCHEN_LANG_NAMES[l] + ' (' + l + ')'; }).join(', ');
+  const prompt = 'A cook typed this into the search box of a recipe app: "' + term + '".\n'
+    + 'For each of these languages, give the words a recipe written in that language would use for the same thing: '
+    + names + '.\nThe usual word, its singular and plural, and common spellings (for Hebrew: with and without the extra '
+    + 'yod and vav, no niqqud) — at most 5 for each, lower case, the language\'s own script, no transliteration, no '
+    + 'explanations. If the term is already in that language, give its forms in it.\n'
+    + 'Answer with JSON only, e.g. {"he": ["פטריות", "פטרייה"], "fr": ["champignons", "champignon"]}.';
+  let data = null, ok = false;
+  try {
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({ model: KITCHEN_WORDS_MODEL, max_tokens: 400, messages: [{ role: 'user', content: prompt }] }),
+    });
+    data = await r.json(); ok = r.ok;
+  } catch (e) { data = null; }
+  if (!ok || !data) return jsonResp({ term, forms, asked: [], error: 'SEARCH_WORDS: the AI did not answer just now.' }, 502);
+  const meter = (metered.ctx && data.usage) ? await meterAdd(env, metered.ctx, KITCHEN_WORDS_MODEL, data.usage) : null;
+  let got = {};
+  try {
+    const text = (data.content || []).map(function (b) { return b.text || ''; }).join('');
+    const m = /\{[\s\S]*\}/.exec(text);
+    got = m ? JSON.parse(m[0]) : {};
+  } catch (e) { got = {}; }
+  const now = Date.now(), writes = [];
+  missing.forEach(function (l) {
+    const f = kitchenForms(got && got[l]);
+    forms[l] = f;
+    // An empty answer is kept too: the same word is not asked again (a later version may clear empty rows).
+    writes.push(db.prepare('INSERT INTO kitchen_words (term, lang, forms, at) VALUES (?1, ?2, ?3, ?4) '
+      + 'ON CONFLICT (term, lang) DO UPDATE SET forms = excluded.forms, at = excluded.at').bind(term, l, JSON.stringify(f), now));
+  });
+  try { if (writes.length) await db.batch(writes); } catch (e) {}
+  return jsonResp({ term, forms, asked: missing, _meter: meter });
+}
 async function mailInvite(request, env, body, claims, to) {
   const owners = ownerEmails(env);
   if (!owners.length || !owners.includes(String(claims.email || '').toLowerCase()))
@@ -4132,4 +4223,4 @@ export default {
   }
 };
 
-// ── END OF WORKER v101 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
+// ── END OF WORKER v102 ── If this is the last line in the Cloudflare editor, the whole file was pasted.

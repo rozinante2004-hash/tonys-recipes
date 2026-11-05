@@ -3124,6 +3124,10 @@
   "🫙 Low FODMAP": "🫙 Низкий FODMAP",
   "🔄 synced {1} · {2} messages · {3} →": "🔄 синхронизировано {1} · {2} сообщений · {3} →",
   "📱 this device {1} · {2} messages · {3} →": "📱 это устройство {1} · {2} сообщений · {3} →",
-  "☁️ folder · {1} messages · {2} →": "☁️ папка · {1} сообщений · {2} →"
+  "☁️ folder · {1} messages · {2} →": "☁️ папка · {1} сообщений · {2} →",
+  "🌐 Also searching:": "🌐 Также ищем:",
+  "The kitchen dictionary (the app’s own server)": "Кухонный словарь (собственный сервер приложения)",
+  "only when you search and your recipes are in more than one language": "только когда вы ищете, а ваши рецепты написаны на нескольких языках",
+  "The word you searched for and the languages your recipes are in, to find how they write it. Each word and its translations are kept for everyone, without who searched; a word new to the dictionary goes to the AI (Anthropic) once.": "Искомое слово и языки ваших рецептов — чтобы узнать, как в них его пишут. Каждое слово и его переводы хранятся для всех, без указания того, кто искал; новое для словаря слово один раз отправляется ИИ (Anthropic)."
  }
 }

@@ -3135,6 +3135,10 @@
   "🫙 Low FODMAP": "🫙 低FODMAP",
   "🔄 synced {1} · {2} messages · {3} →": "🔄 同期済み {1} · {2} 件のメッセージ · {3} →",
   "📱 this device {1} · {2} messages · {3} →": "📱 この端末 {1} · {2} 件のメッセージ · {3} →",
-  "☁️ folder · {1} messages · {2} →": "☁️ フォルダー · {1} 件のメッセージ · {2} →"
+  "☁️ folder · {1} messages · {2} →": "☁️ フォルダー · {1} 件のメッセージ · {2} →",
+  "🌐 Also searching:": "🌐 次も検索中：",
+  "The kitchen dictionary (the app’s own server)": "キッチン辞書（アプリ自身のサーバー）",
+  "only when you search and your recipes are in more than one language": "検索したときで、レシピが複数の言語で書かれている場合のみ",
+  "The word you searched for and the languages your recipes are in, to find how they write it. Each word and its translations are kept for everyone, without who searched; a word new to the dictionary goes to the AI (Anthropic) once.": "検索した言葉とレシピの言語。それらの言語での書き方を調べるためです。言葉とその訳は誰が検索したかを記録せずに全員のために保存され、辞書にない新しい言葉は一度だけ AI（Anthropic）に送られます。"
  }
 }

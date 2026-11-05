@@ -1446,6 +1446,38 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
     Pages for test), Self Tests on main (22:13). The published Hebrew keeps Tony's headings ("🏡 על מטבחים ואנשים",
     "🧹 סידורים") and "מהענן"; the sort words are the store's ("🆕 חדשים", "🔤 א–ת", "⏱ הכנה", "📊 רמה", "🔥 פופולרי",
     "📋 סדר שמור").
+  - **v39.46 + Worker v102 — 🌐 a search finds recipes in every language they are written in** (Tony, 6 Nov 2026, ~01:00
+    Israel time: "When searching for an item in the main search box, it should search for translations of the same
+    meaning in all the languages there are recipes in… if I search for \"Mushrooms\" … for \"פטריות\" as well… The list
+    of languages should also cover recipes from joined kitchens." Asked how: "AI, remembered … each new word should go
+    into a Built-in kitchen dictionary, so asking for the same word will not incur additional AI charges";
+    automatically; "Yes, a short line"). **Worker v102 `search-words` { term, langs }** (`searchWords`): signed in
+    (verifyIdToken); D1 `kitchen_words (term, lang, forms, at)` — one row per word and language, shared by every
+    household and copy, nothing about who asked; only the languages missing go to the AI (`claude-haiku-4-5`, a fixed
+    prompt: the usual word, singular/plural, spellings — Hebrew with and without י/ו — at most 5, JSON), within
+    `rateLimited(…,'ai')` and the household's allowance (`meterStart`/`meterAdd`), and are stored (an empty answer too,
+    so it is not asked again); 12 known languages + nl el ko pl ro sv tr uk yi. Tests (tests/worker-cors.mjs, 8): a new
+    word asks once in the small model and is counted; kept without who asked; the same word by a household with no
+    allowance left is read free; only a missing language is asked; signed out refused; an address is not a word; a new
+    word past the allowance refused before any cost. **App:** `recipeLangOf(r)` (script; Latin by everyday words —
+    en fr es de it pt hu), `searchLangsInView()` (this kitchen's recipes and the shown linked kitchens' `_linkCache`
+    lists), `searchAlsoWordsOf(raw)` (the words typed and each +word / ing: word; 3 letters, or 2 in a script of its
+    own), `searchAlsoTargets` (every language in view but the word's own script; nothing with one Latin language and a
+    Latin word), this device's copy `tonys_kitchen_words` (800 words), `searchAlsoRun` 750 ms after typing stops (signed
+    in and online; a refusal not asked again that session), `recipeMatchesQuery` matching each word or its forms (so the
+    linked kitchens' list too), and "🌐 Also searching: …" under the heading (`#searchAlso`, the words data-no-i18n).
+    **Privacy Statement 1.14** (6 Nov 2026, 11 languages, legal-keys.py): a row "Words you search for, across
+    languages", and a sentence each in Cloudflare's and Anthropic's rows; "What leaves this device" has an entry "The
+    kitchen dictionary (the app's own server)". Help: "🌐 SEARCH IN EVERY LANGUAGE". New phrases (the line and the
+    panel entry, 4) by hand in 11 languages. Self Test **search_every_language** (languages from both kitchens; the
+    word looked up in the recipes' languages; the Hebrew and the linked French recipe found; the line; the same word
+    not asked again; a Hebrew word not asked in Hebrew and finding the English recipe; signed out: nothing asked, the
+    remembered word still works; one language: nothing asked, no line) — fails without the forms in matching, without
+    the linked kitchens, and with nothing remembered.
+    **Size budget:** the page without comments reached 1902 KB, past the 1900 of v39.15 — raised on purpose to 2000
+    (selftests_are_a_separate_download), the reason written there (~100 KB of real features since v39.16). Local:
+    Self Tests 446 passed after; phone fit, phone chrome, ✕ in view, double-click, contrast (dark, light), axe, Worker
+    (with the 8 new) — clean; the gap list 0 in every language (2389 phrases).
   - **v39.45 — a date or a time is never a phrase** (Tony, 6 Nov 2026, on the junk key the v39.44 release published —
     "🔄 synced Nov {1}, {2}, {3} PM · {4} messages · {5} → {6}": "Don't bother. Let's make sure it doesn't happen again,
     as junk tends to accumulate ..."). The shared translations held 12 such keys (the 💬 WhatsApp Groups list's line in
