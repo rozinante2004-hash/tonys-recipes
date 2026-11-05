@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.40 -->
+<!-- Tony's Recipes Collection v39.41 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -10700,7 +10700,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.40';
+var APP_VERSION = 'v39.41';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -14168,7 +14168,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.40</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.41</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14256,7 +14256,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.40</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.41</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -14593,7 +14593,8 @@ body.banner-shown .header {
       <div class="drop-group" style="margin-left:4px;">
         <button class="view-toggle-btn" id="sortBtn" onclick="toggleDrop('sortDrop')" title="Sort recipes">⇅ Sort</button>
         <div class="drop-menu" id="sortDrop" style="min-width:160px;">
-          <button class="drop-item sort-opt" data-sort="default"  onclick="setSort('default');closeDrop('sortDrop')">📋 Default (added)</button>
+          <!-- v39.41 — "Default" no longer: the list starts with 🆕 Recently added; this is the order the recipes are kept in -->
+          <button class="drop-item sort-opt" data-sort="default"  onclick="setSort('default');closeDrop('sortDrop')">📋 Saved order</button>
           <button class="drop-item sort-opt" data-sort="added"    onclick="setSort('added');closeDrop('sortDrop')">🆕 Recently added</button>
           <button class="drop-item sort-opt" data-sort="recent"   onclick="setSort('recent');closeDrop('sortDrop')">🕐 Recently viewed</button>
           <button class="drop-item sort-opt" data-sort="alpha"    onclick="setSort('alpha');closeDrop('sortDrop')">🔤 Alphabetical</button>
@@ -15708,7 +15709,10 @@ function recipeSearchText(r) {
 window.recipeSearchText = recipeSearchText;
 window.parseSearchQuery = parseSearchQuery; window.recipeMatchesQuery = recipeMatchesQuery;
 
-var sortMode         = 'default'; // default|alpha|prep|difficulty|recent|popular
+// v39.41 — the list starts newest first (Tony, 5 Nov 2026: "Please make the default sorting of the recipes on the main
+// page by \"Recently added\""). ⇅ Sort still changes it, until the app is opened again.
+var SORT_DEFAULT     = 'added';
+var sortMode         = SORT_DEFAULT; // default|added|alpha|prep|difficulty|recent|popular
 var _bringSelected = new Set();
 var _bringPopup    = null;
 var _bringTokenCheckInterval = null;
@@ -15977,19 +15981,26 @@ function openGridSettings() {
 window.setMobileCols   = setMobileCols;
 window.openGridSettings = openGridSettings;
 
-function setSort(mode) {
-  sortMode = mode;
-  // Highlight active sort
+// What the ⇅ button says for each order. v39.41 — listed in I18N_EXTRA: only "⇅ Sort" and "🕐 Recent" had ever been
+// translated (the rest were English on every screen), and "🆕 Newest" is now what every visit starts with.
+var SORT_LABELS = {default:'⇅ Sort',added:'🆕 Newest',recent:'🕐 Recent',alpha:'🔤 A–Z',prep:'⏱ Prep',difficulty:'📊 Level',popular:'🔥 Popular'};
+// The menu's chosen order in bold, and its word on the button.
+function sortPaint(mode) {
   document.querySelectorAll('.sort-opt').forEach(function(b) {
     b.style.fontWeight = b.getAttribute('data-sort')===mode ? '700' : '';
     b.style.color = b.getAttribute('data-sort')===mode ? 'var(--terracotta)' : '';
   });
   var btn = document.getElementById('sortBtn');
-  var labels = {default:'⇅ Sort',added:'🆕 Newest',recent:'🕐 Recent',alpha:'🔤 A–Z',prep:'⏱ Prep',difficulty:'📊 Level',popular:'🔥 Popular'};
-  if(btn) btn.textContent = mode==='default' ? '⇅ Sort' : labels[mode];
+  var label = SORT_LABELS[mode] || SORT_LABELS['default'];
+  if (btn) btn.textContent = label;
+}
+function setSort(mode) {
+  sortMode = mode;
+  sortPaint(mode);
   renderGrid();
 }
-window.setSort = setSort;
+sortPaint(sortMode);   // v39.41 — the button says 🆕 Newest from the start
+window.setSort = setSort; window.sortPaint = sortPaint;
 
 // ─── STEP TIMERS ──────────────────────────────────────────────────────────────
 // Durations mentioned in a step ("simmer for 20 minutes") become tappable
@@ -17918,6 +17929,7 @@ var I18N_EXTRA = [
   // v38.90 — the welcome's paragraphs and the tour's steps (each drawn inside dir="auto", translated by i18nAsk)
   Object.keys(HH_WELCOME).map(function(k){ return HH_WELCOME[k]; }), TOUR_STEPS.map(function(st){ return st.text; }),
   setupPhrases(), ['\u{1F9ED} Show me around', 'I’ll look around by myself'],   // v38.95 — the wizard
+  Object.keys(SORT_LABELS).map(function(k){ return SORT_LABELS[k]; }),   // v39.41 — the ⇅ button's words
   ['Secret — linked kitchens do not see it',
    '🔒 Secret recipes are not switched on for this copy yet — the {1} you marked stay as they were (linked kitchens still see them) until they are.']);   // v38.96, v38.99   // v38.18 — 📝 the end-of-beta question   // v38.17 — ✨ What can this app do, ✉️ Contact us
 function i18nRegisterExtra() {
@@ -34043,7 +34055,7 @@ var HELP_SYSTEM_PROMPT = [
   "- 🐄 The farm visitors speak more slowly, and the child and the female a little higher (v39.36)",
   "- 🐄 The farm visitors speak with the voice chosen for everyone: a child or a female is never a man's voice on a device that has another, Microsoft Edge's own child voice speaks for the child, and the owner's farm window says which voice speaks for each choice on that device (v39.35)",
   "- 🕐 Recently Viewed: a 'Recent' chip appears in the filter bar after you open any recipe — shows your last 8 viewed",
-  "- ⇅ Sort: click the Sort button next to Grid/List to sort by Default, Recently viewed, A–Z, Prep time, Difficulty, or Most cooked",
+  "- ⇅ Sort: the recipes start newest first (🆕 Recently added — the button says 🆕 Newest; v39.41). Click the button next to Grid/List to sort by Recently viewed, A–Z, Prep time, Difficulty, Most cooked, or 📋 Saved order (the order they are kept in); each time the app is opened it starts newest first again",
   "- 🍳 Cook count: open any recipe and tap '🍳 Cooked!' to track how many times you've made it. Recipes cooked 3+ times show a 🔥 badge. Sort by 'Most cooked' to find your favourites",
   "- 📸 Auto-fetch missing photos: ··· More → 🧹 Tidy up → 📸 Auto-fetch missing photos — AI translates Hebrew names to English and finds a matching photo (Pexels, Unsplash, Pixabay or Wikimedia Commons) for every recipe that has none; a library that asks for a pause (\"too many searches\") is waited for and asked again; Undo puts things back",
   "- 🏅 The recipe counter: the rosette next to your household's name counts its recipes (a collection counts as its recipes). Its metal rises with the count — First steps, then Bronze at 10, Silver 25, Gold 50, Platinum 100, Ruby 250, Diamond 500 and Legendary at 1000 — and each new rank is celebrated once. Tap it to see all the ranks and how far the next one is",

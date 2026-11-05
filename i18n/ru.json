@@ -3113,6 +3113,12 @@
   "🪵 Keeping {1} day{2} of log": "🪵 Храним лог за последние {1} дн{2}",
   "🪵 Logging & debugging": "🪵 Логирование и отладка",
   "🪵 The log has something worth reporting": "🪵 В логе есть, что стоит сообщить",
-  "🫙 Low FODMAP": "🫙 Низкий FODMAP"
+  "🫙 Low FODMAP": "🫙 Низкий FODMAP",
+  "🆕 Newest": "🆕 Новые",
+  "🔤 A–Z": "🔤 А–Я",
+  "⏱ Prep": "⏱ Подготовка",
+  "📊 Level": "📊 Сложность",
+  "🔥 Popular": "🔥 Чаще всего",
+  "📋 Saved order": "📋 Порядок сохранения"
  }
 }

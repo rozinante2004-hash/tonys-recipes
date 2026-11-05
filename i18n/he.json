@@ -3325,6 +3325,12 @@
   "🪵 Keeping {1} day{2} of log": "🪵 שומר {1} יום{2} של יומן",
   "🪵 Logging & debugging": "🪵 רישום ואיתור תקלות",
   "🪵 The log has something worth reporting": "🪵 יש ביומן משהו שכדאי לבדוק",
-  "🫙 Low FODMAP": "🫙 דל FODMAP"
+  "🫙 Low FODMAP": "🫙 דל FODMAP",
+  "🆕 Newest": "🆕 החדשים",
+  "🔤 A–Z": "🔤 א–ת",
+  "⏱ Prep": "⏱ זמן הכנה",
+  "📊 Level": "📊 רמת קושי",
+  "🔥 Popular": "🔥 הכי מבושלים",
+  "📋 Saved order": "📋 לפי סדר השמירה"
  }
 }

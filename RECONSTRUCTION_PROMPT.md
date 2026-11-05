@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v39.40` — app. **Worker: v101**, deployed separately and versioned separately
+**Current version:** `v39.41` — app. **Worker: v101**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -2154,6 +2154,10 @@ A thin save‑status bar with a **Reset** (clear all data) link sits under the h
 A separate **mobile filter bar** (`#mobileFilterBar`) collapses categories/diets into ▾ dropdown
 panels (`toggleMobilePanel`, `mobileCatChange`, etc.) shown only on narrow screens.
 
+**Sort (v39.41):** the list starts newest first every time the app opens (`SORT_DEFAULT = 'added'`, highest id
+first); ⇅ Sort changes it for the visit (Recently added, Recently viewed, A–Z, Prep time, Difficulty, Most cooked,
+📋 Saved order — the array's own order), not remembered. The button's word for each (`SORT_LABELS`, put on it by
+`sortPaint`, also at load: "🆕 Newest") is in I18N_EXTRA so it is translated.
 **Grid** (`#recipeGrid`): a `list` or `grid` view (`setView`). The choice is remembered in
 `tonys_view_mode`; desktop defaults to `list`, **phones default to `grid`** so the layout
 resembles the desktop cube grid. Cards show photo or emoji tile, a category **pill badge**

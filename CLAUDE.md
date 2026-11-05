@@ -1437,6 +1437,21 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
   - **Released: v39.09 (29 Oct 2026, 11:17 Israel time, on 0de2dde; Tony: "Yes, release v39.09").** Every job success:
     Deploy to GitHub Pages, pages build, Publish languages, Translate new phrases, Self Tests on main and test,
     Cloudflare Pages for the beta and test.
+  - **v39.41 — the recipes start newest first** (Tony, 5 Nov 2026: "Please make the default sorting of the recipes on
+    the main page by \"Recently added\". Once done, push both changes to family and beta."). `SORT_DEFAULT = 'added'`
+    (`sortMode` starts from it): the list is 🆕 Recently added (highest id first — ids come from `nextId`) every time the
+    app opens; ⇅ Sort still changes it for the visit (not kept — he asked for the default only). The button says
+    "🆕 Newest" from the start (`sortPaint`, split out of `setSort`, run once at load) and the menu marks 🆕 Recently
+    added. The menu's "📋 Default (added)" (the order the recipes are kept in) is now **"📋 Saved order"** — it was no
+    longer the default. **The button's words were never translated** (only "⇅ Sort" and "🕐 Recent" were, by chance):
+    the labels are `SORT_LABELS`, listed in I18N_EXTRA; "🆕 Newest", "🔤 A–Z", "⏱ Prep", "📊 Level", "🔥 Popular" and
+    "📋 Saved order" translated by hand in all 11 languages (the release's job puts the store's over them). Gap list:
+    0 in every language (2386 phrases). AI help: the ⇅ Sort line. Self Test **feat_sort_starts_newest** (the default
+    is 'added'; three recipes kept out of order show newest, middle, oldest; the button says it and the menu marks it;
+    the words are in I18N_EXTRA) — fails with the old default and with a label left out of I18N_EXTRA.
+    **i18n_cards_translated_when_built** failed once newest-first: it read the first card's meal type as its first
+    recipe's ("Pasta", now drawn last) — it finds the card by its name now. Local: Self Tests 440 passed + that one
+    again on its own; phone fit, phone chrome, ✕ in view, double-click, contrast (dark, light), axe, Worker — clean.
   - **v39.40 — 🔁 Replace… in ✏️ Edit translations** (Tony, 5 Nov 2026, after v39.39's release left "👑 בעל האפליקציה" in
     sentences whose menu says "👑 בעל הבית": "Please add to the translation editor an option to bulk-replace a string.").
     A **🔁 Replace…** button beside the editor's search opens a panel: Find → Replace with (the search box's text is

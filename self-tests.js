@@ -17522,11 +17522,16 @@ window.SELF_TESTS = [
         document.getElementById('searchInput').value='';
         viewMode='list'; renderGrid();
         if(left.length) throw new Error('English left on a card in a translated interface: '+left.slice(0,8).join(' · '));
-        var badge=document.querySelector('#recipeGrid .recipe-list-meta span');
+        // v39.41 — the card found by its name: the list starts newest first now, so "Card test one" is drawn last.
+        function pastaBadge(){
+          var one=Array.prototype.filter.call(document.querySelectorAll('#recipeGrid .recipe-list-item'), function(c){ return c.textContent.indexOf('Card test one')!==-1; })[0];
+          return one && one.querySelector('.recipe-list-meta span');
+        }
+        var badge=pastaBadge();
         if(!badge || badge.textContent!==dict['Pasta']) throw new Error('the meal type was not translated: '+(badge&&badge.textContent));
         // Switching language redraws the cards — back in English they say Pasta.
         i18nInstall('en', null);
-        badge=document.querySelector('#recipeGrid .recipe-list-meta span');
+        badge=pastaBadge();
         if(!badge || badge.textContent!=='Pasta') throw new Error('back in English, a card still reads '+(badge&&badge.textContent));
       } finally {
         recipes=realR; viewMode=realView; document.getElementById('searchInput').value='';
@@ -19886,6 +19891,39 @@ window.SELF_TESTS = [
         if(sortMode!=='added') throw new Error('sort mode not applied');
         if(document.getElementById('sortBtn').textContent.indexOf('Newest')===-1) throw new Error('sort button label not updated');
       } finally { setSort(prev); }
+    } },
+  { id:'feat_sort_starts_newest', group:'Features', name:'The recipes start newest first (🆕 Recently added), the ⇅ button says so, and its words are translated (v39.41)',
+    test: async()=>{
+      // v39.41 — Tony: "Please make the default sorting of the recipes on the main page by \"Recently added\"".
+      if(typeof SORT_DEFAULT==='undefined' || SORT_DEFAULT!=='added') throw new Error('the list does not start with 🆕 Recently added: '+(typeof SORT_DEFAULT==='undefined' ? 'no SORT_DEFAULT' : SORT_DEFAULT));
+      var prev=sortMode, saved=recipes, q=document.getElementById('searchInput'), qv=q ? q.value : '';
+      // Whatever order the list is in now, the button already says it (from the start: 🆕 Newest).
+      var said0=SORT_LABELS[sortMode]||SORT_LABELS['default'], here0=(typeof i18nPhrase==='function' ? i18nPhrase(said0) : said0);
+      var btn0=document.getElementById('sortBtn');
+      if(!btn0 || (btn0.textContent!==said0 && btn0.textContent!==here0)) throw new Error('the ⇅ button does not say the order the list is in ('+sortMode+'): '+(btn0 && btn0.textContent));
+      var a={ id:9100001, uid:'stSortA', name:'ST sort — the oldest', ingredients:[], steps:[] },
+          b={ id:9100003, uid:'stSortB', name:'ST sort — the newest', ingredients:[], steps:[] },
+          c={ id:9100002, uid:'stSortC', name:'ST sort — the middle one', ingredients:[], steps:[] };
+      try{
+        recipes=[a, b, c];                       // kept in the order they arrived, not by when they were added
+        if(q) q.value='';
+        sortMode=SORT_DEFAULT; sortPaint(sortMode); renderGrid();
+        var names=Array.prototype.map.call(document.querySelectorAll('#recipeGrid .recipe-card, #recipeGrid .recipe-list-item'), function(el){ return el.textContent; })
+          .map(function(s){ return /the newest/.test(s) ? 'newest' : /the middle/.test(s) ? 'middle' : /the oldest/.test(s) ? 'oldest' : ''; }).filter(Boolean);
+        var seen=names.filter(function(n, i){ return names.indexOf(n)===i; });
+        if(seen.join(',')!=='newest,middle,oldest') throw new Error('the list does not start newest first: '+seen.join(','));
+        var btn=document.getElementById('sortBtn');
+        var said=SORT_LABELS.added, saidHere=(typeof i18nPhrase==='function' ? i18nPhrase(said) : said);
+        if(!btn || (btn.textContent!==said && btn.textContent!==saidHere)) throw new Error('the ⇅ button does not say 🆕 Newest: '+(btn && btn.textContent));
+        var opt=document.querySelector('.sort-opt[data-sort="added"]');
+        if(!opt || opt.style.fontWeight!=='700') throw new Error('🆕 Recently added is not marked in the ⇅ menu');
+        // The button's words are put on it by code, so only I18N_EXTRA brings them to the translations.
+        var lost=Object.keys(SORT_LABELS).map(function(k){ return SORT_LABELS[k]; }).filter(function(w){ return I18N_EXTRA.indexOf(w)===-1; });
+        if(lost.length) throw new Error('the ⇅ button\'s words are not in the phrases to translate: '+lost.join(', '));
+        if(i18nFullCatalogue().indexOf('📋 Saved order')===-1) throw new Error('the ⇅ menu\'s 📋 Saved order is not in the phrases to translate');
+      } finally {
+        recipes=saved; if(q) q.value=qv; sortMode=prev; sortPaint(prev); renderGrid();
+      }
     } },
   { id:'feat_units', group:'Features', name:'Metric keeps tsp/tbsp/cup, converts imperial',
     test: async()=>{

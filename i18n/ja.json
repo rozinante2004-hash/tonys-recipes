@@ -3124,6 +3124,12 @@
   "🪵 Keeping {1} day{2} of log": "🪵 ログを{1}日{2}分保持",
   "🪵 Logging & debugging": "🪵 ログとデバッグ",
   "🪵 The log has something worth reporting": "🪵 ログに報告すべき内容があります",
-  "🫙 Low FODMAP": "🫙 低FODMAP"
+  "🫙 Low FODMAP": "🫙 低FODMAP",
+  "🆕 Newest": "🆕 新しい順",
+  "🔤 A–Z": "🔤 名前順",
+  "⏱ Prep": "⏱ 準備時間",
+  "📊 Level": "📊 難易度",
+  "🔥 Popular": "🔥 よく作る順",
+  "📋 Saved order": "📋 保存順"
  }
 }
