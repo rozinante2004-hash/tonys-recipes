@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.43 -->
+<!-- Tony's Recipes Collection v39.44 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -992,8 +992,21 @@ window.LOG_MAX_ENTRIES = LOG_MAX_ENTRIES;  window.LOG_KINDS = LOG_KINDS;
 // Pure function of (entries, now) so it can be driven by a test with a fixture
 // instead of by hoping the right thing goes wrong on someone's device.
 // Returns [{level:'bad'|'warn'|'ok', title, detail, fix}], worst first.
+// v39.44 — the translations being gathered (i18nHarvest, or its on-demand windows on their own): what they draw is a
+// stand-in, never something the person was shown.
+function logQuietForHarvest() {
+  return !!window._i18nHarvesting || !!(document.body && document.body.classList.contains('i18n-harvesting'));
+}
+// v39.44 — entries that never meant anything was wrong, kept in the log but never a finding: the harvest's stand-in
+// error window ("On screen: ·", from v39.23 to v39.43) and Chrome's "ResizeObserver loop completed with undelivered
+// notifications" (a layout notice the browser raises as an error; nothing fails — see the global handler).
+var LOG_NOISE = [/^On screen: \u00b7$/, /^ResizeObserver loop/];
+function logIsNoise(e) {
+  return !!(e && e.k === 'error' && LOG_NOISE.some(function(re){ return re.test(String(e.m || '')); }));
+}
 function analyseSyncLog(list, now) {
   list = Array.isArray(list) ? list : [];
+  list = list.filter(function(e){ return !logIsNoise(e); });   // v39.44
   // Events the self test suite caused are not evidence about the app — it fails
   // on purpose. See syncLog. They are still in the log and still shown in the
   // viewer; they just cannot produce a finding.
@@ -9838,7 +9851,7 @@ function insightsOn() { return typeof featureOn === 'function' && featureOn('ins
 // v39.06 — nor while the app collects its phrases for translation (i18nHarvest): it opens the import-error and
 // service-error windows with a "·" in them, once signed in and once signed out, and each was filed as a real error —
 // reports #24–#27 (27 Oct, "an import failed four times… every error message reached us blank").
-function insQuiet() { return !insightsOn() || !!window._i18nHarvesting || (typeof _selfTestRunning !== 'undefined' && !!_selfTestRunning && !window._insUnderTest); }
+function insQuiet() { return !insightsOn() || !!window._i18nHarvesting || (typeof logQuietForHarvest === 'function' && logQuietForHarvest()) || (typeof _selfTestRunning !== 'undefined' && !!_selfTestRunning && !window._insUnderTest); }
 function insRead(k, dflt) { try { var v = JSON.parse(localStorage.getItem(k) || 'null'); return v == null ? dflt : v; } catch(e) { return dflt; } }
 function insWrite(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch(e) {} }
 function insMonth(t) { return new Date(t || Date.now()).toISOString().slice(0, 7); }
@@ -9859,7 +9872,8 @@ function insClean(s, max) {
 // remove them from the list, and stop bugging you about them"). A browser's bare "Script error." from another site's
 // script; a sign-in that could not reach Google from this device's connection (a key blocked for everyone would show
 // as nobody signing in at all — and such a report is only ever sent once that device has signed in after all).
-var INS_NOT_SENT = [/^Script error\. \(inside a script from another site/, /^Sign-in failed — auth\/network-request-failed/];
+var INS_NOT_SENT = [/^Script error\. \(inside a script from another site/, /^Sign-in failed — auth\/network-request-failed/,
+  /^ResizeObserver loop/, /^On screen: \u00b7$/];   // v39.44 — a browser notice; the translation harvest's stand-in
 function insightError(kind, message, where) {
   if (insQuiet()) return false;
   var msg = insClean(message, 500).trim();
@@ -10700,7 +10714,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.43';
+var APP_VERSION = 'v39.44';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -11481,6 +11495,10 @@ window.addEventListener('error', function(e) {
   // files now load with crossorigin="anonymous", so theirs arrive in full; any
   // that still come through bare say so instead of looking like our own bug.
   var msg = e.message || '';
+  // v39.44 — Chrome's "ResizeObserver loop completed with undelivered notifications" (and the older "…limit
+  // exceeded") says only that a size change was delivered on the next frame; nothing failed. It reached Tony's PC as
+  // "⚠️ Error: …" on screen, an error in his log and one more report to the server.
+  if (/^ResizeObserver loop/.test(msg)) { dlog('[browser] ' + msg); return; }
   if (/^Script error\.?$/.test(msg) && !e.filename)
     msg = 'Script error. (inside a script from another site — the browser hides the details)';
   console.error('[Global error]', msg, e.filename, e.lineno, e.error && e.error.stack);
@@ -14168,7 +14186,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.43</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.44</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14256,7 +14274,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.43</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.44</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -25048,9 +25066,14 @@ function showServiceError(message, actions) {
   if (typeof insightError === 'function') { try { insightError('service', message, ''); } catch(e) {} }   // v38.15
   // v39.23 — what the person was shown is in their log too (a member's phone showed a refusal; her report said
   // "Nothing looks wrong"). Reported to the server once, above — not again from the log.
-  window._insFromRecord = true;
-  try { syncLog('error', 'On screen: ' + String(message == null ? '' : message).split('\n')[0].slice(0, 200)); } catch(e) {}
-  window._insFromRecord = false;
+  // v39.44 — not while the translations are gathered: i18nHarvestDemand draws this window, hidden, with a stand-in "·"
+  // to collect its words, and from v39.23 each gathering left two "On screen: ·" errors in the log (Tony's PC: 32 of
+  // them, "[BAD] 33 errors recorded").
+  if (!logQuietForHarvest()) {
+    window._insFromRecord = true;
+    try { syncLog('error', 'On screen: ' + String(message == null ? '' : message).split('\n')[0].slice(0, 200)); } catch(e) {}
+    window._insFromRecord = false;
+  }
   // Parse multi-line messages with URLs into clickable links
   var lines = message.split('\n').filter(function(l){ return l.trim(); });
   var html = '';

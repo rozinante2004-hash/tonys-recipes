@@ -1446,6 +1446,22 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
     Pages for test), Self Tests on main (22:13). The published Hebrew keeps Tony's headings ("🏡 על מטבחים ואנשים",
     "🧹 סידורים") and "מהענן"; the sort words are the store's ("🆕 חדשים", "🔤 א–ת", "⏱ הכנה", "📊 רמה", "🔥 פופולרי",
     "📋 סדר שמור").
+  - **v39.44 — no false errors in the log** (Tony, 5 Nov 2026, 23:28 Israel time, on his PC after updating to v39.43,
+    pasting the report: "[BAD] 33 errors recorded — On screen: · (×32), ResizeObserver loop completed with undelivered
+    notifications."). **The 32 were never on his screen:** the translation harvest (`i18nHarvestDemand`, run whenever
+    the translations are gathered — ✏️ Edit translations, 🔄 Update all supported languages, and in the harvest's
+    passes) draws each on-demand window hidden with a stand-in "·", among them `showServiceError('·')`; since v39.23
+    (a member's refusal had not reached her report) `showServiceError` writes "On screen: <first line>" to the log —
+    so every gathering left two (signed in and out). The server was spared (insQuiet already checked
+    `_i18nHarvesting`). Now `showServiceError` logs nothing while `logQuietForHarvest()` (the flag, or
+    body.i18n-harvesting); `insQuiet` checks both too. **The ResizeObserver line** is Chrome's notice that a size
+    change waited a frame — nothing fails — but the global error handler logged it, reported it, and showed
+    "⚠️ Error: ResizeObserver loop completed…" on screen: now it goes to dlog only (and INS_NOT_SENT has it).
+    **What older versions left in a log** (`LOG_NOISE`: exactly "On screen: ·", and "ResizeObserver loop…") stays in
+    the log but is no finding (`analyseSyncLog` drops it first), so his report and the start-up nudge stop saying
+    "[BAD]". Self Test **log_noise_not_errors** (the harvest's windows log nothing while a real message still is; the
+    notice is neither toasted nor logged; old entries are not counted, a real error beside them is counted alone);
+    a knock-out of the harvest guard and of LOG_NOISE each makes it fail.
   - **Released: v39.43 to the family's copy and the beta (5 Nov 2026, 22:32 Israel time, on c9d32ba; Tony: "Once done
     you can push it to the family and beta as well").** Green first on test on the same commit: Cloudflare Pages for test
     (22:14), Self Tests (22:32). Every job success: Cloudflare Pages for the beta (22:33); on main: Deploy to GitHub

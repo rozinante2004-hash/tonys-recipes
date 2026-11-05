@@ -19978,6 +19978,46 @@ window.SELF_TESTS = [
       } finally { try{ closeM('viewOverlay'); }catch(e){} recipes=saved; renderGrid(); }
       if(miss.length) throw new Error('the help never names: '+miss.join(' · '));
     } },
+  { id:'log_noise_not_errors', group:'Diagnostics', name:'Gathering the translations leaves no "On screen: ·" errors in the log, and the browser\'s "ResizeObserver loop" notice is no error — shown, logged or counted (v39.44)',
+    test: async()=>{
+      // v39.44 — Tony's PC report after updating: "[BAD] 33 errors recorded — On screen: · (×32), ResizeObserver loop
+      // completed with undelivered notifications." The 32 were the translation harvest drawing the error window, hidden,
+      // with a stand-in "·" (logged since v39.23); the last is a notice Chrome raises as an error, which also put
+      // "⚠️ Error: …" on his screen.
+      var realLog=null, realEnabled=window.logEnabled, realToast=window.toast, said=[];
+      try{ realLog=localStorage.getItem(LOG_KEY); }catch(e){}
+      function entries(){ return readSyncLog().filter(function(e){ return e && e.k==='error'; }).map(function(e){ return e.m; }); }
+      try{
+        window.logEnabled=function(){ return true; };
+        try{ localStorage.removeItem(LOG_KEY); }catch(e){}
+        window.toast=function(m){ said.push(String(m||'')); };
+        // 1. The harvest's on-demand windows: no error in the log.
+        i18nHarvestDemand();
+        var got=entries().filter(function(m){ return /^On screen:/.test(m); });
+        if(got.length) throw new Error('gathering the translations logged: '+JSON.stringify(got));
+        // …while a real one still is.
+        showServiceError('ST a real problem'); await wait(20);
+        try{ var so=document.getElementById('serviceErrorOverlay'); if(so) so.remove(); }catch(e){}
+        if(entries().indexOf('On screen: ST a real problem')===-1) throw new Error('a message really shown is no longer logged');
+        // 2. The browser's notice: no toast, no log entry.
+        said=[];
+        window.dispatchEvent(new ErrorEvent('error', { message:'ResizeObserver loop completed with undelivered notifications.' }));
+        await wait(20);
+        if(said.some(function(m){ return /ResizeObserver/.test(m); })) throw new Error('the ResizeObserver notice was shown as an error: '+JSON.stringify(said));
+        if(entries().some(function(m){ return /ResizeObserver/.test(m); })) throw new Error('the ResizeObserver notice was logged as an error');
+        // 3. What earlier versions left in a log is not counted as errors.
+        var now=Date.now(), old=[{ at:now, k:'error', m:'On screen: \u00b7' }, { at:now-1000, k:'error', m:'On screen: \u00b7' },
+          { at:now-2000, k:'error', m:'ResizeObserver loop completed with undelivered notifications.' }, { at:now-3000, k:'system', m:'App opened' }];
+        var f=analyseSyncLog(old, now);
+        if(f.some(function(x){ return /errors? recorded/.test(x.title); })) throw new Error('old stand-in entries are still counted: '+JSON.stringify(f.map(function(x){ return x.title; })));
+        var g=analyseSyncLog(old.concat([{ at:now-4000, k:'error', m:'Something real broke' }]), now);
+        var bad=g.filter(function(x){ return /errors? recorded/.test(x.title); })[0];
+        if(!bad || !/^1 error recorded/.test(bad.title)) throw new Error('a real error beside them is not counted alone: '+JSON.stringify(g.map(function(x){ return x.title; })));
+      } finally {
+        window.logEnabled=realEnabled; window.toast=realToast;
+        try{ if(realLog==null) localStorage.removeItem(LOG_KEY); else localStorage.setItem(LOG_KEY, realLog); }catch(e){}
+      }
+    } },
   { id:'feat_units', group:'Features', name:'Metric keeps tsp/tbsp/cup, converts imperial',
     test: async()=>{
       // Kitchen measures used in metric kitchens must NOT become millilitres

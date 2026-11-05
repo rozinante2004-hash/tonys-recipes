@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v39.43` — app. **Worker: v101**, deployed separately and versioned separately
+**Current version:** `v39.44` — app. **Worker: v101**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -1887,7 +1887,9 @@ and by a 500-entry ceiling, applied on every write as well as by `pruneSyncLog()
 at app start, when the panel opens, and when the retention is changed. There is no timer,
 because one cannot run while the app is closed. It records recipe ids and names, **never recipe
 contents**; it is never synced and never reaches a backup. `analyseSyncLog(list, now)` is a pure
-function turning entries into findings that each carry a **fix**; `syncLogReportText()` is the
+function turning entries into findings that each carry a **fix** (v39.44: `LOG_NOISE` — the translation harvest's stand-in
+"On screen: ·" and Chrome's "ResizeObserver loop…" notice — stays in the log but is never a finding; the harvest logs
+nothing (`logQuietForHarvest`), and the global error handler drops the ResizeObserver notice); `syncLogReportText()` is the
 plain-text Copy payload; under its Browser line an **Account** line (v39.23, `syncLogAccountLine`: how it signs in, the role in the household, changes waiting yes/no, installed app or browser tab — never an address). Every `showServiceError` is logged ("On screen: …"), every refused save says what it was writing (`_cloudSaveStep`) and the role, and each start logs "App opened — <version>, <installed app / browser tab>"; the Firebase console link in a refusal is for the app's owner only. Because it shares `localStorage` with the recipes, **a logging failure
 must never break a save**: every path is wrapped, and on a quota error the log halves and then
 deletes itself rather than letting the error reach the caller. **Log an outcome where the outcome
