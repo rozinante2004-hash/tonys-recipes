@@ -19925,6 +19925,31 @@ window.SELF_TESTS = [
         recipes=saved; if(q) q.value=qv; sortMode=prev; sortPaint(prev); renderGrid();
       }
     } },
+  { id:'help_knows_whatsapp_import', group:'Features', name:'The help assistant knows how a WhatsApp export is put into the app — by the names the menus really use (v39.42)',
+    test: async()=>{
+      // v39.42 — Tony: "I have forgotten how to upload a WhatsApp group export to the server. I've tried using the Help,
+      // but it would seem it does not know what I'm talking about." Its knowledge named ··· More → 📱 WhatsApp and
+      // nothing under it, nor ⚙️ → 💬 WhatsApp Groups. The words checked are read off the app's own buttons, so a renamed
+      // button fails here until the help says the new name.
+      var k=String(HELP_SYSTEM_PROMPT);
+      function label(sel){ var e=document.querySelector(sel); if(!e) throw new Error('the app has no '+sel); return e.textContent.replace(/\s+/g,' ').trim(); }
+      var names=[label('#settingsDrop [onclick*="openWaSetup"]'), label('[onclick*="waFileIn"]'), label('label[for="waCloudSyncBox"], #waCloudSyncBox + span'),
+                 label('#waAskItem').replace(/\s*\(\d+\)$/,''), label('#waLinksItem'), label('[onclick*="waRefreshCloud()"]')];
+      var lost=names.filter(function(n){ return k.indexOf(n)===-1; });
+      if(lost.length) throw new Error('the help never names: '+lost.join(' · '));
+      if(!/Export chat → Without media/.test(k)) throw new Error('the help does not say how to export the chat in WhatsApp');
+      if(!/upload|server|cloud/i.test(k.slice(k.indexOf('WHATSAPP GROUPS')))) throw new Error('asked about uploading to the server, the help has nothing to match');
+      // …and how to use 💬 Ask my WhatsApp groups (Tony: "It has to know, so it could explain how to use the \"Ask my
+      // WhatsApp groups\" feature"): what to type, what comes back, what to do when nothing does — in the window's own words.
+      var ask=k.slice(k.indexOf('ASK MY WHATSAPP GROUPS'));
+      if(k.indexOf('ASK MY WHATSAPP GROUPS')===-1) throw new Error('the help has no how-to for 💬 Ask my WhatsApp groups');
+      var askBtn=label('#waAskOverlay .help-btn');
+      [askBtn, 'Best answer', 'Other options mentioned', 'Show the', 'Nothing in your', 'No chats loaded yet', 'language the group']
+        .forEach(function(w){ if(ask.indexOf(w)===-1) throw new Error('the Ask how-to does not say: '+w); });
+      // The words quoted must be the window's: its answer headings and its "nothing found" line.
+      var src=String(waAsk);
+      ['Best answer', 'Other options mentioned', 'Show the ', 'Nothing in your '].forEach(function(w){ if(src.indexOf(w)===-1) throw new Error('the Ask window no longer says "'+w+'" — the help quotes it'); });
+    } },
   { id:'feat_units', group:'Features', name:'Metric keeps tsp/tbsp/cup, converts imperial',
     test: async()=>{
       // Kitchen measures used in metric kitchens must NOT become millilitres

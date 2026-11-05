@@ -1437,6 +1437,25 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
   - **Released: v39.09 (29 Oct 2026, 11:17 Israel time, on 0de2dde; Tony: "Yes, release v39.09").** Every job success:
     Deploy to GitHub Pages, pages build, Publish languages, Translate new phrases, Self Tests on main and test,
     Cloudflare Pages for the beta and test.
+  - **v39.42 — the help assistant knows WhatsApp** (Tony, 5 Nov 2026: "I have forgotten how to upload a WhatsApp group
+    export to the server. I've tried using the Help, but it would seem it does not know what I'm talking about." — then
+    "It has to know, so it could explain how to use the \"Ask my WhatsApp groups\" feature"). HELP_SYSTEM_PROMPT (the AI
+    help's knowledge) named ··· More → 📱 WhatsApp and nothing under it, nor ⚙️ → 💬 WhatsApp Groups. Now: **💬 WHATSAPP
+    GROUPS** — export in WhatsApp (group name → Export chat → Without media; iPhone: Save to Files), then ⚙️ Settings →
+    📥 Saving recipes from other apps → 💬 WhatsApp Groups → 📂 Import exported .txt or .zip files, with "Also sync
+    imported chats to my other devices" ticked = in the cloud with the recipes ("☁️ 1 synced to the cloud"); also asked
+    as "uploading to the server"; same file name replaces; 🔄 Load synced chats. **💬 ASK MY WHATSAPP GROUPS — how to use
+    it**: words the group would use, in its language (matched by words of 3+ letters, not meaning; Hebrew prefixes fine);
+    up to 45 matching messages with the messages around each; **Best answer:** / **Other options mentioned:**; never
+    invents; the per-chat coverage and "Show the N messages"; "Nothing in your N messages…" → other words; one AI request
+    each; only the excerpts go to the AI. **🧺 Recipes hiding in my chats** (import each; a link already in the recipes is
+    marked). Also the five settings the help never named (a scan of every menu item against the prompt): 📱 Grid
+    Layout, ☁️ Send my photos to the cloud, 🖼️ Restore photos from a backup, 🧹 Clean up orphaned photos, 🪵 Logging &
+    debugging — each from its own tooltip; the rest are described in other words. Self Test **help_knows_whatsapp_import**
+    reads the names off the app's own buttons (settings item, import button, sync box, Ask and Recipes-hiding items,
+    🔄 Load synced chats, the Ask button) and the Ask window's own lines (Best answer, Other options mentioned, Show the,
+    Nothing in your), so a rename fails until the help says the new words; it fails on the old help and on a renamed
+    import button. The help is English (the AI answers in the asker's language), so nothing to translate.
   - **v39.41 — the recipes start newest first** (Tony, 5 Nov 2026: "Please make the default sorting of the recipes on
     the main page by \"Recently added\". Once done, push both changes to family and beta."). `SORT_DEFAULT = 'added'`
     (`sortMode` starts from it): the list is 🆕 Recently added (highest id first — ids come from `nextId`) every time the
@@ -1470,7 +1489,7 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
     The arrow between the two boxes is hidden under 700 px, where they stack. Self Test **i18n_bulk_replace** (the
     list, untick, replace, kept on the device, the table redrawn, undo sparing a hand edit, {1} and empty refused, Save
     sharing only the changed rows onto a fresh copy, a fresh opening); a knock-out of five parts (the {1} guard, undo's
-    guard, untick, keeping, reset) — each made it fail. AI help knows it (APP_KNOWLEDGE ×2). Local: Self Tests 440 passed,
+    guard, untick, keeping, reset) — each made it fail. AI help knows it (HELP_SYSTEM_PROMPT ×2). Local: Self Tests 440 passed,
     0 failed; phone fit, phone chrome, ✕ in view, double-click, contrast (dark, light), axe, Worker — all clean.
   - **Released: v39.39 to the family's copy and the beta (5 Nov 2026, 10:36 Israel time, on 664f7e4; Tony: "Yes. Please
     do").** Green first on test on the same commit: Cloudflare Pages for test (10:08), Self Tests (10:23). Every job

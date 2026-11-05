@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.41 -->
+<!-- Tony's Recipes Collection v39.42 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -10700,7 +10700,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.41';
+var APP_VERSION = 'v39.42';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -14168,7 +14168,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.41</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.42</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14256,7 +14256,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.41</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.42</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -34046,6 +34046,12 @@ var HELP_SYSTEM_PROMPT = [
   "=== NEW FEATURES ===",
   "- 📁 FILES & BACKUP ▾ (v39.26, was ⇅ Imp/Exp): From File, Drop File Here (on a computer), All to Word, Backup — Save and Restore — the backups on a phone too (v39.28). Adding from a link, text or a photo is in + Add Recipe",
   "- ··· MORE IN FIVE HEADINGS (v39.30): 💡 Ideas, 🧰 Tools, 🏡 Kitchens and people, 📱 WhatsApp, 🧹 Tidy up — tap one to open what is under it, in the menu itself; tap again to close",
+  "- 💬 WHATSAPP GROUPS — putting a group's chat into the app (also asked as 'uploading a WhatsApp export to the server' or 'to the cloud'; v39.42): 1. In WhatsApp: open the group → tap the group's name at the top → Export chat → Without media. On an iPhone choose Save to Files (e.g. On My iPhone → Downloads) and Save; on Android save the file or share it to Files. 2. In the app: ⚙️ Settings → 📥 Saving recipes from other apps → 💬 WhatsApp Groups → 📂 Import exported .txt or .zip files, and pick the file (on an iPhone it is usually the first under Recents; otherwise Browse to where you saved it). Leave 'Also sync imported chats to my other devices' ticked (it is, unless someone unticked it on this device): the chat is then kept in the cloud with your recipes and appears on every device you are signed in on — the app says '☁️ 1 synced to the cloud'. Signed out (or unticked) it stays on this device only. To bring a group up to date, export it again and import it the same way: an export with the same file name replaces the older copy. 🔄 Load synced chats picks up what another device added; Loaded chats lists them. WhatsApp itself has no way to send the export to the app — that step is always done in WhatsApp — and the app never sends anything to your groups.",
+  "- 💬 ASK MY WHATSAPP GROUPS — how to use it (v39.42): ··· More → 📱 WhatsApp → 💬 Ask my WhatsApp groups (the number after it is how many chats are imported; with none, the window says 'No chats loaded yet' — import one first, see WhatsApp Groups above). Type a question in the box and press Ask (or Enter). Write it with the words the group would have used, in the language the group writes in — it finds messages by the words of your question (each word of 3 letters or more; Hebrew's ה/ו/ב/ל in front of a word is fine), not by meaning: 'challah soft', 'focaccia oven temperature', 'who made the cheesecake at Pesach' work better than 'any tips?'. It reads every imported chat, picks the messages that best match your words (up to 45) with the messages around each one — a couple before and several after, where the replies are — and the AI writes the answer from those messages only: **Best answer:** first, then **Other options mentioned:** with who suggested each, and which it recommends and why; it says so when people disagree, never invents amounts, names or steps, and says plainly when the chats do not answer the question. Under the answer: what each chat turned up (a chat that had nothing is listed too, so you know it was searched), and 'Show the N messages this was based on' to read them yourself. 'Nothing in your N messages mentions those words' → try other words, a shorter question, or the group's language. Each question is one AI request (it counts toward your AI use); only those excerpts go to the AI, and nothing is ever posted to your groups. To include newer messages, export the group again and import it (WhatsApp Groups above).",
+  "- 🧺 RECIPES HIDING IN MY CHATS: ··· More → 📱 WhatsApp → 🧺 Recipes hiding in my chats — the recipe links and the recipes written out in your imported chats, found by the app; each has an import button (a link opens the link import, a written recipe the paste-a-recipe window) and the list stays open while you import one after another. A link already in your recipes is marked as imported.",
+  "- 📱 GRID LAYOUT: ⚙️ Settings → 🎨 How it looks → 📱 Grid Layout — how many recipe cards fit in a row in the grid view, on this device (1 to 5 on a phone; 3 unless changed). It only changes how the recipes are shown; nothing is added or removed (v39.42).",
+  "- PHOTOS, under ⚙️ Settings → 💾 Backups and photos (v39.42): ☁️ Send my photos to the cloud — uploads the photos that exist only on this device, so your other devices get them too (use it when a photo shows on one device and not on another); it deletes nothing. 🖼️ Restore photos from a backup — puts photos back from a backup file without replacing recipes changed since. 🧹 Clean up orphaned photos — removes photos kept on THIS device that no recipe uses any more; it does not touch the cloud or any recipe's photo.",
+  "- 🪵 LOGGING & DEBUGGING: ⚙️ Settings → 🔧 Troubleshooting → 🪵 Logging & debugging — keeps a record of what the app does on this device, to send to the app's admin when something goes wrong; the record stays on this device until you choose to send it, and is never put into a backup (v39.42).",
   "- Importing a file: Excel files work again (v39.27); a saved web page keeps its lines apart",
   "- A new version is noticed while the app stays open, and pulling the list down checks at once and says what it found (v39.31, v39.32)",
   "- The Self Test report and Sync Health give times in this device's own time, its UTC offset after it (v39.31)",

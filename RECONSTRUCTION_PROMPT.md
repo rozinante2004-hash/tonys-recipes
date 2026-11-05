@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v39.41` — app. **Worker: v101**, deployed separately and versioned separately
+**Current version:** `v39.42` — app. **Worker: v101**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -2231,6 +2231,9 @@ lines accept `amount — name` / `amount - name` separators. Editing preserves `
   to English if needed, Pixabay‑search, download + compress the top hit into `photo`.
 - **Help assistant** (`openHelp`/`askHelp`): in‑app Q&A bot with a big `HELP_SYSTEM_PROMPT`
   describing every feature; quick‑question chips; can surface detail cards.
+  **v39.42:** it must name each feature by the words on its own buttons — a WhatsApp import ("upload to the server")
+  and how to use 💬 Ask my WhatsApp groups were missing, and five settings; Self Test `help_knows_whatsapp_import`
+  reads those buttons' labels and the Ask window's lines and fails when the prompt does not say them.
 - **`extractJSON(raw)`**: robustly pulls JSON out of a possibly chatty AI reply (strips code
   fences, finds the first balanced `[...]`/`{...}`).
 
