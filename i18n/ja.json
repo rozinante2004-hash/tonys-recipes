@@ -152,6 +152,7 @@
   "All recipes already have diet tags!": "すべてのレシピに食事タグが付いています！",
   "All {1} passed": "{1}件すべて成功",
   "Already invited by Gmail from this device: {1}.": "この端末ではすでにGmailから招待済み：{1}",
+  "Already invited from this device: {1}.": "この端末からすでに招待済み：{1}",
   "Also sync imported chats": "インポートしたチャットも同期する",
   "Also sync imported chats to my other devices": "インポートしたチャットも他のデバイスに同期する",
   "Always allow relay services for imports": "インポート時は常に中継サービスを許可する",

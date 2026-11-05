@@ -1437,6 +1437,28 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
   - **Released: v39.09 (29 Oct 2026, 11:17 Israel time, on 0de2dde; Tony: "Yes, release v39.09").** Every job success:
     Deploy to GitHub Pages, pages build, Publish languages, Translate new phrases, Self Tests on main and test,
     Cloudflare Pages for the beta and test.
+  - **v39.38 + Worker v101 — tester invitations by the app's own e-mail (Resend), Gmail kept as a small backup** (Tony,
+    5 Nov 2026, after v39.37: "50 minutes is not enough. I do not invite testers that often. I would like them to go away
+    altogether. Can we add a secret or something?" — "Can we use Resend instead of gmail?" — "Please keep both the Resend
+    and the Gmail buttons, just in case." — "Make the “📨 Send” the major one, and a smaller Gmail option as a backup").
+    (The 50 minutes only spared a batch Google's window; with v39.37's prompt '' Google asks only the first time — still,
+    on his iPhone the installed app's Google window may not keep his sign-in.) No new secret: the Worker already holds
+    RESEND_API_KEY. **Worker v101:** `mail-recipe` with `invite` → `mailInvite`: the owner only (OWNER_EMAIL), signed in
+    with Google, with the authenticator's code when his two-step is on; from and reply-to "My Kitchen Notes"
+    <contact@ the app's domain> (MAIL_INVITE_FROM overrides); the server lays the e-mail out from the text (escaped,
+    https links made links with a trailing stop left outside, line breaks kept, right to left for Hebrew); 40 a day on
+    their own count, inside the 90; `mailOut` takes options (kind, perDay, from, replyTo). Worker tests: 12 new checks
+    (owner sends; to, from, reply-to, subject; escaping and links; app HTML ignored; Hebrew; not the owner / a password
+    sign-in refused; Google without the code while two-step is off sent; no subject; one address; the count; 40 a day).
+    **App:** ✉️ Invite testers → **📨 Send** (the main button) — `inviteSend`: one request per address, the server's
+    refusal said (a sign-in it refuses explained with `ownerSignInWhy`, the rest not tried), failures kept in To, the
+    invited recorded (testerInvitesAdd), counts only in the log ("Tester invitations by the app's e-mail"); below the
+    buttons a small underlined **📧 Backup: send with Gmail** (`inviteSendGmail`, unchanged but for "Already invited from
+    this device"). invite_testers extended (📨 Send: what reaches the server, no Google asked, a refusal, a sign-in
+    refused). **Privacy Statement 1.13** (5 Nov, 11 languages; tools/legal-keys.py): a row "Invitations to try the App"
+    (the address and the invitation through our e-mail service, only daily counts kept; the address as a fingerprint so
+    it may start a kitchen; legitimate interest) and Resend's line. Help: the invitation steps and NEW FEATURES. The
+    Worker deploys from test (one server for every copy), so 📨 Send works on the test copy at once.
   - **v39.37 — 📧 Send with Gmail asks Google only when it must** (Tony, 5 Nov 2026: "Is there a way to remove Google's
     scare screens every time I invite a new tester to join the Beta? I'm not concerned about them, it's just that I have to
     go through 5 screens each time, and it is very time consuming."). The invitations' 📧 Send with Gmail asked Google's

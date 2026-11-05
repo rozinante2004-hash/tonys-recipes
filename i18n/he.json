@@ -164,6 +164,7 @@
   "All recipes already have diet tags!": "לכל המתכונים כבר יש תגי דיאטה!",
   "All {1} passed": "כל {1} עברו בהצלחה",
   "Already invited by Gmail from this device: {1}.": "כבר הוזמן/ה דרך Gmail ממכשיר זה: {1}.",
+  "Already invited from this device: {1}.": "כבר הוזמן/ה ממכשיר זה: {1}.",
   "Also sync imported chats": "סנכרון גם של צ'אטים מיובאים",
   "Also sync imported chats to my other devices": "סנכרון שיחות מיובאות גם למכשירים אחרים שלי",
   "Always allow relay services for imports": "תמיד לאפשר שירותי ממסר לייבוא",

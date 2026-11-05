@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.37 -->
+<!-- Tony's Recipes Collection v39.38 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -10695,7 +10695,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.37';
+var APP_VERSION = 'v39.38';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -14147,7 +14147,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.37</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.38</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14235,7 +14235,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.37</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.38</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -32539,15 +32539,22 @@ function openInviteTesters(pre) {
     + '<textarea id="invTo" class="form-textarea" rows="2" dir="ltr" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea>'
     + '<div id="invCount" class="inv-note" style="margin:3px 0 0;"></div>'
     + '<div class="inv-row" style="margin-top:12px;">'
-    +   '<button type="button" class="ask-btn" id="invGmail">\u{1F4E7} Send with Gmail</button>'
+    +   '<button type="button" class="ask-btn" id="invSend">\u{1F4E8} Send</button>'
     +   '<button type="button" class="ask-btn ghost" id="invMail">✉️ Mail app</button>'
     +   '<button type="button" class="ask-btn ghost" id="invWa">\u{1F4AC} WhatsApp</button>'
     +   '<button type="button" class="ask-btn ghost" id="invCopy">\u{1F4CB} Copy</button>'
     +   '<button type="button" class="ask-btn ghost" id="invClose">Close</button></div>'
+    // v39.38 — Tony: "Please keep both the Resend and the Gmail buttons, just in case" — "Make the “📨 Send” the major one,
+    // and a smaller Gmail option as a backup"
+    + '<div style="margin-top:6px;"><button type="button" id="invGmail" style="background:none;border:0;padding:6px 0;font:inherit;font-size:12.5px;'
+    +   'color:var(--muted);text-decoration:underline;cursor:pointer;">\u{1F4E7} Backup: send with Gmail</button></div>'
     + '<div id="invStatus" aria-live="polite" style="margin-top:10px;font-size:13px;line-height:1.5;color:var(--ink);"></div>'
-    + '<p class="inv-note" style="margin-top:10px;">Gmail sends each person their own e-mail'
-    + (appSupportEmail() ? ', from the app’s address when your Gmail may send as it (Gmail → Settings → Accounts → Send mail as), otherwise from yours' : '')
-    + '. The first time, Google asks you to allow sending. If it warns that it has not verified the app, that is expected for your own use: choose Advanced, then continue.</p>'
+    // v39.38 — sent by the app's own e-mail service (Resend, through the server), no longer by his Gmail: no Google windows
+    + '<p class="inv-note" style="margin-top:10px;">\u{1F4E8} Send sends each person their own e-mail from the app’s address'
+    + (appSupportEmail() ? ' (' + escH(appSupportEmail()) + '), and their replies come to it' : '')
+    + ' — by the app’s own e-mail service, with no Google window. Up to 40 a day. The Gmail backup sends them from your Gmail instead'
+    + (appSupportEmail() ? ' (from the app’s address when your Gmail may send as it)' : '')
+    + ': the first time, Google asks you to allow it — if it warns that it has not verified the app, choose Advanced, then continue.</p>'
     + '<details id="invSent" class="inv-note" hidden></details></div>';
   if (document.getElementById('manageOverlay')) ov.style.zIndex = '1300';   // v39.11 — opened from 💬 Feedback: above 📊 Households
   document.body.appendChild(ov);
@@ -32564,6 +32571,7 @@ function openInviteTesters(pre) {
   };
   inviteEl('invSubject').onchange = inviteEl('invBody').onchange = inviteKeep;
   inviteEl('invTo').oninput = inviteCountShow;
+  inviteEl('invSend').onclick = function () { inviteSend(); };
   inviteEl('invGmail').onclick = function () { inviteSendGmail(); };
   inviteEl('invMail').onclick = function () { inviteRegisterTo(); inviteMailApp(); };
   inviteEl('invWa').onclick = function () {
@@ -32579,7 +32587,7 @@ function openInviteTesters(pre) {
   if (pre && pre.to) { inviteEl('invTo').value = String(pre.to); inviteCountShow(); }   // v39.11 — 💬 Feedback → ✉️ Send invitation
   inviteSentShow();
   inviteOnlyShow();   // v38.69
-  // Google's sending window must open straight from the tap: what it needs is fetched now.
+  // Google's sending window must open straight from the tap: what 📧 Send with Gmail needs is fetched now.
   gmailClientIdFind().then(function (id) { if (id && !(window.google && window.google.accounts)) loadScriptOnce(GSI_CLIENT_URL, 'google').catch(function () {}); });
   return true;
 }
@@ -32590,6 +32598,64 @@ function inviteMailApp() {
   location.href = 'mailto:?' + (to.length ? 'bcc=' + encodeURIComponent(to.join(',')) + '&' : '')
     + 'subject=' + encodeURIComponent(inviteEl('invSubject').value) + '&body=' + encodeURIComponent(inviteEl('invBody').value);
 }
+// v39.38 — Tony, 5 Nov 2026: "Is there a way to remove Google's scare screens every time I invite a new tester … I have to
+// go through 5 screens each time" — "Can we use Resend instead of gmail?" Each invitation goes to the server (mail-recipe
+// with `invite`), which sends it through Resend from the app's address, replies to it: no Google window, on any device.
+// The owner's tools' sign-in applies (with Google; with the authenticator's code once that is on) — said when it refuses.
+async function inviteSend() {
+  inviteKeep();
+  var to = inviteAddresses(inviteEl('invTo').value), subject = String(inviteEl('invSubject').value || '').trim(), body = inviteEl('invBody').value, lang = _inviteLang;
+  if (!to.length) { inviteSay('Type at least one e-mail address in To.'); inviteEl('invTo').focus(); return null; }
+  if (!subject || !String(body).trim()) { inviteSay('The subject and the message must not be empty.'); return null; }
+  if (!window._fbUser || typeof _fbUser.getIdToken !== 'function') { inviteSay('Sign in first — the app sends the invitations for its owner.'); return null; }
+  var sent = inviteJson(INVITE_SENT_KEY), again = to.filter(function (a) { return sent[a]; });
+  if (again.length) {
+    var pick = await askChoice('Already invited from this device: ' + again.join(', ') + '.', [
+      { value: 'all', label: 'Send to all ' + to.length + ' again' },
+      { value: 'new', label: to.length > again.length ? 'Only the ' + (to.length - again.length) + ' new' : 'Send none' }]);
+    if (pick === 'new') to = to.filter(function (a) { return !sent[a]; });
+    else if (pick !== 'all') return null;
+    if (!to.length) return null;
+  } else if (await askConfirm({ icon: '✉️', title: 'Send the invitation?',
+      message: to.length === 1 ? 'To ' + to[0] + '.' : 'To ' + to.length + ' people, each their own e-mail.', okLabel: 'Send' }) !== true) return null;
+  var ok = [], stop = '', why = '';
+  var btn = inviteEl('invSend'); if (btn) btn.disabled = true;
+  for (var i = 0; i < to.length; i++) {
+    inviteSay('⏳ Sending ' + (i + 1) + ' of ' + to.length + '…');
+    try {
+      var resp = await fetch(WORKER_ENDPOINT, { method: 'POST', headers: workerHeaders(), signal: AbortSignal.timeout(40000),
+        body: workerBody({ action: 'mail-recipe', idToken: await _fbUser.getIdToken(), to: to[i],
+          invite: { subject: subject, text: body, rtl: lang === 'he' } }) });
+      var d = {}; try { d = await resp.json(); } catch (e) {}
+      if (!resp.ok) {
+        var m = String(d.error || ('The server answered ' + resp.status)).replace(/^MAIL:\s*/, '');
+        if (d.needGoogle || d.needTwoStep) { why = 'sign-in'; try { stop = (await ownerSignInWhy()) || m; } catch (e) { stop = m; } break; }
+        if (d.needsConfig) { why = 'config'; stop = 'E-mailing from the app is not switched on on its server yet.'; break; }
+        if (d.rateLimited || resp.status === 401 || resp.status === 403) { why = 'refused'; stop = m; break; }
+        why = why || 'refused'; stop = stop || m; continue;
+      }
+      ok.push(to[i]); inviteSentNote(to[i]);
+    } catch (e) { why = why || 'network'; stop = stop || ('It could not be sent just now (' + ((e && e.message) || e) + ') — try again in a moment.'); }
+  }
+  if (btn) btn.disabled = false;
+  var left = to.filter(function (a) { return ok.indexOf(a) === -1; });
+  var out = ok.length ? '✅ Sent to ' + ok.length + (ok.length === 1 ? ' person' : ' people') + '.' : '';
+  if (left.length) {
+    out += (out ? '<br>' : '') + '❌ Not sent: ' + escH(left.join(', ')) + '<br>' + escH(stop);
+    inviteEl('invTo').value = left.join(', '); inviteCountShow();
+  } else { inviteEl('invTo').value = ''; inviteCountShow(); }
+  // v38.69 — the ones sent to may start a kitchen
+  var mayN = ok.length ? await testerInvitesAdd(ok) : 0;
+  if (ok.length && mayN < ok.length) out += '<br>⚠️ ' + (ok.length - mayN) + ' could not be recorded as invited (they cannot start a kitchen yet): sign in again with Google and send to them once more.';
+  inviteSay(out);
+  inviteSentShow();
+  inviteOnlyShow();
+  // counts only — never an address
+  syncLog(left.length ? 'error' : 'save', 'Tester invitations by the app’s e-mail', { sent: ok.length, notSent: left.length, language: lang,
+    reason: left.length ? (why === 'sign-in' ? 'this device’s sign-in is not one the owner’s tools take' : String(stop || 'unknown').slice(0, 300)) : '' });
+  if (ok.length && typeof insightCount === 'function') insightCount('invite-testers');
+  return { sent: ok.length, notSent: left.length };
+}
 async function inviteSendGmail() {
   inviteKeep();
   var to = inviteAddresses(inviteEl('invTo').value), subject = String(inviteEl('invSubject').value || '').trim(), body = inviteEl('invBody').value, lang = _inviteLang;
@@ -32597,7 +32663,7 @@ async function inviteSendGmail() {
   if (!subject || !String(body).trim()) { inviteSay('The subject and the message must not be empty.'); return null; }
   var sent = inviteJson(INVITE_SENT_KEY), again = to.filter(function (a) { return sent[a]; });
   if (again.length) {
-    var pick = await askChoice('Already invited by Gmail from this device: ' + again.join(', ') + '.', [
+    var pick = await askChoice('Already invited from this device: ' + again.join(', ') + '.', [
       { value: 'all', label: 'Send to all ' + to.length + ' again' },
       { value: 'new', label: to.length > again.length ? 'Only the ' + (to.length - again.length) + ' new' : 'Send none' }]);
     if (pick === 'new') to = to.filter(function (a) { return !sent[a]; });
@@ -32641,7 +32707,7 @@ async function inviteSendGmail() {
   return { sent: ok.length, notSent: left.length };
 }
 window.openInviteTesters = openInviteTesters; window.inviteAddresses = inviteAddresses; window.inviteHtml = inviteHtml; window.inviteLink = inviteLink;
-window.inviteSendGmail = inviteSendGmail; window.INVITE_TEXTS = INVITE_TEXTS;
+window.inviteSend = inviteSend; window.inviteSendGmail = inviteSendGmail; window.INVITE_TEXTS = INVITE_TEXTS;
 
 function openCameraImport() {
   document.getElementById('cameraChoiceOverlay').classList.add('open');
@@ -33775,7 +33841,7 @@ var HELP_SYSTEM_PROMPT = [
   "- A new version is noticed while the app stays open, and pulling the list down checks at once and says what it found (v39.31, v39.32)",
   "- The Self Test report and Sync Health give times in this device's own time, its UTC offset after it (v39.31)",
   "- (The app's owner) A correction in ✏️ Edit translations is never lost: it is kept on the device until it is shared, Save writes only what was changed, and a Save that is not shared says why (v39.34)",
-  "- (The app's owner) 📧 Send with Gmail, for the testers' invitations: Google asks for permission only the first time (or after it was withdrawn), and once allowed, a batch of invitations goes out without Google's screens for the next 50 minutes (v39.37)",
+  "- (The app's owner) ✉️ Invite testers → 📨 Send: the invitations go out by the app's own e-mail service, from the app's address — no Google windows at all; a small 📧 Backup: send with Gmail stays below it, and asks Google's permission only the first time (v39.37, v39.38)",
   "- 🐄 The farm visitors speak more slowly, and the child and the female a little higher (v39.36)",
   "- 🐄 The farm visitors speak with the voice chosen for everyone: a child or a female is never a man's voice on a device that has another, Microsoft Edge's own child voice speaks for the child, and the owner's farm window says which voice speaks for each choice on that device (v39.35)",
   "- 🕐 Recently Viewed: a 'Recent' chip appears in the filter bar after you open any recipe — shows your last 8 viewed",
@@ -33852,7 +33918,7 @@ var HELP_SYSTEM_PROMPT = [
   "- 📊 Households (the owner's): every household — in the family app and My Kitchen Notes, every copy's — with its owner, members, 📚 Recipes (how many it keeps, counted by its own app once a day; rest the mouse on the number for when), AI this month against its AI cap, AI in the two months before (e.g. 'AI in Sep · Oct' in November), links, who shared the app, last active. Click a heading (on a phone: Sort by) to sort — by Recipes for the biggest collections first; ⬇ CSV has the recipe counts too. 📈 Use adds every household up, month by month, in sections side by side (one under the other on a phone; one column when there are many months), with how big the collections are. Click a row for its details: the AI allowance, the members, the Extras, and What they use — two narrow tables side by side (one under the other on a phone), a column for each month, in sections (how often, signing in, recipes added and from where, the farm, devices and settings, then every feature and how many times). In The farm, 'Taps on a visitor (each one)' counts every tap and 'Visits with a farm visitor tapped' counts a visit once, however many taps. Extras: 📧 E-mail recipes from their own Gmail makes that household's ✉️ Email send from each member's own Gmail (Google asks each once) instead of the app's 📨 Send — best left off. If the page says this device's sign-in was made without the code from your authenticator app (or with a password): sign out (at the top, beside the sync status) and sign in again with Google — the app asks for the 6-digit code; the owner's tools need both. 🔑 Reset password, beside the owner and beside each member (in the details), e-mails that person a link to choose a new password — for someone who wrote to you that they can't sign in; you never see their password, and the app doesn't say whether the address has an account. For a household of another copy, the button opens that copy, which sends it after you sign in there.",
   "- 📊 Households → 💬 Feedback (the owner's): a request for an invitation has ✉️ Send invitation — ✉️ Invite testers opens with that address in To (a request from another copy opens that copy's app, where its invitations belong).",
   "- 📊 Households → 💬 Feedback and ⚠️ Errors (the owner's): tick several (or Select all shown), then 👀 Seen (n), ✅ Done (n) or 🗑 Delete selected (n) for all of them at once. 👀 Seen = read, off the ⚙️ red dot, still under 'Not done yet'; ✅ Done = also off that list (still under All). Deleting several asks once and sends one alert",
-  "- ✉️ Invite testers: the tester invitation in English or עברית, with this copy's link; the wording can be changed (this device keeps it; 'The original words' brings it back). Paste the addresses; 📧 Send with Gmail sends each person their own e-mail, from the app's address when the owner's Gmail may send as it. Also ✉️ Mail app, 💬 WhatsApp and 📋 Copy. The first Gmail send needs the Gmail API switched on for the copy's Google Cloud project, and Google's permission",
+  "- ✉️ Invite testers: the tester invitation in English or עברית, with this copy's link; the wording can be changed (this device keeps it; 'The original words' brings it back). Paste the addresses; 📨 Send sends each person their own e-mail from the app's address (contact@…), by the app's own e-mail service — no Google window — and their replies come to that address; up to 40 a day; the owner's sign-in as his other tools need it (with Google, and the authenticator's code once that is on). a small 📧 Backup: send with Gmail below the buttons sends them from the owner's Gmail instead (Google asks for permission the first time, and may say it has not verified the app: Advanced, then continue). Also ✉️ Mail app, 💬 WhatsApp and 📋 Copy",
   "- The beta is by invitation only when 📊 Households says so: every address in To (however the invitation goes) may then start a kitchen, signed in with that address; the window says how many are invited. Only a fingerprint of each address is kept, never the address. The invitation asks testers to sign in with that address, not to forward it, and to invite family from inside the app",
   "- 🩺 Server allowances: a table of every free allowance — Cloudflare's day (Worker requests, KV, D1, server errors), Pages builds this month per copy, what is running now, Firestore reads as the apps count them, sign-in-link e-mails (today, the most in a day, days all 5 went, days someone was turned away), and recipe e-mails (today of the app's 90, and Resend's own day and month). ⚠️ near the limit, ⛔ stopped",
   "- 🔐 Two-step sign-in: an authenticator app's 6-digit code on top of the Google sign-in, for the owner's tools",

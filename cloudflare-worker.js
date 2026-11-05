@@ -1,4 +1,8 @@
-// Tony's Recipes — Cloudflare Worker v100
+// Tony's Recipes — Cloudflare Worker v101
+// v101: THE OWNER'S TESTER INVITATIONS ARE SENT HERE, THROUGH RESEND (Tony, 5 Nov 2026: "Is there a way to remove
+//   Google's scare screens every time I invite a new tester … I have to go through 5 screens each time" — "Can we use
+//   Resend instead of gmail?"). mail-recipe with `invite: { subject, text, rtl }`: the owner only, signed in as his
+//   tools need; from and replies to the app's own address; laid out here from the text; 40 a day (mailInvite).
 // v100: EACH COPY'S OWN HOUSEHOLDS PAGE GETS ITS HOUSEHOLDS' DAILY REPORTS TOO (Tony, 29 Oct 2026, on the test copy's new
 // Recipes column, all "—": "I'm assuming tomorrow I will see a real count"). meter-admin `list` sent the reports (which
 // carry each household's recipe count, its members and links) only with `all` — the family and community copies' "every
@@ -460,7 +464,7 @@
 //   AI_MAX_TOKENS   – the longest answer one call may ask for (32000; the
 //                     app's largest, reading several recipes at once, asks 8000).
 
-const WORKER_VERSION = 'v100';
+const WORKER_VERSION = 'v101';
 const VIDEO_MAX_MB_DEFAULT = 50;
 const GEMINI_API = 'https://generativelanguage.googleapis.com';
 const GEMINI_MODEL_DEFAULT = 'gemini-2.5-flash';
@@ -2669,6 +2673,8 @@ async function mailRecipe(request, env, body) {
   if (!claims.email_verified || !claims.email) return jsonResp({ error: 'MAIL: confirm your e-mail address first (look for our e-mail, in spam too).' }, 403);
   const to = str(body.to, 200).trim().toLowerCase();
   if (!/^[^\s@<>"',;:]+@[^\s@<>"',;:]+\.[^\s@<>"',;:]{2,}$/.test(to)) return jsonResp({ error: 'MAIL: that is not an e-mail address.' }, 400);
+  // v101 — the owner's invitation to try the app, by this server instead of his Gmail (no Google windows)
+  if (body.invite !== undefined) return await mailInvite(request, env, body, claims, to);
   const hid = str(body.hid, 64);
   if (!/^[A-Za-z0-9]{1,64}$/.test(hid)) return jsonResp({ error: 'MAIL: which kitchen?' }, 400);
   let hh;
@@ -2695,11 +2701,14 @@ async function mailRecipe(request, env, body) {
   return await mailOut(env, claims, kitchen, to, subject, (inline) => mailRecipeHtml(rec, kitchen, img && inline ? 'cid:recipe-photo' : remote), mailRecipeText(rec, kitchen), img);
 }
 // v99 — the sending, the limits and the alerts, for a recipe and for a sent recipe's link alike
-async function mailOut(env, claims, kitchen, to, subject, htmlFor, text, img) {
+async function mailOut(env, claims, kitchen, to, subject, htmlFor, text, img, opt) {
+  opt = opt || {};
   const day = new Date().toISOString().slice(0, 10);
-  const mine = await ceilingCount(env, 'mail:' + day + ':' + claims.sub, 86400, 1);
+  const mine = await ceilingCount(env, 'mail:' + day + ':' + claims.sub + (opt.kind ? ':' + opt.kind : ''), 86400, 1);
   const all = await ceilingCount(env, 'mail:' + day, 86400, 1);
-  if (mine.used >= MAIL_PER_USER_DAY) {
+  if (opt.perDay && mine.used >= opt.perDay)   // v101 — the owner's invitations: their own count, no warning (it is him)
+    return jsonResp({ error: 'MAIL: that is today\u2019s ' + opt.perDay + ' invitations \u2014 tomorrow there are more.', rateLimited: true }, 429);
+  if (!opt.perDay && mine.used >= MAIL_PER_USER_DAY) {
     await mailNotice(env, { what: 'mail-person', kind: 'warning', until: nextUtcMidnight(Date.now()),   // v99 — one person, many e-mails: worth a look
       title: 'Someone sent all ' + MAIL_PER_USER_DAY + ' of their recipe e-mails for today',
       detail: 'A member of ' + (kitchen || 'a kitchen') + ' (' + claims.aud + ') reached the ' + MAIL_PER_USER_DAY + ' a day each person may send; more are refused until 00:00 UTC. Usually nothing to do \u2014 unless it looks like someone sending unwanted e-mail.' });
@@ -2711,9 +2720,10 @@ async function mailOut(env, claims, kitchen, to, subject, htmlFor, text, img) {
       detail: 'The app sends at most ' + MAIL_ALL_DAY + ' a day (MAIL_ALL_DAY in the Worker), under Resend\'s free 100. Members can still share by the phone\'s share menu or Copy.' });
     return jsonResp({ error: 'MAIL: the app has sent all its e-mails for today \u2014 try again tomorrow.', rateLimited: true }, 429);
   }
-  const from = '"' + (kitchen ? kitchen + ' via ' : '') + 'My Kitchen Notes" <' + (env.MAIL_FROM || MAIL_FROM_DEFAULT) + '>';
+  const from = opt.from || ('"' + (kitchen ? kitchen + ' via ' : '') + 'My Kitchen Notes" <' + (env.MAIL_FROM || MAIL_FROM_DEFAULT) + '>');
+  const replyTo = opt.replyTo || claims.email;
   const send = async (inline) => {
-    const payload = { from, to: [to], subject, reply_to: claims.email, html: htmlFor(inline), text };
+    const payload = { from, to: [to], subject, reply_to: replyTo, html: htmlFor(inline), text };
     if (img) payload.attachments = [Object.assign({ filename: 'photo.' + img.ext, content: img.b64 }, inline ? { content_id: 'recipe-photo' } : {})];
     return (env.__fetch || fetch)(RESEND_URL, { method: 'POST', headers: { Authorization: 'Bearer ' + env.RESEND_API_KEY, 'Content-Type': 'application/json' },
       body: JSON.stringify(payload), signal: AbortSignal.timeout(25000) });
@@ -2737,7 +2747,45 @@ async function mailOut(env, claims, kitchen, to, subject, htmlFor, text, img) {
   }
   await mine.credit(); await all.credit();
   await mailUsage(env, res, all.used + 1);
-  return jsonResp({ ok: true, replyTo: claims.email });
+  return jsonResp({ ok: true, replyTo });
+}
+// v101 — Tony, 5 Nov 2026: "Is there a way to remove Google's scare screens every time I invite a new tester to join the
+// Beta? … I have to go through 5 screens each time" — "Can we use Resend instead of gmail?" The owner's ✉️ Invite testers
+// sends here: from the app's own address (MAIL_INVITE_FROM, else contact@ the app's domain — verified at Resend, and its
+// mail reaches the owner), replies to it too; the owner only, signed in as his tools need (with Google; with the
+// authenticator's code once he switched that on); one address each time; the server lays the e-mail out from the text
+// (escaped, its links made links) — HTML from the app is never used; 40 a day, inside the app's 90. Nothing is kept but
+// the day's counts.
+const MAIL_INVITES_DAY = 40, MAIL_INVITE_FROM_DEFAULT = ['contact', 'mykitchennotes.community'].join('@');
+async function mailInvite(request, env, body, claims, to) {
+  const owners = ownerEmails(env);
+  if (!owners.length || !owners.includes(String(claims.email || '').toLowerCase()))
+    return jsonResp({ error: 'MAIL: only the app\u2019s owner sends invitations.' }, 403);
+  const fb = claims.firebase || {};
+  if (fb.sign_in_provider !== 'google.com')
+    return jsonResp({ error: 'MAIL: the owner\u2019s tools need a sign-in with Google (not an e-mail link or a password).', needGoogle: true }, 403);
+  if (fb.sign_in_second_factor !== 'totp') {
+    let twoStep;
+    try { twoStep = await ownerTwoStepOn(claims.aud, body.idToken, env, env.METER_DB); }
+    catch (e) { return jsonResp({ error: 'MAIL: could not check the owner\u2019s two-step setting (' + e.message + ') \u2014 try again.' }, 502); }
+    if (twoStep) return jsonResp({ error: 'MAIL: the owner\u2019s tools need a sign-in with the code from your authenticator app.', needTwoStep: true }, 403);
+  }
+  const inv = body.invite && typeof body.invite === 'object' ? body.invite : {};
+  const subject = String(inv.subject == null ? '' : inv.subject).replace(/[\r\n]+/g, ' ').trim().slice(0, 200);
+  const text = String(inv.text == null ? '' : inv.text).replace(/\r\n?/g, '\n').trim().slice(0, 6000);
+  if (!subject || !text) return jsonResp({ error: 'MAIL: the invitation needs a subject and a message.' }, 400);
+  const addr = env.MAIL_INVITE_FROM || MAIL_INVITE_FROM_DEFAULT;
+  return await mailOut(env, claims, '', to, subject, () => mailInviteHtml(text, !!inv.rtl), text, null,
+    { kind: 'invite', perDay: MAIL_INVITES_DAY, from: '"My Kitchen Notes" <' + addr + '>', replyTo: addr });
+}
+function mailInviteHtml(text, rtl) {
+  const body = htmlEsc(text).replace(/https:\/\/[^\s<]+/g, (u) => {
+    const tail = (u.match(/[.,;:!?)\]]+$/) || [''])[0]; u = u.slice(0, u.length - tail.length);
+    return '<a href="' + u + '" style="color:#C1440E;">' + u + '</a>' + tail;
+  }).replace(/\n/g, '<br>');
+  return '<!doctype html><html><body style="margin:0;padding:16px;background:#FAF7F2;"><div dir="' + (rtl ? 'rtl' : 'ltr')
+    + '" style="max-width:600px;margin:0 auto;background:#FFFFFF;border-radius:10px;padding:20px 22px;font-family:Arial,Helvetica,sans-serif;'
+    + 'font-size:15px;line-height:1.55;color:#2B2622;text-align:' + (rtl ? 'right' : 'left') + ';">' + body + '</div></body></html>';
 }
 // v99 — 📨 Send to another kitchen → ✉️ Via Email. Everything in the e-mail comes from the sent recipe as kept in
 // Firestore (read with the sender's sign-in: the rules let anyone holding its id read it while it lasts), never from
@@ -4084,4 +4132,4 @@ export default {
   }
 };
 
-// ── END OF WORKER v100 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
+// ── END OF WORKER v101 ── If this is the last line in the Cloudflare editor, the whole file was pasted.

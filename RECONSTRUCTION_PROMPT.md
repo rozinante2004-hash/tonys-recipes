@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v39.37` — app. **Worker: v100**, deployed separately and versioned separately
+**Current version:** `v39.38` — app. **Worker: v101**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -408,7 +408,15 @@ under its plain path only (a `?url=` request goes network-first).
   **Pace and pitch (v39.36, Tony's choice "E" from five heard on his phone):** FARM_VOICE_TUNE child speed 0.8, pitch
   1.8 (the top; above it speech cracks); female 0.74 / 1.4; male 0.7 / 0.7 (only slower: he stays deep, v38.01); each
   animal adds ±0.3 × (its pitch − 1), kept within 0.55–1.8.
-- **📧 Send with Gmail (the owner's tester invitations; v39.37):** `getGmailToken` asks Google's token client with
+- **✉️ Invite testers → 📨 Send (v39.38, Worker v101):** each invitation goes to the server (`mail-recipe` with
+  `invite: { subject, text, rtl }`, no `hid`), which sends it through Resend (`mailInvite` → `mailOut` with options) from
+  "My Kitchen Notes" <contact@ the app's domain> (MAIL_INVITE_FROM to change it), replies to the same address; the owner
+  only (OWNER_EMAIL), signed in with Google and — when his two-step is on — the authenticator's code (`needGoogle` /
+  `needTwoStep`, said in the window with `ownerSignInWhy`); laid out by the server from the text (escaped, https links
+  made links, line breaks kept; HTML from the app never used); 40 a day on their own count (`mail:<day>:<uid>:invite`),
+  inside the app's 90. No Google window. A small "📧 Backup: send with Gmail" below the buttons keeps the Gmail way.
+  Privacy Statement 1.13 (11 languages): the row "Invitations to try the App" and Resend's line.
+- **📧 Send with Gmail (the owner's tester invitations' backup; v39.37):** `getGmailToken` asks Google's token client with
   `prompt: ''` (Google shows its screens — account, "unverified app", the permission — only the first time or after the
   permission was withdrawn; 'consent' made it show all of them at every first send) and uses a token under 50 minutes
   old again (`_googleAccessTokenAt`; Google's last an hour), so a batch of invitations asks once. A 401 clears it.

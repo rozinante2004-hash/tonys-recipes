@@ -11378,7 +11378,7 @@ window.SELF_TESTS = [
       }
     } },
 
-  { id:'invite_testers', group:'Sharing', name:'✉️ The owner’s Invite testers: English or Hebrew with this copy’s link, his own wording kept, every address found once, one Gmail e-mail to each from the app’s address, the already-invited asked about, a failure said, and no address in the log (v38.42)',
+  { id:'invite_testers', group:'Sharing', name:'✉️ The owner’s Invite testers: English or Hebrew with this copy’s link, his own wording kept, every address found once, one e-mail to each from the app’s address — by the app’s own e-mail service (📨 Send, no Google window, v39.38) or by Gmail — the already-invited asked about, a failure said, and no address in the log (v38.42)',
     test: async()=>{
       var item=document.querySelector('#settingsDrop [onclick*="openInviteTesters"]');
       if(!item || !item.hasAttribute('data-owner-only') || !item.closest('[data-group="owner"]')) throw new Error('no owner-only ✉️ Invite testers in ⚙️ → 👑');
@@ -11434,6 +11434,31 @@ window.SELF_TESTS = [
         if(r.sent!==1 || r.notSent!==1 || document.getElementById('invTo').value!=='bad@x.example' || !/Not sent/.test(document.getElementById('invStatus').textContent)) throw new Error('a failure: '+JSON.stringify(r)+' / '+document.getElementById('invTo').value);
         if(!logs.some(function(l){ return /Tester invitations/.test(l); })) throw new Error('nothing in the log');
         if(logs.some(function(l){ return /@/.test(l); })) throw new Error('an address reached the log: '+logs.join(' | '));
+        // v39.38 — 📨 Send: the app's own e-mail service (Tony: "Can we use Resend instead of gmail?" — "Please keep both the
+        // Resend and the Gmail buttons, just in case.")
+        if(!document.getElementById('invSend') || !document.getElementById('invGmail')) throw new Error('the window lacks 📨 Send or 📧 Send with Gmail');
+        var posts=[], gmailAsked=0, userWas=window._fbUser, whyWas=window.ownerSignInWhy;
+        window.getGmailToken=async function(){ gmailAsked++; return 'tok'; };
+        window._fbUser={ uid:'uOwn', email:ST_OWNER, getIdToken:async function(){ return 'idtok'; } };
+        window.fetch=async function(u, init){ var b=JSON.parse(init.body); posts.push(b); var bad=b.to==='bad@x.example';
+          return { ok:!bad, status:bad?502:200, json:async function(){ return bad ? { error:'MAIL: the e-mail service refused it (422)' } : { ok:true }; } }; };
+        try{
+          window.askConfirm=async function(){ return true; };
+          document.getElementById('invTo').value='eve@x.example, bad@x.example, fay@y.example';
+          r=await inviteSend();
+          if(!r || r.sent!==2 || r.notSent!==1 || posts.length!==3) throw new Error('📨 Send: '+JSON.stringify(r)+' / '+posts.length+' requests');
+          var p0=posts[0];
+          if(p0.action!=='mail-recipe' || p0.to!=='eve@x.example' || !p0.invite || p0.invite.subject!==subj.value.trim() || p0.invite.text.indexOf(link)===-1
+             || p0.invite.rtl!==false || p0.idToken!=='idtok' || p0.hid) throw new Error('what goes to the server: '+JSON.stringify(p0).slice(0,300));
+          if(gmailAsked) throw new Error('📨 Send asked Google for permission');
+          if(document.getElementById('invTo').value!=='bad@x.example' || !/refused it/.test(document.getElementById('invStatus').textContent)) throw new Error('a refusal is not said, or its address left To');
+          // A sign-in the server refuses: said why (as the owner's other tools say it), the rest not tried.
+          posts=[]; window.ownerSignInWhy=async function(){ return 'This device is signed in with an e-mail link or a password, and the owner’s tools need a sign-in with Google and your authenticator’s code.'; };
+          window.fetch=async function(u, init){ posts.push(JSON.parse(init.body)); return { ok:false, status:403, json:async function(){ return { error:'MAIL: the owner’s tools need a sign-in with Google', needGoogle:true }; } }; };
+          document.getElementById('invTo').value='gus@x.example, hal@y.example';
+          r=await inviteSend();
+          if(posts.length!==1 || r.notSent!==2 || !/e-mail link or a password/.test(document.getElementById('invStatus').textContent)) throw new Error('a sign-in the server refuses: '+posts.length+' / '+document.getElementById('invStatus').textContent);
+        } finally { window._fbUser=userWas; window.ownerSignInWhy=whyWas; }
         // The e-mail itself: From and Reply-To the app's, each header once, before the body.
         window.sendViaGmailApi=real.send; var raw=null;
         window.getGmailToken=async function(){ return 'tok'; };

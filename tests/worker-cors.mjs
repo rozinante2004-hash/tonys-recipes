@@ -2242,6 +2242,7 @@ console.log('\nA recipe e-mailed by the server (v98), the owner warned when it r
   globalThis.fetch = async (url, init) => {
     url = String(url);
     if (url.startsWith('https://fs.mail/')) {
+      if (/\/config\/security$/.test(url)) return new Response('{}', { status: 404 });   // v101 — the owner's two-step: not switched on
       const gm = /\/(recipeGifts|recipeGiftPhotos)\/([A-Za-z0-9]+)$/.exec(url);
       if (gm) {
         const g = gifts[gm[2]];
@@ -2304,7 +2305,7 @@ console.log('\nA recipe e-mailed by the server (v98), the owner warned when it r
     a = await mail({ idToken: t }, Object.assign({}, env, { RESEND_API_KEY: '' }));
     expect('v98: no key on the server: "not set up yet"', a.status === 503 && a.d.needsConfig === true, JSON.stringify(a));
     const h = await (await worker.fetch(post({ action: 'health' }), env)).json();
-    expect('v98: health says e-mail can be sent', h.mail === true && h.version === 'v100', JSON.stringify([h.mail, h.version]));
+    expect('v98: health says e-mail can be sent', h.mail === true && h.version === 'v101', JSON.stringify([h.mail, h.version]));
 
     // v99 — the owner hears of it (Tony: "make sure I get a warning if quota is exceeded or if any issues arise")
     let nt = notice('mail-down');
@@ -2393,6 +2394,39 @@ console.log('\nA recipe e-mailed by the server (v98), the owner warned when it r
     a = await gift({ gift: 'gGOODgoodGOODgood0001', site: 'https://rozinante2004-hash.github.io/tonys-recipes/' });
     expect('v99: the family app\'s address, with its path', a.status === 200 && sentMail[s0 + 1].b.text.indexOf('https://rozinante2004-hash.github.io/tonys-recipes/?recipe=gGOODgoodGOODgood0001#for=') > -1, JSON.stringify(a));
     expect('v99: these count in the same daily limits', db.raw.prepare('SELECT n FROM counters WHERE k = ?').get('mail:' + today).n === 2, '');
+
+    // v101 — Tony: "Can we use Resend instead of gmail?" — the owner's invitations to try the app, sent here: no Google windows
+    const OWN = 'owner@mail-test.example', envO = Object.assign({}, env, { OWNER_EMAIL: OWN });
+    const ownTok = (fb) => tok({ sub: 'uOwn', email: OWN, firebase: Object.assign({ sign_in_provider: 'google.com', sign_in_second_factor: 'totp' }, fb || {}) });
+    const invText = 'Hi!\nCome and try My Kitchen Notes: https://mykitchennotes.community/?ref=MKN-AAAA-1111.\n<b>Tony</b> & co';
+    const invite = async (body, e = envO) => { const r = await worker.fetch(post(Object.assign({ action: 'mail-recipe', to: 'New.Tester@Example.com',
+      invite: { subject: 'Join the beta', text: invText } }, body), 'https://mykitchennotes.community'), e); let d = null; try { d = await r.json(); } catch (x) {} return { status: r.status, d }; };
+    const i0 = sentMail.length;
+    a = await invite({ idToken: await ownTok() });
+    const im = sentMail[i0] && sentMail[i0].b, contact = ['contact', 'mykitchennotes.community'].join('@');
+    expect('v101: the owner\'s invitation goes out through the e-mail service, with no kitchen asked for', a.status === 200 && a.d.ok === true && sentMail.length === i0 + 1, JSON.stringify(a));
+    expect('v101: …to that one address, from the app\'s own address, replies to it too', im && im.to[0] === 'new.tester@example.com' && im.from === '"My Kitchen Notes" <' + contact + '>' && im.reply_to === contact && im.subject === 'Join the beta', JSON.stringify(im && [im.to, im.from, im.reply_to, im.subject]));
+    expect('v101: …laid out by the server: every word escaped, the link a link (its full stop left outside), the lines kept', im && /&lt;b&gt;Tony&lt;\/b&gt; &amp; co/.test(im.html) && im.html.indexOf('<b>Tony') === -1
+      && /<a href="https:\/\/mykitchennotes\.community\/\?ref=MKN-AAAA-1111"[^>]*>https:\/\/mykitchennotes\.community\/\?ref=MKN-AAAA-1111<\/a>\./.test(im.html) && /Hi!<br>Come/.test(im.html) && im.text === invText, im && im.html);
+    a = await invite({ idToken: await ownTok(), invite: { subject: 'x', text: 'y', html: '<a href="http://phish.example">click</a>' } });
+    expect('v101: HTML from the app is never used', a.status === 200 && sentMail[sentMail.length - 1].b.html.indexOf('phish.example') === -1, '');
+    a = await invite({ idToken: await ownTok(), invite: { subject: 'שלום', text: 'בואו', rtl: true } });
+    expect('v101: a Hebrew invitation right to left', a.status === 200 && /dir="rtl"/.test(sentMail[sentMail.length - 1].b.html), '');
+    a = await invite({ idToken: await tok({}) });
+    expect('v101: someone who is not the owner may not send invitations', a.status === 403 && /owner/.test(a.d.error), JSON.stringify(a));
+    a = await invite({ idToken: await ownTok({ sign_in_provider: 'password' }) });
+    expect('v101: the owner signed in with a password: refused, said why', a.status === 403 && a.d.needGoogle === true, JSON.stringify(a));
+    a = await invite({ idToken: await ownTok({ sign_in_second_factor: '' }) });
+    expect('v101: the owner with Google and no code, two-step not switched on: sent', a.status === 200, JSON.stringify(a));
+    a = await invite({ idToken: await ownTok(), invite: { subject: '', text: 'y' } });
+    expect('v101: no subject: refused', a.status === 400, JSON.stringify(a));
+    a = await invite({ idToken: await ownTok(), to: 'a@example.com, b@example.com' });
+    expect('v101: one address at a time', a.status === 400, JSON.stringify(a));
+    const inv = db.raw.prepare('SELECT n FROM counters WHERE k = ?').get('mail:' + today + ':uOwn:invite');
+    expect('v101: invitations have their own daily count', inv && inv.n === 4, JSON.stringify(inv));
+    db.raw.prepare('UPDATE counters SET n = 40 WHERE k = ?').run('mail:' + today + ':uOwn:invite');
+    a = await invite({ idToken: await ownTok() });
+    expect('v101: 40 invitations a day, then refused kindly', a.status === 429 && a.d.rateLimited === true && /40 invitations/.test(a.d.error), JSON.stringify(a));
   } finally { globalThis.fetch = realFetch; }
 }
 
