@@ -1446,6 +1446,14 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
     Pages for test), Self Tests on main (22:13). The published Hebrew keeps Tony's headings ("🏡 על מטבחים ואנשים",
     "🧹 סידורים") and "מהענן"; the sort words are the store's ("🆕 חדשים", "🔤 א–ת", "⏱ הכנה", "📊 רמה", "🔥 פופולרי",
     "📋 סדר שמור").
+  - **Released: v39.45 to the family's copy and the beta (6 Nov 2026, 00:53 Israel time, on fa48358; Tony: "Yes, release
+    v39.45 to family and beta when green").** Green first on test on the same commit: Cloudflare Pages for test (00:35),
+    Self Tests (00:52). Every job success: Cloudflare Pages for the beta (00:53); on main: Deploy to GitHub Pages and
+    pages build (00:53), Translate new phrases (00:55 — **the first clean-up: "entries holding an e-mail address, a
+    name or a date taken out — ar 8, de 8, es 8, fr 8, he 11, hu 4, it 7, ja 9, pt 4, ru 9, zh 8"**; the WhatsApp
+    line's 3 phrases translated), Publish languages (00:55 — 3065b02 on main; test fast-forwarded; its Deploy to
+    GitHub Pages, pages build and Cloudflare Pages for test 00:56), Self Tests on main (01:11). The published
+    Hebrew keeps Tony's headings.
   - **v39.46 + Worker v102 — 🌐 a search finds recipes in every language they are written in** (Tony, 6 Nov 2026, ~01:00
     Israel time: "When searching for an item in the main search box, it should search for translations of the same
     meaning in all the languages there are recipes in… if I search for \"Mushrooms\" … for \"פטריות\" as well… The list
