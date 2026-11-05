@@ -1,7 +1,7 @@
 {
  "lang": "pt",
- "updatedAt": 1793908658606,
- "count": 2513,
+ "updatedAt": 1793910856819,
+ "count": 2514,
  "strings": {
   "\"Add to Home Screen\"": "Adicionar à tela inicial",
   "\"Open Bring!\"": "Abrir Bring!",
@@ -1208,7 +1208,7 @@
   "The self-test suite is a separate ~590 KB download, kept out of the app so every device does not carry a developer tool. Fetch it and keep it available on this device?": "O conjunto de testes automáticos é uma descarga separada de ~590 KB, mantida fora da aplicação para que nem todos os dispositivos tenham de carregar uma ferramenta de programador. Transferir e manter disponível neste dispositivo?",
   "The shared translations did not accept them from this device.": "As traduções compartilhadas não as aceitaram a partir deste dispositivo.",
   "The test suite could not be downloaded. {1} It lives at self-tests.js next to the app. Everything else works without it.": "Não foi possível transferir o conjunto de testes. {1} Está em self-tests.js, ao lado da aplicação. Tudo o resto funciona sem ele.",
-  "The tester invitation, in English or Hebrew, with this copy's link — sent by the app's own e-mail, one to each person (Gmail as a backup), or by WhatsApp or the mail app (the app's owner only).": "O convite para testadores, em inglês ou hebraico, com o link desta cópia — enviado pelo e-mail da própria app, um para cada pessoa (Gmail como reserva), ou por WhatsApp ou pela app de e-mail (só o dono da app).",
+  "The tester invitation, in English or Hebrew, with this copy's link — sent by the app's own e-mail, one to each person (Gmail as a backup), or by WhatsApp or the mail app (the app's owner only).": "O convite de testador, em inglês ou hebraico, com o link desta cópia — enviado pelo e-mail do próprio app, um para cada pessoa (Gmail como backup), ou por WhatsApp ou pelo app de e-mail (apenas pelo dono do app).",
   "The tester invitation, in English or Hebrew, with this copy's link — sent through your Gmail, one e-mail to each person, or by WhatsApp or the mail app (the app's owner only).": "O convite para testadores, em inglês ou hebraico, com a hiperligação desta cópia — enviado através do teu Gmail, um e-mail para cada pessoa, ou pelo WhatsApp ou pela aplicação de correio (só o dono da aplicação).",
   "The text of what you asked about — a recipe to translate, a page to import, a question to the help assistant, the parts of your WhatsApp chats that answer a question you asked them. Not your photos — only a picture of a recipe you ask it to read.": "O texto sobre o que perguntaste — uma receita para traduzir, uma página para importar, uma pergunta ao assistente de ajuda, as partes das tuas conversas de WhatsApp que respondem a uma pergunta que lhes fizeste. Não as tuas fotos — só uma imagem de uma receita que pedes para ler.",
   "The things you always have in. One per line (or comma-separated). Matching is loose, so “olive oil” also covers “good olive oil”. Kept on this device only.": "As coisas que tens sempre em casa. Uma por linha (ou separadas por vírgulas). A correspondência é flexível, por isso “azeite” também cobre “azeite bom”. Guardado só neste dispositivo.",

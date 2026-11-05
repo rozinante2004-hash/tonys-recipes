@@ -1,7 +1,7 @@
 {
  "lang": "ru",
- "updatedAt": 1793908658606,
- "count": 3117,
+ "updatedAt": 1793910856819,
+ "count": 3118,
  "strings": {
   "\"Add to Home Screen\"": "Добавить на главный экран",
   "\"One item away\" filter ({1}f.{2})": "Фильтр «Не хватает одного» ({1}ф.{2})",
@@ -1592,6 +1592,7 @@
   "The suite is not inside index.html (v{1})": "Набор тестов не встроен в index.html (v{1})",
   "The sync log is off by default and bounded twice (v{1})": "Журнал синхронизации по умолчанию выключен и дважды ограничен (v{1})",
   "The test suite could not be downloaded. {1} It lives at self-tests.js next to the app. Everything else works without it.": "Не удалось загрузить набор тестов. {1} Он находится в self-tests.js рядом с приложением. Всё остальное работает и без него.",
+  "The tester invitation, in English or Hebrew, with this copy's link — sent by the app's own e-mail, one to each person (Gmail as a backup), or by WhatsApp or the mail app (the app's owner only).": "Приглашение тестировщику на английском или иврите со ссылкой на эту копию — отправляется собственной почтой приложения, каждому отдельно (Gmail как резервный вариант), либо через WhatsApp или почтовое приложение (только для владельца приложения).",
   "The tester invitation, in English or Hebrew, with this copy's link — sent through your Gmail, one e-mail to each person, or by WhatsApp or the mail app (the app's owner only).": "Приглашение тестировщику на английском или иврите со ссылкой на эту копию — отправляется через ваш Gmail, по одному письму каждому, либо через WhatsApp или почтовое приложение (только для владельца приложения).",
   "The text of what you asked about — a recipe to translate, a page to import, a question to the help assistant, the parts of your WhatsApp chats that answer a question you asked them. Not your photos — only a picture of a recipe you ask it to read.": "Текст того, о чём вы спросили — рецепт для перевода, страницу для импорта, вопрос помощнику, части ваших чатов WhatsApp, отвечающие на заданный вопрос. Не ваши фото — только снимок рецепта, который вы просите прочитать.",
   "The text of what you asked about — a recipe to translate, a page to import, a question to the help assistant. Not your photos.": "Текст того, о чём вы спрашивали, — рецепт для перевода, страница для импорта, вопрос помощнику. Не ваши фото.",
@@ -3119,7 +3120,6 @@
   "🪵 Keeping {1} day{2} of log": "🪵 Храним лог за последние {1} дн{2}",
   "🪵 Logging & debugging": "🪵 Логирование и отладка",
   "🪵 The log has something worth reporting": "🪵 В логе есть, что стоит сообщить",
-  "🫙 Low FODMAP": "🫙 Низкий FODMAP",
-  "The tester invitation, in English or Hebrew, with this copy's link — sent by the app's own e-mail, one to each person (Gmail as a backup), or by WhatsApp or the mail app (the app's owner only).": "Приглашение для тестировщиков, на английском или иврите, со ссылкой на эту копию — отправляется собственной почтой приложения, по одному письму каждому (Gmail — запасной вариант), или через WhatsApp или почтовое приложение (только для владельца приложения)."
+  "🫙 Low FODMAP": "🫙 Низкий FODMAP"
  }
 }

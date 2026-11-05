@@ -1,7 +1,7 @@
 {
  "lang": "ar",
- "updatedAt": 1793908658606,
- "count": 2788,
+ "updatedAt": 1793910856819,
+ "count": 2789,
  "strings": {
   "\"Add to Home Screen\"": "إضافة إلى الشاشة الرئيسية",
   "\"Open Bring!\"": "فتح Bring!",
@@ -1341,7 +1341,7 @@
   "The server test did not run: {1}": "لم يُشغَّل اختبار الخادم: {1}",
   "The shared translations did not accept them from this device.": "لم تقبل الترجمات المشتركة هذه التغييرات من هذا الجهاز.",
   "The test suite could not be downloaded. {1} It lives at self-tests.js next to the app. Everything else works without it.": "تعذّر تنزيل مجموعة الاختبارات. {1} يوجد الملف في self-tests.js بجانب التطبيق. كل شيء آخر يعمل بدونه.",
-  "The tester invitation, in English or Hebrew, with this copy's link — sent by the app's own e-mail, one to each person (Gmail as a backup), or by WhatsApp or the mail app (the app's owner only).": "دعوة المختبرين، بالإنجليزية أو العبرية، مع رابط هذه النسخة — تُرسل عبر البريد الإلكتروني الخاص بالتطبيق، رسالة لكل شخص (Gmail كاحتياط)، أو عبر WhatsApp أو تطبيق البريد (لمالك التطبيق فقط).",
+  "The tester invitation, in English or Hebrew, with this copy's link — sent by the app's own e-mail, one to each person (Gmail as a backup), or by WhatsApp or the mail app (the app's owner only).": "دعوة المُختبِر، بالإنجليزية أو العبرية، مع رابط هذه النسخة — تُرسَل عبر البريد الإلكتروني الخاص بالتطبيق، واحدة لكل شخص (وGmail كبديل احتياطي)، أو عبر WhatsApp أو تطبيق البريد (لمالك التطبيق فقط).",
   "The tester invitation, in English or Hebrew, with this copy's link — sent through your Gmail, one e-mail to each person, or by WhatsApp or the mail app (the app's owner only).": "دعوة المختبرين، بالإنجليزية أو العبرية، مع رابط هذه النسخة — تُرسل عبر Gmail الخاص بك، بريد إلكتروني لكل شخص، أو عبر WhatsApp أو تطبيق البريد (لمالك التطبيق فقط).",
   "The text of what you asked about — a recipe to translate, a page to import, a question to the help assistant, the parts of your WhatsApp chats that answer a question you asked them. Not your photos — only a picture of a recipe you ask it to read.": "نص ما سألت عنه — وصفة لترجمتها، صفحة لاستيرادها، سؤال لمساعد المساعدة، أجزاء من محادثات WhatsApp التي تجيب عن سؤال طرحته عليها. وليس صورك — فقط صورة وصفة تطلب منه قراءتها.",
   "The text of what you asked about — a recipe to translate, a page to import, a question to the help assistant. Not your photos.": "نص ما سألت عنه — وصفة للترجمة، صفحة للاستيراد، سؤال لمساعد المساعدة. وليس صورك.",

@@ -1,7 +1,7 @@
 {
  "lang": "fr",
- "updatedAt": 1793908658606,
- "count": 2786,
+ "updatedAt": 1793910856819,
+ "count": 2787,
  "strings": {
   "\"Add to Home Screen\"": "Ajouter à l'écran d'accueil",
   "\"Open Bring!\"": "Ouvrir Bring!",
@@ -1340,7 +1340,7 @@
   "The server test did not run: {1}": "Le test du serveur n'a pas pu s'exécuter : {1}",
   "The shared translations did not accept them from this device.": "Les traductions partagées ne les ont pas acceptées depuis cet appareil.",
   "The test suite could not be downloaded. {1} It lives at self-tests.js next to the app. Everything else works without it.": "Impossible de télécharger la suite de tests. {1} Elle se trouve dans self-tests.js, à côté de l'app. Tout le reste fonctionne sans elle.",
-  "The tester invitation, in English or Hebrew, with this copy's link — sent by the app's own e-mail, one to each person (Gmail as a backup), or by WhatsApp or the mail app (the app's owner only).": "L’invitation des testeurs, en anglais ou en hébreu, avec le lien de cette copie — envoyée par l’e-mail de l’app elle-même, un par personne (Gmail en secours), ou par WhatsApp ou l’app de messagerie (le propriétaire de l’app uniquement).",
+  "The tester invitation, in English or Hebrew, with this copy's link — sent by the app's own e-mail, one to each person (Gmail as a backup), or by WhatsApp or the mail app (the app's owner only).": "L'invitation testeur, en anglais ou en hébreu, avec le lien de cette copie — envoyée par l'e-mail de l'application elle-même, une à chaque personne (Gmail en secours), ou via WhatsApp ou l'application mail (réservé au propriétaire de l'application).",
   "The tester invitation, in English or Hebrew, with this copy's link — sent through your Gmail, one e-mail to each person, or by WhatsApp or the mail app (the app's owner only).": "L'invitation testeur, en anglais ou en hébreu, avec le lien de cette copie — envoyée depuis votre Gmail, un e-mail par personne, ou par WhatsApp ou l'app Mail (propriétaire de l'app uniquement).",
   "The text of what you asked about — a recipe to translate, a page to import, a question to the help assistant, the parts of your WhatsApp chats that answer a question you asked them. Not your photos — only a picture of a recipe you ask it to read.": "Le texte de ce que vous demandez — une recette à traduire, une page à importer, une question posée à l'assistant d'aide, les parties de vos discussions WhatsApp qui répondent à une question que vous leur avez posée. Pas vos photos — seulement une image de recette que vous lui demandez de lire.",
   "The text of what you asked about — a recipe to translate, a page to import, a question to the help assistant. Not your photos.": "Le texte de ce que vous avez demandé — une recette à traduire, une page à importer, une question à l'assistant d'aide. Pas vos photos.",

@@ -1,7 +1,7 @@
 {
  "lang": "de",
- "updatedAt": 1793908658606,
- "count": 2784,
+ "updatedAt": 1793910856819,
+ "count": 2785,
  "strings": {
   "\"Add to Home Screen\"": "Zum Home-Bildschirm hinzufügen",
   "\"Open Bring!\"": "Bring! öffnen",
@@ -1340,7 +1340,7 @@
   "The server test did not run: {1}": "Der Servertest wurde nicht ausgeführt: {1}",
   "The shared translations did not accept them from this device.": "Die geteilten Übersetzungen haben sie von diesem Gerät nicht angenommen.",
   "The test suite could not be downloaded. {1} It lives at self-tests.js next to the app. Everything else works without it.": "Die Testsuite konnte nicht geladen werden. {1} Sie liegt als self-tests.js neben der App. Alles andere funktioniert auch ohne sie.",
-  "The tester invitation, in English or Hebrew, with this copy's link — sent by the app's own e-mail, one to each person (Gmail as a backup), or by WhatsApp or the mail app (the app's owner only).": "Die Tester-Einladung, auf Englisch oder Hebräisch, mit dem Link dieser Kopie – verschickt über die eigene E-Mail der App, eine an jede Person (Gmail als Reserve), oder per WhatsApp oder Mail-App (nur für den Besitzer der App).",
+  "The tester invitation, in English or Hebrew, with this copy's link — sent by the app's own e-mail, one to each person (Gmail as a backup), or by WhatsApp or the mail app (the app's owner only).": "Die Tester-Einladung, auf Englisch oder Hebräisch, mit dem Link dieser Kopie – verschickt per E-Mail der App selbst, einzeln an jede Person (Gmail als Backup), oder per WhatsApp oder Mail-App (nur für den App-Besitzer).",
   "The tester invitation, in English or Hebrew, with this copy's link — sent through your Gmail, one e-mail to each person, or by WhatsApp or the mail app (the app's owner only).": "Die Tester-Einladung, auf Englisch oder Hebräisch, mit dem Link dieser Kopie – versendet über dein Gmail, eine E-Mail pro Person, oder per WhatsApp oder die Mail-App (nur für den Besitzer der App).",
   "The text of what you asked about — a recipe to translate, a page to import, a question to the help assistant, the parts of your WhatsApp chats that answer a question you asked them. Not your photos — only a picture of a recipe you ask it to read.": "Der Text deiner Anfrage — ein Rezept zum Übersetzen, eine Seite zum Importieren, eine Frage an den Hilfe-Assistenten, die Teile deiner WhatsApp-Chats, die eine gestellte Frage beantworten. Nicht deine Fotos — nur ein Bild eines Rezepts, das du zum Lesen vorlegst.",
   "The text of what you asked about — a recipe to translate, a page to import, a question to the help assistant. Not your photos.": "Der Text dessen, wonach du gefragt hast — ein Rezept zum Übersetzen, eine Seite zum Importieren, eine Frage an den Hilfe-Assistenten. Nicht deine Fotos.",

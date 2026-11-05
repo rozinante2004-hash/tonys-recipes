@@ -1,7 +1,7 @@
 {
  "lang": "zh",
- "updatedAt": 1793908658606,
- "count": 2815,
+ "updatedAt": 1793910856819,
+ "count": 2816,
  "strings": {
   "\"Add to Home Screen\"": "添加到主屏幕",
   "\"Open Bring!\"": "打开 Bring!",
@@ -1346,7 +1346,7 @@
   "The server test did not run: {1}": "服务器测试未运行：{1}",
   "The shared translations did not accept them from this device.": "共享翻译未接受此设备的更改。",
   "The test suite could not be downloaded. {1} It lives at self-tests.js next to the app. Everything else works without it.": "测试套件下载失败。{1}它位于应用旁的 self-tests.js,没有它其他功能照常运行。",
-  "The tester invitation, in English or Hebrew, with this copy's link — sent by the app's own e-mail, one to each person (Gmail as a backup), or by WhatsApp or the mail app (the app's owner only).": "测试者邀请，英文或希伯来文，附此副本的链接 —— 通过应用自己的电子邮件发送，每人一封（Gmail 作为备用），或通过 WhatsApp 或邮件应用发送（仅限应用所有者）。",
+  "The tester invitation, in English or Hebrew, with this copy's link — sent by the app's own e-mail, one to each person (Gmail as a backup), or by WhatsApp or the mail app (the app's owner only).": "测试者邀请（英文或希伯来文），附带此副本的链接——通过应用自带的邮件发送，每人一份（Gmail 作为备用），或通过 WhatsApp 或邮件应用发送（仅限应用所有者）。",
   "The tester invitation, in English or Hebrew, with this copy's link — sent through your Gmail, one e-mail to each person, or by WhatsApp or the mail app (the app's owner only).": "测试人员邀请（英文或希伯来文），附带此副本的链接——通过你的Gmail发送，每人一封邮件，或通过WhatsApp或邮件应用发送（仅限应用所有者）。",
   "The text of what you asked about — a recipe to translate, a page to import, a question to the help assistant, the parts of your WhatsApp chats that answer a question you asked them. Not your photos — only a picture of a recipe you ask it to read.": "你所询问内容的文字 —— 要翻译的食谱、要导入的网页、问助手的问题，还有你 WhatsApp 聊天记录中回答你问题的部分。不包括你的照片 —— 只有你让它读取的食谱图片。",
   "The text of what you asked about — a recipe to translate, a page to import, a question to the help assistant. Not your photos.": "你询问内容的文本——要翻译的菜谱、要导入的网页、问助手的问题。不包括你的照片。",

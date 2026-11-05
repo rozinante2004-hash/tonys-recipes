@@ -1,7 +1,7 @@
 {
  "lang": "ja",
- "updatedAt": 1793908658606,
- "count": 3128,
+ "updatedAt": 1793910856819,
+ "count": 3129,
  "strings": {
   "\"Add to Home Screen\"": "ホーム画面に追加",
   "\"One item away\" filter ({1}f.{2})": "「あと1品」フィルター（{1}f.{2}）",
@@ -1595,6 +1595,7 @@
   "The suite is not inside index.html (v{1})": "このテストスイートはindex.htmlには含まれていません (v{1})",
   "The sync log is off by default and bounded twice (v{1})": "同期ログは初期状態でオフで、上限も二重に設けられています (v{1})",
   "The test suite could not be downloaded. {1} It lives at self-tests.js next to the app. Everything else works without it.": "テストスイートをダウンロードできませんでした。{1} self-tests.jsはアプリの隣に置かれています。それ以外の機能はこれがなくても動作します。",
+  "The tester invitation, in English or Hebrew, with this copy's link — sent by the app's own e-mail, one to each person (Gmail as a backup), or by WhatsApp or the mail app (the app's owner only).": "テスター招待状（英語またはヘブライ語、このリンク付き）。アプリ専用のメールで一人ずつ送信（バックアップとしてGmailも使用）、またはWhatsAppやメールアプリで送信（オーナーのみ可）。",
   "The tester invitation, in English or Hebrew, with this copy's link — sent through your Gmail, one e-mail to each person, or by WhatsApp or the mail app (the app's owner only).": "テスター招待(英語かヘブライ語、このコピーのリンク入り)を、あなたのGmailから一人ずつメールで、またはWhatsAppやメールアプリで送信します(アプリのオーナーのみ)。",
   "The text of what you asked about — a recipe to translate, a page to import, a question to the help assistant, the parts of your WhatsApp chats that answer a question you asked them. Not your photos — only a picture of a recipe you ask it to read.": "質問内容のテキストだけです。翻訳したいレシピ、インポートしたいページ、ヘルプへの質問、質問に答えるためのWhatsAppチャットの該当部分などです。写真は送りません — レシピを読み取ってほしいと頼んだ画像だけが例外です。",
   "The text of what you asked about — a recipe to translate, a page to import, a question to the help assistant. Not your photos.": "質問した内容のテキストです — 翻訳するレシピ、インポートするページ、ヘルプアシスタントへの質問など。写真は含まれません。",
@@ -3130,7 +3131,6 @@
   "🪵 Keeping {1} day{2} of log": "🪵 ログを{1}日{2}分保持",
   "🪵 Logging & debugging": "🪵 ログとデバッグ",
   "🪵 The log has something worth reporting": "🪵 ログに報告すべき内容があります",
-  "🫙 Low FODMAP": "🫙 低FODMAP",
-  "The tester invitation, in English or Hebrew, with this copy's link — sent by the app's own e-mail, one to each person (Gmail as a backup), or by WhatsApp or the mail app (the app's owner only).": "テスターへの招待状（英語またはヘブライ語、このコピーのリンク付き）— アプリ自身のメールで一人ずつ送信（予備として Gmail）、または WhatsApp やメールアプリで送信（アプリの所有者のみ）。"
+  "🫙 Low FODMAP": "🫙 低FODMAP"
  }
 }

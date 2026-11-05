@@ -1,7 +1,7 @@
 {
  "lang": "he",
- "updatedAt": 1793908658606,
- "count": 3329,
+ "updatedAt": 1793910856819,
+ "count": 3330,
  "strings": {
   "\"Add to Home Screen\"": "הוספה למסך הבית",
   "\"One item away\" filter ({1}f.{2})": "פילטר \"פריט אחד חסר\" ({1}f.{2})",
@@ -1669,6 +1669,7 @@
   "The suite is not inside index.html (v{1})": "החבילה לא נמצאת בתוך index.html (v{1})",
   "The sync log is off by default and bounded twice (v{1})": "יומן הסנכרון כבוי כברירת מחדל ומוגבל פעמיים (v{1})",
   "The test suite could not be downloaded. {1} It lives at self-tests.js next to the app. Everything else works without it.": "לא הצלחנו להוריד את חבילת הבדיקות. {1} היא נמצאת בקובץ self-tests.js לצד האפליקציה. כל השאר עובד בלעדיה.",
+  "The tester invitation, in English or Hebrew, with this copy's link — sent by the app's own e-mail, one to each person (Gmail as a backup), or by WhatsApp or the mail app (the app's owner only).": "הזמנת הבודקים, באנגלית או בעברית, עם הקישור של העותק הזה — נשלחת במייל של האפליקציה עצמה, אחד לכל אדם (Gmail כגיבוי), או דרך WhatsApp או אפליקציית המייל (רק לבעל האפליקציה).",
   "The tester invitation, in English or Hebrew, with this copy's link — sent through your Gmail, one e-mail to each person, or by WhatsApp or the mail app (the app's owner only).": "הזמנת הבודקים, באנגלית או בעברית, עם הקישור של העותק הזה - נשלחת דרך ה-Gmail שלך, מייל אחד לכל אדם, או דרך WhatsApp או אפליקציית המייל (רק הבעלים של האפליקציה).",
   "The text of what you asked about — a recipe to translate, a page to import, a question to the help assistant, the parts of your WhatsApp chats that answer a question you asked them. Not your photos — only a picture of a recipe you ask it to read.": "הטקסט של מה ששאלתם עליו — מתכון לתרגום, דף לייבוא, שאלה לעוזר העזרה, החלקים בשיחות ה-WhatsApp שלכם שעונים על שאלה ששאלתם. לא התמונות שלכם — רק תמונה של מתכון שתבקשו ממנו לקרוא.",
   "The text of what you asked about — a recipe to translate, a page to import, a question to the help assistant. Not your photos.": "הטקסט של מה ששאלת עליו — מתכון לתרגום, דף לייבוא, שאלה לעוזר העזרה. לא התמונות שלך.",
@@ -3331,7 +3332,6 @@
   "🪵 Keeping {1} day{2} of log": "🪵 שומר {1} יום{2} של יומן",
   "🪵 Logging & debugging": "🪵 רישום ואיתור תקלות",
   "🪵 The log has something worth reporting": "🪵 יש ביומן משהו שכדאי לבדוק",
-  "🫙 Low FODMAP": "🫙 דל FODMAP",
-  "The tester invitation, in English or Hebrew, with this copy's link — sent by the app's own e-mail, one to each person (Gmail as a backup), or by WhatsApp or the mail app (the app's owner only).": "הזמנת הבודקים, באנגלית או בעברית, עם הקישור של העותק הזה — נשלחת בדוא״ל של האפליקציה עצמה, אחד לכל אדם (Gmail כגיבוי), או ב-WhatsApp או באפליקציית הדואר (לבעלים של האפליקציה בלבד)."
+  "🫙 Low FODMAP": "🫙 דל FODMAP"
  }
 }
