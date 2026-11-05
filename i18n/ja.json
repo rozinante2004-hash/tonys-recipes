@@ -1,7 +1,7 @@
 {
  "lang": "ja",
- "updatedAt": 1793915005409,
- "count": 3130,
+ "updatedAt": 1793919291923,
+ "count": 3124,
  "strings": {
   "\"Add to Home Screen\"": "ホーム画面に追加",
   "\"One item away\" filter ({1}f.{2})": "「あと1品」フィルター（{1}f.{2}）",
@@ -2197,8 +2197,6 @@
   "{1} → {2} ready": "{1} → {2} 完了",
   "{1} ▾{2}🗂 Show ({3}) ▾{4}🗂 Show ▾": "{1} ▾{2}🗂 表示 ({3}) ▾{4}🗂 表示 ▾",
   "{1}\"{2}\"{3}this recipe": "{1}「{2}」{3}このレシピ",
-  "{1}, {2} AM": "{1} 午前{2}",
-  "{1}, {2} PM": "{1} 午後{2}",
   "{1}Add them{2}Create it": "{1}追加する{2}作成する",
   "{1}All Recipes": "{1}すべてのレシピ",
   "{1}Allow link requests through the app?{2}Block link requests through the app?": "{1}アプリ経由の連携リクエストを許可しますか？{2}アプリ経由の連携リクエストをブロックしますか？",
@@ -2282,7 +2280,6 @@
   "°C — Celsius": "°C — 摂氏",
   "°F — Fahrenheit": "°F — 華氏",
   "· last {1}": "・前回{1}",
-  "· {2}, {3} AM": "・{2} 午前{3}",
   "··· More": "···その他",
   "אורלי פלאי ברונשטיין · serves {1} · {2} דקות": "אורלי פלאי ברונשטיין · {1}人分 · {2} דקות",
   "אפרת סיאצ'י · serves {1}-{2}": "אפרת סיאצ'י · {1}-{2}人分",
@@ -2383,6 +2380,7 @@
   "☁️ Sync": "☁️ 同期",
   "☁️ Sync did not finish — saved on this device": "☁️ 同期未完了 — この端末に保存済み",
   "☁️ Syncing…": "☁️ 同期中…",
+  "☁️ folder · {1} messages · {2} →": "☁️ フォルダ · {1}件のメッセージ · {2} →",
   "☁️ {1} is now in the cloud": "☁️ {1}をクラウドに保存しました",
   "☁️ {1} synced to the cloud — they will appear on your other devices": "☁️ {1}をクラウドに同期しました — 他の端末にも表示されます",
   "☐ Deselect all": "☐ すべて選択解除",
@@ -2892,7 +2890,7 @@
   "📱 To install on iPhone:": "📱 iPhoneにインストールするには:",
   "📱 WhatsApp": "📱 WhatsApp",
   "📱 Your account": "📱 アカウント",
-  "📱 this device Aug {1}, {2}, {3} PM · {4} messages · {5} → {6}": "📱 この端末 8月{1}日 {2}時{3}分 · メッセージ{4}件 · {5} → {6}",
+  "📱 this device {1} · {2} messages · {3} →": "📱 この端末 {1} · {2}件のメッセージ · {3} →",
   "📲 Open in Bring!": "📲 Bring!で開く",
   "📲 Opening Bring! — choose the list there": "📲 Bring!を開いています — リストを選んでください",
   "📲 Phone alerts": "📲 スマホ通知",
@@ -2945,11 +2943,7 @@
   "🔄 Synced chats — start here": "🔄 同期済みチャット — ここから開始",
   "🔄 Update all supported languages": "🔄 対応言語をすべて更新",
   "🔄 Update now": "🔄 今すぐ更新",
-  "🔄 synced Aug {1}, {2}, {3} PM · {4} messages · {5} → {6}": "🔄 8月{1}日 {2}:{3} PM に同期 · {4}件のメッセージ · {5} → {6}",
-  "🔄 synced Nov {1}, {2}, {3} PM · {4} messages · {5} → {6}": "🔄 {2}年11月{1}日 {3} PM に同期済み · {4}件のメッセージ · {5} → {6}",
-  "🔄 synced Oct {1}, {2}, {3} PM · {4} messages · ? → ?": "🔄 10月{1}日 {2} {3} PMに同期済み · メッセージ{4}件 · ? → ?",
-  "🔄 synced Sep {1}, {2}, {3} PM · {4} messages · ? → ?": "🔄 9月{1}日 {2}:{3} PM に同期 · {4}件のメッセージ · ? → ?",
-  "🔄 synced {1} Aug {2}, {3} · {4} messages · {5} → {6}": "🔄 {1}年8月{2}日 {3}に同期済み · メッセージ{4}件 · {5} → {6}",
+  "🔄 synced {1} · {2} messages · {3} →": "🔄 同期済み {1} · {2}件のメッセージ · {3} →",
   "🔇 Mute — no sound when something arrives": "🔇 ミュート—届いても音を鳴らさない",
   "🔍 Auto-detect": "🔍 自動検出",
   "🔍 Details": "🔍 詳細",
@@ -3132,9 +3126,6 @@
   "🪵 Keeping {1} day{2} of log": "🪵 ログを{1}日{2}分保持",
   "🪵 Logging & debugging": "🪵 ログとデバッグ",
   "🪵 The log has something worth reporting": "🪵 ログに報告すべき内容があります",
-  "🫙 Low FODMAP": "🫙 低FODMAP",
-  "🔄 synced {1} · {2} messages · {3} →": "🔄 同期済み {1} · {2} 件のメッセージ · {3} →",
-  "📱 this device {1} · {2} messages · {3} →": "📱 この端末 {1} · {2} 件のメッセージ · {3} →",
-  "☁️ folder · {1} messages · {2} →": "☁️ フォルダー · {1} 件のメッセージ · {2} →"
+  "🫙 Low FODMAP": "🫙 低FODMAP"
  }
 }

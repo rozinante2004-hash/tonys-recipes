@@ -1,7 +1,7 @@
 {
  "lang": "pt",
- "updatedAt": 1793915005866,
- "count": 2516,
+ "updatedAt": 1793919291923,
+ "count": 2515,
  "strings": {
   "\"Add to Home Screen\"": "Adicionar à tela inicial",
   "\"Open Bring!\"": "Abrir Bring!",
@@ -1688,8 +1688,6 @@
   "{1} → {2} ready": "{1} → {2} pronto",
   "{1} ▾{2}🗂 Show ({3}) ▾{4}🗂 Show ▾": "{1} ▾{2}🗂 Mostrar ({3}) ▾{4}🗂 Mostrar ▾",
   "{1}\"{2}\"{3}this recipe": "{1}\"{2}\"{3}esta receita",
-  "{1}, {2} AM": "{1}, {2} AM",
-  "{1}, {2} PM": "{1}, {2} PM",
   "{1}Add them{2}Create it": "{1}Adicionar{2}Criar",
   "{1}All Recipes": "{1}Todas as Receitas",
   "{1}Allow link requests through the app?{2}Block link requests through the app?": "{1}Permitir pedidos de link pelo app?{2}Bloquear pedidos de link pelo app?",
@@ -2352,8 +2350,6 @@
   "🔄 Synced chats — start here": "🔄 Conversas sincronizadas — comece aqui",
   "🔄 Update all supported languages": "🔄 Atualizar todos os idiomas compatíveis",
   "🔄 Update now": "🔄 Atualizar agora",
-  "🔄 synced Aug {1}, {2}, {3} PM · {4} messages · {5} → {6}": "🔄 sincronizado em {1} de ago., {2}, {3} PM · {4} mensagens · {5} → {6}",
-  "🔄 synced Nov {1}, {2}, {3} PM · {4} messages · {5} → {6}": "🔄 sincronizado em {1} de nov, {2}, {3} PM · {4} mensagens · {5} → {6}",
   "🔄 synced {1} · {2} messages · {3} →": "🔄 sincronizado {1} · {2} mensagens · {3} →",
   "🔇 Mute — no sound when something arrives": "🔇 Silenciar — sem som quando algo chegar",
   "🔍 Auto-detect": "🔍 Detectar automaticamente",
