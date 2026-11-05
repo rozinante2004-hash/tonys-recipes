@@ -1,7 +1,7 @@
 {
  "lang": "he",
- "updatedAt": 1793919291923,
- "count": 3326,
+ "updatedAt": 1793921512805,
+ "count": 3330,
  "strings": {
   "\"Add to Home Screen\"": "הוספה למסך הבית",
   "\"One item away\" filter ({1}f.{2})": "פילטר \"פריט אחד חסר\" ({1}f.{2})",
@@ -1620,6 +1620,7 @@
   "The highest rank there is.": "הדרגה הגבוהה ביותר שיש.",
   "The households linked with yours, and those you asked or that asked you. Only your household’s name is shown — never anyone’s e-mail or phone.": "משקי הבית המקושרים אליכם, ואלה שביקשתם מהם או שביקשו מכם. מוצג רק שם משק הבית — לעולם לא מייל או טלפון של אף אחד.",
   "The keyboard focus ring actually paints ({1}c.{2})": "טבעת המיקוד של המקלדת אכן מוצגת ({1}c.{2})",
+  "The kitchen dictionary (the app’s own server)": "מילון המטבח (השרת של האפליקציה עצמה)",
   "The languages were not published": "השפות לא פורסמו",
   "The languages will be published": "השפות יפורסמו",
   "The link": "הקישור",
@@ -1681,6 +1682,7 @@
   "The version badge states what is RUNNING (v{1})": "תג הגרסה מציין מה פועל כרגע (v{1})",
   "The video’s address, or the video you chose. Google may use what it is sent under its own terms.": "כתובת הסרטון, או הסרטון שבחרתם. Google רשאית להשתמש במה שנשלח אליה בהתאם לתנאים שלה.",
   "The visibilitychange listener that re-runs loadFromFirestore() when the app returns to the foreground is missing. Without it, a remote change (e.g. a photo added on another device) only applies if the transient \"New changes available\" banner is seen within {1}s, or after a full reload.": "חסר מאזין visibilitychange שמריץ מחדש את loadFromFirestore() כשהאפליקציה חוזרת לחזית. בלעדיו, שינוי מרוחק (למשל תמונה שנוספה במכשיר אחר) חל רק אם באנר \"יש עדכונים חדשים\" הזמני נצפה תוך {1} שניות, או לאחר רענון מלא.",
+  "The word you searched for and the languages your recipes are in, to find how they write it. Each word and its translations are kept for everyone, without who searched; a word new to the dictionary goes to the AI (Anthropic) once.": "המילה שחיפשת והשפות שבהן כתובים המתכונים שלך, כדי למצוא איך כותבים אותה. כל מילה והתרגומים שלה נשמרים לכולם, בלי לציין מי חיפש; מילה חדשה במילון נשלחת ל-AI (Anthropic) פעם אחת.",
   "The {1} event(s) recorded all came from the Self Test suite, which fails on purpose to prove the app notices. None of them say anything about how the app is behaving for you.": "כל {1} האירועים שנרשמו הגיעו מחבילת בדיקת העצמי, שנכשלת בכוונה כדי להוכיח שהאפליקציה שמה לב. אף אחד מהם לא אומר משהו על איך האפליקציה מתנהגת אצלך.",
   "Their e-mail address": "כתובת האימייל שלהם",
   "Their request is refused and nothing more from them reaches you. They are not told: on their side it stays “waiting”. You can unblock them here at any time.": "הבקשה שלהם תידחה ושום דבר נוסף מהם לא יגיע אליכם. הם לא יקבלו על כך הודעה: אצלם זה יישאר \"ממתין\". אפשר לבטל את החסימה כאן בכל עת.",
@@ -2178,6 +2180,7 @@
   "only if you have connected them, and only when you send something": "רק אם חיברת אותם, ורק כשאתה שולח משהו",
   "only when a page cannot be fetched any other way": "רק כשלא ניתן לטעון דף בשום דרך אחרת",
   "only when you import a recipe from a video": "רק כשמייבאים מתכון מסרטון",
+  "only when you search and your recipes are in more than one language": "רק כשאתה מחפש והמתכונים שלך בכמה שפות",
   "only when you search for a photo": "רק כשאתה מחפש תמונה",
   "only when you send something there": "רק כשאתה שולח משהו לשם",
   "only when you sign in": "רק כשמתחברים",
@@ -2826,6 +2829,7 @@
   "🌍 {1} is ready on this device. It could not be shared with the family — that needs write access.": "🌍 {1} מוכן במכשיר הזה. לא ניתן היה לשתף עם המשפחה — לכך נדרשת הרשאת כתיבה.",
   "🌍 {1} is ready on this device. Sign in to share it with everyone.": "🌍 {1} מוכן במכשיר הזה. יש להתחבר כדי לשתף עם כולם.",
   "🌍 {1} is ready, and shared with everyone{2}": "🌍 {1} מוכן, ומשותף עם כולם{2}",
+  "🌐 Also searching:": "🌐 מחפש גם:",
   "🌐 Domain": "🌐 דומיין",
   "🌐 Finding the English term…": "🌐 מחפש את המונח באנגלית…",
   "🌐 Live App": "🌐 אפליקציה חיה",
@@ -3328,10 +3332,6 @@
   "🪵 Keeping {1} day{2} of log": "🪵 שומר {1} יום{2} של יומן",
   "🪵 Logging & debugging": "🪵 רישום ואיתור תקלות",
   "🪵 The log has something worth reporting": "🪵 יש ביומן משהו שכדאי לבדוק",
-  "🫙 Low FODMAP": "🫙 דל FODMAP",
-  "🌐 Also searching:": "🌐 מחפש גם:",
-  "The kitchen dictionary (the app’s own server)": "מילון המטבח (השרת של האפליקציה)",
-  "only when you search and your recipes are in more than one language": "רק כשאתם מחפשים והמתכונים שלכם כתובים ביותר משפה אחת",
-  "The word you searched for and the languages your recipes are in, to find how they write it. Each word and its translations are kept for everyone, without who searched; a word new to the dictionary goes to the AI (Anthropic) once.": "המילה שחיפשתם והשפות שבהן כתובים המתכונים שלכם, כדי למצוא איך הם כותבים אותה. כל מילה ותרגומיה נשמרים לכולם, בלי מי שחיפש; מילה חדשה במילון נשלחת לבינה המלאכותית (Anthropic) פעם אחת."
+  "🫙 Low FODMAP": "🫙 דל FODMAP"
  }
 }

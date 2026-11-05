@@ -1,7 +1,7 @@
 {
  "lang": "ja",
- "updatedAt": 1793919291923,
- "count": 3124,
+ "updatedAt": 1793921512805,
+ "count": 3128,
  "strings": {
   "\"Add to Home Screen\"": "ホーム画面に追加",
   "\"One item away\" filter ({1}f.{2})": "「あと1品」フィルター（{1}f.{2}）",
@@ -1547,6 +1547,7 @@
   "The highest rank there is.": "最高ランクです。",
   "The households linked with yours, and those you asked or that asked you. Only your household’s name is shown — never anyone’s e-mail or phone.": "つながっている家族と、招待のやり取りをした相手。表示されるのは家族の名前だけで、メールや電話番号は表示されません。",
   "The keyboard focus ring actually paints ({1}c.{2})": "キーボードのフォーカスリングが実際に描画される（{1}c.{2}）",
+  "The kitchen dictionary (the app’s own server)": "キッチン辞書（アプリ専用サーバー）",
   "The languages were not published": "言語が公開されませんでした",
   "The languages will be published": "言語が公開されます",
   "The link": "リンク",
@@ -1607,6 +1608,7 @@
   "The update banner only fires for a NEWER version": "更新バナーは新しいバージョンがある場合にだけ表示されます",
   "The version badge states what is RUNNING (v{1})": "バージョンバッジは現在動作しているバージョンを示します (v{1})",
   "The video’s address, or the video you chose. Google may use what it is sent under its own terms.": "動画のアドレス、または選んだ動画です。Googleは送られた内容を自社の規約に基づいて利用することがあります。",
+  "The word you searched for and the languages your recipes are in, to find how they write it. Each word and its translations are kept for everyone, without who searched; a word new to the dictionary goes to the AI (Anthropic) once.": "検索したことばと、レシピに使われている言語をもとに、その書き方を調べます。ことばと訳は誰が検索したかに関係なく共有され、辞書にないことばは一度だけAI（Anthropic）に問い合わせます。",
   "The {1} event(s) recorded all came from the Self Test suite, which fails on purpose to prove the app notices. None of them say anything about how the app is behaving for you.": "記録された{1}件のイベントはすべて、アプリが検知することを確認するためにわざと失敗するセルフテストスイートによるものです。あなたに対するアプリの動作については何も示していません。",
   "Their e-mail address": "相手のメールアドレス",
   "Their request is refused and nothing more from them reaches you. They are not told: on their side it stays “waiting”. You can unblock them here at any time.": "相手のリクエストは拒否され、以後連絡は届きません。相手には通知されず、向こうでは「保留中」のままになります。ここでいつでもブロックを解除できます。",
@@ -2050,6 +2052,7 @@
   "only if you have connected them, and only when you send something": "接続済みで、何かを送るときのみ",
   "only when a page cannot be fetched any other way": "ページを他の方法で取得できないときのみ",
   "only when you import a recipe from a video": "動画からレシピをインポートするときのみ",
+  "only when you search and your recipes are in more than one language": "検索時、レシピが複数の言語にまたがる場合のみ",
   "only when you search for a photo": "写真を検索するときのみ",
   "only when you send something there": "そこへ何かを送信するときのみ",
   "only when you sign in": "サインインするときのみ",
@@ -2627,6 +2630,7 @@
   "🌍 {1} is ready on this device. It could not be shared with the family — that needs write access.": "🌍 {1}はこの端末で準備できました。家族と共有できませんでした — 書き込み権限が必要です。",
   "🌍 {1} is ready on this device. Sign in to share it with everyone.": "🌍 {1}はこの端末で準備できました。みんなと共有するにはサインインしてください。",
   "🌍 {1} is ready, and shared with everyone{2}": "🌍 {1}の準備ができ、みんなと共有されました{2}",
+  "🌐 Also searching:": "🌐 こちらも検索中：",
   "🌐 Domain": "🌐 ドメイン",
   "🌐 Finding the English term…": "🌐 英語の用語を探しています…",
   "🌐 Live App": "🌐 ライブアプリ",
@@ -3126,10 +3130,6 @@
   "🪵 Keeping {1} day{2} of log": "🪵 ログを{1}日{2}分保持",
   "🪵 Logging & debugging": "🪵 ログとデバッグ",
   "🪵 The log has something worth reporting": "🪵 ログに報告すべき内容があります",
-  "🫙 Low FODMAP": "🫙 低FODMAP",
-  "🌐 Also searching:": "🌐 次も検索中：",
-  "The kitchen dictionary (the app’s own server)": "キッチン辞書（アプリ自身のサーバー）",
-  "only when you search and your recipes are in more than one language": "検索したときで、レシピが複数の言語で書かれている場合のみ",
-  "The word you searched for and the languages your recipes are in, to find how they write it. Each word and its translations are kept for everyone, without who searched; a word new to the dictionary goes to the AI (Anthropic) once.": "検索した言葉とレシピの言語。それらの言語での書き方を調べるためです。言葉とその訳は誰が検索したかを記録せずに全員のために保存され、辞書にない新しい言葉は一度だけ AI（Anthropic）に送られます。"
+  "🫙 Low FODMAP": "🫙 低FODMAP"
  }
 }

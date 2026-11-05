@@ -1,7 +1,7 @@
 {
  "lang": "ru",
- "updatedAt": 1793919291923,
- "count": 3113,
+ "updatedAt": 1793921512805,
+ "count": 3117,
  "strings": {
   "\"Add to Home Screen\"": "Добавить на главный экран",
   "\"One item away\" filter ({1}f.{2})": "Фильтр «Не хватает одного» ({1}ф.{2})",
@@ -1544,6 +1544,7 @@
   "The highest rank there is.": "Высший ранг.",
   "The households linked with yours, and those you asked or that asked you. Only your household’s name is shown — never anyone’s e-mail or phone.": "Семьи, связанные с вашей, а также те, кому вы отправили запрос или кто отправил его вам. Видно только название семьи — никогда не e-mail и не телефон.",
   "The keyboard focus ring actually paints ({1}c.{2})": "Индикатор фокуса клавиатуры действительно отображается ({1}c.{2})",
+  "The kitchen dictionary (the app’s own server)": "Кухонный словарь (собственный сервер приложения)",
   "The languages were not published": "Языки не были опубликованы",
   "The languages will be published": "Языки будут опубликованы",
   "The link": "Ссылка",
@@ -1603,6 +1604,7 @@
   "The update banner only fires for a NEWER version": "Баннер обновления появляется только для БОЛЕЕ НОВОЙ версии",
   "The version badge states what is RUNNING (v{1})": "Значок версии показывает, какая версия ЗАПУЩЕНА (v{1})",
   "The video’s address, or the video you chose. Google may use what it is sent under its own terms.": "Адрес видео или выбранное вами видео. Google может использовать полученное на своих условиях.",
+  "The word you searched for and the languages your recipes are in, to find how they write it. Each word and its translations are kept for everyone, without who searched; a word new to the dictionary goes to the AI (Anthropic) once.": "Слово, которое вы искали, и языки ваших рецептов — чтобы узнать, как оно пишется на них. Каждое слово и его переводы сохраняются для всех, без указания, кто искал; новое для словаря слово один раз отправляется в ИИ (Anthropic).",
   "The {1} event(s) recorded all came from the Self Test suite, which fails on purpose to prove the app notices. None of them say anything about how the app is behaving for you.": "Все {1} событий записаны из набора самопроверки, который специально ломается, чтобы показать, что приложение это замечает. Они никак не говорят о том, как приложение ведёт себя у вас.",
   "Their e-mail address": "Их адрес электронной почты",
   "Their request is refused and nothing more from them reaches you. They are not told: on their side it stays “waiting”. You can unblock them here at any time.": "Их запрос отклонён, и больше ничего от них к вам не попадёт. Им ничего не сообщат: на их стороне всё останется «в ожидании». Разблокировать их можно здесь в любой момент.",
@@ -2044,6 +2046,7 @@
   "only if you have connected them, and only when you send something": "только если вы их подключили, и только когда что-то отправляете",
   "only when a page cannot be fetched any other way": "только если страницу нельзя получить иначе",
   "only when you import a recipe from a video": "только при импорте рецепта из видео",
+  "only when you search and your recipes are in more than one language": "только когда вы ищете, а рецепты у вас на нескольких языках",
   "only when you search for a photo": "только когда вы ищете фото",
   "only when you send something there": "только когда вы туда что-то отправляете",
   "only when you sign in": "только при входе в аккаунт",
@@ -2620,6 +2623,7 @@
   "🌍 {1} is ready on this device. It could not be shared with the family — that needs write access.": "🌍 {1} готов на этом устройстве. Поделиться с семьёй не удалось — нужен доступ на запись.",
   "🌍 {1} is ready on this device. Sign in to share it with everyone.": "🌍 {1} готов на этом устройстве. Войдите, чтобы поделиться со всеми.",
   "🌍 {1} is ready, and shared with everyone{2}": "🌍 {1} готов и доступен всем{2}",
+  "🌐 Also searching:": "🌐 Также ищем:",
   "🌐 Domain": "🌐 Домен",
   "🌐 Finding the English term…": "🌐 Ищем термин на английском…",
   "🌐 Live App": "🌐 Работающее приложение",
@@ -3115,10 +3119,6 @@
   "🪵 Keeping {1} day{2} of log": "🪵 Храним лог за последние {1} дн{2}",
   "🪵 Logging & debugging": "🪵 Логирование и отладка",
   "🪵 The log has something worth reporting": "🪵 В логе есть, что стоит сообщить",
-  "🫙 Low FODMAP": "🫙 Низкий FODMAP",
-  "🌐 Also searching:": "🌐 Также ищем:",
-  "The kitchen dictionary (the app’s own server)": "Кухонный словарь (собственный сервер приложения)",
-  "only when you search and your recipes are in more than one language": "только когда вы ищете, а ваши рецепты написаны на нескольких языках",
-  "The word you searched for and the languages your recipes are in, to find how they write it. Each word and its translations are kept for everyone, without who searched; a word new to the dictionary goes to the AI (Anthropic) once.": "Искомое слово и языки ваших рецептов — чтобы узнать, как в них его пишут. Каждое слово и его переводы хранятся для всех, без указания того, кто искал; новое для словаря слово один раз отправляется ИИ (Anthropic)."
+  "🫙 Low FODMAP": "🫙 Низкий FODMAP"
  }
 }
