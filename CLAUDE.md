@@ -1446,6 +1446,20 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
     Pages for test), Self Tests on main (22:13). The published Hebrew keeps Tony's headings ("🏡 על מטבחים ואנשים",
     "🧹 סידורים") and "מהענן"; the sort words are the store's ("🆕 חדשים", "🔤 א–ת", "⏱ הכנה", "📊 רמה", "🔥 פופולרי",
     "📋 סדר שמור").
+  - **Released: v39.43 to the family's copy and the beta (5 Nov 2026, 22:32 Israel time, on c9d32ba; Tony: "Once done
+    you can push it to the family and beta as well").** Green first on test on the same commit: Cloudflare Pages for test
+    (22:14), Self Tests (22:32). Every job success: Cloudflare Pages for the beta (22:33); on main: Deploy to GitHub
+    Pages and pages build (22:33), Translate new phrases (22:34 — the corrected Invite testers tooltip, 1 phrase in each
+    of the 11 languages), Publish languages (22:35 — d93579f on main; test fast-forwarded to it; its Deploy to GitHub
+    Pages and pages build 22:35, Cloudflare Pages for test 22:35, Cloudflare usage 22:38), Self Tests on main (22:50).
+    The published Hebrew keeps Tony's headings and "מהענן"; the tooltip in Hebrew is the store's ("…נשלחת במייל של
+    האפליקציה עצמה, אחד לכל אדם (Gmail כגיבוי)…").
+  - **Released: v39.42 to the family's copy and the beta (5 Nov 2026, 22:25 Israel time, on 70fdcea — v39.42 with the
+    published languages merged in; Tony: "Yes, release v39.42 to family and beta when green").** That merge was made by
+    the languages job, so no Self Tests ran on it by themselves: started by hand on test (22:24 success); v39.42's own
+    commit f504ced too (success). Every job success: Cloudflare Pages for the beta (22:26); on main: Deploy to GitHub
+    Pages and pages build (22:26), Translate new phrases (22:26 — nothing new: the help is not translated), Publish
+    languages (22:26 — nothing to publish, no commit), Self Tests on main (22:44).
   - **v39.43 — the help reviewed against the whole app** (Tony, 5 Nov 2026: "please review the Help again and verify that
     all functionalities available in the app are covered there. Once done you can push it to the family and beta as
     well"). Method: every control and window of the app listed in a browser (708 controls, 37 windows, the owner's view
