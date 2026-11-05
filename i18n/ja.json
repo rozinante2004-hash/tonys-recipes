@@ -3130,6 +3130,7 @@
   "🪵 Keeping {1} day{2} of log": "🪵 ログを{1}日{2}分保持",
   "🪵 Logging & debugging": "🪵 ログとデバッグ",
   "🪵 The log has something worth reporting": "🪵 ログに報告すべき内容があります",
-  "🫙 Low FODMAP": "🫙 低FODMAP"
+  "🫙 Low FODMAP": "🫙 低FODMAP",
+  "The tester invitation, in English or Hebrew, with this copy's link — sent by the app's own e-mail, one to each person (Gmail as a backup), or by WhatsApp or the mail app (the app's owner only).": "テスターへの招待状（英語またはヘブライ語、このコピーのリンク付き）— アプリ自身のメールで一人ずつ送信（予備として Gmail）、または WhatsApp やメールアプリで送信（アプリの所有者のみ）。"
  }
 }

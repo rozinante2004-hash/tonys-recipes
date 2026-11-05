@@ -1437,6 +1437,38 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
   - **Released: v39.09 (29 Oct 2026, 11:17 Israel time, on 0de2dde; Tony: "Yes, release v39.09").** Every job success:
     Deploy to GitHub Pages, pages build, Publish languages, Translate new phrases, Self Tests on main and test,
     Cloudflare Pages for the beta and test.
+  - **Released: v39.40 and v39.41 to the family's copy and the beta (5 Nov 2026, 21:56 Israel time, on 69dab73; Tony:
+    "Please make the default sorting … \"Recently added\". Once done, push both changes to family and beta.").** Green
+    first on test on the same commit: Cloudflare Pages for test (21:33), Self Tests (21:55; v39.40's own 31f616c too).
+    Every job success: Cloudflare Pages for the beta (21:56); on main: Deploy to GitHub Pages and pages build (21:56),
+    Translate new phrases (21:58 — the 6 sort words in each of the 11 languages; nothing taken out), Publish languages
+    (21:58 — 241ffe3 on main, merged into test as 70fdcea; its Deploy to GitHub Pages and pages build 21:59, Cloudflare
+    Pages for test), Self Tests on main (22:13). The published Hebrew keeps Tony's headings ("🏡 על מטבחים ואנשים",
+    "🧹 סידורים") and "מהענן"; the sort words are the store's ("🆕 חדשים", "🔤 א–ת", "⏱ הכנה", "📊 רמה", "🔥 פופולרי",
+    "📋 סדר שמור").
+  - **v39.43 — the help reviewed against the whole app** (Tony, 5 Nov 2026: "please review the Help again and verify that
+    all functionalities available in the app are covered there. Once done you can push it to the family and beta as
+    well"). Method: every control and window of the app listed in a browser (708 controls, 37 windows, the owner's view
+    included; every menu with its headings and tooltips; an open recipe's buttons), each checked against
+    HELP_SYSTEM_PROMPT, then feature by feature by keyword, and the whole prompt read. **Added:** ☑ Select (and its
+    bar: 🍳 Cooked, 📄 Word, 📤 Share, 🖨️ Print, 📚 New collection, 📚 Add to collection, 🗑️ Delete); 📚 COLLECTIONS
+    (never explained: what one is, making one, ⤴ Make its own, ✂️ Split them up, "Add all N as one collection"); swipe a
+    card to ❤; UNSAVED CHANGES (Save / Discard / Keep editing); the editor's 🔒 Secret, 🎥 video clip, photo, emoji,
+    ▸ Sub-title for ingredients, ✍️ Paste free-hand to fill; 🥫 MY PANTRY; ☐ ticks + Clear ticks + the line marker;
+    ⏱ STEP TIMERS; 🎤 VOICE (next/back/repeat/clear, Hebrew too; not on iPhone/iPad; 10 minutes); 🕘 VERSION HISTORY
+    (the last 3, ↩ Restore); 🍳 COOKED! with "How did it go?" (rating, note, 📓 Cooking log); ⚙️ → 💬 Help and feedback
+    (tour, Send feedback, Answers, Feedback button, Welcome to the beta); the sign-in screen (Remember me, Trouble signing
+    in?, Continue offline); 🛒 Bring! Connection (owner). **Corrected (stale):** + Add Recipe's items and Scan's three
+    choices; 🌐 Translate ("between English and Hebrew" → 20 languages, auto-detect, saved as a new recipe); the recipe's
+    buttons (Voice, Cooked!, Duplicate, Delete-with-undo; ✨ Calculate; ✏️ source link); Metric/Imperial (and ⚙️ 📏
+    Units); the isClip jargon; the extension's name follows the browser; "🌐 → ➕ Add a language…"; Explore / Suggest by
+    their menu names and buttons (+ Add to My Recipes); ↩︎ Undo last auto-fetch where it lives; "The sort and filter
+    settings reset when you tap All" (wrong — All clears filters, the sort stays). **The ✉️ Invite testers tooltip**
+    still said "sent through your Gmail" (stale since v39.38) → "sent by the app's own e-mail, one to each person (Gmail
+    as a backup)…", translated in all 11 languages. Self Test **help_names_every_menu_item**: every item of ⚙️, ···
+    More, + Add Recipe and 📁 Files & backup, and every button under an open recipe, read off the app (words without the
+    emoji, a count, a value after ':' or '…') must be in the prompt — fails when an entry is dropped and when an item is
+    added that the help does not name.
   - **v39.42 — the help assistant knows WhatsApp** (Tony, 5 Nov 2026: "I have forgotten how to upload a WhatsApp group
     export to the server. I've tried using the Help, but it would seem it does not know what I'm talking about." — then
     "It has to know, so it could explain how to use the \"Ask my WhatsApp groups\" feature"). HELP_SYSTEM_PROMPT (the AI

@@ -19950,6 +19950,34 @@ window.SELF_TESTS = [
       var src=String(waAsk);
       ['Best answer', 'Other options mentioned', 'Show the ', 'Nothing in your '].forEach(function(w){ if(src.indexOf(w)===-1) throw new Error('the Ask window no longer says "'+w+'" — the help quotes it'); });
     } },
+  { id:'help_names_every_menu_item', group:'Features', name:'The help assistant names every item of ⚙️ Settings, ··· More, + Add Recipe and 📁 Files & backup, and every button under an open recipe (v39.43)',
+    test: async()=>{
+      // v39.43 — Tony: "please review the Help again and verify that all functionalities available in the app are covered
+      // there." The help (HELP_SYSTEM_PROMPT) answers only from what it is told, so a feature it never names is one it
+      // cannot explain. Each label is read off the app itself — its words, without the emoji, a count in brackets, a
+      // setting's current value after ':' or a trailing '…' — so a new or renamed item fails here until the help says it.
+      var K=String(HELP_SYSTEM_PROMPT), miss=[];
+      function core(el){
+        var c=el.cloneNode(true); c.querySelectorAll('.drop-hint, small, .lbl-short').forEach(function(x){ x.remove(); });
+        return c.textContent.replace(/\s+/g,' ').trim().replace(/\s*\(\d+\)$/,'').replace(/\s*\(.*\)$/,'').replace(/:.*$/,'')
+          .replace(/…$/,'').replace(/^[^\p{L}\p{N}]+/u,'').trim();
+      }
+      function check(where, els){ Array.prototype.forEach.call(els, function(el){ var w=core(el); if(w.length>2 && K.indexOf(w)===-1) miss.push(where+': '+w); }); }
+      ['addDrop','importExportDrop','moreDrop','settingsDrop'].forEach(function(id){
+        var m=document.getElementById(id); if(!m) throw new Error('the app has no #'+id);
+        check(id, m.querySelectorAll('.drop-item'));
+      });
+      // …and the buttons under an open recipe (a stand-in, taken out again)
+      var r=normalizeRecipe({ id:9100101, uid:'stHelpCover', name:'ST help cover', category:'Dessert', ingredients:['1 cup flour'], steps:['Bake for 20 minutes'], servings:'4' });
+      var saved=recipes;
+      try{
+        recipes=saved.concat([r]); openView(r.id); await wait(80);
+        var ov=document.getElementById('viewOverlay');
+        if(!ov || !ov.classList.contains('open')) throw new Error('the recipe did not open');
+        check('a recipe', ov.querySelectorAll('.action-btn, #clearTicksBtn, .voice-btn'));
+      } finally { try{ closeM('viewOverlay'); }catch(e){} recipes=saved; renderGrid(); }
+      if(miss.length) throw new Error('the help never names: '+miss.join(' · '));
+    } },
   { id:'feat_units', group:'Features', name:'Metric keeps tsp/tbsp/cup, converts imperial',
     test: async()=>{
       // Kitchen measures used in metric kitchens must NOT become millilitres

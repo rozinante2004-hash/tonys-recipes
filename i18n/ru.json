@@ -3119,6 +3119,7 @@
   "🪵 Keeping {1} day{2} of log": "🪵 Храним лог за последние {1} дн{2}",
   "🪵 Logging & debugging": "🪵 Логирование и отладка",
   "🪵 The log has something worth reporting": "🪵 В логе есть, что стоит сообщить",
-  "🫙 Low FODMAP": "🫙 Низкий FODMAP"
+  "🫙 Low FODMAP": "🫙 Низкий FODMAP",
+  "The tester invitation, in English or Hebrew, with this copy's link — sent by the app's own e-mail, one to each person (Gmail as a backup), or by WhatsApp or the mail app (the app's owner only).": "Приглашение для тестировщиков, на английском или иврите, со ссылкой на эту копию — отправляется собственной почтой приложения, по одному письму каждому (Gmail — запасной вариант), или через WhatsApp или почтовое приложение (только для владельца приложения)."
  }
 }
