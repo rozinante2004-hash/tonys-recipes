@@ -1437,6 +1437,17 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
   - **Released: v39.09 (29 Oct 2026, 11:17 Israel time, on 0de2dde; Tony: "Yes, release v39.09").** Every job success:
     Deploy to GitHub Pages, pages build, Publish languages, Translate new phrases, Self Tests on main and test,
     Cloudflare Pages for the beta and test.
+  - **Released: v39.36, v39.37 and v39.38 with Worker v101 to the family's copy and the beta (5 Nov 2026, 02:25 Israel time,
+    on fe0b5b5; Tony: "I've checked on test and the new Send works well. Please move the build to the family and beta once
+    all is green").** Green first on test on the same commit: Deploy the Worker (02:08 — v101 live; "RESEND_API_KEY is
+    set"), Cloudflare Pages for test (02:08), Self Tests (02:25; a container restart mid-wait, the jobs untouched). Every
+    job success: Cloudflare Pages for the beta (02:26); on main (b1408ec's parent a550c82 → fe0b5b5): Deploy to GitHub
+    Pages and pages build (02:26), Deploy the Worker (02:26), Translate new phrases (02:27 — "Already invited from this
+    device: {1}." × 11), Publish languages (02:27 — b1408ec on main; test moved to it; its Deploy to GitHub Pages and pages
+    build 02:28, Cloudflare Pages for test 02:28, Cloudflare usage 02:31), Self Tests on main (02:43). The published Hebrew
+    keeps Tony's headings and "מהענן". Tony asked meanwhile which app wanted $5: Pushover (phone alerts, chosen 27 Oct,
+    $4.99 once, bought in the Pushover app within its 30-day trial, ~26 Nov; else https://pushover.net/licensing) — not
+    Resend (free plan, 100 a day).
   - **v39.38 + Worker v101 — tester invitations by the app's own e-mail (Resend), Gmail kept as a small backup** (Tony,
     5 Nov 2026, after v39.37: "50 minutes is not enough. I do not invite testers that often. I would like them to go away
     altogether. Can we add a secret or something?" — "Can we use Resend instead of gmail?" — "Please keep both the Resend
