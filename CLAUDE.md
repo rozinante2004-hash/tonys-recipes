@@ -1446,6 +1446,17 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
     Pages for test), Self Tests on main (22:13). The published Hebrew keeps Tony's headings ("🏡 על מטבחים ואנשים",
     "🧹 סידורים") and "מהענן"; the sort words are the store's ("🆕 חדשים", "🔤 א–ת", "⏱ הכנה", "📊 רמה", "🔥 פופולרי",
     "📋 סדר שמור").
+  - **Released: v39.44 to the family's copy and the beta (5 Nov 2026, 23:53 Israel time, on 65388f6; Tony: "Yes, release
+    v39.44 to family and beta when green").** Green first on test on the same commit: Cloudflare Pages for test (23:35),
+    Self Tests (23:52). Every job success: Cloudflare Pages for the beta (23:53); on main: Deploy to GitHub Pages and
+    pages build (23:53), Translate new phrases (23:54 — up to date), Publish languages (23:54 — 0affe82 on main; test
+    fast-forwarded to it; its Deploy to GitHub Pages, pages build and Cloudflare Pages for test 23:54), Self Tests on
+    main (00:10, 6 Nov). **The languages commit carried Tony's own Hebrew edits of the evening** (made with v39.40's
+    🔁 Replace): "בעל האפליקציה" → "מנהל האפליקציה" in 11 sentences and "👑 בעל הבית" → "👑 מנהל האפליקציה" (the menu
+    and the sentences agree now), "🍽️ אוכלי כול", "🥩 קרניבורי"; his headings and "מהענן" kept. New in the store, from
+    a device's missing list: "{1} day ago", "{1} hour ago", a privacy passage, and a junk key "🔄 synced Nov {1}, {2},
+    {3} PM · {4} messages · {5} → {6}" — the 💬 WhatsApp Groups list's date line (`renderWaSources`, not data-no-i18n),
+    whose month and AM/PM make a new key every month: offered to Tony as a small follow-up.
   - **v39.44 — no false errors in the log** (Tony, 5 Nov 2026, 23:28 Israel time, on his PC after updating to v39.43,
     pasting the report: "[BAD] 33 errors recorded — On screen: · (×32), ResizeObserver loop completed with undelivered
     notifications."). **The 32 were never on his screen:** the translation harvest (`i18nHarvestDemand`, run whenever
