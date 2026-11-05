@@ -1,7 +1,7 @@
 {
  "lang": "ru",
- "updatedAt": 1793868062222,
- "count": 3111,
+ "updatedAt": 1793908658606,
+ "count": 3117,
  "strings": {
   "\"Add to Home Screen\"": "Добавить на главный экран",
   "\"One item away\" filter ({1}f.{2})": "Фильтр «Не хватает одного» ({1}ф.{2})",
@@ -2332,6 +2332,7 @@
   "⏰ It will show again tomorrow.": "⏰ Напомним завтра снова.",
   "⏰ Time! ({1})": "⏰ Время! ({1})",
   "⏰ Timer finished: {1}": "⏰ Таймер завершён: {1}",
+  "⏱ Prep": "⏱ Подготовка",
   "⏱ Prep time": "⏱ Время подготовки",
   "⏱ {1} — tap to cancel": "⏱ {1} — нажмите, чтобы отменить",
   "⏳ Applying...": "⏳ Применение...",
@@ -2591,6 +2592,7 @@
   "⬆️ Import languages (file)…": "⬆️ Импорт языков (файл)…",
   "⬇️ Download all my data": "⬇️ Скачать все мои данные",
   "⬇️ Export languages (file)": "⬇️ Экспорт языков (файл)",
+  "🆕 Newest": "🆕 Новые",
   "🆕 Recently added": "🆕 Недавно добавленные",
   "🆕 Version {1} is available — please update.": "🆕 Доступна версия {1} — обновите приложение.",
   "🆕 {1} is ready — tap Update now below": "🆕 {1} готова — нажмите «Обновить сейчас» ниже",
@@ -2772,6 +2774,7 @@
   "📄 Word": "📄 Word",
   "📊 Difficulty": "📊 Сложность",
   "📊 Households (management)": "📊 Семьи (управление)",
+  "📊 Level": "📊 Сложность",
   "📊 Usage": "📊 Использование",
   "📊 Workers dashboard": "📊 Панель Workers",
   "📋 Copied {1} of {2} orphans": "📋 Скопировано {1} из {2} сирот",
@@ -2799,6 +2802,7 @@
   "📋 Paste": "📋 Вставить",
   "📋 Project overview": "📋 Обзор проекта",
   "📋 Rules copied! Paste into Firebase Console.": "📋 Правила скопированы! Вставьте в Firebase Console.",
+  "📋 Saved order": "📋 Сохранённый порядок",
   "📋 Self test report copied — paste it straight into the chat": "📋 Отчёт самопроверки скопирован — вставьте его прямо в чат",
   "📋 Sync health copied": "📋 Статус синхронизации скопирован",
   "📋 The address is copied.": "📋 Адрес скопирован.",
@@ -2978,9 +2982,11 @@
   "🔗 The link is on its way. ··· More → 🏡 Kitchens and people → 📤 Recipes I sent shows who saved it.": "🔗 Ссылка уже в пути. ··· Ещё → 🏡 Кухни и участники → 📤 Отправленные рецепты покажет, кто его сохранил.",
   "🔗 The link is on its way. ⋯ More → 📤 Recipes I sent shows who saved it.": "🔗 Ссылка в пути. ⋯ Ещё → 📤 Отправленные рецепты покажет, кто её сохранил.",
   "🔤 Alphabetical": "🔤 По алфавиту",
+  "🔤 A–Z": "🔤 А–Я",
   "🔥 Firebase": "🔥 Firebase",
   "🔥 Its Firebase project": "🔥 Его проект Firebase",
   "🔥 Most cooked": "🔥 Самые готовимые",
+  "🔥 Popular": "🔥 Популярные",
   "🔧 Show Firestore security rules →": "🔧 Показать правила безопасности Firestore →",
   "🔧 Troubleshooting": "🔧 Решение проблем",
   "🔪 Skills & Methods": "🔪 Навыки и техники",
@@ -3113,12 +3119,6 @@
   "🪵 Keeping {1} day{2} of log": "🪵 Храним лог за последние {1} дн{2}",
   "🪵 Logging & debugging": "🪵 Логирование и отладка",
   "🪵 The log has something worth reporting": "🪵 В логе есть, что стоит сообщить",
-  "🫙 Low FODMAP": "🫙 Низкий FODMAP",
-  "🆕 Newest": "🆕 Новые",
-  "🔤 A–Z": "🔤 А–Я",
-  "⏱ Prep": "⏱ Подготовка",
-  "📊 Level": "📊 Сложность",
-  "🔥 Popular": "🔥 Чаще всего",
-  "📋 Saved order": "📋 Порядок сохранения"
+  "🫙 Low FODMAP": "🫙 Низкий FODMAP"
  }
 }

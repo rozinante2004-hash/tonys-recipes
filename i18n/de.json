@@ -1,7 +1,7 @@
 {
  "lang": "de",
- "updatedAt": 1793868062222,
- "count": 2778,
+ "updatedAt": 1793908658606,
+ "count": 2784,
  "strings": {
   "\"Add to Home Screen\"": "Zum Home-Bildschirm hinzufügen",
   "\"Open Bring!\"": "Bring! öffnen",
@@ -2448,7 +2448,7 @@
   "📄 Word": "📄 Word",
   "📊 Difficulty": "📊 Schwierigkeit",
   "📊 Households (management)": "📊 Haushalte (Verwaltung)",
-  "📊 Level": "📊 Schwierigkeit",
+  "📊 Level": "📊 Stufe",
   "📊 Usage": "📊 Nutzung",
   "📊 Workers dashboard": "📊 Workers-Dashboard",
   "📋 Copied {1} of {2} orphans": "📋 {1} von {2} Waisen kopiert",
@@ -2656,7 +2656,7 @@
   "🔥 Firebase": "🔥 Firebase",
   "🔥 Its Firebase project": "🔥 Sein Firebase-Projekt",
   "🔥 Most cooked": "🔥 Am häufigsten gekocht",
-  "🔥 Popular": "🔥 Am häufigsten gekocht",
+  "🔥 Popular": "🔥 Beliebt",
   "🔧 Show Firestore security rules →": "🔧 Firestore-Sicherheitsregeln anzeigen →",
   "🔧 Troubleshooting": "🔧 Problembehandlung",
   "🔪 Skills & Methods": "🔪 Techniken & Methoden",
