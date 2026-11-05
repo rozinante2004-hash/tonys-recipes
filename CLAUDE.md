@@ -1437,6 +1437,24 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
   - **Released: v39.09 (29 Oct 2026, 11:17 Israel time, on 0de2dde; Tony: "Yes, release v39.09").** Every job success:
     Deploy to GitHub Pages, pages build, Publish languages, Translate new phrases, Self Tests on main and test,
     Cloudflare Pages for the beta and test.
+  - **Released: v39.39 to the family's copy and the beta (5 Nov 2026, 10:36 Israel time, on 664f7e4; Tony: "Yes. Please
+    do").** Green first on test on the same commit: Cloudflare Pages for test (10:08), Self Tests (10:23). Every job
+    success: Cloudflare Pages for the beta (10:36); on main: Deploy to GitHub Pages (10:36) and pages build (10:37),
+    Translate new phrases (10:41 — 51 new phrases in each of the ten other languages; one entry taken out of each as "a
+    name": "☁️ Cloudflare Workers", the old Deployments heading — the status-line rule matches "☁️ <words>" kept word
+    for word and no longer in the app, so nothing in use was lost), Publish languages (10:41 — cb9d2ca on main; test
+    moved to it; its Deploy to GitHub Pages and pages build 10:42, Cloudflare Pages for test 10:42), Self Tests on main
+    (10:53). The app's own gap list on the published files: 0 missing in all 11 languages (2380 phrases). The
+    published Hebrew keeps Tony's headings ("🏡 על מטבחים ואנשים", "🧹 סידורים") and "מהענן". **The Deployments Hebrew is
+    the store's, not mine:** the hand Hebrew was only in i18n/he.json, the store lacked those phrases, so the release
+    job translated them for Hebrew too and Publish languages wrote the store's wording over the file — 33 of the 51
+    differ, nearly all just as good. One reads wrong: "🧩 The app’s application" (the app's own entry on Pushover, where
+    its API token lives) → "🧩 האפליקציה עצמה" ("the app itself"; mine was "🧩 האפליקציה שלנו ב-Pushover"). Also the
+    Pushover sentence's path says "👑 בעל האפליקציה ← 📲 התראות טלפון" where the menu says "👑 בעל הבית" / "📲 התראות
+    בטלפון" (the store's other sentences with that path do the same), and the extension sentence translates the GitHub
+    job's name ("Submit the extension to the stores" is English on GitHub). Told Tony; the store is his to change (✏️
+    the translation editor) — not changed. **Lesson:** Hebrew written by hand only into i18n/he.json lasts until the
+    next publish when the store lacks the phrase — the store is the source; the file alone is not kept.
   - **v39.39 — 🚀 Deployments brought up to date** (Tony, 5 Nov 2026: "Thanks. I've paid pushover. Is it mentioned in the
     Deployments modal? Let's review it and make sure all is updated in that page."). **Pushover bought** (US$4.99 once,
     the iPhone) — it was not in Deployments. The window, section by section now: **🏡 My Kitchen Notes** (new, first — the
@@ -1455,7 +1473,7 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
     family's old copy). New address placeholders, all from APP_CONFIG: communitySiteUrl, communityDomain (betaCopy),
     communityProjectId (languageSource), githubOwner — cfg_identifiers_in_one_place: nothing hard-wired, every link
     filled (46 links). Checked on a 393 px phone: one hint was cut off (two long secret names) — shortened, and marked
-    data-no-i18n. Help: what Deployments holds. Translations: 51 phrases — Hebrew by hand now; the other ten languages
+    data-no-i18n. Help: what Deployments holds. Translations: 51 phrases — Hebrew by hand (on the file only; the release put the store's Hebrew over it — see the release above); the other ten languages
     by the release's "Translate new phrases" (the window is the owner's).
   - **Released: v39.36, v39.37 and v39.38 with Worker v101 to the family's copy and the beta (5 Nov 2026, 02:25 Israel time,
     on fe0b5b5; Tony: "I've checked on test and the new Send works well. Please move the build to the family and beta once
