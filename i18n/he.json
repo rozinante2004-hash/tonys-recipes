@@ -1,7 +1,7 @@
 {
  "lang": "he",
- "updatedAt": 1793868062222,
- "count": 3323,
+ "updatedAt": 1793908658606,
+ "count": 3329,
  "strings": {
   "\"Add to Home Screen\"": "הוספה למסך הבית",
   "\"One item away\" filter ({1}f.{2})": "פילטר \"פריט אחד חסר\" ({1}f.{2})",
@@ -2534,6 +2534,7 @@
   "⏰ It will show again tomorrow.": "⏰ זה יופיע שוב מחר.",
   "⏰ Time! ({1})": "⏰ הזמן נגמר! ({1})",
   "⏰ Timer finished: {1}": "⏰ הטיימר הסתיים: {1}",
+  "⏱ Prep": "⏱ הכנה",
   "⏱ Prep time": "⏱ זמן הכנה",
   "⏱ {1} — tap to cancel": "⏱ {1} — הקש לביטול",
   "⏳ Applying...": "⏳ מחיל...",
@@ -2795,6 +2796,7 @@
   "⬇️ Export languages (file)": "⬇️ ייצוא שפות (קובץ)",
   "中文 — Chinese (Simplified)": "中文 — Chinese (Simplified)",
   "日本語 — Japanese": "日本語 — Japanese",
+  "🆕 Newest": "🆕 חדשים",
   "🆕 Recently added": "🆕 נוספו לאחרונה",
   "🆕 Version {1} is available — please update.": "🆕 גרסה {1} זמינה — נא לעדכן.",
   "🆕 {1} is ready — tap Update now below": "🆕 {1} מוכן — הקישו על עדכון עכשיו למטה",
@@ -2976,6 +2978,7 @@
   "📄 Word": "📄 Word",
   "📊 Difficulty": "📊 רמת קושי",
   "📊 Households (management)": "📊 משקי בית (ניהול)",
+  "📊 Level": "📊 רמה",
   "📊 Usage": "📊 שימוש",
   "📊 Workers dashboard": "📊 לוח בקרה של Workers",
   "📋 Copied 40 of 1016 orphans": "📋 הועתקו 40 מתוך 1016 יתומים",
@@ -3004,6 +3007,7 @@
   "📋 Paste": "📋 הדבק",
   "📋 Project overview": "📋 סקירת הפרויקט",
   "📋 Rules copied! Paste into Firebase Console.": "📋 הכללים הועתקו! הדביקו ב-Firebase Console.",
+  "📋 Saved order": "📋 סדר שמור",
   "📋 Self test report copied — paste it straight into the chat": "📋 דוח בדיקה עצמית הועתק — הדביקו אותו ישירות בצ'אט",
   "📋 Sync health copied": "📋 תקינות הסנכרון הועתקה",
   "📋 The address is copied.": "📋 הכתובת הועתקה.",
@@ -3189,9 +3193,11 @@
   "🔗 The link is on its way. ··· More → 🏡 Kitchens and people → 📤 Recipes I sent shows who saved it.": "🔗 הקישור בדרך. ··· עוד → 🏡 מטבחים ואנשים → 📤 מתכונים ששלחתי מציג מי שמר אותו.",
   "🔗 The link is on its way. ⋯ More → 📤 Recipes I sent shows who saved it.": "🔗 הקישור בדרך. ⋯ עוד → 📤 מתכונים ששלחתי מראה מי שמר אותו.",
   "🔤 Alphabetical": "🔤 לפי א-ב",
+  "🔤 A–Z": "🔤 א–ת",
   "🔥 Firebase": "🔥 Firebase",
   "🔥 Its Firebase project": "🔥 פרויקט ה-Firebase שלו",
   "🔥 Most cooked": "🔥 הכי מבושלים",
+  "🔥 Popular": "🔥 פופולרי",
   "🔧 Show Firestore security rules →": "🔧 הצג כללי אבטחה של Firestore ←",
   "🔧 Troubleshooting": "🔧 פתרון בעיות",
   "🔪 Skills & Methods": "🔪 טכניקות ושיטות",
@@ -3325,12 +3331,6 @@
   "🪵 Keeping {1} day{2} of log": "🪵 שומר {1} יום{2} של יומן",
   "🪵 Logging & debugging": "🪵 רישום ואיתור תקלות",
   "🪵 The log has something worth reporting": "🪵 יש ביומן משהו שכדאי לבדוק",
-  "🫙 Low FODMAP": "🫙 דל FODMAP",
-  "🆕 Newest": "🆕 החדשים",
-  "🔤 A–Z": "🔤 א–ת",
-  "⏱ Prep": "⏱ זמן הכנה",
-  "📊 Level": "📊 רמת קושי",
-  "🔥 Popular": "🔥 הכי מבושלים",
-  "📋 Saved order": "📋 לפי סדר השמירה"
+  "🫙 Low FODMAP": "🫙 דל FODMAP"
  }
 }

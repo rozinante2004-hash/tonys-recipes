@@ -1,7 +1,7 @@
 {
  "lang": "hu",
- "updatedAt": 1793868062222,
- "count": 2524,
+ "updatedAt": 1793908658606,
+ "count": 2530,
  "strings": {
   "\"Add to Home Screen\"": "Hozzáadás a kezdőképernyőhöz",
   "\"Open Bring!\"": "Bring! megnyitása",
@@ -2221,7 +2221,7 @@
   "📊 Difficulty": "📊 Nehézség",
   "📊 Households (management)": "📊 Háztartások (kezelés)",
   "📊 Háztartások (kezelés)": "📊 Háztartások (kezelés)",
-  "📊 Level": "📊 Nehézség",
+  "📊 Level": "📊 Szint",
   "📊 Usage": "📊 Használat",
   "📊 Workers dashboard": "📊 Dolgozói irányítópult",
   "📋 Copied {1} of {2} orphans": "📋 {1}/{2} árva másolva",
@@ -2409,7 +2409,7 @@
   "🔥 Firebase": "🔥 Firebase",
   "🔥 Its Firebase project": "🔥 A Firebase-projektje",
   "🔥 Most cooked": "🔥 Leggyakrabban főzött",
-  "🔥 Popular": "🔥 Legtöbbet főzött",
+  "🔥 Popular": "🔥 Népszerű",
   "🔧 Show Firestore security rules →": "🔧 Firestore biztonsági szabályok megjelenítése →",
   "🔧 Troubleshooting": "🔧 Hibaelhárítás",
   "🔪 Skills & Methods": "🔪 Készségek és módszerek",

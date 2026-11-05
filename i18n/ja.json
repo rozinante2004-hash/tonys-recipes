@@ -1,7 +1,7 @@
 {
  "lang": "ja",
- "updatedAt": 1793868062222,
- "count": 3122,
+ "updatedAt": 1793908658606,
+ "count": 3128,
  "strings": {
   "\"Add to Home Screen\"": "ホーム画面に追加",
   "\"One item away\" filter ({1}f.{2})": "「あと1品」フィルター（{1}f.{2}）",
@@ -2339,6 +2339,7 @@
   "⏰ It will show again tomorrow.": "⏰ また明日表示されます。",
   "⏰ Time! ({1})": "⏰ 時間です！（{1}）",
   "⏰ Timer finished: {1}": "⏰ タイマー終了：{1}",
+  "⏱ Prep": "⏱ 準備時間",
   "⏱ Prep time": "⏱ 準備時間",
   "⏱ {1} — tap to cancel": "⏱ {1} — タップで取消",
   "⏳ Applying...": "⏳ 適用中...",
@@ -2598,6 +2599,7 @@
   "⬆️ Import languages (file)…": "⬆️ 言語をインポート（ファイル）…",
   "⬇️ Download all my data": "⬇️ 自分のデータを全部ダウンロード",
   "⬇️ Export languages (file)": "⬇️ 言語をエクスポート（ファイル）",
+  "🆕 Newest": "🆕 新着",
   "🆕 Recently added": "🆕 最近追加した",
   "🆕 Version {1} is available — please update.": "🆕 バージョン{1}が利用可能です。更新してください。",
   "🆕 {1} is ready — tap Update now below": "🆕 {1}の準備ができました — 下の「今すぐ更新」をタップ",
@@ -2779,6 +2781,7 @@
   "📄 Word": "📄 Word",
   "📊 Difficulty": "📊 難易度",
   "📊 Households (management)": "📊 世帯（管理）",
+  "📊 Level": "📊 難易度",
   "📊 Usage": "📊 使用状況",
   "📊 Workers dashboard": "📊 Workersダッシュボード",
   "📋 Copied {1} of {2} orphans": "📋 {2}件中{1}件の孤立データをコピーしました",
@@ -2806,6 +2809,7 @@
   "📋 Paste": "📋 貼り付け",
   "📋 Project overview": "📋 プロジェクト概要",
   "📋 Rules copied! Paste into Firebase Console.": "📋 ルールをコピーしました！Firebaseコンソールに貼り付けてください。",
+  "📋 Saved order": "📋 保存順",
   "📋 Self test report copied — paste it straight into the chat": "📋 セルフテストレポートをコピーしました — そのままチャットに貼り付けてください",
   "📋 Sync health copied": "📋 同期状態をコピーしました",
   "📋 The address is copied.": "📋 アドレスをコピーしました。",
@@ -2985,9 +2989,11 @@
   "🔗 The link is on its way. ··· More → 🏡 Kitchens and people → 📤 Recipes I sent shows who saved it.": "🔗 リンクを送信中です。··· その他 → 🏡 キッチンと仲間 → 📤 送ったレシピ で誰が保存したか確認できます。",
   "🔗 The link is on its way. ⋯ More → 📤 Recipes I sent shows who saved it.": "🔗 リンクを送信中です。⋯その他 → 📤 送ったレシピで、誰が保存したか確認できます。",
   "🔤 Alphabetical": "🔤 五十音順",
+  "🔤 A–Z": "🔤 A–Z",
   "🔥 Firebase": "🔥 Firebase",
   "🔥 Its Firebase project": "🔥 そのFirebaseプロジェクト",
   "🔥 Most cooked": "🔥 よく作る",
+  "🔥 Popular": "🔥 人気",
   "🔧 Show Firestore security rules →": "🔧 Firestoreセキュリティルールを表示 →",
   "🔧 Troubleshooting": "🔧 トラブルシューティング",
   "🔪 Skills & Methods": "🔪 技術・調理法",
@@ -3124,12 +3130,6 @@
   "🪵 Keeping {1} day{2} of log": "🪵 ログを{1}日{2}分保持",
   "🪵 Logging & debugging": "🪵 ログとデバッグ",
   "🪵 The log has something worth reporting": "🪵 ログに報告すべき内容があります",
-  "🫙 Low FODMAP": "🫙 低FODMAP",
-  "🆕 Newest": "🆕 新しい順",
-  "🔤 A–Z": "🔤 名前順",
-  "⏱ Prep": "⏱ 準備時間",
-  "📊 Level": "📊 難易度",
-  "🔥 Popular": "🔥 よく作る順",
-  "📋 Saved order": "📋 保存順"
+  "🫙 Low FODMAP": "🫙 低FODMAP"
  }
 }
