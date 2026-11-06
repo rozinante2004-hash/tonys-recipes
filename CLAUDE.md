@@ -1454,6 +1454,29 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
     line's 3 phrases translated), Publish languages (00:55 — 3065b02 on main; test fast-forwarded; its Deploy to
     GitHub Pages, pages build and Cloudflare Pages for test 00:56), Self Tests on main (01:11). The published
     Hebrew keeps Tony's headings.
+  - **Released: v39.49 to the family's copy and the beta (7 Nov 2026, 00:06 Israel time, on a7abea8; Tony: "When green,
+    please push thd new build to family and beta").** Green first on test on the same commit: Cloudflare Pages for test
+    (23:48), Self Tests (00:06). Every job success: Cloudflare Pages for the beta (00:06); on main: Deploy to GitHub Pages
+    and pages build (00:07), Translate new phrases (00:08 — the keep-open hint in each of the 11 languages; nothing to
+    take out), Publish languages (00:08 — 09cf9b3 on main, test fast-forwarded; its Deploy to GitHub Pages, pages build
+    and Cloudflare Pages for test 00:09), Self Tests on main (00:25).
+  - **Released: v39.48 to the family's copy and the beta (6 Nov 2026, 23:35 Israel time, on 60b00e0; Tony: "Release v39.48
+    to family and beta when green").** Green first on test on the same commit: Cloudflare Pages for test (23:08), Self
+    Tests (23:34). Every job success: Cloudflare Pages for the beta (23:35); on main: Deploy to GitHub Pages and pages
+    build (23:36), Translate new phrases and Publish languages (23:38 — b8bf538 on main, test merged; its Deploy to
+    GitHub Pages, pages build and Cloudflare Pages for test 23:39–23:40), Self Tests on main (00:00).
+  - **v39.50 — the screen lock asked for at the tap, and its answer in the log** (Tony, 7 Nov 2026, ~00:15 Israel time,
+    v39.49 on the beta, the installed app: "I have loaded a the 30-recipe URL and I have noticed the phone's screen still
+    went black at around recipe #25. Is this expected?"; then his log, and "The phone was at 100% charge"). **The log:**
+    the import worked — 30 pages, "33 recipe(s) from 30 of 30 pages", nothing lost, saved with 32 imported and 1 updated;
+    the screen went off at 00:11:35 (2½ minutes after his tap) and he woke it 3 s later. v39.49 asked for the lock only
+    when the pages began (~25 s after the tap, after the outline and the link pick) and never logged the answer; at 100%
+    charge Low Power Mode is off (iOS turns it off above 80%), so the likelier reason is the request coming long after
+    the tap. **Fix:** the lock is asked for at the tap (`runUrlImport` → hold → `runUrlImportSteps`), one request at a time,
+    the log says "The screen is kept on while the import runs" / "The phone would not keep the screen on …" (with the
+    error) / "The phone let the screen go off during the import — asking it again", and refused, the progress says to
+    touch the screen now and then. Self Test `import_screen_lock_said` (knock-outs: asked only when the pages open, no
+    advice when refused — each fails it). Whether the phone agrees is shown only by his next log.
   - **v39.49 — a long import survives the phone's sleep** (Tony, 6 Nov 2026, ~23:35 Israel time, v39.48 on Test, the
     installed app on his iPhone: "Is the recipe extraction stopping when the phone's screen is turned off? It seems that
     the extraction halted around recipe #17. Please review the log." — his log is data). **What the log showed:** the

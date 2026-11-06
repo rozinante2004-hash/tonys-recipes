@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v39.49` — app. **Worker: v102**, deployed separately and versioned separately
+**Current version:** `v39.50` — app. **Worker: v102**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -418,7 +418,10 @@ under its plain path only (a `?url=` request goes network-first).
   the screen is held on (`importAwakeHold`/`importAwakeRelease`, a Screen Wake Lock of its own, taken again on return),
   the progress says to keep the app open (`spinnerLong`), and a page download cut off by the phone's sleep
   (`importNetworkCut`: "Load failed", a TypeError) is asked for again once the app is on screen (`whenVisible`).
-  Self Test `import_survives_sleep`.
+  Self Test `import_survives_sleep`. (v39.50) The lock is asked for at the tap that starts the import (`runUrlImport`
+  wraps `runUrlImportSteps` in a hold), one request at a time (`importAwakeTake`); the log says whether the phone kept
+  the screen on, refused (`NotAllowedError`…) or took it back (asked once more); refused, `spinnerLong` says to touch the
+  screen now and then. Self Test `import_screen_lock_said`.
 - **Data is never a phrase (v39.47):** the screens that show a recipe's or a photo's data mark it (`data-no-i18n` on a
   `<span>` — `<bdi>` is not a placeholder child): the photo search's library, search words and credits; the credit line
   ("Photo:" + who · licence · library); a collection recipe's by-line, 🍽 servings and ⏱ time; an imported collection's

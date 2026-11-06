@@ -14055,7 +14055,8 @@ window.SELF_TESTS = [
       // the failure message blamed the recipe site — Tony went looking at a site
       // that was working perfectly. Reported by him.
       var c=(document.querySelector('meta[http-equiv="Content-Security-Policy"]')||{getAttribute:function(){return '';}}).getAttribute('content')||'';
-      var src=String(runUrlImport);
+      // v39.50 — runUrlImport holds the screen on and hands over to runUrlImportSteps, where the fetching is.
+      var src=String(runUrlImport)+String(typeof runUrlImportSteps==='function' ? runUrlImportSteps : '');
       // Pull the proxy hosts out of the code itself, so adding a fourth proxy
       // without adding it to the CSP fails here rather than in Tony's hands.
       var hosts=(src.match(/https:\/\/[a-z0-9.-]+(?=\/[^`'"]*\$\{|\/)/gi)||[])
@@ -15112,6 +15113,67 @@ window.SELF_TESTS = [
         if(!hadOwn) delete navigator.wakeLock;
         for(var g=0; g<20 && _importWakeHolds; g++) importAwakeRelease();   // bounded: a broken release must not hang the suite
         _importWakeHolds=0;
+      }
+    } },
+  { id:'import_screen_lock_said', group:'Import/Export', name:'The screen is asked to stay on at the tap that starts an import, once; the log says what the phone answered; refused, the progress says what to do instead (v39.50)',
+    test: async()=>{
+      // v39.50 — Tony, 7 Nov 2026: "the phone's screen still went black at around recipe #25". v39.49 asked for the lock only
+      // once the pages were being opened, and nothing recorded whether the phone agreed.
+      ['importAwakeTake','importAwakeHold','importAwakeRelease','spinnerLong'].forEach(function(f){ if(typeof window[f]!=='function') throw new Error(f+' is not defined'); });
+      var realAi=window.aiCall, realFetch=window.fetch, inp=document.getElementById('urlImportInput'), res=document.getElementById('urlImportResult');
+      var wasUrl=inp.value, wasRes=res.innerHTML, hadOwn=Object.prototype.hasOwnProperty.call(navigator,'wakeLock');
+      var text='ROUNDUP Qzx stews — 4 recipes\n', links=[], titles=[];
+      for(var i=1;i<=4;i++){ var t='Qzx stew number '+i; titles.push(t); text+=t+'\n'+'A short line about it. '.repeat(12)+'\nto the recipe\n';
+        links.push({ href:'https://food.example.invalid/item/'+(3000+i), text:t }); }
+      text+='x '.repeat(3000);
+      var events=[], hints=[];
+      function logLines(){ try{ return syncLogEntries().map(function(e){ return (e.msg||e.what||e.text||'')+' '; }).join('\n'); }catch(e){ return ''; } }
+      async function run(mode){
+        events=[]; hints=[];
+        var sentinels=[];
+        Object.defineProperty(navigator,'wakeLock',{ configurable:true, value:{ request:async function(){
+          events.push('lock');
+          if(mode==='refused'){ var e=new Error('The request is not allowed'); e.name='NotAllowedError'; throw e; }
+          var ls={}, sn={ released:false, addEventListener:function(n,f){ ls[n]=f; }, release:async function(){ if(sn.released) return; sn.released=true; events.push('given back'); if(ls.release) ls.release(); },
+            _byPhone:function(){ if(sn.released) return; sn.released=true; events.push('taken back'); if(ls.release) ls.release(); } };
+          sentinels.push(sn); return sn; } } });
+        window.fetch=function(u, opts){
+          var b={}; try{ b=JSON.parse((opts&&opts.body)||'{}'); }catch(e){}
+          if(b.action==='fetch-url'){
+            events.push(/roundup/.test(b.url) ? 'page' : 'recipe');
+            if(/Keep the app open/.test(res.textContent)) hints.push(res.textContent);
+            if(mode==='taken' && /3002$/.test(b.url) && sentinels[0] && !sentinels[0].released) sentinels[0]._byPhone();   // the phone takes it back
+            if(/roundup/.test(b.url)) return Promise.resolve(new Response(JSON.stringify({ text:text, links:links }), { status:200 }));
+            return Promise.resolve(new Response(JSON.stringify({ text:'Recipe page for item '+b.url.slice(-4)+'\nIngredients: 1 onion\nMethod:\n1. Stew.\n'+'x '.repeat(40) }), { status:200 }));
+          }
+          return realFetch.apply(window, arguments);
+        };
+        window.aiCall=async function(prompt){
+          if(prompt.indexOf('List the recipes in it')!==-1) return JSON.stringify({ collectionName:'Qzx stews', titles:titles });
+          var m=prompt.match(/Recipe page for item (\d+)/);
+          if(m) return JSON.stringify({ recipes:[{ name:'Page '+m[1], ingredients:[{a:'1',n:'onion'}], steps:['stew'] }] });
+          return JSON.stringify({ error:'no recipe found' });
+        };
+        inp.value='https://food.example.invalid/roundup';
+        await runUrlImport();
+        return { sentinels:sentinels };
+      }
+      try{
+        var a=await run('granted');
+        if(events[0]!=='lock') throw new Error('the screen was not asked to stay on at the tap — first came: '+events.slice(0,3).join(', '));
+        if(events.filter(function(e){ return e==='lock'; }).length!==1) throw new Error('the screen was asked for '+events.filter(function(e){ return e==='lock'; }).length+' times in one import, not once');
+        if(events[events.length-1]!=='given back') throw new Error('the screen lock was not given back at the end: '+events.slice(-3).join(', '));
+        if(!/4 recipes/.test(res.textContent)) throw new Error('the import did not finish: '+res.textContent.slice(0,120));
+        var b=await run('refused');
+        if(!/4 recipes/.test(res.textContent)) throw new Error('a refused screen lock stopped the import');
+        if(!hints.some(function(h){ return /touch the screen now and then/.test(h); })) throw new Error('refused, the progress does not say to touch the screen now and then');
+        var c=await run('taken');
+        if(events.filter(function(e){ return e==='lock'; }).length!==2) throw new Error('a lock the phone took back was not asked for again (once): '+events.join(', '));
+      } finally {
+        window.aiCall=realAi; window.fetch=realFetch; inp.value=wasUrl; res.innerHTML=wasRes;
+        if(!hadOwn) delete navigator.wakeLock;
+        for(var g=0; g<20 && _importWakeHolds; g++) importAwakeRelease();
+        _importWakeHolds=0; _importWake=null; _importWakeAsking=false; _importWakeRefused=false;
       }
     } },
   { id:'link_roundup_import', group:'Import/Export', name:'A page that only LINKS to its recipes still imports (v36.2)',
