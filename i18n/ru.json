@@ -1,7 +1,7 @@
 {
  "lang": "ru",
- "updatedAt": 1794001077572,
- "count": 3103,
+ "updatedAt": 1794002875559,
+ "count": 3104,
  "strings": {
   "\"Add to Home Screen\"": "Добавить на главный экран",
   "\"One item away\" filter ({1}f.{2})": "Фильтр «Не хватает одного» ({1}ф.{2})",
@@ -2864,6 +2864,7 @@
   "📱 Add to my iPhone’s Share menu": "📱 Добавить в меню «Поделиться» на iPhone",
   "📱 Add to my phone’s Share menu": "📱 Добавить в меню «Поделиться» на телефоне",
   "📱 Grid Layout": "📱 Сетка",
+  "📱 Keep the app open until it finishes — a phone pauses it while the screen is off.": "📱 Держи приложение открытым, пока не закончится — телефон приостанавливает его, если экран выключен.",
   "📱 Phone grid set to {1} per row": "📱 В строке: {1}",
   "📱 Save from the iPhone’s Share menu": "📱 Сохранение из меню «Поделиться» на iPhone",
   "📱 Save from the phone’s Share menu": "📱 Сохранение из меню «Поделиться» на телефоне",
@@ -3105,7 +3106,6 @@
   "🪵 Keeping {1} day{2} of log": "🪵 Храним лог за последние {1} дн{2}",
   "🪵 Logging & debugging": "🪵 Логирование и отладка",
   "🪵 The log has something worth reporting": "🪵 В логе есть, что стоит сообщить",
-  "🫙 Low FODMAP": "🫙 Низкий FODMAP",
-  "📱 Keep the app open until it finishes — a phone pauses it while the screen is off.": "📱 Не закрывайте приложение, пока не закончится, — на телефоне оно останавливается, когда экран выключен."
+  "🫙 Low FODMAP": "🫙 Низкий FODMAP"
  }
 }

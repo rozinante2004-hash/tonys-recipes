@@ -1,7 +1,7 @@
 {
  "lang": "ja",
- "updatedAt": 1794001077572,
- "count": 3112,
+ "updatedAt": 1794002875559,
+ "count": 3113,
  "strings": {
   "\"Add to Home Screen\"": "ホーム画面に追加",
   "\"One item away\" filter ({1}f.{2})": "「あと1品」フィルター（{1}f.{2}）",
@@ -2869,6 +2869,7 @@
   "📱 Add to my iPhone’s Share menu": "📱 iPhoneの共有メニューに追加",
   "📱 Add to my phone’s Share menu": "📱 スマホの共有メニューに追加",
   "📱 Grid Layout": "📱 グリッド表示",
+  "📱 Keep the app open until it finishes — a phone pauses it while the screen is off.": "📱 スマホは画面が消えると処理を一時停止するので、終わるまでアプリを開いたままにしてください。",
   "📱 Phone grid set to {1} per row": "📱 1行あたり{1}件に設定しました",
   "📱 Save from the iPhone’s Share menu": "📱 iPhoneの共有メニューから保存",
   "📱 Save from the phone’s Share menu": "📱 スマホの共有メニューから保存",
@@ -3114,7 +3115,6 @@
   "🪵 Keeping {1} day{2} of log": "🪵 ログを{1}日{2}分保持",
   "🪵 Logging & debugging": "🪵 ログとデバッグ",
   "🪵 The log has something worth reporting": "🪵 ログに報告すべき内容があります",
-  "🫙 Low FODMAP": "🫙 低FODMAP",
-  "📱 Keep the app open until it finishes — a phone pauses it while the screen is off.": "📱 終わるまでアプリを開いたままにしてください — 画面が消えている間、スマホはアプリを一時停止します。"
+  "🫙 Low FODMAP": "🫙 低FODMAP"
  }
 }

@@ -1,7 +1,7 @@
 {
  "lang": "zh",
- "updatedAt": 1794001077572,
- "count": 2811,
+ "updatedAt": 1794002875559,
+ "count": 2812,
  "strings": {
   "\"Add to Home Screen\"": "添加到主屏幕",
   "\"Open Bring!\"": "打开 Bring!",
@@ -2569,7 +2569,7 @@
   "📱 Add to my iPhone’s Share menu": "📱 添加到我 iPhone 的分享菜单",
   "📱 Add to my phone’s Share menu": "📱 添加到我手机的分享菜单",
   "📱 Grid Layout": "📱 网格布局",
-  "📱 Keep the app open until it finishes — a phone pauses it while the screen is off.": "📱 请保持应用打开直到完成——手机屏幕关闭时应用会暂停。",
+  "📱 Keep the app open until it finishes — a phone pauses it while the screen is off.": "📱 请保持应用开启直到处理完成——锁屏后手机会暂停它。",
   "📱 Phone grid set to {1} per row": "📱 每行显示 {1} 个",
   "📱 Save from the iPhone’s Share menu": "📱 从 iPhone 的分享菜单保存",
   "📱 Save from the phone’s Share menu": "📱 从手机的分享菜单保存",

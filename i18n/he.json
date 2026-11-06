@@ -1,7 +1,7 @@
 {
  "lang": "he",
- "updatedAt": 1794001077572,
- "count": 3238,
+ "updatedAt": 1794002875559,
+ "count": 3239,
  "strings": {
   "\"Add to Home Screen\"": "הוספה למסך הבית",
   "\"One item away\" filter ({1}f.{2})": "פילטר \"פריט אחד חסר\" ({1}f.{2})",
@@ -2996,6 +2996,7 @@
   "📱 Add to my iPhone’s Share menu": "📱 הוספה לתפריט השיתוף באייפון שלי",
   "📱 Add to my phone’s Share menu": "📱 הוספה לתפריט השיתוף בטלפון שלי",
   "📱 Grid Layout": "📱 תצוגת רשת",
+  "📱 Keep the app open until it finishes — a phone pauses it while the screen is off.": "📱 השאירו את האפליקציה פתוחה עד לסיום — הטלפון משהה אותה כשהמסך כבוי.",
   "📱 Phone grid set to {1} per row": "📱 רשת הטלפון הוגדרה ל-{1} בשורה",
   "📱 Save from the iPhone’s Share menu": "📱 שמור מתפריט השיתוף של האייפון",
   "📱 Save from the phone’s Share menu": "📱 שמירה מתפריט השיתוף של הטלפון",
@@ -3240,7 +3241,6 @@
   "🪵 Keeping {1} day{2} of log": "🪵 שומר {1} יום{2} של יומן",
   "🪵 Logging & debugging": "🪵 רישום ואיתור תקלות",
   "🪵 The log has something worth reporting": "🪵 יש ביומן משהו שכדאי לבדוק",
-  "🫙 Low FODMAP": "🫙 דל FODMAP",
-  "📱 Keep the app open until it finishes — a phone pauses it while the screen is off.": "📱 השאירו את האפליקציה פתוחה עד הסוף — בטלפון היא נעצרת כשהמסך כבוי."
+  "🫙 Low FODMAP": "🫙 דל FODMAP"
  }
 }

@@ -1,7 +1,7 @@
 {
  "lang": "de",
- "updatedAt": 1794001077572,
- "count": 2788,
+ "updatedAt": 1794002875559,
+ "count": 2789,
  "strings": {
   "\"Add to Home Screen\"": "Zum Home-Bildschirm hinzufügen",
   "\"Open Bring!\"": "Bring! öffnen",
@@ -2552,7 +2552,7 @@
   "📱 Add to my iPhone’s Share menu": "📱 Zum Teilen-Menü meines iPhones hinzufügen",
   "📱 Add to my phone’s Share menu": "📱 Zum Teilen-Menü meines Handys hinzufügen",
   "📱 Grid Layout": "📱 Rasteransicht",
-  "📱 Keep the app open until it finishes — a phone pauses it while the screen is off.": "📱 Lassen Sie die App geöffnet, bis sie fertig ist – ein Telefon pausiert sie, solange der Bildschirm aus ist.",
+  "📱 Keep the app open until it finishes — a phone pauses it while the screen is off.": "📱 Lass die App geöffnet, bis der Vorgang abgeschlossen ist – bei ausgeschaltetem Display pausiert das Handy ihn.",
   "📱 Phone grid set to {1} per row": "📱 Handy-Raster auf {1} pro Reihe gesetzt",
   "📱 Save from the iPhone’s Share menu": "📱 Über das Teilen-Menü vom iPhone speichern",
   "📱 Save from the phone’s Share menu": "📱 Über das Teilen-Menü vom Handy speichern",
