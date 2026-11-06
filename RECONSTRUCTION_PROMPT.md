@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v39.48` — app. **Worker: v102**, deployed separately and versioned separately
+**Current version:** `v39.49` — app. **Worker: v102**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -414,7 +414,11 @@ under its plain path only (a `?url=` request goes network-first).
   Links are picked by the outline's names when they match (`linkPicksByTitles`: at least two and half the names), else
   by the AI (`LINK_PICK_TOKENS` 8000, a number and a short name each). Up to `LINK_ROUNDUP_MAX` 30 pages, three at a time;
   a page refused by the Worker's per-minute cap is asked again after a minute; past 30 the preview says how many more.
-  Self Test `link_roundup_many`.
+  Self Test `link_roundup_many`. (v39.49) While several recipes are read (a long article's pieces, a round-up's pages)
+  the screen is held on (`importAwakeHold`/`importAwakeRelease`, a Screen Wake Lock of its own, taken again on return),
+  the progress says to keep the app open (`spinnerLong`), and a page download cut off by the phone's sleep
+  (`importNetworkCut`: "Load failed", a TypeError) is asked for again once the app is on screen (`whenVisible`).
+  Self Test `import_survives_sleep`.
 - **Data is never a phrase (v39.47):** the screens that show a recipe's or a photo's data mark it (`data-no-i18n` on a
   `<span>` — `<bdi>` is not a placeholder child): the photo search's library, search words and credits; the credit line
   ("Photo:" + who · licence · library); a collection recipe's by-line, 🍽 servings and ⏱ time; an imported collection's

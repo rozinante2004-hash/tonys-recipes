@@ -1454,6 +1454,22 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
     line's 3 phrases translated), Publish languages (00:55 — 3065b02 on main; test fast-forwarded; its Deploy to
     GitHub Pages, pages build and Cloudflare Pages for test 00:56), Self Tests on main (01:11). The published
     Hebrew keeps Tony's headings.
+  - **v39.49 — a long import survives the phone's sleep** (Tony, 6 Nov 2026, ~23:35 Israel time, v39.48 on Test, the
+    installed app on his iPhone: "Is the recipe extraction stopping when the phone's screen is turned off? It seems that
+    the extraction halted around recipe #17. Please review the log." — his log is data). **What the log showed:** the
+    walla page now worked — the outline found 29, "29 short entries, no recipe in any — trying the pages they link to
+    first", the AI picked the links (8000 tokens, 40 s, 1,246 chars — the links' words were not the names), 30 pages
+    opened from 23:11. At 23:12:26 "The app was put away while the import window was open" (screen off); two answers
+    already on their way came in, then nothing for 18 minutes; at 23:30:14 "Back in the app", the two AI calls the sleep
+    had cut were retried by aiCall and answered ("1086s" — counted from their start), the page download it had cut
+    ("Could not read “מרק תפוחי אדמה” — Load failed") was not retried; the rest were read by 23:31:35, "got 32 of 30"
+    (some pages hold two recipes), and he saved "30 מתכונים למרקים הכי טובים לחורף" (31 imported, 1 existing updated).
+    So: an iPhone stops a web app while its screen is off; the import paused, it did not halt, and lost one page.
+    **Fix:** a Screen Wake Lock of the import's own while several recipes are read (taken again on return, given back at
+    the end), the progress line "📱 Keep the app open until it finishes — a phone pauses it while the screen is off.",
+    a page download cut off by the network or the sleep is asked for again once the app is on screen, and the log
+    counts "N recipe(s) from M of P pages". Self Test `import_survives_sleep` (knock-outs: no lock, no retry, no hint,
+    the lock never given back — each fails it). The wake lock itself cannot be shown working here (no iPhone).
   - **v39.48 — a page that links to many recipes imports again** (Tony, 6 Nov 2026, ~22:55 Israel time, the beta on his
     iPhone: "I have tried importing a list of recipes from a url. This url has many recipes connected to it via internal
     URLs. I remember this worked in the past. What went wrong?" — a walla round-up, food.walla.co.il/item/3476843; his log

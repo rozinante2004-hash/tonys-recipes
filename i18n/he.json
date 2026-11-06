@@ -3240,6 +3240,7 @@
   "🪵 Keeping {1} day{2} of log": "🪵 שומר {1} יום{2} של יומן",
   "🪵 Logging & debugging": "🪵 רישום ואיתור תקלות",
   "🪵 The log has something worth reporting": "🪵 יש ביומן משהו שכדאי לבדוק",
-  "🫙 Low FODMAP": "🫙 דל FODMAP"
+  "🫙 Low FODMAP": "🫙 דל FODMAP",
+  "📱 Keep the app open until it finishes — a phone pauses it while the screen is off.": "📱 השאירו את האפליקציה פתוחה עד הסוף — בטלפון היא נעצרת כשהמסך כבוי."
  }
 }

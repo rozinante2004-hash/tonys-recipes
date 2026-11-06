@@ -15063,6 +15063,57 @@ window.SELF_TESTS = [
         window.aiCall=realAi; window.fetch=realFetch; inp.value=wasUrl; res.innerHTML=wasRes;
       }
     } },
+  { id:'import_survives_sleep', group:'Import/Export', name:'A long import keeps the screen on, says to keep the app open, and reads again a page the phone\'s sleep cut off (v39.49)',
+    test: async()=>{
+      // v39.49 — Tony, 6 Nov 2026: "Is the recipe extraction stopping when the phone's screen is turned off? It seems that
+      // the extraction halted around recipe #17." It was: the iPhone stopped the app for 18 minutes, the import went on when
+      // he came back, and the one page whose download was cut off ("Load failed") was lost.
+      ['importAwakeHold','importAwakeRelease','importNetworkCut','spinnerLong'].forEach(function(f){ if(typeof window[f]!=='function') throw new Error(f+' is not defined'); });
+      var realAi=window.aiCall, realFetch=window.fetch, inp=document.getElementById('urlImportInput'), res=document.getElementById('urlImportResult');
+      var wasUrl=inp.value, wasRes=res.innerHTML, hadOwn=Object.prototype.hasOwnProperty.call(navigator,'wakeLock');
+      var locks={ asked:0, released:0, held:0, maxHeld:0 }, hints=0, cut={}, fetched=[];
+      Object.defineProperty(navigator,'wakeLock',{ configurable:true, value:{ request:async function(){
+        locks.asked++; locks.held++; locks.maxHeld=Math.max(locks.maxHeld, locks.held);
+        var ls={}, sentinel={ released:false, addEventListener:function(n,f){ ls[n]=f; }, release:async function(){ if(sentinel.released) return; sentinel.released=true; locks.released++; locks.held--; if(ls.release) ls.release(); } };
+        return sentinel; } } });
+      var text='ROUNDUP Qzx soups — 8 recipes\n', links=[{ href:'https://food.example.invalid/', text:'Food' }], titles=[];
+      for(var i=1;i<=8;i++){ var t='Qzx soup number '+i; titles.push(t); text+=t+'\n'+'A short line about it. '.repeat(12)+'\nto the recipe\n';
+        links.push({ href:'https://food.example.invalid/item/'+(2000+i), text:t }); }
+      text+='x '.repeat(3000);
+      try{
+        window.fetch=function(u, opts){
+          var b={}; try{ b=JSON.parse((opts&&opts.body)||'{}'); }catch(e){}
+          if(b.action==='fetch-url'){
+            if(/roundup/.test(b.url)) return Promise.resolve(new Response(JSON.stringify({ text:text, links:links }), { status:200 }));
+            if(/2005$/.test(b.url) && !cut[b.url]){ cut[b.url]=1; return Promise.reject(new TypeError('Load failed')); }   // the phone went to sleep
+            fetched.push(b.url);
+            if(/Keep the app open/.test(res.textContent)) hints++;
+            return Promise.resolve(new Response(JSON.stringify({ text:'Recipe page for item '+b.url.slice(-4)+'\nIngredients: 2 onions\nMethod:\n1. Fry.\n2. Simmer.\n'+'x '.repeat(40) }), { status:200 }));
+          }
+          return realFetch.apply(window, arguments);
+        };
+        window.aiCall=async function(prompt){
+          if(prompt.indexOf('List the recipes in it')!==-1) return JSON.stringify({ collectionName:'Qzx soups', titles:titles });
+          var m=prompt.match(/Recipe page for item (\d+)/);
+          if(m) return JSON.stringify({ recipes:[{ name:'Page '+m[1], ingredients:[{a:'2',n:'onions'}], steps:['fry','simmer'] }] });
+          return JSON.stringify({ error:'no recipe found' });
+        };
+        inp.value='https://food.example.invalid/roundup';
+        await runUrlImport();
+        if(fetched.length!==8) throw new Error('read '+fetched.length+' of 8 pages — the page whose download was cut off was not read again');
+        if(!/8 recipes/.test(res.textContent)) throw new Error('the preview is not all 8: '+res.textContent.slice(0,160));
+        if(/could not be read/.test(res.textContent)) throw new Error('a page is reported as unreadable though it was read again');
+        if(!locks.asked) throw new Error('the screen was not kept on while the pages were read');
+        if(locks.held) throw new Error('the screen is still held on after the import ended ('+locks.held+' lock(s))');
+        if(!hints) throw new Error('the progress did not say to keep the app open');
+        if(!importNetworkCut(new TypeError('Load failed')) || importNetworkCut(new Error('the server could not fetch it (502)'))) throw new Error('a cut-off download is not told apart from a server\'s answer');
+      } finally {
+        window.aiCall=realAi; window.fetch=realFetch; inp.value=wasUrl; res.innerHTML=wasRes;
+        if(!hadOwn) delete navigator.wakeLock;
+        for(var g=0; g<20 && _importWakeHolds; g++) importAwakeRelease();   // bounded: a broken release must not hang the suite
+        _importWakeHolds=0;
+      }
+    } },
   { id:'link_roundup_import', group:'Import/Export', name:'A page that only LINKS to its recipes still imports (v36.2)',
     test: async()=>{
       // "10 soups in 15 minutes" is ten names, ten ratings, ten photo credits

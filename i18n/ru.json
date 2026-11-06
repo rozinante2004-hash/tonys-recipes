@@ -3105,6 +3105,7 @@
   "🪵 Keeping {1} day{2} of log": "🪵 Храним лог за последние {1} дн{2}",
   "🪵 Logging & debugging": "🪵 Логирование и отладка",
   "🪵 The log has something worth reporting": "🪵 В логе есть, что стоит сообщить",
-  "🫙 Low FODMAP": "🫙 Низкий FODMAP"
+  "🫙 Low FODMAP": "🫙 Низкий FODMAP",
+  "📱 Keep the app open until it finishes — a phone pauses it while the screen is off.": "📱 Не закрывайте приложение, пока не закончится, — на телефоне оно останавливается, когда экран выключен."
  }
 }

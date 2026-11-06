@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.48 -->
+<!-- Tony's Recipes Collection v39.49 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -3459,11 +3459,42 @@ function releaseWakeLock() {
   if (_wakeLock) { _wakeLock.release(); _wakeLock = null; }
 }
 
+// v39.49 — A LONG IMPORT KEEPS THE SCREEN ON (Tony, 6 Nov 2026: "Is the recipe extraction stopping when the phone's
+// screen is turned off? It seems that the extraction halted around recipe #17." — it was: an iPhone stops a web app the
+// moment its screen goes off, so his 30-page import stood still for 18 minutes, went on when he came back, and lost the
+// one page whose download the sleep cut off). Held while recipes are read several at a time (a long article's pieces,
+// a round-up's linked pages), on top of the recipe screen's own lock, and given back when the import ends. A screen
+// switched off by hand still stops the app — the progress line says to keep it open.
+var _importWake = null, _importWakeHolds = 0;
+async function importAwakeHold() {
+  _importWakeHolds++;
+  if (_importWake || !('wakeLock' in navigator) || document.visibilityState !== 'visible') return;
+  try {
+    _importWake = await navigator.wakeLock.request('screen');
+    _importWake.addEventListener('release', function() { _importWake = null; });
+    if (!_importWakeHolds) { try { _importWake.release(); } catch(e) {} _importWake = null; }   // the import ended meanwhile
+  } catch(err) { dlog('[WakeLock] import', err && err.message); }
+}
+function importAwakeRelease() {
+  _importWakeHolds = Math.max(0, _importWakeHolds - 1);
+  if (!_importWakeHolds && _importWake) { try { _importWake.release(); } catch(e) {} _importWake = null; }
+}
+// …and a moment's wait for the app to be on the screen again (a phone resumes a stopped app only then).
+function whenVisible() {
+  if (document.visibilityState === 'visible') return Promise.resolve();
+  return new Promise(function(res) {
+    function on() { if (document.visibilityState === 'visible') { document.removeEventListener('visibilitychange', on); res(); } }
+    document.addEventListener('visibilitychange', on);
+  });
+}
+window.importAwakeHold = importAwakeHold; window.importAwakeRelease = importAwakeRelease; window.whenVisible = whenVisible;
+
 // Re-acquire wake lock if page becomes visible again (iOS releases on background)
 document.addEventListener('visibilitychange', function() {
   if (document.visibilityState === 'visible') {
     var viewOpen = document.getElementById('viewOverlay');
     if (viewOpen && viewOpen.classList.contains('open')) requestWakeLock();
+    if (_importWakeHolds && !_importWake) { _importWakeHolds--; importAwakeHold(); }   // v39.49 — the import's too
   }
 });
 
@@ -10714,7 +10745,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.48';
+var APP_VERSION = 'v39.49';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -14189,7 +14220,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.48</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.49</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14277,7 +14308,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.48</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.49</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -17823,6 +17854,8 @@ window.i18nPatternsFromDict = i18nPatternsFromDict; window.i18nAsk = i18nAsk;
 // translating a string nobody sees. A `{1}` makes it a shape, matched the same
 // way a built toast is.
 var I18N_EXTRA = [
+  // v39.49 — under the progress while several recipes are read (spinnerLong)
+  '\uD83D\uDCF1 Keep the app open until it finishes \u2014 a phone pauses it while the screen is off.',
   // v39.48 — the import preview, when a page links to more recipes than one import opens (LINK_ROUNDUP_MAX)
   'The page links to {1} more recipe(s)',
   '\u26A0\uFE0F {1} than one import opens. Import these, then add the rest one at a time from their own pages.',
@@ -26557,6 +26590,12 @@ function linkPicksByTitles(titles, links) {
   return (picks.length >= 2 && picks.length * 2 >= asked) ? picks : [];
 }
 window.linkPicksByTitles = linkPicksByTitles;
+// v39.49 — a request the network (or the phone going to sleep) cut off, not one the server answered.
+function importNetworkCut(e) {
+  var m = String((e && e.message) || '');
+  return !!e && (e.name === 'TypeError' || /load failed|failed to fetch|networkerror|network connection was lost/i.test(m));
+}
+window.importNetworkCut = importNetworkCut;
 
 // Returns the same shape as extractRecipesFromText, or null when this is not a
 // link round-up after all — so the caller can fail the way it always did.
@@ -26594,11 +26633,24 @@ async function extractRecipesFromLinks(pageText, links, pageUrl, onProgress, out
   syncLog('import', 'Link round-up: opening ' + picks.length + ' recipe pages');
   var done = 0, failures = [];
   say(0, picks.length, '');
-  var got = await mapLimited(picks, MULTI_CONCURRENCY, async function(pick) {
+  importAwakeHold();   // v39.49
+  var got;
+  try { got = await mapLimited(picks, MULTI_CONCURRENCY, async function(pick) {
     try {
-      var r = await fetch(WORKER_ENDPOINT, { method: 'POST', headers: workerHeaders(),
-        body: workerBody({ action: 'fetch-url', url: pick.href }),
-        signal: AbortSignal.timeout(25000) });
+      // v39.49 — a download the phone's sleep cut off ("Load failed") is asked for again once the app is back on screen.
+      var getPage = function() {
+        return fetch(WORKER_ENDPOINT, { method: 'POST', headers: workerHeaders(),
+          body: workerBody({ action: 'fetch-url', url: pick.href }),
+          signal: AbortSignal.timeout(25000) });
+      };
+      var r;
+      try { r = await getPage(); }
+      catch (e0) {
+        if (!importNetworkCut(e0)) throw e0;
+        syncLog('import', 'Reading “' + (pick.title || pick.href) + '” again — its download was cut off', String(e0 && e0.message).slice(0, 120));
+        await whenVisible();
+        r = await getPage();
+      }
       if (!r.ok) throw new Error('the server could not fetch it (' + r.status + ')');
       var d = await r.json();
       var t = (d && d.text) || '';
@@ -26625,7 +26677,7 @@ async function extractRecipesFromLinks(pageText, links, pageUrl, onProgress, out
       syncLog('error', 'Could not read “' + (pick.title || pick.href) + '”', String(e && e.message).slice(0, 200));
       return [];
     } finally { say(++done, picks.length, ''); }
-  });
+  }); } finally { importAwakeRelease(); }
 
   var recipes_ = [];
   got.forEach(function(l){ (l || []).forEach(function(x){ recipes_.push(x); }); });
@@ -26633,7 +26685,7 @@ async function extractRecipesFromLinks(pageText, links, pageUrl, onProgress, out
     syncLog('error', 'Every linked recipe failed — ' + failures.length + ' of ' + picks.length);
     return null;
   }
-  syncLog('import', 'Link round-up: got ' + recipes_.length + ' of ' + picks.length);
+  syncLog('import', 'Link round-up: ' + recipes_.length + ' recipe(s) from ' + (picks.length - failures.length) + ' of ' + picks.length + ' pages');
   return {
     collectionName:  plan.collectionName || outline.collectionName || '',
     collectionNotes: plan.collectionNotes || outline.collectionNotes || '',
@@ -26951,14 +27003,14 @@ async function runUrlImport() {
   syncLog('import', 'URL import: ' + pageText.length + ' chars of page text, '
     + _pageLinks.length + ' link(s)', url.slice(0, 120));
   var progress = function(done, total, label) {
-    res.innerHTML = spinner(label || (total > 1
+    res.innerHTML = (total > 1 ? spinnerLong : spinner)(label || (total > 1
       ? 'Extracting recipe ' + Math.min(done + 1, total) + ' of ' + total + '…'
       : 'Extracting recipe…'));
   };
   // v39.48 — the page's links go in with its text: a round-up of short entries opens them first (extractRecipesFromText).
   var linksTried = false;
   var linkProgress = function(done, total, label) {
-    res.innerHTML = spinner(label || (total
+    res.innerHTML = (total ? spinnerLong : spinner)(label || (total
       ? 'Opening recipe ' + Math.min(done + 1, total) + ' of ' + total + '…'
       : 'Looking for links to the recipes…'));
   };
@@ -27102,6 +27154,12 @@ window.recipeFromReelVideo = recipeFromReelVideo;
 function spinner(msg) {
   return '<div class="explore-loading"><div class="ai-spinner"></div><br>' + msg + '</div>';
 }
+// v39.49 — while several recipes are read one after another: a phone stops the app while its screen is off.
+function spinnerLong(msg) {
+  return spinner(msg) + '<div style="font-size:12px;color:var(--muted);text-align:center;margin-top:6px;line-height:1.5;">'
+    + '\uD83D\uDCF1 Keep the app open until it finishes \u2014 a phone pauses it while the screen is off.</div>';
+}
+window.spinnerLong = spinnerLong;
 
 function applyParsedRecipe(parsed, resultDivId, overlayId, originalPhoto) {
   // A collection gets its own preview: the article's title, and every recipe it
@@ -27679,7 +27737,9 @@ async function extractRecipesFromText(text, hint, onProgress, opts) {
   syncLog('import', 'Cut into ' + slices.length + ' recipes — extracting each separately');
   var done = 0, failures = [];
   say(0, slices.length, '');
-  var results = await mapLimited(slices, MULTI_CONCURRENCY, async function(sl) {
+  importAwakeHold();   // v39.49
+  var results;
+  try { results = await mapLimited(slices, MULTI_CONCURRENCY, async function(sl) {
     try {
       var p = extractJSON(await aiCall(multiRecipePrompt(sl.text, hint), multiRecipeMaxTokens(sl.text)));
       var got = Array.isArray(p && p.recipes) ? p.recipes
@@ -27693,7 +27753,7 @@ async function extractRecipesFromText(text, hint, onProgress, opts) {
     } finally {
       say(++done, slices.length, '');
     }
-  });
+  }); } finally { importAwakeRelease(); }
 
   var recipes = [];
   results.forEach(function(list) { (list || []).forEach(function(r) { recipes.push(r); }); });
@@ -34619,7 +34679,7 @@ var HELP_SYSTEM_PROMPT = [
   "- Diet tags on recipes help the diet filters work correctly — use Auto-tag to set them",
   "- The Self Test (⚙️ → 🔧 Troubleshooting → 🧪 Self Test) is useful for diagnosing if something stops working",
   "- The interface language: tap 🌐 next to ? — the app's words change; recipes stay as written. The app speaks English, Hebrew, Arabic, Russian, French, Spanish, German, Italian, Portuguese, Chinese, Japanese and Hungarian, and any language someone adds (🌐 → ➕ Add a language… — translated once, then everyone has it). On a new device whose own language the app speaks, it asks once, before the setup: that language or English (a Hungarian phone is asked Magyar or English) — so the setup, the kitchen rules and the welcome come in that language too",
-  "- A PAGE THAT LINKS TO ITS RECIPES (v39.48): some recipe round-ups (a list of 20 or 30 dishes, each a name, a line and a 'to the recipe' link) do not hold the recipes themselves. 🔗 From URL (or sharing the page to the app) then opens each recipe's own page and brings them all in as one 📚 collection — up to 30 at a time; if the page links to more, the preview says how many more, and those can be added one at a time from their own pages. It takes a minute or two for a long list ('Opening recipe 7 of 29…'). If it ever finds nothing, the log says why — copy it and send it",
+  "- A PAGE THAT LINKS TO ITS RECIPES (v39.48): some recipe round-ups (a list of 20 or 30 dishes, each a name, a line and a 'to the recipe' link) do not hold the recipes themselves. 🔗 From URL (or sharing the page to the app) then opens each recipe's own page and brings them all in as one 📚 collection — up to 30 at a time; if the page links to more, the preview says how many more, and those can be added one at a time from their own pages. It takes a minute or two for a long list ('Opening recipe 7 of 29…'). If it ever finds nothing, the log says why — copy it and send it. (v39.49) While several recipes are read, the screen stays on by itself — keep the app open until it finishes: a phone stops the app while its screen is off or another app is in front, and the import goes on from where it stopped when you come back; a recipe page cut off by that is read again",
   "- WHAT THE TRANSLATIONS HOLD (v39.47): only the app's own words. A recipe's name, a by-line, servings and time, a photographer's credit, the words someone searched for, names and e-mail addresses are never sent to be translated and never kept in the shared translations — the screens that show them mark them as data, and the app refuses anything that looks like data (another alphabet in an English phrase, a © credit, a recipe's own name). On a release, GitHub takes out of the shared translations whatever the app no longer asks for and would not collect today (dates, code, credits, recipe lines, old copies of a phrase with a number in it), and the published language files and their kept versions never hold a name. So the ✏️ Edit translations list stays the app's words, and nothing has to be cleaned by hand. A recipe inside a collection shows its servings and time as the open recipe does (🍽 4 · ⏱ 20 min); a photo credit reads 'Photo: <who> · <licence> · <library>'; after 🔄 Update all supported languages the message gives totals ('🔄 11 language(s) up to date, 24 phrase(s) added — shared with everyone'), and which language got how many is in the log",
   "- (The app's owner) Correcting a translation: in My Kitchen Notes (the copy that holds the translations), switch the interface to that language, then 🌐 → ✏️ Edit translations…, change the words and press 💾 Save — it must say '✅ <language> saved and shared with everyone' — then 🌐 → 🚀 Publish languages now (every copy has it within about ten minutes). What you change is kept on this device until it is shared: closing the window, restarting the app or signing out does not lose it, and the editor brings it back. If Save cannot share it, it says why — usually this device's sign-in: sign out, sign in again with Google and your authenticator's 6-digit code, open the editor and press Save. A Save writes only what you changed, onto the newest shared copy, and the automatic translation of new phrases only fills in what is missing — it never replaces a correction. The same wording wrong in many places (e.g. a menu's name inside many sentences): 🔁 Replace… beside the search — what is in the search box is offered as the words to find; untick the rows that should stay, press 🔁 Replace in N, then 💾 Save",
   "- ✦ All clears the filters; the sort stays as chosen (⇅ Sort), and starts newest first each time the app is opened"

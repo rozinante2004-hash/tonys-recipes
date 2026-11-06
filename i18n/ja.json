@@ -3114,6 +3114,7 @@
   "🪵 Keeping {1} day{2} of log": "🪵 ログを{1}日{2}分保持",
   "🪵 Logging & debugging": "🪵 ログとデバッグ",
   "🪵 The log has something worth reporting": "🪵 ログに報告すべき内容があります",
-  "🫙 Low FODMAP": "🫙 低FODMAP"
+  "🫙 Low FODMAP": "🫙 低FODMAP",
+  "📱 Keep the app open until it finishes — a phone pauses it while the screen is off.": "📱 終わるまでアプリを開いたままにしてください — 画面が消えている間、スマホはアプリを一時停止します。"
  }
 }
