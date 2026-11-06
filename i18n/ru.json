@@ -1,7 +1,7 @@
 {
  "lang": "ru",
- "updatedAt": 1794005420437,
- "count": 3105,
+ "updatedAt": 1794005873139,
+ "count": 3106,
  "strings": {
   "\"Add to Home Screen\"": "Добавить на главный экран",
   "\"One item away\" filter ({1}f.{2})": "Фильтр «Не хватает одного» ({1}ф.{2})",
@@ -2994,6 +2994,7 @@
   "🖼️ Photo Sources": "🖼️ Источники фото",
   "🖼️ Restore photos from a backup": "🖼️ Восстановить фото из резервной копии",
   "🖼️ Restored {1} photo{2} from the cloud": "🖼️ Восстановлено {1} фото{2} из облака",
+  "🖼️ “Mushrooms” now uses Seasoned Mushrooms’s photo": "🖼️ «Грибы» теперь использует фото рецепта «Грибы с приправами»",
   "🖼️ “{1}” now uses {2}’s photo": "🖼️ «{1}» теперь использует фото {2}",
   "🗂 Show ▾": "🗂 Показать ▾",
   "🗄️ Firestore database": "🗄️ База данных Firestore",
