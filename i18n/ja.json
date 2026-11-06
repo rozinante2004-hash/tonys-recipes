@@ -1,7 +1,7 @@
 {
  "lang": "ja",
- "updatedAt": 1794005420437,
- "count": 3114,
+ "updatedAt": 1794005872126,
+ "count": 3115,
  "strings": {
   "\"Add to Home Screen\"": "ホーム画面に追加",
   "\"One item away\" filter ({1}f.{2})": "「あと1品」フィルター（{1}f.{2}）",
@@ -2999,6 +2999,7 @@
   "🖼️ Photo Sources": "🖼️ 写真の取得元",
   "🖼️ Restore photos from a backup": "🖼️ バックアップから写真を復元",
   "🖼️ Restored {1} photo{2} from the cloud": "🖼️ クラウドから{1}枚の写真を復元しました",
+  "🖼️ “Mushrooms” now uses Seasoned Mushrooms’s photo": "🖼️ 「Mushrooms」は「Seasoned Mushrooms」の写真を使用するようになりました",
   "🖼️ “{1}” now uses {2}’s photo": "🖼️ 「{1}」は{2}の写真を使用しています",
   "🗂 Show ▾": "🗂 表示 ▾",
   "🗄️ Firestore database": "🗄️ Firestoreデータベース",
