@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.50 -->
+<!-- Tony's Recipes Collection v39.51 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -303,6 +303,7 @@
     var v = {
       projectId: c.firebase.projectId, authDomain: c.firebase.authDomain,
       siteUrl: c.siteOrigin + c.sitePath, siteHost: (c.siteOrigin + c.sitePath).replace(/^https?:\/\//, '').replace(/\/$/, ''),
+      mailDomain: c.supportMailbox && c.supportMailbox[1],   // v39.51 — the domain the app's e-mails are sent from (Resend)
       workerName: c.workerName, cloudflareAccountId: c.cloudflareAccountId,
       githubRepo: c.githubRepo, workerUrl: c.workerUrl,
       liveSiteUrl: c.liveSiteUrl,
@@ -10779,7 +10780,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.50';
+var APP_VERSION = 'v39.51';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -14254,7 +14255,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.50</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.51</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14342,7 +14343,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.50</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.51</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -40192,7 +40193,7 @@ window.onHeaderScroll = onHeaderScroll;
       </div>
       <div style="display:flex;flex-direction:column;gap:4px;">
         <a href="https://resend.com/emails" target="_blank" rel="noopener noreferrer" class="deploy-link">📬 Sent e-mails <span class="deploy-hint">each one: delivered, bounced, or marked as spam</span></a>
-        <a href="https://resend.com/domains" target="_blank" rel="noopener noreferrer" class="deploy-link">🌐 Domain <span class="deploy-hint">mykitchennotes.community — should say Verified</span></a>
+        <a href="https://resend.com/domains" target="_blank" rel="noopener noreferrer" class="deploy-link">🌐 Domain <span class="deploy-hint"><span data-no-i18n data-cfg-text="{mailDomain}"></span> — should say Verified</span></a>
         <a href="https://resend.com/api-keys" target="_blank" rel="noopener noreferrer" class="deploy-link">🔑 API keys <span class="deploy-hint">secret: RESEND_API_KEY · Sending access</span></a>
         <a href="https://resend.com/settings/usage" target="_blank" rel="noopener noreferrer" class="deploy-link">📊 Usage <span class="deploy-hint">100 a day, 3,000 a month on the free plan</span></a>
         <a href="https://resend.com/settings/billing" target="_blank" rel="noopener noreferrer" class="deploy-link">💳 Plan &amp; billing <span class="deploy-hint">a paid plan lifts the daily quota</span></a>

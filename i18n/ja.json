@@ -3116,6 +3116,7 @@
   "🪵 Keeping {1} day{2} of log": "🪵 ログを{1}日{2}分保持",
   "🪵 Logging & debugging": "🪵 ログとデバッグ",
   "🪵 The log has something worth reporting": "🪵 ログに報告すべき内容があります",
-  "🫙 Low FODMAP": "🫙 低FODMAP"
+  "🫙 Low FODMAP": "🫙 低FODMAP",
+  "— should say Verified": "— 「認証済み」と表示されるはずです"
  }
 }

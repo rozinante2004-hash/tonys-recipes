@@ -4744,6 +4744,11 @@ window.SELF_TESTS = [
       var ids=[APP_CONFIG.firebase.apiKey, APP_CONFIG.firebase.projectId, APP_CONFIG.firebase.messagingSenderId,
                APP_CONFIG.workerName, APP_CONFIG.cloudflareAccountId, APP_CONFIG.ownerKeys[0], APP_CONFIG.githubRepo,
                APP_CONFIG.siteOrigin.replace(/^https:\/\//,'')+APP_CONFIG.sitePath.replace(/\/$/,'')];
+      // v39.51 — and the OTHER copies' addresses: Tony's Self Test on the beta found its own domain written out in
+      // 🚀 Deployments since v39.16, which no run on the family's or the test copy could see (each looked for its own).
+      [APP_CONFIG.liveSiteUrl, APP_CONFIG.betaCopy && APP_CONFIG.betaCopy.siteUrl, APP_CONFIG.testCopy && APP_CONFIG.testCopy.siteUrl, APP_CONFIG.movedTo]
+        .forEach(function(u){ var h=String(u||'').replace(/^https?:\/\//,'').replace(/\/$/,''); if(h && ids.indexOf(h)===-1) ids.push(h); });
+      if(APP_CONFIG.supportMailbox && APP_CONFIG.supportMailbox[1] && ids.indexOf(APP_CONFIG.supportMailbox[1])===-1) ids.push(APP_CONFIG.supportMailbox[1]);
       var hits=ids.filter(function(v){ return rest.indexOf(v)!==-1; });
       if(hits.length) throw new Error('hard-wired outside APP_CONFIG: '+hits.join(', '));
       // Every link built from it was actually filled in.

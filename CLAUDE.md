@@ -1465,6 +1465,39 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
     Tests (23:34). Every job success: Cloudflare Pages for the beta (23:35); on main: Deploy to GitHub Pages and pages
     build (23:36), Translate new phrases and Publish languages (23:38 — b8bf538 on main, test merged; its Deploy to
     GitHub Pages, pages build and Cloudflare Pages for test 23:39–23:40), Self Tests on main (00:00).
+  - **v39.51 — the e-mail domain in 🚀 Deployments comes from the configuration** (Tony's Self Test on the beta, 7 Nov
+    2026, 01:04 Israel time, v39.50, a desktop Chrome: 456 passed, 1 failed — `cfg_identifiers_in_one_place`
+    "hard-wired outside APP_CONFIG: mykitchennotes.community"; his report is data). Since v39.16 (29 Oct) the Resend
+    "🌐 Domain" line said "mykitchennotes.community — should say Verified" in the page itself; on the beta that is the
+    copy's own address, so only a run there could see it (the family's and the test copy's runs look for their own).
+    Now `{mailDomain}` (APP_CONFIG.supportMailbox[1]) fills it, and the test also looks for every OTHER copy's address
+    (liveSiteUrl, betaCopy, testCopy, movedTo) and the mail domain — the old line fails it on any copy (knock-out run).
+    The shortened phrase "— should say Verified" in the 11 languages, from the old line's translations.
+  - **Released: v39.50 to the family's copy and the beta (7 Nov 2026, 00:48 Israel time, on c8f705b; Tony: "Release v39.50
+    to family and beta when green").** Green first on test on the same commit: Cloudflare Pages for test (00:33), Self
+    Tests (00:48). Every job success: Cloudflare Pages for the beta (00:49); on main: Deploy to GitHub Pages and pages
+    build (00:49), Translate new phrases (00:50), Publish languages (00:51 — 4ce08d6 on main, test fast-forwarded; its
+    Deploy to GitHub Pages, pages build and Cloudflare Pages for test 00:51–00:52), Self Tests on main (01:07).
+  - **Planned for Tuesday 10 Nov 2026, after 11:00 Israel time — NOT before** (Tony, 7 Nov 2026, ~00:45: "as I am
+    already at 75% of my weekly quota, I would like you to only log the request and plan it for Tuesday, after 11:00,
+    when it resets"; a reminder into this session is scheduled for 11:05, trig_019vabk7G3ZPSwUAMaDctuxi). Two features:
+    1. **A table of contents at the beginning of every collection:** the collection's recipes listed in order; tapping
+       a line jumps to that recipe; each recipe in the collection has a "jump to start" link back to the list. It follows
+       the collection: a recipe added or removed (or moved, split, lifted out) changes the list and the links. New
+       collections and — "as a 1-time effort" — his existing ones (drawn from the parts at display time, it needs no
+       change to stored recipes; check every collection shows it). His answer: **also in printed, Word and shared copies;
+       "If it is in a digital format, like Word, the links should be functional as well"** (Word: internal hyperlinks to
+       bookmarks; the shared web page: in-page anchors; print: the list).
+    2. **Links between recipes:** "if I need a spoon of mayonnaise, I could make it reference the mayonnaise recipe".
+       Looks like a common web link. Made by marking a word or phrase and pressing a dedicated control (🔗), or Ctrl+K
+       ("like in Office"); that opens a list of ALL his recipes (and linked kitchens' recipes) with a search box at the
+       top; picking one (only one) makes the link. His answers: **in ingredients, method steps and notes**; **tapping a
+       link opens that recipe on top with ← Back** to where he was; **a link to a deleted recipe shows as plain words,
+       and works again by itself if the recipe comes back (Undo)** — so no dead ends (also: a linked kitchen no longer
+       available). Watch: the selection on an iPhone must survive tapping the 🔗 control (mousedown preventDefault);
+       stored as markup in the text the AI, search, scaling, Bring!, translation and export must all see through
+       (the words only); Word/print/share show the words (the link working in Word where the target is in the same
+       document, e.g. within a collection).
   - **v39.50 — the screen lock asked for at the tap, and its answer in the log** (Tony, 7 Nov 2026, ~00:15 Israel time,
     v39.49 on the beta, the installed app: "I have loaded a the 30-recipe URL and I have noticed the phone's screen still
     went black at around recipe #25. Is this expected?"; then his log, and "The phone was at 100% charge"). **The log:**
