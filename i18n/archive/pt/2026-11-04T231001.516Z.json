@@ -1,7 +1,7 @@
 {
  "lang": "pt",
  "updatedAt": 1793833758413,
- "count": 2456,
+ "count": 2455,
  "strings": {
   "\"Add to Home Screen\"": "Adicionar à tela inicial",
   "\"Open Bring!\"": "Abrir Bring!",
@@ -1738,7 +1738,6 @@
   "°F — Fahrenheit": "°F — Fahrenheit",
   "· last {1}": "· último {1}",
   "··· More": "··· Mais",
-  "יידיש Yiddish": "יידיש Iídiche",
   "— You wrote on {1}:\n“{2}”\n\nEvery answer is kept in ⚙️ → 💬 Help and feedback → 📨 Answers to my notes.": "— Escreveste a {1}:\n“{2}”\n\nTodas as respostas ficam guardadas em ⚙️ → 💬 Ajuda e feedback → 📨 Respostas às minhas notas.",
   "— this is the whole route, and it needs no GitHub access at all:{2} {3}. WhatsApp → open the group → tap the {4} at the top → scroll down → {5} → {6}.{7} {8}. WhatsApp prepares the file (a few seconds on a big group), then the {9} opens.{10} {11}. Scroll the lower list of actions and tap {12}. Pick somewhere you will find again — {13} is fine — then {14}.{15} {16}. Come back here: {17} above.{18} {19}. The iPhone's file picker opens. The export is usually the top entry under {20}; otherwise tap {21} and go to where you saved it. Tap it.": "— este é o caminho todo, e não precisa de nenhum acesso ao GitHub:{2} {3}. WhatsApp → abra o grupo → toque no {4} no topo → role para baixo → {5} → {6}.{7} {8}. O WhatsApp prepara o arquivo (alguns segundos em um grupo grande), depois o {9} abre.{10} {11}. Role a lista de ações abaixo e toque em {12}. Escolha um lugar que você vai encontrar de novo — {13} serve — depois {14}.{15} {16}. Volte aqui: {17} acima.{18} {19}. O seletor de arquivos do iPhone abre. A exportação geralmente é o primeiro item em {20}; caso contrário, toque em {21} e vá até onde você salvou. Toque nele.",
   "“{1}” as it was on {2}. The current version is kept in the history, so you can undo this.": "“{1}” como estava em {2}. A versão atual fica guardada no histórico, então dá para desfazer isso.",

@@ -1,7 +1,7 @@
 {
  "lang": "it",
  "updatedAt": 1793833758413,
- "count": 2615,
+ "count": 2612,
  "strings": {
   "\"Add to Home Screen\"": "Aggiungi a Home",
   "\"Open Bring!\"": "Apri Bring!",
@@ -1740,7 +1740,6 @@
   "{1} error{2} recorded": "{1} errore{2} registrato",
   "{1} events over about {2} minutes, with no refusals, timeouts or errors.": "{1} eventi in circa {2} minuti, senza rifiuti, timeout o errori.",
   "{1} event{2} over about {3} minute{4}, with no refusals, timeouts or errors.": "{1} evento{2} in circa {3} minuto{4}, senza rifiuti, timeout o errori.",
-  "{1} from Openverse — tap to select · ⚠️ no English term found for “מרק עוף” — searched as typed": "{1} da Openverse — tocca per selezionare · ⚠️ nessun termine inglese trovato per “מרק עוף” — cercato così com'è scritto",
   "{1} from {2} — tap to select{3}": "{1} da {2} — tocca per selezionare{3}",
   "{1} has sent you a recipe for “{2}”.": "{1} ti ha inviato una ricetta per \"{2}\".",
   "{1} is already translated, but it could not be downloaded right now. Check the connection (and that you are signed in), then try again.": "{1} è già tradotto, ma non è stato possibile scaricarlo ora. Controlla la connessione (e di aver effettuato l'accesso), poi riprova.",
@@ -1858,7 +1857,6 @@
   "· last {1}": "· ultimo {1}",
   "· {2}, {3} AM": "· {2}, {3} AM",
   "··· More": "··· Altro",
-  "יידיש Yiddish": "יידיש Yiddish",
   "— You wrote on {1}:\n“{2}”\n\nEvery answer is kept in ⚙️ → 💬 Help and feedback → 📨 Answers to my notes.": "— Hai scritto il {1}:\n“{2}”\n\nOgni risposta viene salvata in ⚙️ → 💬 Aiuto e feedback → 📨 Risposte alle mie note.",
   "— this is the whole route, and it needs no GitHub access at all:{2} {3}. WhatsApp → open the group → tap the {4} at the top → scroll down → {5} → {6}.{7} {8}. WhatsApp prepares the file (a few seconds on a big group), then the {9} opens.{10} {11}. Scroll the lower list of actions and tap {12}. Pick somewhere you will find again — {13} is fine — then {14}.{15} {16}. Come back here: {17} above.{18} {19}. The iPhone's file picker opens. The export is usually the top entry under {20}; otherwise tap {21} and go to where you saved it. Tap it.": "— questo è il percorso completo, e non richiede alcun accesso a GitHub:{2} {3}. WhatsApp → apri il gruppo → tocca il {4} in alto → scorri verso il basso → {5} → {6}.{7} {8}. WhatsApp prepara il file (qualche secondo se il gruppo è grande), poi si apre {9}.{10} {11}. Scorri l'elenco delle azioni in basso e tocca {12}. Scegli un posto che ritroverai facilmente — va bene {13} — poi {14}.{15} {16}. Torna qui: {17} qui sopra.{18} {19}. Si apre il selettore file dell'iPhone. L'esportazione di solito è la prima voce sotto {20}; altrimenti tocca {21} e vai dove l'hai salvato. Toccalo.",
   "“{1}” as it was on {2}. The current version is kept in the history, so you can undo this.": "“{1}” come era il {2}. La versione attuale viene conservata nella cronologia, quindi puoi annullare questa operazione.",
@@ -2356,7 +2354,6 @@
   "📚 Collection imported — {1} recipes in “{2}”": "📚 Raccolta importata — {1} ricette in “{2}”",
   "📚 Collections": "📚 Raccolte",
   "📚 New collection": "📚 Nuova raccolta",
-  "📚 {1} recipe now in “Winter soups”": "📚 {1} ricetta ora in \"Zuppe invernali\"",
   "📚 {1} recipes found — filling the form with the first": "📚 {1} ricette trovate — form compilato con la prima",
   "📚 {1} recipe{2} now in “{3}”": "📚 {1} ricetta{2} ora in “{3}”",
   "📜 Privacy statement": "📜 Informativa sulla privacy",

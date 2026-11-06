@@ -1,7 +1,7 @@
 {
  "lang": "hu",
  "updatedAt": 1793796000632,
- "count": 2471,
+ "count": 2468,
  "strings": {
   "\"Add to Home Screen\"": "Hozzáadás a kezdőképernyőhöz",
   "\"Open Bring!\"": "Bring! megnyitása",
@@ -1748,7 +1748,6 @@
   "°F — Fahrenheit": "°F — Fahrenheit",
   "· last {1}": "· utoljára: {1}",
   "··· More": "··· Több",
-  "יידיש Yiddish": "יידיש jiddis",
   "— You wrote on {1}:\n“{2}”\n\nEvery answer is kept in ⚙️ → 💬 Help and feedback → 📨 Answers to my notes.": "— Ezt írtad ekkor: {1}:\n„{2}”\n\nMinden válasz megtalálható itt: ⚙️ → 💬 Súgó és visszajelzés → 📨 Válaszok a jegyzeteimre.",
   "— this is the whole route, and it needs no GitHub access at all:{2} {3}. WhatsApp → open the group → tap the {4} at the top → scroll down → {5} → {6}.{7} {8}. WhatsApp prepares the file (a few seconds on a big group), then the {9} opens.{10} {11}. Scroll the lower list of actions and tap {12}. Pick somewhere you will find again — {13} is fine — then {14}.{15} {16}. Come back here: {17} above.{18} {19}. The iPhone's file picker opens. The export is usually the top entry under {20}; otherwise tap {21} and go to where you saved it. Tap it.": "— ez a teljes folyamat, és egyáltalán nincs szükség GitHub-hozzáférésre:{2} {3}. WhatsApp → nyisd meg a csoportot → koppints a {4} elemre fent → görgess le → {5} → {6}.{7} {8}. A WhatsApp előkészíti a fájlt (nagyobb csoportnál néhány másodpercig tart), majd megnyílik a {9}.{10} {11}. Görgesd le a műveletek listáját, és koppints erre: {12}. Válassz egy helyet, ahol később is megtalálod — a {13} tökéletes —, majd {14}.{15} {16}. Gyere vissza ide: {17} fent.{18} {19}. Megnyílik az iPhone fájlválasztója. Az exportált fájl általában a {20} alatt a legfelső elem; ha nem, koppints a {21} elemre, és keresd meg, ahova mentetted. Koppints rá.",
   "“{1}” as it was on {2}. The current version is kept in the history, so you can undo this.": "„{1}” olyan állapotban, amilyen {2}-kor volt. A jelenlegi verzió megmarad az előzményekben, így ezt visszavonhatod.",
@@ -2105,7 +2104,6 @@
   "👋 No hard feelings — you are signed out. The kitchen is here if you change your mind.": "👋 Semmi gond — kijelentkeztünk. A konyha itt vár, ha meggondolod magad.",
   "👋 Not now — sign me out": "👋 Most nem — kijelentkezés",
   "👋 Welcome to the beta": "👋 Üdv a bétaverzióban",
-  "👑 Alkalmazás tulajdonosa": "👑 Alkalmazás tulajdonosa",
   "👑 App owner": "👑 Alkalmazás tulajdonosa",
   "👑 Hand over…": "👑 Átadás…",
   "👑 {1} now owns {2}": "👑 {1} mostantól {2} tulajdonosa",
@@ -2179,7 +2177,6 @@
   "📄 Word": "📄 Word",
   "📊 Difficulty": "📊 Nehézség",
   "📊 Households (management)": "📊 Háztartások (kezelés)",
-  "📊 Háztartások (kezelés)": "📊 Háztartások (kezelés)",
   "📊 Usage": "📊 Használat",
   "📊 Workers dashboard": "📊 Dolgozói irányítópult",
   "📋 Copied {1} of {2} orphans": "📋 {1}/{2} árva másolva",
