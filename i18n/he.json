@@ -3404,6 +3404,17 @@
   "🪵 Keeping {1} day{2} of log": "🪵 שומר {1} יום{2} של יומן",
   "🪵 Logging & debugging": "🪵 רישום ואיתור תקלות",
   "🪵 The log has something worth reporting": "🪵 יש ביומן משהו שכדאי לבדוק",
-  "🫙 Low FODMAP": "🫙 דל FODMAP"
+  "🫙 Low FODMAP": "🫙 דל FODMAP",
+  "🔍 Searching {1}…": "🔍 מחפש ב-{1}…",
+  "{1} from {2} — tap to select": "{1} מ-{2} — הקישו לבחירה",
+  "{1} from {2} (round {3}) — tap to select": "{1} מ-{2} (סבב {3}) — הקישו לבחירה",
+  "⚠️ no English term found for “{1}” — searched as typed": "⚠️ לא נמצא מונח באנגלית ל“{1}” — חיפשנו כפי שהוקלד",
+  "No photos from {1} for “{2}”. Tap “See more” to try another source, or edit the search above.": "אין תמונות מ-{1} עבור “{2}”. הקישו “עוד” כדי לנסות מקור אחר, או שנו את החיפוש למעלה.",
+  "Photo:": "תמונה:",
+  "{1} ingredients · {2} steps": "{1} מרכיבים · {2} שלבים",
+  "🔄 {1} language(s) up to date, {2} phrase(s) added — shared with everyone": "🔄 {1} שפות עודכנו, {2} ביטויים נוספו — ושותפו עם כולם",
+  "🔄 {1} language(s) up to date, {2} phrase(s) added — on this device only": "🔄 {1} שפות עודכנו, {2} ביטויים נוספו — במכשיר הזה בלבד",
+  "🔄 {1} language(s) up to date, {2} phrase(s) added; {3} failed — the log says why — shared with everyone": "🔄 {1} שפות עודכנו, {2} ביטויים נוספו; {3} נכשלו — הסיבה ביומן — ושותפו עם כולם",
+  "🔄 {1} language(s) up to date, {2} phrase(s) added; {3} failed — the log says why — on this device only": "🔄 {1} שפות עודכנו, {2} ביטויים נוספו; {3} נכשלו — הסיבה ביומן — במכשיר הזה בלבד"
  }
 }

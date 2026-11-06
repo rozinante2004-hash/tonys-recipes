@@ -96,6 +96,25 @@ ok('an entry holding an e-mail address is left out of the file', heNow.strings.S
 ok('…and out of the newest kept version', !JSON.stringify(read('archive/' + arch().langs.he[0].file)).includes('@'));
 ok('…and taken out of a version kept before', !fs.readdirSync(path.join(out, 'archive', 'he')).some(f => fs.readFileSync(path.join(out, 'archive', 'he', f), 'utf8').includes('@')), log);
 
+// v39.47 — nor a name, a credit or another script's words held as a phrase (tools/i18n-junk.mjs): out of the file and
+// out of every kept version, whatever the database holds. The listed name is one kept in tools/i18n-retired.json only
+// as a hash, so the check covers that path too.
+const JUNK = ['\u00a9 Some Photographer', 'Chef \u05d2\u05d9\u05d0 \u00b7 serves {1}', 'Wikimedia Commons', 'A retired name for the publishing test'];
+const old2 = read('archive/' + arch().langs.he[0].file);
+JUNK.forEach(k => { old2.strings[k] = 'x'; });
+fs.writeFileSync(path.join(out, 'archive', arch().langs.he[0].file), JSON.stringify(old2));
+await seed(async db => {
+  await setDoc(doc(db, 'i18n/he'), { strings: Object.assign({ Save: 'שמור', 'Photo:': 'תמונה:' }, Object.fromEntries(JUNK.map(k => [k, 'x']))), count: 6, updatedAt: 600 });
+  await setDoc(doc(db, 'i18n/_index'), { langs: { he: { at: 600, count: 6 } }, probed: true });
+});
+log = run();
+const heJ = read('he.json') || { strings: {} };
+ok('a credit, another script\'s words, a listed line and a listed name are left out of the file (v39.47)',
+  JUNK.every(k => !(k in heJ.strings)) && heJ.strings.Save === 'שמור' && heJ.strings['Photo:'] === 'תמונה:' && heJ.count === 2, JSON.stringify(heJ));
+ok('…and out of every kept version', !fs.readdirSync(path.join(out, 'archive', 'he')).some(f => {
+  const s = (JSON.parse(fs.readFileSync(path.join(out, 'archive', 'he', f), 'utf8')).strings) || {};
+  return JUNK.some(k => k in s); }), log);
+
 await env.cleanup();
 console.log(failures ? failures + ' publishing check(s) FAILED' : 'all publishing checks passed');
 process.exit(failures ? 1 : 0);

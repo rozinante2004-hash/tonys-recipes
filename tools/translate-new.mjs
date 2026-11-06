@@ -35,6 +35,7 @@ import path from 'node:path';
 import http from 'node:http';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
+import { retiredKey } from './i18n-junk.mjs';
 const require = createRequire(import.meta.url);      // finds the packages beside the checkout, or on NODE_PATH
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -192,9 +193,22 @@ try {
       const strings = (d && d.data && d.data.strings) || null;
       if (!strings) break;
       // v39.45 — nor a date or a time: a browser's date printed into a line ("🔄 synced Nov {1}, {2}, {3} PM · …") made a
-      // new key every month. Judged by the app's own rule (i18nLooksLikeDate), and only for what the app no longer asks for.
-      const dated = new Set(await page.evaluate(ks => (typeof i18nLooksLikeDate === 'function') ? ks.filter(k => i18nLooksLikeDate(k)) : [],
-        Object.keys(strings).filter(k => !inApp.has(k))));
+      // new key every month. v39.47 — nor anything else the app's own rule would no longer collect (i18nKeepable: a
+      // date, code, or data — a credit, a recipe's line, another script's words), nor an old key holding a plain number
+      // whose {1} form is in the same language (it can never be shown: the app turns every number into {n}), nor a name
+      // or stray line on tools/i18n-retired.json. Only ever for what the app no longer asks for.
+      const notAsked = Object.keys(strings).filter(k => !inApp.has(k));
+      const dated = new Set(await page.evaluate(([ks, all]) => {
+        if (typeof i18nKeepable !== 'function') return ks.filter(k => typeof i18nLooksLikeDate === 'function' && i18nLooksLikeDate(k));
+        const have = new Set(all);
+        return ks.filter(k => {
+          if (!i18nKeepable(k)) return true;
+          if (/\{\d+\}/.test(k) || !/\d/.test(k) || typeof i18nDeriveKey !== 'function') return false;
+          const d = i18nDeriveKey(k, []).key;
+          return d !== k && have.has(d);
+        });
+      }, [notAsked, Object.keys(strings)]));
+      notAsked.forEach(k => { if (retiredKey(k)) dated.add(k); });
       const bad = Object.keys(strings).filter(k => ADDRESS.test(k) || ADDRESS.test(String(strings[k])) || named(k, strings[k]) || dated.has(k));
       if (!bad.length) break;
       if (DRY) { scrubbed.push(lang + ' ' + bad.length + ' (dry run: kept)'); break; }
@@ -202,7 +216,7 @@ try {
       bad.forEach(k => { delete kept[k]; });
       const at = Date.now();
       const fields = { strings: { mapValue: { fields: Object.fromEntries(Object.entries(kept).map(([k, v]) => [k, fsString(v)])) } },
-        count: fsInt(Object.keys(kept).length), updatedAt: fsInt(at), by: fsString('GitHub, after ' + version + ' (addresses, names and dates taken out)') };
+        count: fsInt(Object.keys(kept).length), updatedAt: fsInt(at), by: fsString('GitHub, after ' + version + ' (addresses, names, dates and data taken out)') };
       const w = await patchDoc(prefix + lang, fields, d.updateTime);
       if (w === 'changed') { console.log(`  ${lang}: changed meanwhile — reading it again`); continue; }
       await patchDoc(indexPath, { langs: { mapValue: { fields: { [lang]: { mapValue: { fields: { at: fsInt(at), count: fsInt(Object.keys(kept).length) } } } } } } }, null, ['langs.' + lang]);
@@ -210,7 +224,7 @@ try {
       break;
     }
   }
-  if (scrubbed.length) console.log('::notice::Languages: entries holding an e-mail address, a name or a date taken out — ' + scrubbed.join(', '));
+  if (scrubbed.length) console.log('::notice::Languages: entries holding an e-mail address, a name, a date or other data (not phrases of the app) taken out — ' + scrubbed.join(', '));
 
   const plan = [];
   for (const lang of langs) {

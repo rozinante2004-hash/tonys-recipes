@@ -1,0 +1,37 @@
+{
+ "about": "v39.47 — entries that are not phrases of the app and must never be in the shared translations or a published file: names (kept here only as SHA-256 of the exact key, so this public file does not repeat them) and a few stray lines. Read by tools/translate-new.mjs (the release job takes them out of the central store) and tools/publish-languages.mjs (never written into i18n/*.json or a kept version). One hash is of \"A retired name for the publishing test\" (tests/publish-languages.test.mjs).",
+ "keys": [
+  "Openverse",
+  "Pixabay",
+  "Wikimedia Commons",
+  "👑 Alkalmazás tulajdonosa",
+  "📊 Háztartások (kezelés)",
+  "Deutsch — German",
+  "Español — Spanish",
+  "Français — French",
+  "Italiano — Italian",
+  "Português — Portuguese"
+ ],
+ "sha256": [
+  "18b5fb3cae6f15d91a21496b2b69e24670c6592c378a67100472dff404f49557",
+  "446ccaa20d24b4254484a31905854786223ac875bb790dbd09696a0e151d0269",
+  "452905cb3df8a6158e9e53424acd17d6e12054b780f2f199781d226ede6cc98b",
+  "55cef8aa085ae25dc1342be158433b5bdae39a59afb853351c84a57bc7ac9396",
+  "596d2d98b142f51982f172339ea0bd9b2865567a197b59facc545d152d93bc58",
+  "5d49ec061915ee755a1ae79e06b61eca74f761f590e35ffb5b759369b4c4af7c",
+  "72244502cd8c2a7d4fc5ce3c17d2fc816c2da71814c1d0dc9a4dc43164d610a0",
+  "74dc1e6a60db5509602d505f606b3d2260d0be62404dff528fdadb11680eb345",
+  "77c9481b274391feda589ea0d1a60b16ee64fdb1f702152cbff0c45528e81c8e",
+  "7973218d700ca5f33a3b003cff867c7396a8d44d63341325f6f52392f6b1ae5e",
+  "8b9470c0da936dd837218bf1a8d19f1960e1064eccce218b793090fe5de5cdbe",
+  "8cac23036aab05ad163276d93c46f23cefc4d1a6ff27a0b1a49ca96d65f1bc08",
+  "9eb415c795ec59dc852e8b51473ff1e56fb2eab3b6e63121963cf1e17e5c058e",
+  "a6c293d53a0fcc772a752903bee7f4f3364b886758fb055ed48d67252448166a",
+  "ad5a5f55cb7eb9f817021821c8b5cc9ac82d2b72aa4de6ed4985e82ae63dbae4",
+  "afefbf424bb24298ec0fd7d34eb099819bc8a97a98bf6da966ed7e7d56c4e975",
+  "b68a580c0c797d03cf9bcf885387f8cdb28f668983d4a66223238de1c16669da",
+  "c4d457ba25ddaedcec7deabb98829632c6d96ae1f64bc40fc3901a6d7ceb5a0d",
+  "df0c90d502d2694ed528134970ebced70f44d114dc43fa355fc2b1528b886ac9",
+  "e4841eaf9850fb20f71d085b9c3560b5bcd971a3696cd3ffcb6763e5ff22901e"
+ ]
+}

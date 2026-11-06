@@ -26,6 +26,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { neverPublished, otherScriptFrom } from './i18n-junk.mjs';
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const argv = process.argv.slice(2);
@@ -108,17 +109,25 @@ fs.mkdirSync(outDir, { recursive: true });
 // holds, and takes them out of the versions already kept here too.
 const ADDRESS = /[^\s@<>()"'`]+@[^\s@<>()"'`]+\.[A-Za-z]{2,}/;
 const noAddresses = o => { let n = 0; for (const k of Object.keys(o)) if (ADDRESS.test(k) || ADDRESS.test(String(o[k]))) { delete o[k]; n++; } return n; };
-let scrubbedFiles = 0;
+// v39.47 — nor a name, a credit or another script's words held as a phrase (tools/i18n-junk.mjs): out of the files
+// whatever the database holds, and out of the versions already kept here.
+const OTHER_SCRIPT = otherScriptFrom(html);
+const noJunk = o => { let n = 0; for (const k of Object.keys(o)) if (neverPublished(k, OTHER_SCRIPT)) { delete o[k]; n++; } return n; };
+let scrubbedFiles = 0, junkFiles = 0;
 for (const code of Object.keys(arch.langs || {})) {
   for (const v of arch.langs[code] || []) {
     const f = path.join(archDir, v.file), d = readJson(f);
-    if (!d || !d.strings || !noAddresses(d.strings)) continue;
+    if (!d || !d.strings) continue;
+    const a = noAddresses(d.strings), j = noJunk(d.strings);
+    if (!a && !j) continue;
     d.count = Object.keys(d.strings).length; v.count = d.count;
     fs.writeFileSync(f, JSON.stringify(d, null, 1) + '\n');
-    scrubbedFiles++;
+    if (a) scrubbedFiles++;
+    if (j) junkFiles++;
   }
 }
 if (scrubbedFiles) console.log(`::notice::Languages: e-mail addresses taken out of ${scrubbedFiles} kept version(s)`);
+if (junkFiles) console.log(`::notice::Languages: names, credits and other data taken out of ${junkFiles} kept version(s)`);
 const written = {};
 const now = Date.now();
 const stamp = new Date(now).toISOString().replace(/:/g, '');   // 2026-09-27T205412.345Z
@@ -145,6 +154,8 @@ for (const code of langs) {
   for (const [k, v] of Object.entries(d.strings)) if (typeof v === 'string') strings[k] = v;
   const dropped = noAddresses(strings);
   if (dropped) console.log(`::warning::${code}: ${dropped} entr${dropped === 1 ? 'y' : 'ies'} holding an e-mail address left out of the file`);
+  const junk = noJunk(strings);
+  if (junk) console.log(`  ${code}: ${junk} entr${junk === 1 ? 'y' : 'ies'} that are data, not phrases, left out of the file`);
   const count = Object.keys(strings).length;
   if (!count) { console.log(`  ${code}: empty — skipped`); continue; }
   const doc = { lang: code, updatedAt: d.updatedAt || (idx.langs[code] || {}).at || 0, count, strings: stable(strings) };

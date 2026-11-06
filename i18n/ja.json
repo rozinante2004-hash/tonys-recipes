@@ -3131,6 +3131,17 @@
   "🪵 Keeping {1} day{2} of log": "🪵 ログを{1}日{2}分保持",
   "🪵 Logging & debugging": "🪵 ログとデバッグ",
   "🪵 The log has something worth reporting": "🪵 ログに報告すべき内容があります",
-  "🫙 Low FODMAP": "🫙 低FODMAP"
+  "🫙 Low FODMAP": "🫙 低FODMAP",
+  "🔍 Searching {1}…": "🔍 {1}で検索中…",
+  "{1} from {2} — tap to select": "{2}から{1}件 — タップして選択",
+  "{1} from {2} (round {3}) — tap to select": "{2}から{1}件（{3}巡目）— タップして選択",
+  "⚠️ no English term found for “{1}” — searched as typed": "⚠️「{1}」の英語表記が見つかりません — 入力されたまま検索しました",
+  "No photos from {1} for “{2}”. Tap “See more” to try another source, or edit the search above.": "{1}に「{2}」の写真はありません。「その他を見る」で別のソースを試すか、上の検索語を変えてください。",
+  "Photo:": "写真：",
+  "{1} ingredients · {2} steps": "材料{1}点 · 手順{2}",
+  "🔄 {1} language(s) up to date, {2} phrase(s) added — shared with everyone": "🔄 {1}言語を更新、{2}件のフレーズを追加 — 全員と共有しました",
+  "🔄 {1} language(s) up to date, {2} phrase(s) added — on this device only": "🔄 {1}言語を更新、{2}件のフレーズを追加 — この端末のみ",
+  "🔄 {1} language(s) up to date, {2} phrase(s) added; {3} failed — the log says why — shared with everyone": "🔄 {1}言語を更新、{2}件のフレーズを追加。{3}件失敗 — 理由はログに — 全員と共有しました",
+  "🔄 {1} language(s) up to date, {2} phrase(s) added; {3} failed — the log says why — on this device only": "🔄 {1}言語を更新、{2}件のフレーズを追加。{3}件失敗 — 理由はログに — この端末のみ"
  }
 }

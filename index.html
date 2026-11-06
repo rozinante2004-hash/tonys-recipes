@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.46 -->
+<!-- Tony's Recipes Collection v39.47 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -10714,7 +10714,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.46';
+var APP_VERSION = 'v39.47';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -14189,7 +14189,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.46</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.47</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14277,7 +14277,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.46</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.47</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -17823,6 +17823,16 @@ window.i18nPatternsFromDict = i18nPatternsFromDict; window.i18nAsk = i18nAsk;
 // translating a string nobody sees. A `{1}` makes it a shape, matched the same
 // way a built toast is.
 var I18N_EXTRA = [
+  // v39.47 — lines whose data (a photo library, the words searched for, a credit, a count of languages) now sits in an
+  // element of its own; drawn only while a photo search runs or after "Update all languages", so no harvest reads them
+  '\uD83D\uDD0D Searching {1}\u2026', '{1} from {2} \u2014 tap to select', '{1} from {2} (round {3}) \u2014 tap to select',
+  '\u26A0\uFE0F no English term found for \u201C{1}\u201D \u2014 searched as typed', '\uD83D\uDD04 See more from {1} \u2192',
+  'No photos from {1} for \u201C{2}\u201D. Tap \u201CSee more\u201D to try another source, or edit the search above.',
+  '\u23F3 {1} asks for a pause \u2014 {2} s\u2026', 'Photo:', '{1} ingredients \u00b7 {2} steps',
+  '\uD83D\uDD04 {1} language(s) up to date, {2} phrase(s) added \u2014 shared with everyone',
+  '\uD83D\uDD04 {1} language(s) up to date, {2} phrase(s) added \u2014 on this device only',
+  '\uD83D\uDD04 {1} language(s) up to date, {2} phrase(s) added; {3} failed \u2014 the log says why \u2014 shared with everyone',
+  '\uD83D\uDD04 {1} language(s) up to date, {2} phrase(s) added; {3} failed \u2014 the log says why \u2014 on this device only',
   // v39.35 — the farm window (the owner's, drawn only when opened, so no harvest reads it): which voice speaks for the
   // male and the child on this device, and a female voice that is neither Scottish nor British
   'Male voice: {1}. Child’s voice: {2}.', 'On this device: {1} — English — this device has no Scottish voice',
@@ -18062,7 +18072,9 @@ var I18N_CODE_CERTAIN = [
   // A sync-log row: "9/18/2026, 10:57:13 PM · save". Since v36.44 those rows
   // carry data-no-i18n and can never be a key again, so hundreds of them sit in
   // Tony's file as pure weight. Nothing a person reads starts like this.
-  /^\s*\d{1,2}\/\d{1,2}\/\d{2,4},?\s+\d{1,2}:\d{2}/
+  /^\s*\d{1,2}\/\d{1,2}\/\d{2,4},?\s+\d{1,2}:\d{2}/,
+  // v39.47 — a JSON object ('{"id":96,"at":1789828099690,"bytes":16694}' — a log row's details, printed once).
+  /^\s*\{\s*"[\w$]+"\s*:/
 ];
 var I18N_CODE_HINTS = [
   /\)\s*;/, /;\s*if\s*\(/, /\)\s*\{/,
@@ -18121,9 +18133,75 @@ function i18nLooksLikeDate(s) {
   }
   return false;
 }
-function i18nKeepable(s) {
-  return !!s && i18nTranslatable(s) && !i18nLooksLikeCode(s) && !i18nLooksLikeDate(s);
+// v39.47 — DATA IS NEVER A PHRASE (Tony, 6 Nov 2026 — the 01:50 publish brought 72 Hebrew entries, most of them
+// data: photographers' credits, a collection's recipe lines with a chef's name, a recipe's name, a list of language
+// names with counts). Each screen that did it now marks its data (data-no-i18n); this is the guard behind them, for
+// the shapes no English phrase of the app can have:
+//   • letters of another script — the app's English never holds Hebrew, Arabic, Cyrillic, Thai, Devanagari, Japanese,
+//     Chinese or Korean; when a line does, the line holds someone's words (a search, a name, a recipe);
+//   • a credit — it starts with ©;
+//   • the shapes of the lines that carried data before v39.47 (I18N_RETIRED), written so that the same line as it is
+//     drawn now ("🔍 Searching {1}…", "🔄 See more from {1} →") is not one of them.
+// The release job takes stored entries out by this same rule (tools/translate-new.mjs), for what the app no longer asks for.
+var I18N_OTHER_SCRIPT = /[\u0590-\u05FF\u0600-\u06FF\u0750-\u077F\u0400-\u04FF\u0900-\u097F\u0E00-\u0E7F\u3040-\u30FF\u3400-\u9FFF\uAC00-\uD7AF]/;
+var I18N_RETIRED = [
+  /^\u00a9/,                                                     // "© <photographer>" — a photo's credit
+  /^Photo: \{\d+\} \u00b7 /,                                   // "Photo: {1} · CC BY-SA {2} ·" — licence and library as words
+  /^\uD83D\uDD0D Searching (?!\{\d+\}\u2026$)/,                    // "🔍 Searching Pixabay…"
+  /^\u23F3 [^{\s][^\n]* asks for a pause/,                       // "⏳ Pixabay asks for a pause — {1} s…"
+  /^\uD83D\uDD04 See more from (?!\{\d+\} \u2192$)/,              // "🔄 See more from Pixabay →"
+  /^(?:\{\d+\}|\d+) from (?!\{\d+\}(?: \(round \{\d+\}\))? \u2014 tap to select$)[^\n]*tap to select/,   // "{1} from Pixabay — tap to select · “…”"
+  /^No photos from (?!\{\d+\} for \u201C\{\d+\}\u201D)/,           // "No photos from Pixabay for “…”"
+  / \u00b7 serves /,                                              // "<a chef> · serves {1} · {2} …" — a recipe's line
+  /^[A-Z][a-z]+ \u00b7$/,                                         // "Breakfast ·" — the same line, cut short
+  /\u00b7 \u00b7$/,                                               // "Dessert · Easy · ·" — the same line, drawn for a stand-in
+  /^\uD83D\uDD04 (?:[A-Z][a-z]+(?: \([A-Za-z]+\))? (?:\+\{\d+\}|\u2717)(?: \u00b7 |(?= \u2014)))+/  // "🔄 Arabic +{1} · Russian +{2} — …"
+];
+function i18nLooksLikeData(s) {
+  s = String(s || '');
+  if (I18N_OTHER_SCRIPT.test(s)) return true;
+  for (var i = 0; i < I18N_RETIRED.length; i++) if (I18N_RETIRED[i].test(s)) return true;
+  return false;
 }
+function i18nKeepable(s) {
+  return !!s && i18nTranslatable(s) && !i18nLooksLikeCode(s) && !i18nLooksLikeDate(s) && !i18nLooksLikeData(s);
+}
+// v39.47 — …and this kitchen's own words are never a NEW phrase: a recipe's name (or one in a collection, or in a
+// linked kitchen), its by-line, a photographer's credit. Asked only of what is about to be recorded as missing, so a
+// word the dictionary already has (a meal type that is also somebody's recipe name) is not affected. The whole line,
+// one " · " piece of it, or a name in quotes ("Deleted “<a recipe's name>”") counts.
+var _i18nKitchenWords = null, _i18nKitchenWordsAt = 0, _i18nKitchenWordsOf = null;
+function i18nKitchenWords() {
+  var now = Date.now(), list = (typeof recipes !== 'undefined' && Array.isArray(recipes)) ? recipes : [];
+  if (_i18nKitchenWords && _i18nKitchenWordsOf === list && now - _i18nKitchenWordsAt < 5000) return _i18nKitchenWords;
+  var set = Object.create(null);
+  var add = function(t) {
+    t = String(t == null ? '' : t).replace(/\s+/g, ' ').trim();
+    if (t.length >= 3 && /[A-Za-z]/.test(t)) set[i18nDeriveKey(t, []).key.toLowerCase()] = 1;
+  };
+  var one = function(r) {
+    if (!r || typeof r !== 'object') return;
+    add(r.name); add(r.by);
+    if (r.photoCredit) add(r.photoCredit.name);
+    if (Array.isArray(r.parts)) r.parts.forEach(function(p){ if (p) { add(p.name); add(p.by); if (p.credit) add(p.credit.name); } });
+  };
+  list.forEach(one);
+  try { Object.keys(_linkCache || {}).forEach(function(h){ ((_linkCache[h] || {}).list || []).forEach(one); }); } catch(e) {}
+  _i18nKitchenWords = set; _i18nKitchenWordsAt = now; _i18nKitchenWordsOf = list;
+  return set;
+}
+function i18nIsKitchenData(key) {
+  var k = String(key || '').replace(/\s+/g, ' ').trim().toLowerCase();
+  if (!k) return false;
+  var words = i18nKitchenWords();
+  if (words[k]) return true;
+  var bits = k.split(' \u00b7 ');
+  for (var i = 0; i < bits.length; i++) if (words[bits[i].trim()]) return true;
+  var q = /[\u201C"]([^\u201D"]{3,})[\u201D"]/g, m;
+  while ((m = q.exec(k)) !== null) if (words[m[1].trim()]) return true;
+  return false;
+}
+window.i18nLooksLikeData = i18nLooksLikeData; window.i18nIsKitchenData = i18nIsKitchenData;
 function i18nLoadMissing(lang) {
   _i18nMissing = Object.create(null);
   var dropped = 0;
@@ -18149,6 +18227,7 @@ function i18nMissingCount() { return Object.keys(_i18nMissing).length; }
 function i18nNoteMissing(src) {
   if (!src || _i18nMissing[src]) return;
   if (!i18nKeepable(src)) return;          // never record what we would not send
+  if (i18nIsKitchenData(src)) return;      // v39.47 — nor this kitchen's own words (a recipe's name, a credit)
   // A string the dictionary answers with the English itself is not missing —
   // rule 7 of the prompt asks the model to do exactly that for proper nouns.
   _i18nMissing[src] = 1;
@@ -19705,10 +19784,12 @@ window.i18nGenerate = i18nGenerate;
 function i18nGapList(dict, missing, catalogue) {
   if (arguments.length === 0) { dict = _i18nDict; missing = i18nMissingList(); }
   var gaps = Object.create(null), selfTest = i18nSelfTestWords();
+  var inApp = Object.create(null);
   (missing || []).forEach(function(s){ gaps[s] = 1; });
-  (catalogue || i18nFullCatalogue()).forEach(function(s){ if (!dict || !dict[s]) gaps[s] = 1; });
-  // Belt and braces: nothing is ever SENT that would not be recorded.
-  return Object.keys(gaps).filter(function(k){ return i18nKeepable(k) && !selfTest[k]; }).sort();
+  (catalogue || i18nFullCatalogue()).forEach(function(s){ inApp[s] = 1; if (!dict || !dict[s]) gaps[s] = 1; });
+  // Belt and braces: nothing is ever SENT that would not be recorded — v39.47: nor this kitchen's own words (a recipe's
+  // name, a credit) recorded on a device before the app knew to leave them out; an app phrase is sent whatever it says.
+  return Object.keys(gaps).filter(function(k){ return i18nKeepable(k) && !selfTest[k] && (inApp[k] || !i18nIsKitchenData(k)); }).sort();
 }
 async function i18nFillGaps(lang) {
   lang = lang || _i18nLang;
@@ -19870,10 +19951,21 @@ async function i18nUpdateAll() {
     return i18nLangName(r.lang) + ' ' + (r.error ? '✗' : '+' + r.filled);
   }).join(' · ');
   var shared = results.every(function(r){ return r.error || !r.filled || r.where === 'cloud'; });
-  toast('🔄 ' + summary + (shared ? ' — shared with everyone' : ' — on this device only'), 9000);
+  // v39.47 — the toast says totals; which language got how many goes to the log. As "🔄 Arabic +3 · Russian +3 · …"
+  // every set of languages was a phrase of its own, and each went to be translated into all of them.
+  syncLog('system', 'Update all languages: ' + summary, '');
+  toast(i18nUpdateAllSummary(results, shared), 9000);
   return { updated: results, plan: plan };
 }
 window.i18nUpdateAll = i18nUpdateAll;
+function i18nUpdateAllSummary(results, shared) {
+  var bad = results.filter(function(r){ return r.error; }).length, ok = results.length - bad;
+  var added = results.reduce(function(n, r){ return n + (r.error ? 0 : (r.filled || 0)); }, 0);
+  return '🔄 ' + ok + ' language(s) up to date, ' + added + ' phrase(s) added'
+    + (bad ? '; ' + bad + ' failed — the log says why' : '')
+    + (shared ? ' — shared with everyone' : ' — on this device only');
+}
+window.i18nUpdateAllSummary = i18nUpdateAllSummary;
 
 // ─── COPYING THE LANGUAGES BETWEEN COPIES (v36.83) ───────────────────────────
 // Each copy of the app keeps its translations in its own Firebase project, so
@@ -22160,16 +22252,20 @@ function collectionSectionsHtml(r) {
         + ' can\'t be split — round up or down, or pick a serving count that divides evenly.</div>'
       : '';
 
+    // v39.47 — each piece in an element of its own: the by-line, the servings and the time are the recipe's words
+    // (marked as data, shown as the open recipe shows them: 🍽 4, ⏱ 20 min), the meal type and the level are the
+    // app's. Run together as text they made one phrase per recipe ("<a chef> · serves {1} · {2} דקות", "Dinner · {1} ·
+    // serves - · {2} hours {3} minutes"), each sent to be translated into eleven languages.
     var meta = [];
-    if (p.by) meta.push(escH(p.by));
+    if (p.by) meta.push('<span dir="auto" data-no-i18n>' + escH(p.by) + '</span>');
     // v36.12 — shown only when the recipe has its OWN, because an empty value
     // means "same as the collection" and repeating that under all ten recipes
     // of a dessert book is noise, not information.
-    if (p.category) meta.push(escH(p.category));
+    if (p.category) meta.push('<span>' + escH(p.category) + '</span>');
     if (p.difficulty) meta.push('<span class="difficulty ' + escA(p.difficulty.toLowerCase())
       + '" style="padding:1px 6px;">' + escH(p.difficulty) + '</span>');
-    if (p.servings) meta.push('serves ' + escH(p.servings));
-    if (p.prep) meta.push(escH(p.prep));
+    if (p.servings) meta.push('<span dir="auto" data-no-i18n>🍽 ' + escH(p.servings) + '</span>');
+    if (p.prep) meta.push('<span dir="auto" data-no-i18n>⏱ ' + escH(p.prep) + '</span>');
 
     // v36.11 — each recipe's OWN source, shown per recipe rather than once for
     // the whole collection. A round-up's entries each point at a different
@@ -27002,16 +27098,17 @@ function applyParsedCollection(parsed, resultDivId, overlayId, originalPhoto) {
     return '<label style="display:flex;gap:10px;align-items:flex-start;padding:9px 0;cursor:pointer;'
       + (idx ? 'border-top:1px solid var(--border);' : '') + '">'
       + '<input type="checkbox" class="coll-pick" data-i="' + idx + '" checked onchange="collectionPickChanged(\'' + resultDivId + '\')"'
-      + ' aria-label="Keep ' + escA(p.name || ('recipe ' + (idx + 1))) + '" style="flex-shrink:0;width:20px;height:20px;margin:1px 0 0;accent-color:var(--terracotta);">'
+      + ' aria-label="Keep ' + escA(p.name || ('recipe ' + (idx + 1))) + '" data-i18n-skip-attrs="aria-label" style="flex-shrink:0;width:20px;height:20px;margin:1px 0 0;accent-color:var(--terracotta);">'
       + '<div style="flex-shrink:0;width:22px;height:22px;border-radius:50%;background:var(--terracotta);'
       + 'color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;">'
       + (idx + 1) + '</div>'
       + '<div style="flex:1;min-width:0;">'
       + '<div dir="auto" style="font-weight:600;font-size:13.5px;color:var(--ink);">' + escH(p.name) + '</div>'
+      // v39.47 — the counts are the app's words; the by-line and the servings are the page's (marked as data)
       + '<div style="font-size:11.5px;color:var(--muted);">'
-      + p.ingredients.length + ' ingredients · ' + p.steps.length + ' steps'
-      + (p.by ? ' · ' + escH(p.by) : '')
-      + (p.servings ? ' · serves ' + escH(p.servings) : '')
+      + '<span>' + p.ingredients.length + ' ingredients · ' + p.steps.length + ' steps</span>'
+      + (p.by ? ' · <span dir="auto" data-no-i18n>' + escH(p.by) + '</span>' : '')
+      + (p.servings ? ' · <span dir="auto" data-no-i18n>🍽 ' + escH(p.servings) + '</span>' : '')
       + '</div></div></label>';
   }).join('');
 
@@ -33940,9 +34037,12 @@ async function searchPhotos() {
   // Held as state, not written to the status line here: doPhotoSearch overwrites
   // that line when results land, so a note written now would vanish exactly when
   // the user has results to make sense of.
+  // v39.47 — HTML, with the words in elements marked as data: as text, every Hebrew search became a phrase of its own
+  // ("…no English term found for “מרק עוף”…") and went to be translated into eleven languages.
+  var w = function(t){ return '<span data-no-i18n dir="auto">' + escH(t) + '</span>'; };
   _photoOriginal = isHeb
-    ? (r.translated ? '“' + r.original + '” → “' + r.query + '”'
-                    : '⚠️ no English term found for “' + r.original + '” — searched as typed')
+    ? (r.translated ? '“' + w(r.original) + '” → “' + w(r.query) + '”'
+                    : '⚠️ no English term found for “' + w(r.original) + '” — searched as typed')
     : '';
   // Show what is actually being searched for, not what was typed.
   if (input && r.query !== query) input.value = r.query;
@@ -33966,7 +34066,7 @@ function updatePhotoMoreBtn() {
   var btn  = document.getElementById('photoSearchMoreBtn');
   if (!wrap || !btn) return;
   var nextIdx = (_photoSrcIdx + 1) % PHOTO_SOURCES.length;
-  btn.textContent = '🔄 See more from ' + (PHOTO_SOURCE_LABELS[PHOTO_SOURCES[nextIdx]] || PHOTO_SOURCES[nextIdx]) + ' →';
+  btn.innerHTML = '🔄 See more from <span data-no-i18n>' + escH(PHOTO_SOURCE_LABELS[PHOTO_SOURCES[nextIdx]] || PHOTO_SOURCES[nextIdx]) + '</span> →';
   wrap.style.display = 'block';
 }
 
@@ -33988,14 +34088,17 @@ async function doPhotoSearch() {
   while (tried < PHOTO_SOURCES.length) {
     var source = PHOTO_SOURCES[_photoSrcIdx];
     var label  = PHOTO_SOURCE_LABELS[source] || source;
-    grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--muted);font-size:13px;">🔍 Searching ' + label + '…</div>';
+    // v39.47 — the library's name (and below, the search words) in an element of its own marked as data, so the
+    // sentence is one phrase with a hole ("🔍 Searching {1}…"), not a new phrase per library and per search.
+    var labelHtml = '<span data-no-i18n>' + escH(label) + '</span>';
+    grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--muted);font-size:13px;">🔍 Searching ' + labelHtml + '…</div>';
     try {
       var data = await photoFetch(source, _photoPage);
       if (gen !== _photoGen) return;
       // v38.81 — Pixabay: "too many searches in the last minute; try again in about 1–8 s". A short pause
       // is waited out once (the refusal is not kept, so it is asked again), rather than passed over.
       if (data.rateLimited && photoPauseSecs(data) <= 10) {
-        grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--muted);font-size:13px;">⏳ ' + label + ' asks for a pause — ' + photoPauseSecs(data) + ' s…</div>';
+        grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--muted);font-size:13px;">⏳ ' + labelHtml + ' asks for a pause — ' + photoPauseSecs(data) + ' s…</div>';
         await new Promise(function (res) { setTimeout(res, photoPauseSecs(data) * 1000); });
         if (gen !== _photoGen) return;
         data = await photoFetch(source, _photoPage);
@@ -34016,8 +34119,8 @@ async function doPhotoSearch() {
         continue;
       }
       if (!data.images || !data.images.length) {
-        grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--muted);">No photos from ' + label + ' for “' + escH(_photoQuery) + '”. Tap “See more” to try another source, or edit the search above.</div>';
-        if (status) status.textContent = _photoOriginal || '';
+        grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--muted);">No photos from ' + labelHtml + ' for “<span data-no-i18n dir="auto">' + escH(_photoQuery) + '</span>”. Tap “See more” to try another source, or edit the search above.</div>';
+        if (status) status.innerHTML = _photoOriginal || '';
         updatePhotoMoreBtn(); return;
       }
       _photoSearchResults = data.images;
@@ -34025,8 +34128,8 @@ async function doPhotoSearch() {
       // v38.45 — the next source is asked now, so See more shows it at once.
       var nx = (_photoSrcIdx + 1) % PHOTO_SOURCES.length;
       photoFetch(PHOTO_SOURCES[nx], nx === 0 ? _photoPage + 1 : _photoPage).catch(function () {});
-      status.textContent = data.images.length + ' from ' + label + (_photoPage > 1 ? ' (round ' + _photoPage + ')' : '') + ' — tap to select'
-        + (_photoOriginal ? '  ·  ' + _photoOriginal : '');
+      status.innerHTML = '<span>' + data.images.length + ' from ' + labelHtml + (_photoPage > 1 ? ' (round ' + _photoPage + ')' : '') + ' — tap to select</span>'
+        + (_photoOriginal ? '  ·  <span>' + _photoOriginal + '</span>' : '');
       updatePhotoMoreBtn(); return;
     } catch(err) {
       if (gen !== _photoGen) return;
@@ -34042,7 +34145,7 @@ async function doPhotoSearch() {
     grid.innerHTML = '<div style="grid-column:1/-1;padding:14px;color:var(--ink);font-size:13px;line-height:1.7;">'
       + '<strong>No photos came back.</strong> All ' + failures.length + ' source'
       + (failures.length === 1 ? '' : 's') + ' were tried:<br>'
-      + failures.map(function(f){ return '• <strong>' + escH(f.label) + '</strong> — ' + escH(f.why); }).join('<br>')
+      + failures.map(function(f){ return '• <strong data-no-i18n>' + escH(f.label) + '</strong> — <span>' + escH(f.why) + '</span>'; }).join('<br>')
       + (failures.some(function(f){ return /minute/.test(f.why); })
           ? '<br><br>Rate limits reset on their own. Waiting a minute and searching again usually works.'
           : '')
@@ -34085,7 +34188,7 @@ function renderPhotoSearchGrid(images) {
     image.onerror=nextTry;
     div.style.cssText='aspect-ratio:1;border-radius:8px;overflow:hidden;cursor:pointer;border:2px solid transparent;transition:border-color 0.15s;position:relative;background:#f0ebe4;display:flex;align-items:center;justify-content:center;';
     div.innerHTML='<div style="color:var(--muted);font-size:10px;">Loading...</div>';
-    image.onload=function(){ clearTimeout(slow); div.innerHTML=''; div.appendChild(image); if(img.credit){var c=document.createElement('div');c.style.cssText='position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,0.5);color:white;font-size:9px;padding:2px 4px;text-align:right;';c.textContent='© '+img.credit;div.appendChild(c);} };
+    image.onload=function(){ clearTimeout(slow); div.innerHTML=''; div.appendChild(image); if(img.credit){var c=document.createElement('div');c.setAttribute('data-no-i18n','');c.style.cssText='position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,0.5);color:white;font-size:9px;padding:2px 4px;text-align:right;';c.textContent='© '+img.credit;div.appendChild(c);} };
     image.src=tries[0]; if(tries.length>1) slow=setTimeout(nextTry, 8000); grid.appendChild(div);
   });
 }
@@ -34111,9 +34214,11 @@ function photoCreditHtml(r) {
     : escH(c.name);
   // v38.82 — the library named with a link to it (Pexels asks for one; the others are named the same way)
   var home = Object.prototype.hasOwnProperty.call(PHOTO_SOURCE_HOMES, c.source) ? PHOTO_SOURCE_HOMES[c.source] : '';
-  return '<div style="font-size:11px;color:var(--muted);padding:4px 18px 0;text-align:end;">Photo: ' + who
+  // v39.47 — the photographer, the licence and the library are data (one element marked so): as words, each credit
+  // became a phrase ("Photo: {1} · CC BY-SA {2} ·", and each photographer's name on its own).
+  return '<div style="font-size:11px;color:var(--muted);padding:4px 18px 0;text-align:end;">Photo: <span data-no-i18n dir="auto">' + who
     + (c.license ? ' · ' + escH(c.license) : '')
-    + (c.source ? ' · ' + (home ? '<a href="' + escA(home) + '" target="_blank" rel="noopener noreferrer" style="color:inherit;">' + escH(c.source) + '</a>' : escH(c.source)) : '') + '</div>';
+    + (c.source ? ' · ' + (home ? '<a href="' + escA(home) + '" target="_blank" rel="noopener noreferrer" style="color:inherit;">' + escH(c.source) + '</a>' : escH(c.source)) : '') + '</span></div>';
 }
 window.photoCreditHtml = photoCreditHtml;
 
@@ -34416,6 +34521,7 @@ var HELP_SYSTEM_PROMPT = [
   "- Diet tags on recipes help the diet filters work correctly — use Auto-tag to set them",
   "- The Self Test (⚙️ → 🔧 Troubleshooting → 🧪 Self Test) is useful for diagnosing if something stops working",
   "- The interface language: tap 🌐 next to ? — the app's words change; recipes stay as written. The app speaks English, Hebrew, Arabic, Russian, French, Spanish, German, Italian, Portuguese, Chinese, Japanese and Hungarian, and any language someone adds (🌐 → ➕ Add a language… — translated once, then everyone has it). On a new device whose own language the app speaks, it asks once, before the setup: that language or English (a Hungarian phone is asked Magyar or English) — so the setup, the kitchen rules and the welcome come in that language too",
+  "- WHAT THE TRANSLATIONS HOLD (v39.47): only the app's own words. A recipe's name, a by-line, servings and time, a photographer's credit, the words someone searched for, names and e-mail addresses are never sent to be translated and never kept in the shared translations — the screens that show them mark them as data, and the app refuses anything that looks like data (another alphabet in an English phrase, a © credit, a recipe's own name). On a release, GitHub takes out of the shared translations whatever the app no longer asks for and would not collect today (dates, code, credits, recipe lines, old copies of a phrase with a number in it), and the published language files and their kept versions never hold a name. So the ✏️ Edit translations list stays the app's words, and nothing has to be cleaned by hand. A recipe inside a collection shows its servings and time as the open recipe does (🍽 4 · ⏱ 20 min); a photo credit reads 'Photo: <who> · <licence> · <library>'; after 🔄 Update all supported languages the message gives totals ('🔄 11 language(s) up to date, 24 phrase(s) added — shared with everyone'), and which language got how many is in the log",
   "- (The app's owner) Correcting a translation: in My Kitchen Notes (the copy that holds the translations), switch the interface to that language, then 🌐 → ✏️ Edit translations…, change the words and press 💾 Save — it must say '✅ <language> saved and shared with everyone' — then 🌐 → 🚀 Publish languages now (every copy has it within about ten minutes). What you change is kept on this device until it is shared: closing the window, restarting the app or signing out does not lose it, and the editor brings it back. If Save cannot share it, it says why — usually this device's sign-in: sign out, sign in again with Google and your authenticator's 6-digit code, open the editor and press Save. A Save writes only what you changed, onto the newest shared copy, and the automatic translation of new phrases only fills in what is missing — it never replaces a correction. The same wording wrong in many places (e.g. a menu's name inside many sentences): 🔁 Replace… beside the search — what is in the search box is offered as the words to find; untick the rows that should stay, press 🔁 Replace in N, then 💾 Save",
   "- ✦ All clears the filters; the sort stays as chosen (⇅ Sort), and starts newest first each time the app is opened"
 ].join("\n");

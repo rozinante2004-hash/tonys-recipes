@@ -1454,6 +1454,28 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
     line's 3 phrases translated), Publish languages (00:55 — 3065b02 on main; test fast-forwarded; its Deploy to
     GitHub Pages, pages build and Cloudflare Pages for test 00:56), Self Tests on main (01:11). The published
     Hebrew keeps Tony's headings.
+  - **v39.47 — data is never a phrase to translate** (Tony, 6 Nov 2026, standing wish from v39.45: "Let's make sure it
+    doesn't happen again, as junk tends to accumulate"). The 01:50 publish from the app (d1680a5) brought 72 Hebrew
+    entries, most of them data. Found by drawing every data screen with marked values ("Qzx…") and listing the phrase
+    keys that carried the mark (scratchpad junk47/leaks.js): the photo search (library name, the Hebrew search words,
+    each photographer's "© …"), the credit under a photo ("Photo: {1} · CC BY-SA {2} ·" and the photographer's name as a
+    phrase of its own), a collection recipe's line ("<chef> · serves {1} · {2} דקות" — 17 Hebrew chef lines were in the
+    files), an imported collection's list, and "🔄 Arabic +{1} · Russian +{2} · …" after Update all. **Fixed at each
+    screen** (data in `<span data-no-i18n>`; servings and time shown as the open recipe does, 🍽 4 · ⏱ 20 min; the toast
+    gives totals, the per-language list goes to the log) **and behind them**: `i18nLooksLikeData` in `i18nKeepable`
+    (another script's letters, a © credit, the old shapes in `I18N_RETIRED`), JSON as code, and `i18nIsKitchenData`
+    (this kitchen's recipe names, by-lines, credits — also linked kitchens' — never recorded as missing nor sent).
+    **The files also held family members' e-mail names** (three, from the access list before it was marked) and the
+    owner's name: `tools/i18n-retired.json` lists such keys only as SHA-256. **Clean-up:** on a release, translate-new
+    takes out of the store whatever the app does not ask for and would not collect today, plus old number-bearing
+    copies whose {n} form exists, plus the listed keys — simulated on the published files: he 177, ja 30, ru 29, zh 20,
+    ar/de/es/fr 12, it 10, hu 7, pt 5, nothing real among them (reviewed one by one); publish-languages never writes
+    another script's key, a © key or a listed one into a file or a kept version (run into a scratch copy from the live
+    store: 132 kept versions cleaned, no family name or © key left, no real value changed). Git history still holds
+    the old files. 11 new phrases translated by hand into the 11 languages (scratchpad tr/tr47.py). Self Test
+    `i18n_no_data_as_phrases` (knock-outs: no data rule, no kitchen-words rule, credit as words, collection by-line as
+    words, search line as text, Update-all listing languages — each fails it). `<bdi>` is NOT a placeholder child
+    (I18N_INLINE): a line holding one is not a phrase at all — use a span.
   - **Released: v39.46 + Worker v102 to the family's copy and the beta (6 Nov 2026, 01:29 Israel time, on 41830ee;
     Tony: "Release v39.46 to family and beta when green").** Green first on test: 04c6775 (Cloudflare Pages for test
     and Deploy the Worker 01:09 — Worker v102 live from then; Self Tests success), then 41830ee (Self Tests 01:29).

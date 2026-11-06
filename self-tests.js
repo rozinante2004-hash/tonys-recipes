@@ -20055,6 +20055,70 @@ window.SELF_TESTS = [
       var off=lines.filter(function(k){ return I18N_EXTRA.indexOf(k)===-1 || i18nLooksLikeDate(k); });
       if(off.length) throw new Error('a WhatsApp list line is not the listed phrase: '+JSON.stringify(off));
     } },
+  { id:'i18n_no_data_as_phrases', group:'UI', name:'A photo credit, a recipe\'s name or by-line, a search\'s words or a list of languages never becomes a phrase to translate — the lines around them still do (v39.47)',
+    test: async()=>{
+      // v39.47 — Tony: "Let's make sure it doesn't happen again, as junk tends to accumulate". A publish from the app
+      // brought 72 Hebrew entries that were data: "© <photographer>", "Photo: {1} · CC BY-SA {2} ·", "<a chef> · serves {1}",
+      // a recipe's name, "🔄 Arabic +{1} · Russian +{2} · …". Each screen now marks its data; the rules stand behind.
+      ['i18nLooksLikeData','i18nIsKitchenData','i18nUpdateAllSummary','photoCreditHtml','collectionSectionsHtml','applyParsedCollection','searchPhotos'].forEach(function(f){
+        if(typeof window[f]!=='function') throw new Error(f+' is not defined'); });
+      var junk=['© Some Photographer', 'Photo: {1} · CC BY-SA {2} ·', '🔍 Searching Pixabay…', '🔄 See more from Pixabay →', '{1} from Pixabay — tap to select',
+        '{1} from Openverse — tap to select · ⚠️ no English term found for “מרק עוף” — searched as typed', 'גיא מועלם · serves {1}', 'Dinner · {1} · serves - · -',
+        'Breakfast ·', '🔄 Arabic +{1} · Russian +{2} · Chinese (Simplified) +{3} — shared with everyone', '{"id":{1},"at":{2}}', '中文 — Chinese (Simplified)'];
+      var kept=junk.filter(function(k){ return i18nKeepable(k); });
+      if(kept.length) throw new Error('these would still become phrases: '+JSON.stringify(kept));
+      var mine=i18nFullCatalogue().concat(I18N_EXTRA).filter(function(k){ return i18nLooksLikeData(k); });
+      if(mine.length) throw new Error('the app\'s own phrases are taken for data: '+JSON.stringify(mine.slice(0,5)));
+      var GIF='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+      var keysOf=function(el){ return i18nUnits(el).map(function(u){ return (u.attr?'['+u.attr+'] ':'')+u.key; }); };
+      var leaks=function(where, keys){ var l=keys.filter(function(k){ return /qzx/i.test(k); }); if(l.length) throw new Error(where+': data became a phrase: '+JSON.stringify(l.slice(0,4))); };
+      var host=document.createElement('div'); host.id='stDataHost'; document.body.appendChild(host);
+      var real={ fetch:window.photoFetch, q:window.photoQueryForSearch, recipes:recipes.slice() };
+      var ov=document.getElementById('photoSearchOverlay');
+      try{
+        // A collection's recipe: its by-line, servings and time are data; its meal type is the app's word.
+        var coll=normalizeRecipe({ id:9300401, name:'Qzx book', category:'Dinner', difficulty:'Easy', photo:GIF, photoCredit:{ name:'Qzx Person from Qzxcity, Brasil', url:'https://example.invalid/u', license:'CC BY-SA 4.0', source:'Wikimedia Commons' },
+          parts:[{ name:'Qzx part', by:'Qzx Chef', category:'Breakfast', difficulty:'Medium', servings:'Qzx 4', prep:'Qzx 1 hrs 20 mins', ingredients:[{ a:'1', n:'x' }], steps:['y'] },
+                 { name:'Qzx part two', ingredients:[{ a:'1', n:'x' }], steps:['y'] }] });
+        host.innerHTML=collectionSectionsHtml(coll)+photoCreditHtml(coll);
+        var k1=keysOf(host); leaks('a collection and its photo credit', k1);
+        if(k1.indexOf('Breakfast')===-1) throw new Error('the meal type of a collection\'s recipe is no longer a phrase: '+JSON.stringify(k1.slice(0,12)));
+        if(k1.indexOf('Photo:')===-1) throw new Error('the photo credit\'s "Photo:" is no longer a phrase: '+JSON.stringify(k1.slice(0,12)));
+        // An import that found a collection: the counts are the app's words, the by-line is the page's.
+        host.innerHTML='';
+        applyParsedCollection({ name:'Qzx book', parts:[{ name:'Qzx one', by:'Qzx Writer', servings:'Qzx 6', ingredients:[{ a:'1', n:'x' }], steps:['y'] }] }, 'stDataHost', null, '');
+        var k2=keysOf(host); leaks('an imported collection', k2);
+        if(k2.indexOf('{1} ingredients · {2} steps')===-1) throw new Error('an imported recipe\'s counts are no longer a phrase: '+JSON.stringify(k2.slice(0,12)));
+        // A photo search in Hebrew: the library, the words and the photographers are data.
+        window.photoQueryForSearch=async function(q){ return { query:'qzx soup', original:q, translated:false }; };
+        window.photoFetch=function(){ return Promise.resolve({ images:[{ thumb:GIF, url:GIF, credit:'Qzx Photographer' }, { thumb:GIF, url:GIF, credit:'qzx_user42' }] }); };
+        openPhotoSearch(''); document.getElementById('photoSearchInput').value='Qzx מרק';
+        await searchPhotos(); await wait(300);
+        var k3=keysOf(ov); leaks('the photo search', k3);
+        ['{1} from {2} — tap to select', '⚠️ no English term found for “{1}” — searched as typed'].forEach(function(t){
+          if(k3.indexOf(t)===-1) throw new Error('the photo search line is not the phrase "'+t+'": '+JSON.stringify(k3.filter(function(k){ return /select|term|from/.test(k); }))); });
+        // This kitchen's own words are never recorded as missing, a name in quotes neither; a new phrase still is.
+        recipes.push(normalizeRecipe({ id:9300402, name:'Qzx Pint Please...', by:'Qzx Byline', ingredients:[], steps:[] }));
+        _i18nKitchenWords=null;
+        var probes=['Qzx Pint Please...', '🗑️ Deleted “Qzx Pint Please...”', 'Qzx Byline · Dinner', 'A brand new sentence for the data test'];
+        probes.forEach(function(k){ i18nNoteMissing(k); });
+        var noted=i18nMissingList().filter(function(k){ return probes.indexOf(k)!==-1; });
+        i18nClearMissing(probes);
+        if(noted.join('|')!=='A brand new sentence for the data test') throw new Error('recorded as missing: '+JSON.stringify(noted)+' (only the new sentence should be)');
+        var gap=i18nGapList({}, ['Qzx Pint Please...', 'A brand new sentence for the data test'], []);
+        if(gap.join('|')!=='A brand new sentence for the data test') throw new Error('sent for translation: '+JSON.stringify(gap));
+        // "Update all languages" says totals, in a phrase the app lists — not a list of language names.
+        var said=i18nUpdateAllSummary([{ lang:'he', filled:3, where:'cloud' }, { lang:'ar', filled:2, where:'cloud' }, { lang:'ru', error:'x' }], true);
+        var sk=i18nDeriveKey(said, []).key;
+        if(/Hebrew|Arabic|Russian/.test(said) || I18N_EXTRA.indexOf(sk)===-1) throw new Error('the "Update all" message is not one listed phrase: '+said);
+      } finally {
+        window.photoFetch=real.fetch; window.photoQueryForSearch=real.q;
+        recipes.length=0; real.recipes.forEach(function(r){ recipes.push(r); }); _i18nKitchenWords=null;
+        try{ _photoCache={}; _photoQuery=''; _photoOriginal=''; document.getElementById('photoSearchGrid').innerHTML=''; document.getElementById('photoSearchStatus').textContent=''; }catch(e){}
+        if(ov) ov.classList.remove('open');
+        host.remove();
+      }
+    } },
   { id:'search_every_language', group:'Features', name:'🌐 A search finds recipes in every language the recipes are in — linked kitchens\' too — each word looked up once, the words it added shown (v39.46)',
     test: async()=>{
       // v39.46 — Tony: "if I have recipes in English and Hebrew, and I search for \"Mushrooms\", then the search should

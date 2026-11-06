@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v39.46` — app. **Worker: v102**, deployed separately and versioned separately
+**Current version:** `v39.47` — app. **Worker: v102**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -408,6 +408,17 @@ under its plain path only (a `?url=` request goes network-first).
   **Pace and pitch (v39.36, Tony's choice "E" from five heard on his phone):** FARM_VOICE_TUNE child speed 0.8, pitch
   1.8 (the top; above it speech cracks); female 0.74 / 1.4; male 0.7 / 0.7 (only slower: he stays deep, v38.01); each
   animal adds ±0.3 × (its pitch − 1), kept within 0.55–1.8.
+- **Data is never a phrase (v39.47):** the screens that show a recipe's or a photo's data mark it (`data-no-i18n` on a
+  `<span>` — `<bdi>` is not a placeholder child): the photo search's library, search words and credits; the credit line
+  ("Photo:" + who · licence · library); a collection recipe's by-line, 🍽 servings and ⏱ time; an imported collection's
+  by-line. `i18nLooksLikeData` (in `i18nKeepable`) refuses another script's letters (`I18N_OTHER_SCRIPT`), a © credit
+  and the old data-bearing shapes (`I18N_RETIRED`); `i18nIsKitchenData` keeps this kitchen's recipe names, by-lines and
+  credits (whole, a " · " piece, or in quotes) out of the missing list and the gap sent to be translated. "Update all
+  languages" toasts totals (`i18nUpdateAllSummary`), the per-language list goes to the log. On a release
+  `tools/translate-new.mjs` takes out of the central store what the app does not ask for and would not collect
+  (`!i18nKeepable`), old copies with a plain number whose {n} form exists, and `tools/i18n-retired.json` (names only as
+  SHA-256); `tools/publish-languages.mjs` (via `tools/i18n-junk.mjs`) never writes another script's key, a © key or a
+  listed one into `i18n/<lang>.json` or a kept version. Self Test `i18n_no_data_as_phrases`.
 - **🌐 Search in every language (v39.46, Worker v102):** when the recipes in view (this kitchen's and the shown linked
   kitchens') are in more than one language (`recipeLangOf`: by script, Latin by everyday words), each word typed is
   also matched as recipes in those languages write it (`searchAlsoForms` inside `recipeMatchesQuery`), 750 ms after

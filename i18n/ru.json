@@ -3121,6 +3121,17 @@
   "🪵 Keeping {1} day{2} of log": "🪵 Храним лог за последние {1} дн{2}",
   "🪵 Logging & debugging": "🪵 Логирование и отладка",
   "🪵 The log has something worth reporting": "🪵 В логе есть, что стоит сообщить",
-  "🫙 Low FODMAP": "🫙 Низкий FODMAP"
+  "🫙 Low FODMAP": "🫙 Низкий FODMAP",
+  "🔍 Searching {1}…": "🔍 Ищем в {1}…",
+  "{1} from {2} — tap to select": "{1} из {2} — нажмите, чтобы выбрать",
+  "{1} from {2} (round {3}) — tap to select": "{1} из {2} (круг {3}) — нажмите, чтобы выбрать",
+  "⚠️ no English term found for “{1}” — searched as typed": "⚠️ английский термин для «{1}» не найден — поиск выполнен как есть",
+  "No photos from {1} for “{2}”. Tap “See more” to try another source, or edit the search above.": "Нет фото из {1} по запросу «{2}». Нажмите «Ещё», чтобы попробовать другой источник, или измените запрос выше.",
+  "Photo:": "Фото:",
+  "{1} ingredients · {2} steps": "{1} ингр. · {2} шаг.",
+  "🔄 {1} language(s) up to date, {2} phrase(s) added — shared with everyone": "🔄 Обновлено языков: {1}, добавлено фраз: {2} — опубликовано для всех",
+  "🔄 {1} language(s) up to date, {2} phrase(s) added — on this device only": "🔄 Обновлено языков: {1}, добавлено фраз: {2} — только на этом устройстве",
+  "🔄 {1} language(s) up to date, {2} phrase(s) added; {3} failed — the log says why — shared with everyone": "🔄 Обновлено языков: {1}, добавлено фраз: {2}; не удалось: {3} — причина в журнале — опубликовано для всех",
+  "🔄 {1} language(s) up to date, {2} phrase(s) added; {3} failed — the log says why — on this device only": "🔄 Обновлено языков: {1}, добавлено фраз: {2}; не удалось: {3} — причина в журнале — только на этом устройстве"
  }
 }
