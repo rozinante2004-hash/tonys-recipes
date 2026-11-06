@@ -1454,6 +1454,19 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
     line's 3 phrases translated), Publish languages (00:55 — 3065b02 on main; test fast-forwarded; its Deploy to
     GitHub Pages, pages build and Cloudflare Pages for test 00:56), Self Tests on main (01:11). The published
     Hebrew keeps Tony's headings.
+  - **Released: v39.47 to the family's copy and the beta (6 Nov 2026, 02:34 Israel time, on 0c833cd; Tony: "Release
+    v39.47 to family and beta when green").** Green first on test on the same commit: Cloudflare Pages for test (02:18),
+    Self Tests (02:34, its "Language publishing job (emulator)" step success with the new v39.47 case). Every job success:
+    Cloudflare Pages for the beta (02:35); on main: Deploy to GitHub Pages and pages build (02:35), Translate new phrases
+    (02:38 — **"entries holding an e-mail address, a name, a date or other data (not phrases of the app) taken out — ar
+    12, de 12, es 12, fr 12, he 177, hu 7, it 10, ja 30, pt 5, ru 29, zh 20"**, exactly the simulation; the 11 new
+    phrases in each language), Publish languages (02:38 — **"names, credits and other data taken out of 132 kept
+    version(s)"**; d5dfae5 on main, test fast-forwarded; its Deploy to GitHub Pages, pages build and Cloudflare Pages for
+    test 02:39), Self Tests on main (03:00). Checked on main: no family e-mail name and no © key in any file under i18n/
+    (kept versions included), no Hebrew letters in any Hebrew key; Tony's headings ("🏡 על מטבחים ואנשים", "🧹 סידורים",
+    "👑 מנהל האפליקציה") and his rewording of the kitchen-dictionary line kept. The store's AI wording replaced the hand
+    translations of the new phrases (as always when the store lacks a phrase): he "{1} from {2} — tap to select" is
+    "{1} מאת {2} — הקש לבחירה" (singular, and "מאת"). Git history still holds the old files.
   - **v39.47 — data is never a phrase to translate** (Tony, 6 Nov 2026, standing wish from v39.45: "Let's make sure it
     doesn't happen again, as junk tends to accumulate"). The 01:50 publish from the app (d1680a5) brought 72 Hebrew
     entries, most of them data. Found by drawing every data screen with marked values ("Qzx…") and listing the phrase
