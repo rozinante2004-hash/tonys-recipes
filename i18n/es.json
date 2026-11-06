@@ -1,7 +1,7 @@
 {
  "lang": "es",
- "updatedAt": 1794002875559,
- "count": 2788,
+ "updatedAt": 1794005420437,
+ "count": 2789,
  "strings": {
   "\"Add to Home Screen\"": "Añadir a pantalla de inicio",
   "\"Open Bring!\"": "Abrir Bring!",
@@ -2552,7 +2552,7 @@
   "📱 Add to my phone’s Share menu": "📱 Añadir al menú Compartir de mi teléfono",
   "📱 Grid Layout": "📱 Diseño en cuadrícula",
   "📱 Keep the app open until it finishes — a phone pauses it while the screen is off.": "📱 Mantén la app abierta hasta que termine; el teléfono la pausa cuando se apaga la pantalla.",
-  "📱 Keep the app open, and touch the screen now and then — this phone would not keep it on by itself (Low Power Mode does that).": "📱 Mantén la app abierta y toca la pantalla de vez en cuando: este teléfono no la mantuvo encendida por sí solo (el modo de bajo consumo hace eso).",
+  "📱 Keep the app open, and touch the screen now and then — this phone would not keep it on by itself (Low Power Mode does that).": "📱 Mantén la app abierta y toca la pantalla de vez en cuando: este teléfono no la mantendría encendida por sí solo (el modo de bajo consumo hace eso).",
   "📱 Phone grid set to {1} per row": "📱 Cuadrícula del teléfono ajustada a {1} por fila",
   "📱 Save from the iPhone’s Share menu": "📱 Guardar desde el menú Compartir del iPhone",
   "📱 Save from the phone’s Share menu": "📱 Guardar desde el menú Compartir del teléfono",

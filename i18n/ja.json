@@ -1,7 +1,7 @@
 {
  "lang": "ja",
- "updatedAt": 1794002875559,
- "count": 3113,
+ "updatedAt": 1794005420437,
+ "count": 3114,
  "strings": {
   "\"Add to Home Screen\"": "ホーム画面に追加",
   "\"One item away\" filter ({1}f.{2})": "「あと1品」フィルター（{1}f.{2}）",
@@ -2870,6 +2870,7 @@
   "📱 Add to my phone’s Share menu": "📱 スマホの共有メニューに追加",
   "📱 Grid Layout": "📱 グリッド表示",
   "📱 Keep the app open until it finishes — a phone pauses it while the screen is off.": "📱 スマホは画面が消えると処理を一時停止するので、終わるまでアプリを開いたままにしてください。",
+  "📱 Keep the app open, and touch the screen now and then — this phone would not keep it on by itself (Low Power Mode does that).": "📱 アプリを開いたまま、時々画面をタップしてください。そのままだと画面が自動で消えてしまいます（低電力モードのため）。",
   "📱 Phone grid set to {1} per row": "📱 1行あたり{1}件に設定しました",
   "📱 Save from the iPhone’s Share menu": "📱 iPhoneの共有メニューから保存",
   "📱 Save from the phone’s Share menu": "📱 スマホの共有メニューから保存",
@@ -3115,7 +3116,6 @@
   "🪵 Keeping {1} day{2} of log": "🪵 ログを{1}日{2}分保持",
   "🪵 Logging & debugging": "🪵 ログとデバッグ",
   "🪵 The log has something worth reporting": "🪵 ログに報告すべき内容があります",
-  "🫙 Low FODMAP": "🫙 低FODMAP",
-  "📱 Keep the app open, and touch the screen now and then — this phone would not keep it on by itself (Low Power Mode does that).": "📱 アプリを開いたままにして、ときどき画面に触れてください — このスマホは画面を自動で点けたままにしませんでした（低電力モードではそうなります）。"
+  "🫙 Low FODMAP": "🫙 低FODMAP"
  }
 }

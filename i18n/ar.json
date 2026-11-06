@@ -1,7 +1,7 @@
 {
  "lang": "ar",
- "updatedAt": 1794002875559,
- "count": 2793,
+ "updatedAt": 1794005420437,
+ "count": 2794,
  "strings": {
   "\"Add to Home Screen\"": "إضافة إلى الشاشة الرئيسية",
   "\"Open Bring!\"": "فتح Bring!",
@@ -2558,7 +2558,7 @@
   "📱 Add to my phone’s Share menu": "📱 إضافة إلى قائمة المشاركة في الهاتف",
   "📱 Grid Layout": "📱 تخطيط الشبكة",
   "📱 Keep the app open until it finishes — a phone pauses it while the screen is off.": "📱 أبقِ التطبيق مفتوحًا حتى ينتهي — يوقفه الهاتف مؤقتًا عند إطفاء الشاشة.",
-  "📱 Keep the app open, and touch the screen now and then — this phone would not keep it on by itself (Low Power Mode does that).": "📱 أبقِ التطبيق مفتوحًا والمس الشاشة من حين لآخر — هذا الهاتف لم يُبقِها مضاءة من تلقاء نفسه (وضع الطاقة المنخفضة يفعل ذلك).",
+  "📱 Keep the app open, and touch the screen now and then — this phone would not keep it on by itself (Low Power Mode does that).": "📱 اترك التطبيق مفتوحًا، والمس الشاشة بين الحين والآخر — فهذا الهاتف لن يبقيها مضاءة من تلقاء نفسه (وضع توفير الطاقة هو السبب).",
   "📱 Phone grid set to {1} per row": "📱 الشبكة مضبوطة على {1} في كل صف",
   "📱 Save from the iPhone’s Share menu": "📱 الحفظ من قائمة المشاركة في الآيفون",
   "📱 Save from the phone’s Share menu": "📱 الحفظ من قائمة المشاركة في الهاتف",

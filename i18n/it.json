@@ -1,7 +1,7 @@
 {
  "lang": "it",
- "updatedAt": 1794002875559,
- "count": 2682,
+ "updatedAt": 1794005420437,
+ "count": 2683,
  "strings": {
   "\"Add to Home Screen\"": "Aggiungi a Home",
   "\"Open Bring!\"": "Apri Bring!",
@@ -2454,7 +2454,7 @@
   "📮 Mail to contact@": "📮 Email a contact@",
   "📱 Grid Layout": "📱 Layout a griglia",
   "📱 Keep the app open until it finishes — a phone pauses it while the screen is off.": "📱 Tieni l'app aperta finché non finisce: il telefono la mette in pausa quando lo schermo è spento.",
-  "📱 Keep the app open, and touch the screen now and then — this phone would not keep it on by itself (Low Power Mode does that).": "📱 Tieni l’app aperta e tocca lo schermo ogni tanto: questo telefono non l’ha tenuto acceso da solo (lo fa la modalità Risparmio energetico).",
+  "📱 Keep the app open, and touch the screen now and then — this phone would not keep it on by itself (Low Power Mode does that).": "📱 Tieni l'app aperta e tocca lo schermo ogni tanto: questo telefono non la terrebbe accesa da solo (è la Modalità risparmio energetico a farlo).",
   "📱 Phone grid set to {1} per row": "📱 Griglia impostata a {1} per riga",
   "📱 Save from the iPhone’s Share menu": "📱 Salva dal menu Condividi dell'iPhone",
   "📱 Save from the phone’s Share menu": "📱 Salva dal menu Condividi del telefono",

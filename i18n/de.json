@@ -1,7 +1,7 @@
 {
  "lang": "de",
- "updatedAt": 1794002875559,
- "count": 2789,
+ "updatedAt": 1794005420437,
+ "count": 2790,
  "strings": {
   "\"Add to Home Screen\"": "Zum Home-Bildschirm hinzufügen",
   "\"Open Bring!\"": "Bring! öffnen",
@@ -2553,7 +2553,7 @@
   "📱 Add to my phone’s Share menu": "📱 Zum Teilen-Menü meines Handys hinzufügen",
   "📱 Grid Layout": "📱 Rasteransicht",
   "📱 Keep the app open until it finishes — a phone pauses it while the screen is off.": "📱 Lass die App geöffnet, bis der Vorgang abgeschlossen ist – bei ausgeschaltetem Display pausiert das Handy ihn.",
-  "📱 Keep the app open, and touch the screen now and then — this phone would not keep it on by itself (Low Power Mode does that).": "📱 Lassen Sie die App geöffnet und berühren Sie ab und zu den Bildschirm – dieses Telefon hat ihn nicht von selbst angelassen (der Stromsparmodus tut das).",
+  "📱 Keep the app open, and touch the screen now and then — this phone would not keep it on by itself (Low Power Mode does that).": "📱 Lass die App geöffnet und tipp ab und zu auf den Bildschirm – dieses Handy hält den Bildschirm sonst nicht von selbst an (das liegt am Energiesparmodus).",
   "📱 Phone grid set to {1} per row": "📱 Handy-Raster auf {1} pro Reihe gesetzt",
   "📱 Save from the iPhone’s Share menu": "📱 Über das Teilen-Menü vom iPhone speichern",
   "📱 Save from the phone’s Share menu": "📱 Über das Teilen-Menü vom Handy speichern",

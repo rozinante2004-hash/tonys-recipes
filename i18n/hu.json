@@ -1,7 +1,7 @@
 {
  "lang": "hu",
- "updatedAt": 1794002875559,
- "count": 2546,
+ "updatedAt": 1794005420437,
+ "count": 2547,
  "strings": {
   "\"Add to Home Screen\"": "Hozzáadás a kezdőképernyőhöz",
   "\"Open Bring!\"": "Bring! megnyitása",
@@ -2325,7 +2325,7 @@
   "📮 Mail to contact@": "📮 Levél ide: contact@",
   "📱 Grid Layout": "📱 Rácsos elrendezés",
   "📱 Keep the app open until it finishes — a phone pauses it while the screen is off.": "📱 Hagyd nyitva az appot, amíg be nem fejezi — telefonon ez megáll, ha kialszik a kijelző.",
-  "📱 Keep the app open, and touch the screen now and then — this phone would not keep it on by itself (Low Power Mode does that).": "📱 Hagyd nyitva az alkalmazást, és időnként érintsd meg a képernyőt — ez a telefon magától nem hagyta bekapcsolva (az energiatakarékos mód ezt teszi).",
+  "📱 Keep the app open, and touch the screen now and then — this phone would not keep it on by itself (Low Power Mode does that).": "📱 Tartsd nyitva az appot, és időnként érintsd meg a kijelzőt — ez a telefon magától nem tartaná ébren (ezt az energiatakarékos üzemmód okozza).",
   "📱 Phone grid set to {1} per row": "📱 A telefon rácsa {1}/sorra állítva",
   "📱 Save from the iPhone’s Share menu": "📱 Mentés az iPhone Megosztás menüjéből",
   "📱 Save from the phone’s Share menu": "📱 Mentés a telefon Megosztás menüjéből",

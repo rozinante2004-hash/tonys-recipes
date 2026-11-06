@@ -1,7 +1,7 @@
 {
  "lang": "ru",
- "updatedAt": 1794002875559,
- "count": 3104,
+ "updatedAt": 1794005420437,
+ "count": 3105,
  "strings": {
   "\"Add to Home Screen\"": "Добавить на главный экран",
   "\"One item away\" filter ({1}f.{2})": "Фильтр «Не хватает одного» ({1}ф.{2})",
@@ -2865,6 +2865,7 @@
   "📱 Add to my phone’s Share menu": "📱 Добавить в меню «Поделиться» на телефоне",
   "📱 Grid Layout": "📱 Сетка",
   "📱 Keep the app open until it finishes — a phone pauses it while the screen is off.": "📱 Держи приложение открытым, пока не закончится — телефон приостанавливает его, если экран выключен.",
+  "📱 Keep the app open, and touch the screen now and then — this phone would not keep it on by itself (Low Power Mode does that).": "📱 Держи приложение открытым и время от времени касайся экрана — сам телефон не будет держать его включённым (это из-за режима энергосбережения).",
   "📱 Phone grid set to {1} per row": "📱 В строке: {1}",
   "📱 Save from the iPhone’s Share menu": "📱 Сохранение из меню «Поделиться» на iPhone",
   "📱 Save from the phone’s Share menu": "📱 Сохранение из меню «Поделиться» на телефоне",
@@ -3106,7 +3107,6 @@
   "🪵 Keeping {1} day{2} of log": "🪵 Храним лог за последние {1} дн{2}",
   "🪵 Logging & debugging": "🪵 Логирование и отладка",
   "🪵 The log has something worth reporting": "🪵 В логе есть, что стоит сообщить",
-  "🫙 Low FODMAP": "🫙 Низкий FODMAP",
-  "📱 Keep the app open, and touch the screen now and then — this phone would not keep it on by itself (Low Power Mode does that).": "📱 Не закрывайте приложение и время от времени касайтесь экрана — этот телефон сам не оставил его включённым (так делает режим энергосбережения)."
+  "🫙 Low FODMAP": "🫙 Низкий FODMAP"
  }
 }
