@@ -15002,6 +15002,67 @@ window.SELF_TESTS = [
       });
     } },
 
+  { id:'link_roundup_many', group:'Import/Export', name:'A long page of short entries that link to their recipes imports all of them — the links opened first, picked by name, up to 30 (v39.48)',
+    test: async()=>{
+      // v39.48 — Tony, 6 Nov 2026: a walla page of 29 recipes (a name, a line and a link each; 36 links; 10,423 characters)
+      // came back with nothing. Each of the 29 entries was read by the AI (29 calls, no ingredients in any), then the call
+      // that picks the recipe links ran out of room ("0 chars (stop: max_tokens)") and the import was lost.
+      if(typeof slicesAreHeadings!=='function' || typeof linkPicksByTitles!=='function') throw new Error('the v39.48 round-up helpers are missing');
+      var realAi=window.aiCall, realFetch=window.fetch, inp=document.getElementById('urlImportInput'), res=document.getElementById('urlImportResult');
+      var wasUrl=inp.value, wasRes=res.innerHTML;
+      async function run(n, named){
+        var titles=[], text='ROUNDUP Qzx kitchen — '+n+' recipes for the week\nAn intro line.\n', links=[{ href:'https://food.example.invalid/', text:'Food' }, { href:'https://food.example.invalid/tags/soup', text:'soup' }];
+        for(var i=1;i<=n;i++){
+          var title='Qzx dish number '+i;
+          titles.push(title);
+          text+=title+'\n'+'A short line about this dish, its rating and how long it takes. '.repeat(4)+'\nto the recipe\n';
+          links.push({ href:'https://food.example.invalid/item/'+(1000+i), text: named ? title : 'to the recipe' });
+        }
+        var calls={ outline:0, entry:0, pick:0, pickTokens:0, pickPrompt:'', page:0 }, fetched=[];
+        window.fetch=function(u, opts){
+          var b={}; try{ b=JSON.parse((opts&&opts.body)||'{}'); }catch(e){}
+          if(b.action==='fetch-url'){
+            if(/roundup/.test(b.url)) return Promise.resolve(new Response(JSON.stringify({ text:text, links:links }), { status:200 }));
+            fetched.push(b.url);
+            return Promise.resolve(new Response(JSON.stringify({ text:'Recipe page for item '+b.url.slice(-4)+'\nIngredients: 2 onions, 1 litre stock\nMethod:\n1. Fry the onions.\n2. Add the stock and simmer.\n'+'x '.repeat(40) }), { status:200 }));
+          }
+          return realFetch.apply(window, arguments);
+        };
+        window.aiCall=async function(prompt, max){
+          if(prompt.indexOf('List the recipes in it')!==-1){ calls.outline++; return JSON.stringify({ collectionName:'Qzx kitchen', category:'Dinner', titles:titles }); }
+          if(prompt.indexOf('LINKS to its recipes')!==-1){ calls.pick++; calls.pickTokens=max; calls.pickPrompt=prompt;
+            return JSON.stringify({ collectionName:'Qzx kitchen', picks:links.map(function(l,k){ return /item/.test(l.href) ? k : -1; }).filter(function(k){ return k>=0; }) }); }
+          var m=prompt.match(/Recipe page for item (\d+)/);
+          if(m){ calls.page++; return JSON.stringify({ recipes:[{ name:'Page '+m[1], ingredients:[{a:'2',n:'onions'},{a:'1l',n:'stock'}], steps:['fry','simmer'] }] }); }
+          calls.entry++; return JSON.stringify({ error:'no recipe found' });
+        };
+        inp.value='https://food.example.invalid/roundup';
+        await runUrlImport();
+        return { calls:calls, fetched:fetched, html:res.innerHTML, text:res.textContent };
+      }
+      try{
+        // 29 entries whose links carry their names — Tony's page.
+        var a=await run(29, true);
+        if(a.calls.entry) throw new Error('the AI read '+a.calls.entry+' of the short entries one by one — the links should have gone first');
+        if(a.calls.pick) throw new Error('the AI was asked to pick the links, though every link carries its recipe\'s name');
+        if(a.fetched.length!==29) throw new Error('opened '+a.fetched.length+' recipe pages, not 29');
+        if(!/29 recipes/.test(a.text)) throw new Error('the preview is not a collection of 29: '+a.text.slice(0,200));
+        if(a.text.indexOf('Qzx dish number 7')===-1) throw new Error('the recipes are not called what the page calls them');
+        // The same page, links reading only "to the recipe": the AI picks them — with room, and without the intro paragraph.
+        var b=await run(29, false);
+        if(b.calls.entry) throw new Error('(unnamed links) the short entries were read one by one');
+        if(b.calls.pick!==1) throw new Error('(unnamed links) the AI was asked to pick the links '+b.calls.pick+' times, not once');
+        if(b.calls.pickTokens<LINK_PICK_TOKENS || LINK_PICK_TOKENS<6000) throw new Error('the link-picking answer has '+b.calls.pickTokens+' tokens of room — not enough for a long list');
+        if(/collectionNotes/.test(b.calls.pickPrompt)) throw new Error('the link-picking answer still asks for the intro paragraph');
+        if(b.fetched.length!==29 || !/29 recipes/.test(b.text)) throw new Error('(unnamed links) '+b.fetched.length+' pages opened; preview: '+b.text.slice(0,160));
+        // 35 recipes: the first 30, and the preview says 5 more.
+        var c=await run(35, true);
+        if(c.fetched.length!==LINK_ROUNDUP_MAX || LINK_ROUNDUP_MAX<29) throw new Error('opened '+c.fetched.length+' pages of 35 (the most is '+LINK_ROUNDUP_MAX+')');
+        if(!/links to 5 more recipe/.test(c.text)) throw new Error('the preview does not say the page links to 5 more: '+c.text.slice(0,300));
+      } finally {
+        window.aiCall=realAi; window.fetch=realFetch; inp.value=wasUrl; res.innerHTML=wasRes;
+      }
+    } },
   { id:'link_roundup_import', group:'Import/Export', name:'A page that only LINKS to its recipes still imports (v36.2)',
     test: async()=>{
       // "10 soups in 15 minutes" is ten names, ten ratings, ten photo credits

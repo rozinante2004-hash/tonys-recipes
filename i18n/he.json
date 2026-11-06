@@ -3238,6 +3238,8 @@
   "🪵 Keeping {1} day{2} of log": "🪵 שומר {1} יום{2} של יומן",
   "🪵 Logging & debugging": "🪵 רישום ואיתור תקלות",
   "🪵 The log has something worth reporting": "🪵 יש ביומן משהו שכדאי לבדוק",
-  "🫙 Low FODMAP": "🫙 דל FODMAP"
+  "🫙 Low FODMAP": "🫙 דל FODMAP",
+  "The page links to {1} more recipe(s)": "העמוד מקשר ל-{1} מתכונים נוספים",
+  "⚠️ {1} than one import opens. Import these, then add the rest one at a time from their own pages.": "⚠️ {1} ממה שייבוא אחד פותח. ייבאו את אלה, ואת השאר הוסיפו אחד אחד מהעמודים שלהם."
  }
 }

@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.47 -->
+<!-- Tony's Recipes Collection v39.48 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -10714,7 +10714,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.47';
+var APP_VERSION = 'v39.48';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -14189,7 +14189,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.47</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.48</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14277,7 +14277,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.47</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.48</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -17823,6 +17823,9 @@ window.i18nPatternsFromDict = i18nPatternsFromDict; window.i18nAsk = i18nAsk;
 // translating a string nobody sees. A `{1}` makes it a shape, matched the same
 // way a built toast is.
 var I18N_EXTRA = [
+  // v39.48 — the import preview, when a page links to more recipes than one import opens (LINK_ROUNDUP_MAX)
+  'The page links to {1} more recipe(s)',
+  '\u26A0\uFE0F {1} than one import opens. Import these, then add the rest one at a time from their own pages.',
   // v39.47 — lines whose data (a photo library, the words searched for, a credit, a count of languages) now sits in an
   // element of its own; drawn only while a photo search runs or after "Update all languages", so no harvest reads them
   '\uD83D\uDD0D Searching {1}\u2026', '{1} from {2} \u2014 tap to select', '{1} from {2} (round {3}) \u2014 tap to select',
@@ -26500,7 +26503,13 @@ var _pageLinks = [];
 // first (which of these links ARE the recipes?), then do the small per-recipe
 // work behind real progress. Each linked page is an ordinary single-recipe
 // import, so nothing new is needed to read one.
-var LINK_ROUNDUP_MAX = 12;        // pages we are willing to open for one import
+// v39.48 — 30, not 12 (Tony, 6 Nov 2026: a walla round-up of 29 recipes). Each page is one fetch and one AI call, a few
+// at a time; past 30 the preview says how many more the page links to.
+var LINK_ROUNDUP_MAX = 30;        // pages we are willing to open for one import
+// v39.48 — the answer that picks the links had 2000 tokens and asked for the page's intro paragraph too: on Tony's
+// 29-recipe page (36 links, Hebrew) it came back with nothing written at all ("0 chars (stop: max_tokens)") and the
+// whole import was lost. Room for a long list now, and only what is used: a number and a short name per recipe.
+var LINK_PICK_TOKENS = 8000;
 
 function linkPickPrompt(text, links) {
   return 'This page is a round-up that LINKS to its recipes instead of containing them. '
@@ -26510,35 +26519,77 @@ function linkPickPrompt(text, links) {
     + 'and anything that leads to another list. Several links often point at the same '
     + 'recipe (its rating, its prep time, its "to the recipe" button) — return each '
     + 'recipe ONCE.\n\n'
-    + 'Return ONLY valid JSON, no markdown fences:\n'
-    + '{"collectionName":"the page\'s own title","collectionNotes":"its intro paragraph, if any",'
+    + 'Return ONLY valid JSON, no markdown fences, and nothing else — answer straight away:\n'
+    + '{"collectionName":"the page\'s own title",'
     + '"category":"one of Breakfast/Lunch/Dinner/Snack/Dessert/Soup/Skills & Methods",'
-    + '"picks":[{"n":<the link number>,"title":"the recipe\'s name as the page gives it"}]}\n'
+    + '"picks":[{"n":<the link number>,"title":"the recipe\'s name as the page gives it, short"}]}\n'
     + 'Return {"picks":[]} if none of them are individual recipes.\n\n'
     + 'PAGE TEXT:\n' + text.slice(0, 20000) + '\n\nLINKS:\n'
     + links.map(function(l, i){ return i + '. ' + l.href + '  — ' + (l.text || ''); }).join('\n');
 }
 
+// v39.48 — WHICH LINKS ARE THE RECIPES, BY THEIR NAMES. When the article's outline already named its recipes, a link
+// whose words are one of those names is that recipe's page: no AI call needed, and nothing to run out of room. Taken
+// only when it accounts for at least half of the names (and two); otherwise the AI picks, as before.
+function linkPickNorm(t) {
+  return String(t || '').toLowerCase().replace(/[\u0591-\u05C7]/g, '')
+    .replace(/[^0-9a-z\u00c0-\u024f\u0400-\u04ff\u0590-\u05ff\u0600-\u06ff\u3040-\u30ff\u4e00-\u9fff]+/g, ' ').trim();
+}
+function linkPicksByTitles(titles, links) {
+  if (!Array.isArray(titles) || !Array.isArray(links)) return [];
+  var used = {}, picks = [];
+  var named = links.map(function(l){ return { l: l, t: linkPickNorm(l && l.text) }; }).filter(function(x){ return x.l && x.l.href && x.t; });
+  titles.forEach(function(title) {
+    var n = linkPickNorm(title);
+    if (n.length < 3) return;
+    var hit = null;
+    for (var i = 0; i < named.length && !hit; i++) if (!used[named[i].l.href] && named[i].t === n) hit = named[i];
+    for (var j = 0; j < named.length && !hit; j++) {
+      var x = named[j];
+      if (used[x.l.href]) continue;
+      if ((n.length >= 4 && x.t.indexOf(n) !== -1) || (x.t.length >= Math.max(6, n.length * 0.6) && n.indexOf(x.t) !== -1)) hit = x;
+    }
+    if (!hit) return;
+    used[hit.l.href] = true;
+    picks.push({ href: hit.l.href, title: String(title).trim() });
+  });
+  var asked = titles.filter(function(t){ return linkPickNorm(t).length >= 3; }).length;
+  return (picks.length >= 2 && picks.length * 2 >= asked) ? picks : [];
+}
+window.linkPicksByTitles = linkPicksByTitles;
+
 // Returns the same shape as extractRecipesFromText, or null when this is not a
 // link round-up after all — so the caller can fail the way it always did.
-async function extractRecipesFromLinks(pageText, links, pageUrl, onProgress) {
+// v39.48 — `outline` (optional): what the long-article pass already learnt — the recipes' names, the page's title.
+async function extractRecipesFromLinks(pageText, links, pageUrl, onProgress, outline) {
   var say = (typeof onProgress === 'function') ? onProgress : function(){};
   if (!Array.isArray(links) || links.length < 2) return null;
+  outline = outline || {};
 
   say(0, 0, 'Looking for links to the recipes…');
-  var plan = {};
-  try { plan = extractJSON(await aiCall(linkPickPrompt(pageText, links), 2000)) || {}; }
-  catch (e) { syncLog('import', 'Could not work out which links are recipes', String(e && e.message)); return null; }
-
-  var picks = [], seen = {};
-  (plan.picks || []).forEach(function(p) {
-    var l = links[p && p.n];
-    if (!l || seen[l.href]) return;
-    seen[l.href] = true;
-    picks.push({ href: l.href, title: (p.title || l.text || '').trim() });
-  });
+  var plan = {}, picks = [], seen = {};
+  var byName = linkPicksByTitles(outline.titles, links);
+  if (byName.length) {
+    picks = byName;
+    syncLog('import', 'Link round-up: ' + picks.length + ' of ' + (outline.titles || []).length + ' recipes found among the links by name');
+  } else {
+    try { plan = extractJSON(await aiCall(linkPickPrompt(pageText, links), LINK_PICK_TOKENS)) || {}; }
+    catch (e) { syncLog('import', 'Could not work out which links are recipes', String(e && e.message)); return null; }
+    (plan.picks || []).forEach(function(p) {
+      var num = (typeof p === 'number') ? p : (p && p.n);
+      var l = links[num];
+      if (!l || seen[l.href]) return;
+      seen[l.href] = true;
+      picks.push({ href: l.href, title: String((p && p.title) || l.text || '').trim() });
+    });
+  }
   if (!picks.length) return null;
-  if (picks.length > LINK_ROUNDUP_MAX) picks = picks.slice(0, LINK_ROUNDUP_MAX);
+  var more = 0;
+  if (picks.length > LINK_ROUNDUP_MAX) {
+    more = picks.length - LINK_ROUNDUP_MAX;
+    syncLog('import', 'Link round-up: ' + picks.length + ' recipe links — opening the first ' + LINK_ROUNDUP_MAX);
+    picks = picks.slice(0, LINK_ROUNDUP_MAX);
+  }
 
   syncLog('import', 'Link round-up: opening ' + picks.length + ' recipe pages');
   var done = 0, failures = [];
@@ -26553,7 +26604,15 @@ async function extractRecipesFromLinks(pageText, links, pageUrl, onProgress) {
       var t = (d && d.text) || '';
       if (t.length < 100) throw new Error('that page had no readable text');
       // An individual recipe page is short, so this is one small call each.
-      var parsed = await extractRecipesFromText(t, 'webpage text');
+      // v39.48 — thirty pages can meet the Worker's per-minute cap on AI calls: that one is asked again after the minute.
+      var parsed;
+      try { parsed = await extractRecipesFromText(t, 'webpage text'); }
+      catch (e1) {
+        if (!/^RATE_LIMIT:/.test(String(e1 && e1.message))) throw e1;
+        syncLog('import', 'The server\u2019s per-minute AI limit — waiting a minute for “' + (pick.title || pick.href) + '”');
+        await sleep(61000);
+        parsed = await extractRecipesFromText(t, 'webpage text');
+      }
       var list = Array.isArray(parsed && parsed.recipes) ? parsed.recipes
                : (parsed && (parsed.name || parsed.ingredients)) ? [parsed] : [];
       // The round-up's own wording for the name is usually better than the
@@ -26576,12 +26635,13 @@ async function extractRecipesFromLinks(pageText, links, pageUrl, onProgress) {
   }
   syncLog('import', 'Link round-up: got ' + recipes_.length + ' of ' + picks.length);
   return {
-    collectionName:  plan.collectionName || '',
-    collectionNotes: plan.collectionNotes || '',
-    category:        plan.category || '',
+    collectionName:  plan.collectionName || outline.collectionName || '',
+    collectionNotes: plan.collectionNotes || outline.collectionNotes || '',
+    category:        plan.category || outline.category || '',
     recipes:         recipes_,
     _partial:        failures.length ? failures.length : 0,
-    _expected:       picks.length
+    _expected:       picks.length,
+    _more:           more
   };
 }
 window.linkPickPrompt = linkPickPrompt;
@@ -26895,10 +26955,21 @@ async function runUrlImport() {
       ? 'Extracting recipe ' + Math.min(done + 1, total) + ' of ' + total + '…'
       : 'Extracting recipe…'));
   };
+  // v39.48 — the page's links go in with its text: a round-up of short entries opens them first (extractRecipesFromText).
+  var linksTried = false;
+  var linkProgress = function(done, total, label) {
+    res.innerHTML = spinner(label || (total
+      ? 'Opening recipe ' + Math.min(done + 1, total) + ' of ' + total + '…'
+      : 'Looking for links to the recipes…'));
+  };
+  var roundup = (_pageLinks.length >= 2) ? function(outline) {
+    linksTried = true;
+    return extractRecipesFromLinks(pageText, _pageLinks, url, linkProgress, outline);
+  } : null;
   try {
     var parsed = null, built = { kind: 'none' };
     try {
-      parsed = await extractRecipesFromText(pageText, 'webpage text', progress);
+      parsed = await extractRecipesFromText(pageText, 'webpage text', progress, { roundup: roundup });
       if (parsed && parsed.error) parsed = null;
       if (parsed) built = buildImportFromParsed(parsed, url);
     } catch (e) {
@@ -26909,12 +26980,8 @@ async function runUrlImport() {
 
     // A round-up that only LINKS to its recipes leaves nothing behind here —
     // ten headings with no ingredients under them, all correctly refused.
-    if (built.kind === 'none' && _pageLinks.length) {
-      var viaLinks = await extractRecipesFromLinks(pageText, _pageLinks, url, function(done, total, label) {
-        res.innerHTML = spinner(label || (total
-          ? 'Opening recipe ' + Math.min(done + 1, total) + ' of ' + total + '…'
-          : 'Looking for links to the recipes…'));
-      });
+    if (built.kind === 'none' && _pageLinks.length && !linksTried) {
+      var viaLinks = await extractRecipesFromLinks(pageText, _pageLinks, url, linkProgress);
       if (viaLinks) { parsed = viaLinks; built = buildImportFromParsed(viaLinks, url); }
     }
     if (built.kind === 'none') throw (typeof textErr !== 'undefined' && textErr) || new Error('no recipe found');
@@ -26923,6 +26990,7 @@ async function runUrlImport() {
     // Just the count: the preview's own sentence supplies "of these", so
     // passing "1 of 3" here read "1 of 3 of these could not be read".
     if (parsed._partial) built.recipe._partial = parsed._partial;
+    if (parsed._more) built.recipe._more = parsed._more;          // v39.48 — the page links to more than were opened
     applyParsedRecipe(built.recipe, 'urlImportResult', 'urlImportOverlay');
   } catch(err) {
     // "There is no recipe here" and "the request timed out" are different
@@ -27143,6 +27211,13 @@ function applyParsedCollection(parsed, resultDivId, overlayId, originalPhoto) {
       + escH(String(parsed._partial)) + ' of these could not be read</strong> and are missing from the '
       + 'list below. Import what came back, then run the import again for the rest.</div>'
     : '';
+  // v39.48 — a page of links to more recipes than one import opens (LINK_ROUNDUP_MAX): said, with what to do.
+  var more = parsed._more
+    ? '<div style="background:#FFF8E8;border:1px solid #E8D9A8;border-radius:8px;padding:9px 11px;'
+      + 'font-size:12px;color:#7A5C00;line-height:1.5;margin-top:10px;">⚠️ <strong>The page links to '
+      + escH(String(parsed._more)) + ' more recipe(s)</strong> than one import opens. Import these, then add the rest '
+      + 'one at a time from their own pages.</div>'
+    : '';
   var thin = parts.filter(function(p){ return !p.ingredients.length || !p.steps.length; });
   var warn = thin.length
     ? '<div style="background:#FFF8E8;border:1px solid #E8D9A8;border-radius:8px;padding:9px 11px;'
@@ -27159,7 +27234,7 @@ function applyParsedCollection(parsed, resultDivId, overlayId, originalPhoto) {
     + (parsed.notes ? '<div dir="auto" style="font-size:12px;color:var(--muted);margin-bottom:8px;'
         + 'line-height:1.5;">' + escH(parsed.notes) + '</div>' : '')
     + '<div style="margin-top:8px;">' + rows + '</div>'
-    + relay + cut + missed + warn
+    + relay + cut + missed + more + warn
     + '</div>'
     + '<button class="save-translation-btn coll-add-btn" onclick="confirmImportPicked(\'' + resultDivId + '\')">'
     + '&#10003; Add all ' + parts.length + ' as one collection</button>';
@@ -27556,7 +27631,9 @@ async function mapLimited(items, limit, fn) {
 // The one entry point every import path uses. Returns what the AI would have
 // returned from a single call, so buildImportFromParsed is unchanged.
 // `onProgress(done, total, label)` is optional and is what the spinner reads.
-async function extractRecipesFromText(text, hint, onProgress) {
+// v39.48 — `opts.roundup(outline, slices)` (optional, the URL import passes it when the page has links): asked first
+// when the article's entries are too short to be recipes (slicesAreHeadings) — see below.
+async function extractRecipesFromText(text, hint, onProgress, opts) {
   text = String(text || '');
   var say = (typeof onProgress === 'function') ? onProgress : function(){};
 
@@ -27584,6 +27661,19 @@ async function extractRecipesFromText(text, hint, onProgress) {
     var capped = extractJSON(await aiCall(multiRecipePrompt(text.slice(0, 24000), hint), 8000));
     say(1, 1, '');
     return capped;
+  }
+
+  // v39.48 — A ROUND-UP OF LINKS, KNOWN BEFORE IT IS READ (Tony, 6 Nov 2026: a walla page of 29 recipes, each a name,
+  // a line and a link). Entries this short hold no ingredients and no method — the recipes are on the pages they link
+  // to. Reading them one call each was 29 paid calls that could only find nothing, and most of a minute's allowance
+  // of AI calls gone before the links were looked at. With the page's links at hand, those go first; if they give
+  // nothing, the entries are read as before.
+  if (opts && typeof opts.roundup === 'function' && slicesAreHeadings(slices)) {
+    syncLog('import', slices.length + ' short entries, no recipe in any — trying the pages they link to first');
+    var viaLinks = null;
+    try { viaLinks = await opts.roundup(outline, slices); }
+    catch (e) { syncLog('import', 'The linked pages could not be read — reading the entries instead', String(e && e.message).slice(0, 200)); }
+    if (viaLinks && Array.isArray(viaLinks.recipes) && viaLinks.recipes.length) return viaLinks;
   }
 
   syncLog('import', 'Cut into ' + slices.length + ' recipes — extracting each separately');
@@ -27624,6 +27714,14 @@ async function extractRecipesFromText(text, hint, onProgress) {
     _expected:       slices.length
   };
 }
+// v39.48 — short entries: most of them (the median) under ROUNDUP_ENTRY_MAX characters — a name, a rating, a line.
+var ROUNDUP_ENTRY_MAX = 500;
+function slicesAreHeadings(slices) {
+  if (!Array.isArray(slices) || slices.length < 2) return false;
+  var lens = slices.map(function(sl){ return String((sl && sl.text) || '').length; }).sort(function(a, b){ return a - b; });
+  return lens[Math.floor(lens.length / 2)] < ROUNDUP_ENTRY_MAX;
+}
+window.slicesAreHeadings = slicesAreHeadings;
 window.MULTI_SPLIT_OVER = MULTI_SPLIT_OVER;
 window.multiOutlinePrompt = multiOutlinePrompt;
 window.sliceByTitles = sliceByTitles;
@@ -34521,6 +34619,7 @@ var HELP_SYSTEM_PROMPT = [
   "- Diet tags on recipes help the diet filters work correctly — use Auto-tag to set them",
   "- The Self Test (⚙️ → 🔧 Troubleshooting → 🧪 Self Test) is useful for diagnosing if something stops working",
   "- The interface language: tap 🌐 next to ? — the app's words change; recipes stay as written. The app speaks English, Hebrew, Arabic, Russian, French, Spanish, German, Italian, Portuguese, Chinese, Japanese and Hungarian, and any language someone adds (🌐 → ➕ Add a language… — translated once, then everyone has it). On a new device whose own language the app speaks, it asks once, before the setup: that language or English (a Hungarian phone is asked Magyar or English) — so the setup, the kitchen rules and the welcome come in that language too",
+  "- A PAGE THAT LINKS TO ITS RECIPES (v39.48): some recipe round-ups (a list of 20 or 30 dishes, each a name, a line and a 'to the recipe' link) do not hold the recipes themselves. 🔗 From URL (or sharing the page to the app) then opens each recipe's own page and brings them all in as one 📚 collection — up to 30 at a time; if the page links to more, the preview says how many more, and those can be added one at a time from their own pages. It takes a minute or two for a long list ('Opening recipe 7 of 29…'). If it ever finds nothing, the log says why — copy it and send it",
   "- WHAT THE TRANSLATIONS HOLD (v39.47): only the app's own words. A recipe's name, a by-line, servings and time, a photographer's credit, the words someone searched for, names and e-mail addresses are never sent to be translated and never kept in the shared translations — the screens that show them mark them as data, and the app refuses anything that looks like data (another alphabet in an English phrase, a © credit, a recipe's own name). On a release, GitHub takes out of the shared translations whatever the app no longer asks for and would not collect today (dates, code, credits, recipe lines, old copies of a phrase with a number in it), and the published language files and their kept versions never hold a name. So the ✏️ Edit translations list stays the app's words, and nothing has to be cleaned by hand. A recipe inside a collection shows its servings and time as the open recipe does (🍽 4 · ⏱ 20 min); a photo credit reads 'Photo: <who> · <licence> · <library>'; after 🔄 Update all supported languages the message gives totals ('🔄 11 language(s) up to date, 24 phrase(s) added — shared with everyone'), and which language got how many is in the log",
   "- (The app's owner) Correcting a translation: in My Kitchen Notes (the copy that holds the translations), switch the interface to that language, then 🌐 → ✏️ Edit translations…, change the words and press 💾 Save — it must say '✅ <language> saved and shared with everyone' — then 🌐 → 🚀 Publish languages now (every copy has it within about ten minutes). What you change is kept on this device until it is shared: closing the window, restarting the app or signing out does not lose it, and the editor brings it back. If Save cannot share it, it says why — usually this device's sign-in: sign out, sign in again with Google and your authenticator's 6-digit code, open the editor and press Save. A Save writes only what you changed, onto the newest shared copy, and the automatic translation of new phrases only fills in what is missing — it never replaces a correction. The same wording wrong in many places (e.g. a menu's name inside many sentences): 🔁 Replace… beside the search — what is in the search box is offered as the words to find; untick the rows that should stay, press 🔁 Replace in N, then 💾 Save",
   "- ✦ All clears the filters; the sort stays as chosen (⇅ Sort), and starts newest first each time the app is opened"

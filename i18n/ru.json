@@ -3103,6 +3103,8 @@
   "🪵 Keeping {1} day{2} of log": "🪵 Храним лог за последние {1} дн{2}",
   "🪵 Logging & debugging": "🪵 Логирование и отладка",
   "🪵 The log has something worth reporting": "🪵 В логе есть, что стоит сообщить",
-  "🫙 Low FODMAP": "🫙 Низкий FODMAP"
+  "🫙 Low FODMAP": "🫙 Низкий FODMAP",
+  "The page links to {1} more recipe(s)": "Страница ссылается ещё на {1} рецепт(ов)",
+  "⚠️ {1} than one import opens. Import these, then add the rest one at a time from their own pages.": "⚠️ {1} — больше, чем открывает один импорт. Импортируйте эти, а остальные добавьте по одному с их собственных страниц."
  }
 }

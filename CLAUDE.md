@@ -1454,6 +1454,23 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
     line's 3 phrases translated), Publish languages (00:55 — 3065b02 on main; test fast-forwarded; its Deploy to
     GitHub Pages, pages build and Cloudflare Pages for test 00:56), Self Tests on main (01:11). The published
     Hebrew keeps Tony's headings.
+  - **v39.48 — a page that links to many recipes imports again** (Tony, 6 Nov 2026, ~22:55 Israel time, the beta on his
+    iPhone: "I have tried importing a list of recipes from a url. This url has many recipes connected to it via internal
+    URLs. I remember this worked in the past. What went wrong?" — a walla round-up, food.walla.co.il/item/3476843; his log
+    is data). **What happened:** the server read the page (10,423 characters, 36 links); the outline found 29 recipes;
+    each of the 29 short entries (a name, a line, a link) was read by the AI one call at a time — 14 answered "no
+    recipe", 15 a name without ingredients, so nothing could be kept; then the call that picks the recipe links (2000
+    tokens of room, asking for the intro paragraph too) came back with nothing written ("0 chars (stop: max_tokens)")
+    and the import ended "no recipe found"; the saved "food.walla.co.il" was the link-only bookmark the failure offers.
+    Even had it worked, `LINK_ROUNDUP_MAX` 12 would have opened 12 of the 29. The round-up code was unchanged since
+    v36.2 (18 Sep); what worked before were smaller pages. **Fix:** short entries plus links → the links first
+    (`slicesAreHeadings`, `opts.roundup`), picked by name when the outline's names are the links' words
+    (`linkPicksByTitles`, no AI call), else by the AI with 8000 tokens and a slimmer answer; up to 30 pages; a page
+    refused by the Worker's per-minute AI cap is asked again after a minute; the preview says when the page links to
+    more than 30. Not verifiable here: walla and the Worker are outside this environment's network, so the Self Test
+    `link_roundup_many` drives the real `runUrlImport` with the page's shape (29 named links; the same with "to the
+    recipe" links; 35) — knock-outs (entries read first, no picking by name, 12 pages, 2000 tokens) each fail it.
+    Help entry; 2 new phrases translated by hand (tr/tr48.py).
   - **Released: v39.47 to the family's copy and the beta (6 Nov 2026, 02:34 Israel time, on 0c833cd; Tony: "Release
     v39.47 to family and beta when green").** Green first on test on the same commit: Cloudflare Pages for test (02:18),
     Self Tests (02:34, its "Language publishing job (emulator)" step success with the new v39.47 case). Every job success:
