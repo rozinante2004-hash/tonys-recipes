@@ -1,7 +1,7 @@
 {
  "lang": "pt",
- "updatedAt": 1793925468653,
- "count": 2529,
+ "updatedAt": 1794001077572,
+ "count": 2531,
  "strings": {
   "\"Add to Home Screen\"": "Adicionar à tela inicial",
   "\"Open Bring!\"": "Abrir Bring!",
@@ -1199,7 +1199,7 @@
   "The move into a household stopped: {1} Nothing was deleted or changed in the family’s collection; running it again is safe.": "A mudança para uma casa foi interrompida: {1} Nada foi apagado ou alterado na coleção da família; pode repetir com segurança.",
   "The name did not match — nothing was deleted.": "O nome não coincidiu — nada foi apagado.",
   "The older route: {1} files committed to the repo's {2} folder. Still read, and still fine from a computer. {3} — reading and uploading both go through the same API — so prefer Synced above unless you have a reason not to.": "A rota mais antiga: arquivos {1} enviados para a pasta {2} do repositório. Ainda são lidos, e ainda funcionam bem a partir de um computador. {3} — a leitura e o envio passam pela mesma API — então prefira Sincronizado acima, a menos que você tenha um motivo para não preferir.",
-  "The page links to {1} more recipe(s)": "A página tem ligações para mais {1} receita(s)",
+  "The page links to {1} more recipe(s)": "A página tem links para mais {1} receita(s)",
   "The password was not changed: {1}": "A senha não foi alterada: {1}",
   "The photo was not changed. {1} The recipe still has its previous photo. You can also set a photo from a file: open the recipe, tap the picture, and choose Upload.": "A foto não foi alterada. {1} A receita continua com a foto anterior. Você também pode definir uma foto a partir de um arquivo: abra a receita, toque na imagem e escolha Enviar.",
   "The recipe": "A receita",
@@ -1892,7 +1892,7 @@
   "⚠️ You are offline — the update needs a connection. Try again when you are back online.": "⚠️ Você está offline — a atualização precisa de conexão. Tente novamente quando estiver online.",
   "⚠️ no English term found for “{1}” — searched as typed": "⚠️ nenhum termo em inglês encontrado para “{1}” — pesquisado como foi escrito",
   "⚠️ {1} could not replace anything and were imported instead": "⚠️ {1} não puderam substituir nada e foram importados em vez disso",
-  "⚠️ {1} than one import opens. Import these, then add the rest one at a time from their own pages.": "⚠️ {1} do que uma importação abre. Importe estas e depois adicione as restantes uma a uma a partir das suas próprias páginas.",
+  "⚠️ {1} than one import opens. Import these, then add the rest one at a time from their own pages.": "⚠️ {1} de uma importação está aberta. Importe essas, depois adicione as demais uma de cada vez a partir de suas próprias páginas.",
   "⚡ Keto": "⚡ Keto",
   "⚫ Unsplash — get Access Key": "⚫ Unsplash — obter Access Key",
   "✂️ Split into {1} recipes": "✂️ Dividir em {1} receitas",

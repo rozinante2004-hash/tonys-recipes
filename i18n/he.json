@@ -1,7 +1,7 @@
 {
  "lang": "he",
- "updatedAt": 1793925468653,
- "count": 3236,
+ "updatedAt": 1794001077572,
+ "count": 3238,
  "strings": {
   "\"Add to Home Screen\"": "הוספה למסך הבית",
   "\"One item away\" filter ({1}f.{2})": "פילטר \"פריט אחד חסר\" ({1}f.{2})",
@@ -1622,6 +1622,7 @@
   "The name did not match — nothing was deleted.": "השם לא תאם — שום דבר לא נמחק.",
   "The nudge is off by default, per device, and does not nag (v{1})": "התזכורת כבויה כברירת מחדל, לפי מכשיר, ולא מציקה (v{1})",
   "The older route: {1} files committed to the repo's {2} folder. Still read, and still fine from a computer. {3} — reading and uploading both go through the same API — so prefer Synced above unless you have a reason not to.": "השיטה הישנה: קבצי {1} שמוטמעים בתיקיית {2} של המאגר. עדיין נקראים, ועדיין בסדר ממחשב. {3} — קריאה והעלאה שתיהן עוברות דרך אותו API — אז עדיף להעדיף את 'מסונכרן' למעלה אלא אם יש לכם סיבה שלא.",
+  "The page links to {1} more recipe(s)": "הדף מקשר ל-{1} מתכונים נוספים",
   "The password was not changed: {1}": "הסיסמה לא שונתה: {1}",
   "The photo document name has ONE builder, and the range follows it ({1}g.{2})": "לשם מסמך התמונה יש בונה אחד יחיד, והטווח נגזר ממנו ({1}g.{2})",
   "The photo repair is bounded and never guesses absence ({1}g.{2})": "תיקון התמונה מוגבל ולעולם לא מנחש היעדר (v{1})",
@@ -2539,6 +2540,7 @@
   "⚠️ no English term found for “{1}” — searched as typed": "⚠️ לא נמצא מונח באנגלית עבור \"{1}\" — בוצע חיפוש כפי שהוקלד",
   "⚠️ {1} COPY — not the family’s recipes": "⚠️ {1} עותק — לא המתכונים של המשפחה",
   "⚠️ {1} could not replace anything and were imported instead": "⚠️ {1} לא הצליחו להחליף כלום ויובאו במקום זאת",
+  "⚠️ {1} than one import opens. Import these, then add the rest one at a time from their own pages.": "⚠️ נפתח {1} מייבוא אחד. ייבאו את אלה, ואז הוסיפו את השאר אחד-אחד מהדף של כל מתכון.",
   "⚡ Keto": "⚡ קטוגני",
   "⚫ Unsplash — get Access Key": "⚫ Unsplash — קבלת מפתח גישה",
   "✂️ Split into {1} recipes": "✂️ פוצל ל-{1} מתכונים",
@@ -3238,8 +3240,6 @@
   "🪵 Keeping {1} day{2} of log": "🪵 שומר {1} יום{2} של יומן",
   "🪵 Logging & debugging": "🪵 רישום ואיתור תקלות",
   "🪵 The log has something worth reporting": "🪵 יש ביומן משהו שכדאי לבדוק",
-  "🫙 Low FODMAP": "🫙 דל FODMAP",
-  "The page links to {1} more recipe(s)": "העמוד מקשר ל-{1} מתכונים נוספים",
-  "⚠️ {1} than one import opens. Import these, then add the rest one at a time from their own pages.": "⚠️ {1} ממה שייבוא אחד פותח. ייבאו את אלה, ואת השאר הוסיפו אחד אחד מהעמודים שלהם."
+  "🫙 Low FODMAP": "🫙 דל FODMAP"
  }
 }

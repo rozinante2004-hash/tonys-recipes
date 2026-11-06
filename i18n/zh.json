@@ -1,7 +1,7 @@
 {
  "lang": "zh",
- "updatedAt": 1793925468653,
- "count": 2809,
+ "updatedAt": 1794001077572,
+ "count": 2811,
  "strings": {
   "\"Add to Home Screen\"": "添加到主屏幕",
   "\"Open Bring!\"": "打开 Bring!",
@@ -1326,7 +1326,7 @@
   "The move into a household stopped: {1} Nothing was deleted or changed in the family’s collection; running it again is safe.": "移入家庭组的操作已停止：{1} 家庭合集中没有任何内容被删除或更改；再次运行是安全的。",
   "The name did not match — nothing was deleted.": "名称不匹配——未删除任何内容。",
   "The older route: {1} files committed to the repo's {2} folder. Still read, and still fine from a computer. {3} — reading and uploading both go through the same API — so prefer Synced above unless you have a reason not to.": "旧方式：{1} 个文件已提交到仓库的 {2} 文件夹。仍可从电脑读取，一切正常。{3}——读取和上传都走同一个 API——所以除非有特殊原因，否则建议优先使用「已同步」。",
-  "The page links to {1} more recipe(s)": "该页面还链接了 {1} 个食谱",
+  "The page links to {1} more recipe(s)": "该页面还链接到 {1} 个食谱",
   "The password was not changed: {1}": "密码未能修改：{1}",
   "The photo was not changed. {1} The recipe still has its previous photo. You can also set a photo from a file: open the recipe, tap the picture, and choose Upload.": "照片未更改。{1} 该食谱仍使用之前的照片。你也可以从文件设置照片：打开食谱，点击图片，选择「上传」。",
   "The recipe": "菜谱",
@@ -2112,7 +2112,7 @@
   "⚠️ no English term found for “{1}” — searched as typed": "⚠️ 未找到“{1}”对应的英文词 — 按原文搜索",
   "⚠️ {1} COPY — not the family’s recipes": "⚠️ {1}副本——并非家庭菜谱",
   "⚠️ {1} could not replace anything and were imported instead": "⚠️ {1} 无法替换任何内容，已改为直接导入",
-  "⚠️ {1} than one import opens. Import these, then add the rest one at a time from their own pages.": "⚠️ {1}，超出一次导入能打开的数量。先导入这些，其余的请从各自的页面逐个添加。",
+  "⚠️ {1} than one import opens. Import these, then add the rest one at a time from their own pages.": "⚠️ 打开了{1}个以上的导入。先导入这些,然后再逐个从各自页面添加其余的。",
   "⚡ Keto": "⚡ 生酮",
   "⚫ Unsplash — get Access Key": "⚫ Unsplash — 获取 Access Key",
   "✂️ Split into {1} recipes": "✂️ 拆分为 {1} 个菜谱",

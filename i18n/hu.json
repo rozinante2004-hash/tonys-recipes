@@ -1,7 +1,7 @@
 {
  "lang": "hu",
- "updatedAt": 1793925468653,
- "count": 2543,
+ "updatedAt": 1794001077572,
+ "count": 2545,
  "strings": {
   "\"Add to Home Screen\"": "Hozzáadás a kezdőképernyőhöz",
   "\"Open Bring!\"": "Bring! megnyitása",
@@ -1204,7 +1204,7 @@
   "The move into a household stopped: {1} Nothing was deleted or changed in the family’s collection; running it again is safe.": "A háztartásba költözés megszakadt: {1} Semmi nem törlődött vagy változott a család gyűjteményében; újra lefuttatható, az biztonságos.",
   "The name did not match — nothing was deleted.": "A név nem egyezett — semmi sem törlődött.",
   "The older route: {1} files committed to the repo's {2} folder. Still read, and still fine from a computer. {3} — reading and uploading both go through the same API — so prefer Synced above unless you have a reason not to.": "A régebbi út: {1} fájl a repó {2} mappájába commitolva. Így is olvasható, és számítógépről továbbra is jó. {3} — az olvasás és a feltöltés is ugyanazon az API-n megy keresztül — ezért inkább a Szinkronizáltat válaszd, hacsak nincs rá okod, hogy ne.",
-  "The page links to {1} more recipe(s)": "Az oldal további {1} receptre hivatkozik",
+  "The page links to {1} more recipe(s)": "Az oldal {1} további receptre hivatkozik",
   "The password was not changed: {1}": "A jelszó nem változott meg: {1}",
   "The photo was not changed. {1} The recipe still has its previous photo. You can also set a photo from a file: open the recipe, tap the picture, and choose Upload.": "A fénykép nem változott. {1} A recept továbbra is a korábbi fényképet használja. Fényképet fájlból is beállíthatsz: nyisd meg a receptet, koppints a képre, és válaszd a Feltöltés lehetőséget.",
   "The recipe": "A recept",
@@ -1903,7 +1903,7 @@
   "⚠️ You are offline — the update needs a connection. Try again when you are back online.": "⚠️ Nincs internetkapcsolat — a frissítéshez kapcsolat kell. Próbáld újra, ha újra online vagy.",
   "⚠️ no English term found for “{1}” — searched as typed": "⚠️ nincs angol kifejezés erre: „{1}” — az eredeti szöveggel kerestünk",
   "⚠️ {1} could not replace anything and were imported instead": "⚠️ {1} nem tudott semmit lecserélni, ezért inkább importálva lett",
-  "⚠️ {1} than one import opens. Import these, then add the rest one at a time from their own pages.": "⚠️ {1}, mint amennyit egy importálás megnyit. Importáld ezeket, a többit pedig egyenként add hozzá a saját oldalukról.",
+  "⚠️ {1} than one import opens. Import these, then add the rest one at a time from their own pages.": "⚠️ {1} egynél több importálás nyílik meg. Importáld ezeket, majd a többit add hozzá egyesével, a saját oldalukról.",
   "⚡ Keto": "⚡ Keto",
   "⚫ Unsplash — get Access Key": "⚫ Unsplash — Access Key beszerzése",
   "✂️ Split into {1} recipes": "✂️ Felosztás {1} receptre",

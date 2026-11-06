@@ -1,7 +1,7 @@
 {
  "lang": "es",
- "updatedAt": 1793925468653,
- "count": 2785,
+ "updatedAt": 1794001077572,
+ "count": 2787,
  "strings": {
   "\"Add to Home Screen\"": "Añadir a pantalla de inicio",
   "\"Open Bring!\"": "Abrir Bring!",
@@ -2104,7 +2104,7 @@
   "⚠️ no English term found for “{1}” — searched as typed": "⚠️ no se encontró un término en inglés para “{1}” — se buscó tal cual",
   "⚠️ {1} COPY — not the family’s recipes": "⚠️ COPIA {1} — no son las recetas de la familia",
   "⚠️ {1} could not replace anything and were imported instead": "⚠️ {1} no se pudieron reemplazar y se importaron en su lugar",
-  "⚠️ {1} than one import opens. Import these, then add the rest one at a time from their own pages.": "⚠️ {1} de las que abre una sola importación. Importa estas y luego añade las demás una a una desde sus propias páginas.",
+  "⚠️ {1} than one import opens. Import these, then add the rest one at a time from their own pages.": "⚠️ {1} de una importación se abre. Impórtalas y luego añade el resto una por una desde sus propias páginas.",
   "⚡ Keto": "⚡ Keto",
   "⚫ Unsplash — get Access Key": "⚫ Unsplash — obtener clave de acceso",
   "✂️ Split into {1} recipes": "✂️ Dividido en {1} recetas",

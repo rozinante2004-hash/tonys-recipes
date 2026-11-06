@@ -1,7 +1,7 @@
 {
  "lang": "ru",
- "updatedAt": 1793925468653,
- "count": 3101,
+ "updatedAt": 1794001077572,
+ "count": 3103,
  "strings": {
   "\"Add to Home Screen\"": "Добавить на главный экран",
   "\"One item away\" filter ({1}f.{2})": "Фильтр «Не хватает одного» ({1}ф.{2})",
@@ -1562,6 +1562,7 @@
   "The name did not match — nothing was deleted.": "Имя не совпало — ничего не удалено.",
   "The nudge is off by default, per device, and does not nag (v{1})": "Подсказка отключена по умолчанию, для каждого устройства своя, и не надоедает (v{1})",
   "The older route: {1} files committed to the repo's {2} folder. Still read, and still fine from a computer. {3} — reading and uploading both go through the same API — so prefer Synced above unless you have a reason not to.": "Старый способ: файлы {1}, закоммиченные в папку {2} репозитория. Их по-прежнему можно читать, и с компьютера всё нормально. {3} — чтение и загрузка идут через один и тот же API — поэтому выше предпочтительнее «Синхронизировано», если нет причин поступать иначе.",
+  "The page links to {1} more recipe(s)": "Страница ссылается ещё на {1} рецепт(ов)",
   "The password was not changed: {1}": "Пароль не изменён: {1}",
   "The photo document name has ONE builder, and the range follows it ({1}g.{2})": "У имени файла фото ОДИН генератор, и диапазон следует за ним ({1}g.{2})",
   "The photo repair is bounded and never guesses absence ({1}g.{2})": "Восстановление фото ограничено и никогда не предполагает отсутствие ({1}g.{2})",
@@ -2409,6 +2410,7 @@
   "⚠️ no English term found for “{1}” — searched as typed": "⚠️ английский термин для «{1}» не найден — поиск выполнен как есть",
   "⚠️ {1} COPY — not the family’s recipes": "⚠️ КОПИЯ {1} — не семейные рецепты",
   "⚠️ {1} could not replace anything and were imported instead": "⚠️ {1} не удалось ничем заменить, поэтому их импортировали как есть",
+  "⚠️ {1} than one import opens. Import these, then add the rest one at a time from their own pages.": "⚠️ {1} одного импорта открывается. Импортируйте эти, а остальные добавляйте по одному — с их страниц.",
   "⚡ Keto": "⚡ Кето",
   "⚫ Unsplash — get Access Key": "⚫ Unsplash — получить ключ доступа",
   "✂️ Split into {1} recipes": "✂️ Разделено на {1} рецептов",
@@ -3103,8 +3105,6 @@
   "🪵 Keeping {1} day{2} of log": "🪵 Храним лог за последние {1} дн{2}",
   "🪵 Logging & debugging": "🪵 Логирование и отладка",
   "🪵 The log has something worth reporting": "🪵 В логе есть, что стоит сообщить",
-  "🫙 Low FODMAP": "🫙 Низкий FODMAP",
-  "The page links to {1} more recipe(s)": "Страница ссылается ещё на {1} рецепт(ов)",
-  "⚠️ {1} than one import opens. Import these, then add the rest one at a time from their own pages.": "⚠️ {1} — больше, чем открывает один импорт. Импортируйте эти, а остальные добавьте по одному с их собственных страниц."
+  "🫙 Low FODMAP": "🫙 Низкий FODMAP"
  }
 }

@@ -1,7 +1,7 @@
 {
  "lang": "ja",
- "updatedAt": 1793925468653,
- "count": 3110,
+ "updatedAt": 1794001077572,
+ "count": 3112,
  "strings": {
   "\"Add to Home Screen\"": "ホーム画面に追加",
   "\"One item away\" filter ({1}f.{2})": "「あと1品」フィルター（{1}f.{2}）",
@@ -1564,6 +1564,7 @@
   "The name did not match — nothing was deleted.": "名前が一致しなかったため、削除されませんでした。",
   "The nudge is off by default, per device, and does not nag (v{1})": "この通知は初期設定でオフで、端末ごとに設定され、しつこく表示されません (v{1})",
   "The older route: {1} files committed to the repo's {2} folder. Still read, and still fine from a computer. {3} — reading and uploading both go through the same API — so prefer Synced above unless you have a reason not to.": "旧方式：{1} ファイルはリポジトリの {2} フォルダにコミットされます。読み込みは可能で、パソコンからなら今も問題ありません。{3} — 読み込みもアップロードも同じAPIを通るので、理由がなければ上の「同期」を使ってください。",
+  "The page links to {1} more recipe(s)": "このページには他に{1}件のレシピへのリンクがあります",
   "The password was not changed: {1}": "パスワードを変更できませんでした：{1}",
   "The photo document name has ONE builder, and the range follows it ({1}g.{2})": "写真ドキュメント名にはビルダーが1つあり、範囲はその後に続きます ({1}g.{2})",
   "The photo repair is bounded and never guesses absence ({1}g.{2})": "写真の修復には範囲があり、存在しないものを推測することはありません ({1}g.{2})",
@@ -2414,6 +2415,7 @@
   "⚠️ no English term found for “{1}” — searched as typed": "⚠️「{1}」の英語表記が見つかりません — 入力のまま検索しました",
   "⚠️ {1} COPY — not the family’s recipes": "⚠️ {1} コピー — 家族のレシピではありません",
   "⚠️ {1} could not replace anything and were imported instead": "⚠️ {1}は何にも置き換えられなかったため、代わりにインポートされました",
+  "⚠️ {1} than one import opens. Import these, then add the rest one at a time from their own pages.": "⚠️ {1}件のインポートが開いています。これらをインポートしてから、残りは各ページから1件ずつ追加してください。",
   "⚡ Keto": "⚡ ケトジェニック",
   "⚫ Unsplash — get Access Key": "⚫ Unsplash — アクセスキーを取得",
   "✂️ Split into {1} recipes": "✂️ {1}件のレシピに分割しました",
@@ -3112,8 +3114,6 @@
   "🪵 Keeping {1} day{2} of log": "🪵 ログを{1}日{2}分保持",
   "🪵 Logging & debugging": "🪵 ログとデバッグ",
   "🪵 The log has something worth reporting": "🪵 ログに報告すべき内容があります",
-  "🫙 Low FODMAP": "🫙 低FODMAP",
-  "The page links to {1} more recipe(s)": "このページはさらに{1}件のレシピにリンクしています",
-  "⚠️ {1} than one import opens. Import these, then add the rest one at a time from their own pages.": "⚠️ {1}。1回の取り込みで開ける数を超えています。これらを取り込んでから、残りはそれぞれのページから1件ずつ追加してください。"
+  "🫙 Low FODMAP": "🫙 低FODMAP"
  }
 }
