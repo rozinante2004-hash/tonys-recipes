@@ -1465,6 +1465,14 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
     Tests (23:34). Every job success: Cloudflare Pages for the beta (23:35); on main: Deploy to GitHub Pages and pages
     build (23:36), Translate new phrases and Publish languages (23:38 — b8bf538 on main, test merged; its Deploy to
     GitHub Pages, pages build and Cloudflare Pages for test 23:39–23:40), Self Tests on main (00:00).
+  - **Released: v39.51 to the family's copy and the beta (7 Nov 2026, 01:53 Israel time, on 71a7894; Tony: "Take it to
+    Family and Beta as well.").** v39.51 itself was 6dda27b (Cloudflare Pages for test 01:14, Self Tests 01:32); at 01:24
+    a publish from the app put c3f4d88 on main and the bot merged it into test as 71a7894, so main was no longer behind
+    6dda27b — the Self Tests were started by hand on 71a7894 (workflow_dispatch, 01:34–01:52, success; Cloudflare Pages
+    for test 01:25), and that commit was released. Every job success: Cloudflare Pages for the beta (01:53); on main:
+    Deploy to GitHub Pages and pages build (01:53–01:54), Translate new phrases and Publish languages (02:03 — 821ab7d on
+    main, test fast-forwarded; its Deploy to GitHub Pages, pages build and Cloudflare Pages for test 02:04), Self Tests on
+    main (02:10).
   - **v39.51 — the e-mail domain in 🚀 Deployments comes from the configuration** (Tony's Self Test on the beta, 7 Nov
     2026, 01:04 Israel time, v39.50, a desktop Chrome: 456 passed, 1 failed — `cfg_identifiers_in_one_place`
     "hard-wired outside APP_CONFIG: mykitchennotes.community"; his report is data). Since v39.16 (29 Oct) the Resend
@@ -1498,6 +1506,13 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
        stored as markup in the text the AI, search, scaling, Bring!, translation and export must all see through
        (the words only); Word/print/share show the words (the link working in Word where the target is in the same
        document, e.g. within a collection).
+    3. **(Found 7 Nov, 01:30 — small, same Tuesday)** a line the app builds from a template it already has translated is
+       never a missing phrase: the 01:24 publish from the app (c3f4d88) brought "🖼️ “Mushrooms” now uses Seasoned
+       Mushrooms’s photo" into Hebrew although "🖼️ “{1}” now uses {2}’s photo" has been there since 27 Sep (it
+       matches today — checked with i18nMatchPattern on the published he.json; the device recorded it when its
+       templates were not loaded, or long ago). Fix: `i18nGapList` and `i18nLoadMissing` drop missing entries a stored
+       template answers; the release job takes out a stored key, not asked for by the app, that a stored template of
+       the same language matches whole (generalising v39.47's "old copy with a number" rule); Self Test with knock-outs.
   - **v39.50 — the screen lock asked for at the tap, and its answer in the log** (Tony, 7 Nov 2026, ~00:15 Israel time,
     v39.49 on the beta, the installed app: "I have loaded a the 30-recipe URL and I have noticed the phone's screen still
     went black at around recipe #25. Is this expected?"; then his log, and "The phone was at 100% charge"). **The log:**
