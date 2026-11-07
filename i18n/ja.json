@@ -1,7 +1,7 @@
 {
  "lang": "ja",
- "updatedAt": 1794005872126,
- "count": 3115,
+ "updatedAt": 1794009762314,
+ "count": 3116,
  "strings": {
   "\"Add to Home Screen\"": "ホーム画面に追加",
   "\"One item away\" filter ({1}f.{2})": "「あと1品」フィルター（{1}f.{2}）",
@@ -2283,6 +2283,7 @@
   "· last {1}": "・前回{1}",
   "··· More": "···その他",
   "— You wrote on {1}:\n“{2}”\n\nEvery answer is kept in ⚙️ → 💬 Help and feedback → 📨 Answers to my notes.": "— {1}に書いたメッセージ：\n「{2}」\n\n回答はすべて ⚙️ → 💬 ヘルプとフィードバック → 📨 回答 に保存されます。",
+  "— should say Verified": "— 「確認済み」と表示されるはず",
   "— this is the whole route, and it needs no GitHub access at all:{2} {3}. WhatsApp → open the group → tap the {4} at the top → scroll down → {5} → {6}.{7} {8}. WhatsApp prepares the file (a few seconds on a big group), then the {9} opens.{10} {11}. Scroll the lower list of actions and tap {12}. Pick somewhere you will find again — {13} is fine — then {14}.{15} {16}. Come back here: {17} above.{18} {19}. The iPhone's file picker opens. The export is usually the top entry under {20}; otherwise tap {21} and go to where you saved it. Tap it.": "—これが全ルートで、GitHubへのアクセスは一切不要です:{2} {3}。WhatsApp → グループを開く → 上部の{4}をタップ → 下にスクロール → {5} → {6}。{7} {8}。WhatsAppがファイルを準備します(大きいグループだと数秒かかります)、その後{9}が開きます。{10} {11}。下の操作リストをスクロールして{12}をタップします。あとで見つけられる場所を選んでください — {13}で構いません — その後{14}。{15} {16}。ここに戻ってきてください:上の{17}。{18} {19}。iPhoneのファイル選択画面が開きます。書き出したファイルは通常{20}の一番上にあります。なければ{21}をタップして保存した場所に移動してください。それをタップします。",
   "— {1} run in {2}s": "— {1}は{2}秒で実行されます",
   "“My Kitchen Notes — Save recipes from any site”: the job “Submit the extension to the stores” uploads each new version.": "「My Kitchen Notes — どのサイトからでもレシピを保存」：「拡張機能をストアへ提出」ジョブが新バージョンをアップロードする。",
@@ -3117,7 +3118,6 @@
   "🪵 Keeping {1} day{2} of log": "🪵 ログを{1}日{2}分保持",
   "🪵 Logging & debugging": "🪵 ログとデバッグ",
   "🪵 The log has something worth reporting": "🪵 ログに報告すべき内容があります",
-  "🫙 Low FODMAP": "🫙 低FODMAP",
-  "— should say Verified": "— 「認証済み」と表示されるはずです"
+  "🫙 Low FODMAP": "🫙 低FODMAP"
  }
 }

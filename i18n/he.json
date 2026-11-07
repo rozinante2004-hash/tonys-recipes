@@ -1,7 +1,7 @@
 {
  "lang": "he",
- "updatedAt": 1794005872914,
- "count": 3244,
+ "updatedAt": 1794009762314,
+ "count": 3245,
  "strings": {
   "\"Add to Home Screen\"": "הוספה למסך הבית",
   "\"One item away\" filter ({1}f.{2})": "פילטר \"פריט אחד חסר\" ({1}f.{2})",
@@ -2403,6 +2403,7 @@
   "· last {1}": "· לאחרונה {1}",
   "··· More": "··· עוד",
   "— You wrote on {1}:\n“{2}”\n\nEvery answer is kept in ⚙️ → 💬 Help and feedback → 📨 Answers to my notes.": "— כתבת ב-{1}:\n“{2}”\n\nכל תשובה נשמרת ב-⚙️ ← 💬 עזרה ומשוב ← 📨 תשובות להערות שלי.",
+  "— should say Verified": "— אמור להופיע כ'מאומת'",
   "— this is the whole route, and it needs no GitHub access at all:{2} 1. WhatsApp → open the group → tap the {3} at the top → scroll down → {4} → {5}.{6} 2. WhatsApp prepares the file (a few seconds on a big group), then the {7} opens.{8} 3. Scroll the lower list of actions and tap {9}. Pick somewhere you will find again — {10} is fine — then {11}.{12} 4. Come back here: {13} above.{14} 5. The iPhone's file picker opens. The export is usually the top entry under {15}; otherwise tap {16} and go to where you saved it. Tap it.": "— זה כל המסלול, ולא צריך בשבילו גישה ל-GitHub בכלל:{2} 1. WhatsApp → פתחו את הקבוצה → הקישו על {3} בחלק העליון → גללו למטה → {4} → {5}.{6} 2. WhatsApp מכין את הקובץ (כמה שניות בקבוצה גדולה), ואז {7} נפתח.{8} 3. גללו ברשימת הפעולות התחתונה והקישו על {9}. בחרו מקום שתמצאו בקלות בהמשך — {10} מתאים — ואז {11}.{12} 4. חזרו לכאן: {13} מעל.{14} 5. בורר הקבצים של האייפון נפתח. הייצוא נמצא בדרך כלל בפריט העליון תחת {15}; אחרת הקישו על {16} ועברו למקום שבו שמרתם אותו. הקישו עליו.",
   "— this is the whole route, and it needs no GitHub access at all:{2} {3}. WhatsApp → open the group → tap the {4} at the top → scroll down → {5} → {6}.{7} {8}. WhatsApp prepares the file (a few seconds on a big group), then the {9} opens.{10} {11}. Scroll the lower list of actions and tap {12}. Pick somewhere you will find again — {13} is fine — then {14}.{15} {16}. Come back here: {17} above.{18} {19}. The iPhone's file picker opens. The export is usually the top entry under {20}; otherwise tap {21} and go to where you saved it. Tap it.": "— זה כל התהליך, והוא לא דורש גישה ל-GitHub בכלל:{2} {3}. WhatsApp → פתח את הקבוצה → הקש על ה-{4} למעלה → גלול למטה → {5} → {6}.{7} {8}. WhatsApp מכין את הקובץ (כמה שניות בקבוצה גדולה), ואז נפתח ה-{9}.{10} {11}. גלול ברשימת הפעולות התחתונה והקש על {12}. בחר מיקום שתמצא שוב — {13} מתאים — ואז {14}.{15} {16}. חזור לכאן: {17} למעלה.{18} {19}. בורר הקבצים של האייפון נפתח. הייצוא נמצא בדרך כלל בפריט העליון תחת {20}; אחרת הקש על {21} ועבור למקום שבו שמרת. הקש עליו.",
   "— {1} run in {2}s": "— {1} רץ תוך {2}s",
@@ -3246,7 +3247,6 @@
   "🪵 Keeping {1} day{2} of log": "🪵 שומר {1} יום{2} של יומן",
   "🪵 Logging & debugging": "🪵 רישום ואיתור תקלות",
   "🪵 The log has something worth reporting": "🪵 יש ביומן משהו שכדאי לבדוק",
-  "🫙 Low FODMAP": "🫙 דל FODMAP",
-  "— should say Verified": "— אמור להופיע כ-Verified"
+  "🫙 Low FODMAP": "🫙 דל FODMAP"
  }
 }

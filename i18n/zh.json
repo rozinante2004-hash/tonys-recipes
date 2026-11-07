@@ -1985,7 +1985,6 @@
   "· last {1}": "· 上次 {1}",
   "··· More": "··· 更多",
   "— You wrote on {1}:\n“{2}”\n\nEvery answer is kept in ⚙️ → 💬 Help and feedback → 📨 Answers to my notes.": "— 你在 {1} 写道：\n“{2}”\n\n所有回答都保存在 ⚙️ → 💬 帮助与反馈 → 📨 回复 里，作为我的笔记。",
-  "— should say Verified": "——应显示“已验证”",
   "— this is the whole route, and it needs no GitHub access at all:{2} {3}. WhatsApp → open the group → tap the {4} at the top → scroll down → {5} → {6}.{7} {8}. WhatsApp prepares the file (a few seconds on a big group), then the {9} opens.{10} {11}. Scroll the lower list of actions and tap {12}. Pick somewhere you will find again — {13} is fine — then {14}.{15} {16}. Come back here: {17} above.{18} {19}. The iPhone's file picker opens. The export is usually the top entry under {20}; otherwise tap {21} and go to where you saved it. Tap it.": "—这是完整流程，完全不需要 GitHub 权限：{2} {3}。WhatsApp → 打开群组 → 点击顶部的{4} → 向下滚动 → {5} → {6}。{7} {8}。WhatsApp 会准备文件（群组较大时需要几秒钟），然后{9}打开。{10} {11}。滚动下方的操作列表，点击{12}。选一个你以后找得到的位置——{13}就行——然后{14}。{15} {16}。回到这里：上面的{17}。{18} {19}。iPhone 的文件选择器会打开。导出的文件通常会显示在{20}下方的顶部；否则点击{21}，前往你保存的位置，然后点击它。",
   "“My Kitchen Notes — Save recipes from any site”: the job “Submit the extension to the stores” uploads each new version.": "“My Kitchen Notes — Save recipes from any site”：“提交扩展到应用商店”任务会上传每个新版本。",
   "“{1}” as it was on {2}. The current version is kept in the history, so you can undo this.": "把“{1}”恢复为{2}时的样子。当前版本已保存在历史记录中，你可以撤销此操作。",

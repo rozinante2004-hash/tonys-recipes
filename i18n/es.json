@@ -1,7 +1,7 @@
 {
  "lang": "es",
- "updatedAt": 1794005872632,
- "count": 2803,
+ "updatedAt": 1794009762314,
+ "count": 2804,
  "strings": {
   "\"Add to Home Screen\"": "Añadir a pantalla de inicio",
   "\"Open Bring!\"": "Abrir Bring!",
@@ -1982,7 +1982,7 @@
   "· last {1}": "· último {1}",
   "··· More": "··· Más",
   "— You wrote on {1}:\n“{2}”\n\nEvery answer is kept in ⚙️ → 💬 Help and feedback → 📨 Answers to my notes.": "— Escribiste el {1}:\n«{2}»\n\nTodas las respuestas se guardan en ⚙️ → 💬 Ayuda y comentarios → 📨 Respuestas en mis notas.",
-  "— should say Verified": "— debería decir Verified",
+  "— should say Verified": "— debería decir Verificado",
   "— this is the whole route, and it needs no GitHub access at all:{2} {3}. WhatsApp → open the group → tap the {4} at the top → scroll down → {5} → {6}.{7} {8}. WhatsApp prepares the file (a few seconds on a big group), then the {9} opens.{10} {11}. Scroll the lower list of actions and tap {12}. Pick somewhere you will find again — {13} is fine — then {14}.{15} {16}. Come back here: {17} above.{18} {19}. The iPhone's file picker opens. The export is usually the top entry under {20}; otherwise tap {21} and go to where you saved it. Tap it.": "— este es el camino completo, y no necesita acceso a GitHub en absoluto:{2} {3}. WhatsApp → abre el grupo → toca los {4} en la parte superior → desplázate hacia abajo → {5} → {6}.{7} {8}. WhatsApp prepara el archivo (unos segundos si el grupo es grande), y luego se abre {9}.{10} {11}. Desplázate por la lista inferior de acciones y toca {12}. Elige un lugar donde puedas encontrarlo después — {13} está bien — y luego {14}.{15} {16}. Vuelve aquí: {17} arriba.{18} {19}. Se abre el selector de archivos del iPhone. La exportación suele aparecer como primer elemento bajo {20}; si no, toca {21} y ve a donde lo guardaste. Tócalo.",
   "“My Kitchen Notes — Save recipes from any site”: the job “Submit the extension to the stores” uploads each new version.": "«My Kitchen Notes — Guarda recetas de cualquier sitio»: el trabajo «Enviar la extensión a las tiendas» sube cada nueva versión.",
   "“{1}” as it was on {2}. The current version is kept in the history, so you can undo this.": "“{1}” tal como estaba el {2}. La versión actual se guarda en el historial, así que puedes deshacer esto.",

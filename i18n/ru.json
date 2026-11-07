@@ -1,7 +1,7 @@
 {
  "lang": "ru",
- "updatedAt": 1794005873139,
- "count": 3106,
+ "updatedAt": 1794009762314,
+ "count": 3107,
  "strings": {
   "\"Add to Home Screen\"": "Добавить на главный экран",
   "\"One item away\" filter ({1}f.{2})": "Фильтр «Не хватает одного» ({1}ф.{2})",
@@ -2278,6 +2278,7 @@
   "· last {1}": "· последний {1}",
   "··· More": "··· Ещё",
   "— You wrote on {1}:\n“{2}”\n\nEvery answer is kept in ⚙️ → 💬 Help and feedback → 📨 Answers to my notes.": "— Вы написали {1}:\n«{2}»\n\nВсе ответы сохраняются в ⚙️ → 💬 Помощь и отзывы → 📨 Ответы в моих заметках.",
+  "— should say Verified": "— должно быть «Подтверждено»",
   "— this is the whole route, and it needs no GitHub access at all:{2} {3}. WhatsApp → open the group → tap the {4} at the top → scroll down → {5} → {6}.{7} {8}. WhatsApp prepares the file (a few seconds on a big group), then the {9} opens.{10} {11}. Scroll the lower list of actions and tap {12}. Pick somewhere you will find again — {13} is fine — then {14}.{15} {16}. Come back here: {17} above.{18} {19}. The iPhone's file picker opens. The export is usually the top entry under {20}; otherwise tap {21} and go to where you saved it. Tap it.": "— это весь путь, и для него вообще не нужен доступ к GitHub:{2} {3}. WhatsApp → откройте группу → нажмите {4} вверху → прокрутите вниз → {5} → {6}.{7} {8}. WhatsApp подготовит файл (пара секунд для большой группы), затем откроется {9}.{10} {11}. Прокрутите нижний список действий и нажмите {12}. Выберите место, которое легко найти снова — подойдёт {13} — затем {14}.{15} {16}. Вернитесь сюда: {17} выше.{18} {19}. Откроется выбор файла на iPhone. Экспорт обычно находится первым под {20}; если нет, нажмите {21} и перейдите туда, куда вы сохранили файл. Нажмите на него.",
   "— {1} run in {2}s": "— {1} выполняются за {2} с",
   "“My Kitchen Notes — Save recipes from any site”: the job “Submit the extension to the stores” uploads each new version.": "«My Kitchen Notes — Save recipes from any site»: задача «Отправить расширение в магазины» загружает каждую новую версию.",
@@ -3108,7 +3109,6 @@
   "🪵 Keeping {1} day{2} of log": "🪵 Храним лог за последние {1} дн{2}",
   "🪵 Logging & debugging": "🪵 Логирование и отладка",
   "🪵 The log has something worth reporting": "🪵 В логе есть, что стоит сообщить",
-  "🫙 Low FODMAP": "🫙 Низкий FODMAP",
-  "— should say Verified": "— должно быть написано Verified"
+  "🫙 Low FODMAP": "🫙 Низкий FODMAP"
  }
 }
