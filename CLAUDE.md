@@ -1513,6 +1513,13 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
        templates were not loaded, or long ago). Fix: `i18nGapList` and `i18nLoadMissing` drop missing entries a stored
        template answers; the release job takes out a stored key, not asked for by the app, that a stored template of
        the same language matches whole (generalising v39.47's "old copy with a number" rule); Self Test with knock-outs.
+    4. **(Found 8 Nov, Tony's beta log — small, same Tuesday)** (a) the screen lock: "The phone would not keep the screen
+       on during the import — NotAllowedError: Permission was denied" on both imports that started by themselves from a
+       shared link (Safari, a browser tab — no tap, so no user activation). Fix: refused with NotAllowedError, ask again at
+       the next touch (one capture pointerdown/touchstart while the import holds), and the hint says one tap keeps it on.
+       (b) a false SYNC_TIMEOUT: "cloud write did not finish in 90s — signIn" at 19:28 for a write begun at the 17:05
+       sign-in — `withSyncWatchdog` is a plain setTimeout, frozen while the phone slept and fired on return. Fix: the
+       90 s count only while the app is on screen (pause on hidden, a fresh window on visible); Self Tests with knock-outs.
   - **v39.50 — the screen lock asked for at the tap, and its answer in the log** (Tony, 7 Nov 2026, ~00:15 Israel time,
     v39.49 on the beta, the installed app: "I have loaded a the 30-recipe URL and I have noticed the phone's screen still
     went black at around recipe #25. Is this expected?"; then his log, and "The phone was at 100% charge"). **The log:**
