@@ -1520,6 +1520,13 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
        (b) a false SYNC_TIMEOUT: "cloud write did not finish in 90s — signIn" at 19:28 for a write begun at the 17:05
        sign-in — `withSyncWatchdog` is a plain setTimeout, frozen while the phone slept and fired on return. Fix: the
        90 s count only while the app is on screen (pause on hidden, a fresh window on visible); Self Tests with knock-outs.
+    5. **(Tony, 8 Nov: "hide the delete button from non-admins, or any other member who does not have Delete privileges,
+       or offer \"ask Admin to delete\". It will prevent frustration and ungainly error messages.")** His choice (asked):
+       **"🗑️ Ask an admin to delete"** in place of 🗑️ Delete for anyone whose role cannot delete (every place a delete
+       is offered: the recipe's buttons, Select → delete, a collection's recipe, swipe): it sends the kitchen's admins a
+       request naming the recipe, which an admin can delete with one tap from the request (or dismiss); the member is told
+       it was sent. No refusal message from a delete that was never allowed. Check the roles (hhRole viewer / editor /
+       admin / owner) and which may delete in the rules, so the button follows the same rule as the server.
   - **v39.50 — the screen lock asked for at the tap, and its answer in the log** (Tony, 7 Nov 2026, ~00:15 Israel time,
     v39.49 on the beta, the installed app: "I have loaded a the 30-recipe URL and I have noticed the phone's screen still
     went black at around recipe #25. Is this expected?"; then his log, and "The phone was at 100% charge"). **The log:**
