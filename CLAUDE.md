@@ -1522,7 +1522,8 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
        90 s count only while the app is on screen (pause on hidden, a fresh window on visible); Self Tests with knock-outs.
     5. **(Tony, 8 Nov: "hide the delete button from non-admins, or any other member who does not have Delete privileges,
        or offer \"ask Admin to delete\". It will prevent frustration and ungainly error messages.")** His choice (asked):
-       **"🗑️ Ask an admin to delete"** in place of 🗑️ Delete for anyone whose role cannot delete (every place a delete
+       **"🗑️ Ask an admin to delete"** in place of 🗑️ Delete — **for recipes** (Tony: "The above is for recipes, of
+       course") — for anyone whose role cannot delete one (every place a recipe's delete
        is offered: the recipe's buttons, Select → delete, a collection's recipe, swipe): it sends the kitchen's admins a
        request naming the recipe, which an admin can delete with one tap from the request (or dismiss); the member is told
        it was sent. No refusal message from a delete that was never allowed. Check the roles (hhRole viewer / editor /
