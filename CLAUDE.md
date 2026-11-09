@@ -1529,6 +1529,15 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
        request naming the recipe or collection, which an admin can delete with one tap from the request (or dismiss); the member is told
        it was sent. No refusal message from a delete that was never allowed. Check the roles (hhRole viewer / editor /
        admin / owner) and which may delete in the rules, so the button follows the same rule as the server.
+    6. **(Tony, 9 Nov) 🧺 Recipes hiding in my chats:** "do not display links for recipes I already have in my list of
+       recipes. This should be easy to do by comparing the URLs. Also, if there are actual recipes in my chats, then
+       please do display them, unless I already have them." So: (a) a link whose address is a recipe's source in his
+       kitchen is not shown at all — compared after normalising (`normUrl`, 27401: scheme, www./m., trailing slash,
+       utm_*/tracking parameters, ynet's ?utm…, walla's ?Source=…); a collection's parts' sources count too; check what
+       the f-series ("Links are found, de-duplicated and matched to what I already have") already does — today it
+       matches, he wants them gone; (b) recipes written out in a message (ingredients and steps in the text itself) are
+       found and listed too, each with an import button, unless the kitchen already has it (`findDuplicate`, 27144:
+       name and ingredients); say how many were left out as already there. Self Test with a chat fixture; knock-outs.
   - **v39.50 — the screen lock asked for at the tap, and its answer in the log** (Tony, 7 Nov 2026, ~00:15 Israel time,
     v39.49 on the beta, the installed app: "I have loaded a the 30-recipe URL and I have noticed the phone's screen still
     went black at around recipe #25. Is this expected?"; then his log, and "The phone was at 100% charge"). **The log:**
