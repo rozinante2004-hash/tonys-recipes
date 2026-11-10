@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.56 -->
+<!-- Tony's Recipes Collection v39.57 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -11017,7 +11017,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.56';
+var APP_VERSION = 'v39.57';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -14525,7 +14525,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.56</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.57</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14613,7 +14613,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.56</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.57</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -30348,7 +30348,10 @@ var _ownMetaStamps = [];
 function noteOwnMetaStamp(t) { _ownMetaStamps.push(t); if (_ownMetaStamps.length > 50) _ownMetaStamps.shift(); }
 function isOwnMetaStamp(t) { return _ownMetaStamps.indexOf(t) !== -1; }
 window.isOwnMetaStamp = isOwnMetaStamp;
-async function writeCloudMeta(list, nextIdVal, db) {
+// v39.57 — `gone`: the ids this save has just deleted. flushCloudDeletes runs first and takes them off
+// _pendingCloudDeletes as it goes, so without them the index kept a deleted recipe's id (read back from the cloud's
+// own index below): every other device then found it still listed, kept its copy, and the recipe never left them.
+async function writeCloudMeta(list, nextIdVal, db, gone) {
   db = db || _fbDb;
   var stamp = Date.now();
   noteOwnMetaStamp(stamp);
@@ -30367,6 +30370,7 @@ async function writeCloudMeta(list, nextIdVal, db) {
     // (a recipe marked but not moved — its save refused — is still where linked households read: listed there)
     list.forEach(function(r){ ids[r.id] = true; if (hh && r.secret && _secretLives[String(r.id)] !== false) secret[String(r.id)] = true; else delete secret[String(r.id)]; });
     Object.keys(_pendingCloudDeletes).forEach(function(i){ delete ids[i]; delete ids[parseInt(i,10)]; });
+    (gone || []).forEach(function(i){ delete ids[i]; delete ids[parseInt(i,10)]; });   // v39.57
     // v38.71 — ids this device found listed without a document (deleted long ago) leave the index
     if (_cloudLayout === 'households') (cloudSyncMark().absent || []).forEach(function(i){
       if (!list.some(function(r){ return String(r.id) === String(i); })) { delete ids[i]; delete ids[parseInt(i,10)]; } });
@@ -30398,7 +30402,7 @@ async function writeCloudMeta(list, nextIdVal, db) {
 async function flushCloudDeletes(db) {
   db = db || _fbDb;
   var ids = Object.keys(_pendingCloudDeletes);
-  var denied = [];
+  var denied = [], deleted = [];
   for (var i = 0; i < ids.length; i++) {
     var id = ids[i];
     try {
@@ -30419,6 +30423,7 @@ async function flushCloudDeletes(db) {
       if (e && e.code === 'permission-denied' && !isTestFixture({ id: parseInt(id, 10) })) denied.push(id);
       // anything else: the document is already gone, or will be retried next save
     }
+    if (denied.indexOf(id) === -1) deleted.push(id);   // v39.57 — what the index must stop listing
     delete _pendingCloudDeletes[id];
     delete _cloudRecipeIds[id];
     delete _cloudRecipeBase[id];
@@ -30427,7 +30432,7 @@ async function flushCloudDeletes(db) {
     delete _cloudPhotoStamps[id];
   }
   savePendingCloudDeletes();
-  return { attempted: ids.length, denied: denied };
+  return { attempted: ids.length, denied: denied, deleted: deleted };
 }
 
 // Read every `recipe_*` document. The range query is one round trip; the
@@ -30910,7 +30915,7 @@ async function saveToFirestore() {
     _cloudSaveStep = 'index';
     // 5.9 — record the stamp we just wrote, so our own save doesn't force the
     // next load to re-read the whole collection.
-    setLastCloudMetaAt(await writeCloudMeta(live, nextId));
+    setLastCloudMetaAt(await writeCloudMeta(live, nextId, null, delRes.deleted));   // v39.57 — the deleted leave the index
     saveCloudBase();   // v29.2 — so the next session still knows its base
 
     // 3) Each changed photo into its own doc

@@ -401,16 +401,29 @@ try {
   await until(() => cloudRecipe(doomed));
   await tapRefreshWhenOffered(B);
   await until(async () => (await names(B)).includes('E2E to delete'));
-  // A WRITER's delete: the rules refuse it, the recipe stays in the cloud,
-  // and the writer is told rather than left thinking it worked.
-  await inPage(B, (id) => { window.askConfirm = async () => true; return deleteRecipe(id); }, doomed);
-  await new Promise(r => setTimeout(r, 4000));
-  ok('a writer\'s delete is refused — the recipe is still in the cloud', !!(await cloudRecipe(doomed)));
-  ok('…and the writer is told', await inPage(B, () => {
-    const o = document.getElementById('serviceErrorOverlay');
-    return !!(o && /DELETE|admin|only/i.test(o.textContent));
-  }));
-  await inPage(B, () => { const o = document.getElementById('serviceErrorOverlay'); if (o) o.remove(); });
+  if (SERVE_HH) {
+    // v39.55 — in a household a WRITER is not offered deleting at all: 🗑️ asks the owner and admins instead. Nothing is
+    // deleted — not in the cloud, not on the writer's device — the writer is told the request went, and it waits in the
+    // household for its admins.
+    await inPage(B, (id) => { window.askConfirm = async () => true; return deleteRecipe(id); }, doomed);
+    await new Promise(r => setTimeout(r, 2500));
+    ok('a writer\'s 🗑️ asks an admin instead — the recipe is still in the cloud', !!(await cloudRecipe(doomed)));
+    ok('…and on the writer\'s device', (await names(B)).includes('E2E to delete'), JSON.stringify(await names(B)));
+    ok('…and the writer is told the request was sent', await inPage(B, () => /Sent/.test((document.getElementById('toast') || {}).textContent || '')));
+    const ask = await restDoc('households/' + HID + '/deleteAsks/' + await uidOnPage(B) + '_' + doomed);
+    ok('…which waits in the household for its owner and admins', !!(ask && ask.what === 'recipe' && ask.title === 'E2E to delete'), JSON.stringify(ask));
+  } else {
+    // A WRITER's delete: the rules refuse it, the recipe stays in the cloud,
+    // and the writer is told rather than left thinking it worked.
+    await inPage(B, (id) => { window.askConfirm = async () => true; return deleteRecipe(id); }, doomed);
+    await new Promise(r => setTimeout(r, 4000));
+    ok('a writer\'s delete is refused — the recipe is still in the cloud', !!(await cloudRecipe(doomed)));
+    ok('…and the writer is told', await inPage(B, () => {
+      const o = document.getElementById('serviceErrorOverlay');
+      return !!(o && /DELETE|admin|only/i.test(o.textContent));
+    }));
+    await inPage(B, () => { const o = document.getElementById('serviceErrorOverlay'); if (o) o.remove(); });
+  }
   // The OWNER's delete goes through, and reaches the other device.
   await inPage(A, (id) => { window.askConfirm = async () => true; return deleteRecipe(id); }, doomed);
   ok('the owner\'s delete removes it from the cloud', await until(async () => !(await cloudRecipe(doomed))));

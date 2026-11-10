@@ -1585,6 +1585,21 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
     fixture: a recipe's link with www./utm, a source sentence with m., a collection recipe's link with fbclid, a new
     link; a written recipe by a name the kitchen has and a new one); 5 knock-outs each fail it. Screen at 393 px checked.
     The panel is English-only (not translated), as before.
+  - **v39.57 — a recipe the owner or an admin deletes now leaves the other devices too (a real, older sync bug, found
+    by v39.55).** v39.55's CI failed on the household end-to-end test (tests/e2e-sync.mjs): its "a writer's delete is
+    refused … and the writer is told" no longer applies (the writer asks instead — the test now checks the request: the
+    recipe stays in the cloud and on the writer's device, the writer is told "Sent", and `deleteAsks/<uid>_<id>` holds
+    it), and **"the owner's delete … and from the other device" failed for real**: before v39.55 the writer's device had
+    deleted the recipe itself, so that check never tested anything. The cause: `saveToFirestore` runs
+    `flushCloudDeletes` (which takes each id off `_pendingCloudDeletes` as it deletes the document) before
+    `writeCloudMeta`, which merges the cloud's own index (`cur.ids`) and removes only what is still pending — so a
+    deleted recipe's id stayed in `state/meta` (shared/meta in the first layout), every other device found it still
+    listed and kept its copy. Fix: `flushCloudDeletes` returns `deleted` (every id it took off, except those the rules
+    refused) and `writeCloudMeta(list, nextId, db, gone)` drops them from the index. Both end-to-end layouts pass on the
+    emulators here (households: every check, incl. the request and the deletion reaching the other device); the Self
+    Tests 457 passed. Knock-out: without the fix the household end-to-end check fails as on CI. To tell Tony: devices
+    other than the one that deleted may still hold recipes deleted before v39.57 (they leave at a full read, or
+    can be deleted again).
   - **Planned for Tuesday 10 Nov 2026, after 11:00 Israel time — NOT before** (Tony, 7 Nov 2026, ~00:45: "as I am
     already at 75% of my weekly quota, I would like you to only log the request and plan it for Tuesday, after 11:00,
     when it resets"; a reminder into this session is scheduled for 11:05, trig_019vabk7G3ZPSwUAMaDctuxi). Two features:
