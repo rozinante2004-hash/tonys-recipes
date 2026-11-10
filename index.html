@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.55 -->
+<!-- Tony's Recipes Collection v39.56 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -11017,7 +11017,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.55';
+var APP_VERSION = 'v39.56';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -14525,7 +14525,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.55</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.56</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14613,7 +14613,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.55</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.56</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -35399,7 +35399,7 @@ var HELP_SYSTEM_PROMPT = [
   "- ··· MORE IN FIVE HEADINGS (v39.30): 💡 Ideas, 🧰 Tools, 🏡 Kitchens and people, 📱 WhatsApp, 🧹 Tidy up — tap one to open what is under it, in the menu itself; tap again to close",
   "- 💬 WHATSAPP GROUPS — putting a group's chat into the app (also asked as 'uploading a WhatsApp export to the server' or 'to the cloud'; v39.42): 1. In WhatsApp: open the group → tap the group's name at the top → Export chat → Without media. On an iPhone choose Save to Files (e.g. On My iPhone → Downloads) and Save; on Android save the file or share it to Files. 2. In the app: ⚙️ Settings → 📥 Saving recipes from other apps → 💬 WhatsApp Groups → 📂 Import exported .txt or .zip files, and pick the file (on an iPhone it is usually the first under Recents; otherwise Browse to where you saved it). Leave 'Also sync imported chats to my other devices' ticked (it is, unless someone unticked it on this device): the chat is then kept in the cloud with your recipes and appears on every device you are signed in on — the app says '☁️ 1 synced to the cloud'. Signed out (or unticked) it stays on this device only. To bring a group up to date, export it again and import it the same way: an export with the same file name replaces the older copy. 🔄 Load synced chats picks up what another device added; Loaded chats lists them. WhatsApp itself has no way to send the export to the app — that step is always done in WhatsApp — and the app never sends anything to your groups.",
   "- 💬 ASK MY WHATSAPP GROUPS — how to use it (v39.42): ··· More → 📱 WhatsApp → 💬 Ask my WhatsApp groups (the number after it is how many chats are imported; with none, the window says 'No chats loaded yet' — import one first, see WhatsApp Groups above). Type a question in the box and press Ask (or Enter). Write it with the words the group would have used, in the language the group writes in — it finds messages by the words of your question (each word of 3 letters or more; Hebrew's ה/ו/ב/ל in front of a word is fine), not by meaning: 'challah soft', 'focaccia oven temperature', 'who made the cheesecake at Pesach' work better than 'any tips?'. It reads every imported chat, picks the messages that best match your words (up to 45) with the messages around each one — a couple before and several after, where the replies are — and the AI writes the answer from those messages only: **Best answer:** first, then **Other options mentioned:** with who suggested each, and which it recommends and why; it says so when people disagree, never invents amounts, names or steps, and says plainly when the chats do not answer the question. Under the answer: what each chat turned up (a chat that had nothing is listed too, so you know it was searched), and 'Show the N messages this was based on' to read them yourself. 'Nothing in your N messages mentions those words' → try other words, a shorter question, or the group's language. Each question is one AI request (it counts toward your AI use); only those excerpts go to the AI, and nothing is ever posted to your groups. To include newer messages, export the group again and import it (WhatsApp Groups above).",
-  "- 🧺 RECIPES HIDING IN MY CHATS: ··· More → 📱 WhatsApp → 🧺 Recipes hiding in my chats — the recipe links and the recipes written out in your imported chats, found by the app; each has an import button (a link opens the link import, a written recipe the paste-a-recipe window) and the list stays open while you import one after another. A link already in your recipes is marked as imported.",
+  "- 🧺 RECIPES HIDING IN MY CHATS: ··· More → 📱 WhatsApp → 🧺 Recipes hiding in my chats — the recipe links and the recipes written out in your imported chats, found by the app; each has an import button (a link opens the link import, a written recipe the paste-a-recipe window) and the list stays open while you import one after another. (v39.56) What your kitchen already has is left out: a link whose address is one of your recipes' sources — or the source of a recipe inside one of your collections; www., the phone version (m.) and tracking bits do not count — and a written-out recipe whose title is a recipe you have. The panel says how many it left out, with a tick box to show them again (each marked ✔ already saved). The written-out recipes come first, and the panel opens on them when there are any you do not have.",
   "- 📱 GRID LAYOUT: ⚙️ Settings → 🎨 How it looks → 📱 Grid Layout — how many recipe cards fit in a row in the grid view, on this device (1 to 5 on a phone; 3 unless changed). It only changes how the recipes are shown; nothing is added or removed (v39.42).",
   "- PHOTOS, under ⚙️ Settings → 💾 Backups and photos (v39.42): ☁️ Send my photos to the cloud — uploads the photos that exist only on this device, so your other devices get them too (use it when a photo shows on one device and not on another); it deletes nothing. 🖼️ Restore photos from a backup — puts photos back from a backup file without replacing recipes changed since. 🧹 Clean up orphaned photos — removes photos kept on THIS device that no recipe uses any more; it does not touch the cloud or any recipe's photo.",
   "- 🪵 LOGGING & DEBUGGING: ⚙️ Settings → 🔧 Troubleshooting → 🪵 Logging & debugging — keeps a record of what the app does on this device, to send to the app's admin when something goes wrong; the record stays on this device until you choose to send it, and is never put into a backup (v39.42).",
@@ -36323,19 +36323,70 @@ function waExtractLinks(messages) {
 
 // Which links are already in the collection. Compared on the SAME normalised form
 // as extraction, so "already have it" cannot disagree with de-duplication.
-function waLinksAlreadyImported(links, recipeList) {
+// v39.56 — Tony, 9 Nov 2026: "do not display links for recipes I already have in my list of recipes. This should be
+// easy to do by comparing the URLs." Compared now with every address the kitchen holds: each recipe's source — the
+// address inside it too, when the source is a sentence ("From https://… via WhatsApp") — and each source of a recipe
+// inside a collection (a round-up's entries each have their own); the phone and desktop forms of a site
+// (m.example.com / example.com) are one page.
+function waHaveKey(u) {
+  var k = waNormalizeUrl(u);
+  return k ? k.replace(/^(m|mobile|amp)\./, '') : '';
+}
+function waHaveIndex(recipeList) {
   var have = {};
+  var add = function(src, r, name) {
+    var s = String(src || ''), u = sourceUrlIn(s) || s, k = waHaveKey(u);
+    if (k && !have[k]) have[k] = { r: r, name: name };
+  };
   (recipeList || []).forEach(function(r){
-    var k = waNormalizeUrl(r && r.source);
-    if (k) have[k] = r;
+    if (!r) return;
+    add(r.source, r, r.name);
+    recipeParts(r).forEach(function(p){ add(p && p.source, r, (p && p.name) || r.name); });
   });
+  return have;
+}
+function waLinksAlreadyImported(links, recipeList) {
+  var have = waHaveIndex(recipeList);
   (links || []).forEach(function(l){
-    var hit = have[l.key];
+    var hit = have[l.key] || have[waHaveKey(l.url)];
     l.imported = !!hit;
     l.importedAs = hit ? (hit.name || '') : '';
   });
   return links;
 }
+// v39.56 — "if there are actual recipes in my chats, then please do display them, unless I already have them". A recipe
+// written into a message has no address to compare; its title is its first line that is neither a heading
+// ("Ingredients:"), a quantity nor a link, and the kitchen has it when findDuplicate finds that name among its recipes
+// and the recipes inside its collections — or when it was imported from this very message.
+function waTextTitle(text) {
+  var lines = String(text || '').split('\n');
+  for (var i = 0; i < lines.length && i < 6; i++) {
+    var l = lines[i].replace(WA_URL_RE, ' ').replace(/^[^\p{L}\p{N}]+/u, '').replace(/[\s:\-\u2013\u2014.!]+$/, '').trim();
+    if (l.length < 3 || l.length > 80) continue;
+    WA_SECTION_RE.lastIndex = 0; WA_QTY_RE.lastIndex = 0;
+    if (WA_SECTION_RE.test(l) && l.length < 25) continue;
+    WA_QTY_RE.lastIndex = 0;
+    if (WA_QTY_RE.test(l)) continue;
+    return l;
+  }
+  return '';
+}
+function waTextsAlreadyHad(texts, recipeList) {
+  var list = [];
+  (recipeList || []).forEach(function(r){
+    if (!r) return;
+    list.push({ name: r.name, source: '' });
+    recipeParts(r).forEach(function(p){ if (p && p.name) list.push({ name: p.name, source: '' }); });
+  });
+  (texts || []).forEach(function(c){
+    var title = waTextTitle(c.text), hit = title ? findDuplicate({ name: title, source: '' }, list) : null;
+    var mine = waSeen()[waSelKey('text', c)] === 'imported';
+    c.have = !!(hit || mine);
+    c.haveAs = hit ? (hit.recipe.name || '') : '';
+  });
+  return texts;
+}
+window.waHaveKey = waHaveKey; window.waTextTitle = waTextTitle; window.waTextsAlreadyHad = waTextsAlreadyHad;
 // ─── In-text recipes ────────────────────────────────────────────────────────
 // Plenty of what is worth keeping was never a link: somebody just typed the
 // mayonnaise recipe into the group. These are easy to lose precisely because
@@ -37354,7 +37405,7 @@ function waIndexTexts(list){
 function waHarvestSyncResults(){
   if (!_waScan.acc) return;
   _waHarvest.links = waLinksAlreadyImported(_waScan.acc.links(), recipes);
-  _waHarvest.texts = _waScan.acc.textList();
+  _waHarvest.texts = waTextsAlreadyHad(_waScan.acc.textList(), recipes);   // v39.56
 }
 window.waHarvestSyncResults = waHarvestSyncResults;
 window.waEtaText = waEtaText; window.waElapsedMs = waElapsedMs;
@@ -37372,7 +37423,7 @@ async function openWaLinks(){
     var saved = await waHarvestLoad();
     if (saved) {
       _waHarvest.links = waLinksAlreadyImported(saved.links || [], recipes);
-      _waHarvest.texts = saved.texts || [];
+      _waHarvest.texts = waTextsAlreadyHad(saved.texts || [], recipes);   // v39.56
       _waHarvest.selected = saved.selected || {};
       _waHarvest.dismissed = saved.dismissed || {};
       _waHarvest.seen = saved.seen || {};
@@ -37389,7 +37440,15 @@ async function openWaLinks(){
 }
 window.openWaLinks = openWaLinks;
 
-function waHarvestTab(which){ _waHarvest.tab = which; waRenumber(); renderWaHarvest(); }
+function waHarvestTab(which){ _waHarvest.tab = which; _waHarvest.tabChosen = true; waRenumber(); renderWaHarvest(); }
+// v39.56 — until a tab is chosen, the panel opens on the recipes written in the chats when there are any he does not have
+function waHarvestDefaultTab() {
+  if (_waHarvest.tabChosen) return _waHarvest.tab;
+  var t = (_waHarvest.texts || []).some(function(c){ return !waIsDismissed('text', c) && !c.have; });
+  _waHarvest.tab = t ? 'texts' : 'links';
+  return _waHarvest.tab;
+}
+window.waHarvestDefaultTab = waHarvestDefaultTab;
 window.waHarvestTab = waHarvestTab;
 
 // Closing the panel must not strand a paused scan. A pause parks the loop on a
@@ -37528,6 +37587,7 @@ function waQueueAbort(){
 function waHarvestRefreshImported(){
   if (!_waHarvest.links.length && !_waHarvest.texts.length) return;
   waLinksAlreadyImported(_waHarvest.links, recipes);
+  waTextsAlreadyHad(_waHarvest.texts, recipes);   // v39.56
   renderWaHarvest();
 }
 window.waHarvestRefreshImported = waHarvestRefreshImported;
@@ -37636,7 +37696,7 @@ function waRenumber(){
     if (_waHarvest.hideImported && l.imported) return false;
     return true;
   }).forEach(function(l, i){ n[waSelKey('link', l)] = i + 1; });
-  _waHarvest.texts.filter(function(c){ return !waIsDismissed('text', c); })
+  _waHarvest.texts.filter(function(c){ return !waIsDismissed('text', c) && !(_waHarvest.hideImported && c.have); })
     .forEach(function(c, i){ n[waSelKey('text', c)] = i + 1; });
   _waHarvest.numbering = n;
 }
@@ -37753,7 +37813,7 @@ function renderWaHarvest(){
   // assignment is a fair price for not dumping the reader at row 1 of 969 if it
   // behaves differently. Do not claim it is tested — it is not.
   var keepScroll = body.scrollTop;
-  var tab  = _waHarvest.tab || 'links';
+  var tab  = waHarvestDefaultTab() || 'links';
   var scanning = (_waScan.status === 'running' || _waScan.status === 'loading' || _waScan.status === 'paused');
 
   var links = _waHarvest.links.filter(function(l){
@@ -37762,8 +37822,9 @@ function renderWaHarvest(){
     if (_waHarvest.hideImported && l.imported) return false;
     return true;
   });
-  var texts = _waHarvest.texts.filter(function(c){ return !waIsDismissed('text', c); });
-  var hiddenImported = _waHarvest.links.filter(function(l){ return l.imported; }).length;
+  var texts = _waHarvest.texts.filter(function(c){ return !waIsDismissed('text', c) && !(_waHarvest.hideImported && c.have); });
+  var hiddenImported = _waHarvest.links.filter(function(l){ return l.imported && !waIsDismissed('link', l); }).length
+    + _waHarvest.texts.filter(function(c){ return c.have && !waIsDismissed('text', c); }).length;   // v39.56 — links and written
   var hiddenNoise    = _waHarvest.links.filter(function(l){ return l.noise; }).length;
   var sel = waSelCount();
 
@@ -37776,11 +37837,15 @@ function renderWaHarvest(){
     + '<b>' + texts.length + '</b> recipe' + (texts.length === 1 ? '' : 's') + ' written in the chat'
     + ' &nbsp;·&nbsp; <b>' + links.length + '</b> link' + (links.length === 1 ? '' : 's')
     + (scanning ? ' <span class="wa-count-sub">— still reading</span>' : '')
-    + '</div>';
+    + '</div>'
+    // v39.56 — what was left out because the kitchen has it, said, with the way to see it
+    + (hiddenImported ? '<div class="wa-filters wa-have"><label><input type="checkbox" ' + (_waHarvest.hideImported ? 'checked' : '')
+      + ' onchange="_waHarvest.hideImported=this.checked;waRenumber();renderWaHarvest()"> leave out the ' + hiddenImported
+      + ' already in your recipes</label></div>' : '');
 
   h += '<div class="wa-tabs">'
-    + '<button onclick="waHarvestTab(\'links\')" class="wa-tab' + (tab==='links'?' on':'') + '">🔗 Links (' + links.length + ')</button>'
     + '<button onclick="waHarvestTab(\'texts\')" class="wa-tab' + (tab==='texts'?' on':'') + '">📝 Written in the chat (' + texts.length + ')</button>'
+    + '<button onclick="waHarvestTab(\'links\')" class="wa-tab' + (tab==='links'?' on':'') + '">🔗 Links (' + links.length + ')</button>'
     + '</div>';
 
   if (sel) {
@@ -37798,8 +37863,6 @@ function renderWaHarvest(){
 
   if (tab === 'links') {
     h += '<div class="wa-filters">'
-      + '<label><input type="checkbox" ' + (_waHarvest.hideImported ? 'checked' : '')
-      + ' onchange="_waHarvest.hideImported=this.checked;renderWaHarvest()"> hide the ' + hiddenImported + ' already imported</label>'
       + '<label><input type="checkbox" ' + (_waHarvest.hideNoise ? 'checked' : '')
       + ' onchange="_waHarvest.hideNoise=this.checked;waRenumber();renderWaHarvest()"> hide ' + hiddenNoise
       + ' shops, sign-ups, invites &amp; maps</label>'
@@ -37856,7 +37919,9 @@ function renderWaHarvest(){
         + (c.who ? escH(c.who) : 'unknown') + (c.date ? ' · ' + escH(c.date) : '')
         + (c.group ? ' · ' + escH(c.group) : '')
         + (c.dupes ? ' · posted ' + c.dupes + '×' : '')
-        + ' · ' + escH(c.signals.join(', ')) + '</div>'
+        + ' · ' + escH(c.signals.join(', '))
+        + (c.have ? ' · <span style="color:var(--green);">already saved' + (c.haveAs ? ' as <span dir="auto" data-no-i18n>' + escH(c.haveAs) + '</span>' : '') + '</span>' : '')
+        + '</div>'
         + '<div dir="auto" class="wa-text">' + escH(preview) + (c.text.length > 220 ? '…' : '') + '</div>'
         + '<div class="wa-acts">'
         + '<button class="wa-eye ' + (st === 'imported' ? 'is-imported' : (st === 'viewed' ? 'is-viewed' : ''))

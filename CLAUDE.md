@@ -1500,6 +1500,10 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
     light and dark checked. 4 phrases by hand in 11 languages (tr/tr52.py; and zh's "— should say Verified" put back).
   - **v39.52 on Test (10 Nov 2026):** 29ce829 pushed 11:18; Cloudflare Pages for test 11:19, Self Tests 11:36 — success.
     Releasing it needs Tony's yes.
+  - **v39.53 on Test:** 004de5d, Cloudflare Pages for test 11:43, Self Tests 11:59 — success. **v39.54 on Test:** bc536c4,
+    Cloudflare Pages 11:52, Self Tests 12:10 — success. **v39.55:** 84b312a, Cloudflare Pages 12:02, "Publish the database
+    rules" (to the test project, after the emulator checks) 12:02 — success; its Self Tests were still running at
+    v39.56's push. Releasing any of them needs Tony's yes.
   - **v39.53 — 🔗 links between recipes** (Tuesday 10 Nov 2026, item 2 of the plan below). Mark words in an ingredient,
     the Method or the Notes; 🔗 (beside B in both toolbars, and beside Notes) or Ctrl+K / ⌘K opens a list of every recipe
     — his own, each recipe inside his collections, and the linked kitchens' (theirs, and the recipes inside their
@@ -1567,6 +1571,20 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
     (tr/tr55.py); a choice written into a message was harvested as one junk phrase — each sentence is now in a variable.
     Not changed: gathering recipes into a collection or merging still removes the originals for an editor (the server
     refuses those deletions as before) — to raise with Tony.
+  - **v39.56 — 🧺 Recipes hiding in my chats leaves out what the kitchen has** (Tuesday 10 Nov 2026, item 6 of the plan
+    below). It already hid "imported" links by default, but matched only each recipe's own source as written. Now
+    `waHaveIndex` holds every address the kitchen has — each recipe's source, the address inside a source written as a
+    sentence (`sourceUrlIn`), and each source of a recipe inside a collection — compared with `waHaveKey` (the link's
+    normalised form, tracking parameters off, and the phone host m./mobile./amp. folded into the site). **Written-out
+    recipes** (they were found already, on their own tab): `waTextTitle` reads the title (the first line that is not a
+    heading, a quantity or a link), and `waTextsAlreadyHad` marks one the kitchen has — `findDuplicate` on that name among
+    its recipes and the recipes inside its collections, or imported from that very message. Both are left out while
+    "leave out the N already in your recipes" is ticked (it is, and the line says how many — links and written ones
+    together; unticked they show, marked ✔ already saved); the 📝 Written in the chat tab comes first, and the panel opens
+    on it while it holds any the kitchen does not have (until a tab is chosen). Self Test `wa_have_left_out` (a chat
+    fixture: a recipe's link with www./utm, a source sentence with m., a collection recipe's link with fbclid, a new
+    link; a written recipe by a name the kitchen has and a new one); 5 knock-outs each fail it. Screen at 393 px checked.
+    The panel is English-only (not translated), as before.
   - **Planned for Tuesday 10 Nov 2026, after 11:00 Israel time — NOT before** (Tony, 7 Nov 2026, ~00:45: "as I am
     already at 75% of my weekly quota, I would like you to only log the request and plan it for Tuesday, after 11:00,
     when it resets"; a reminder into this session is scheduled for 11:05, trig_019vabk7G3ZPSwUAMaDctuxi). Two features:

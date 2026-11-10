@@ -15126,6 +15126,56 @@ window.SELF_TESTS = [
         var d=document.getElementById('delBarDelete'); if(d) d.textContent='🗑️ Delete';
       }
     } },
+  { id:'wa_have_left_out', group:'WhatsApp', name:'🧺 Recipes hiding in my chats leaves out what the kitchen has — links by address (a collection\'s recipes too), written recipes by name — says how many, and shows the written ones first (v39.56)',
+    test: async()=>{
+      // v39.56 — Tony, 9 Nov 2026: "do not display links for recipes I already have in my list of recipes. This should be
+      // easy to do by comparing the URLs. Also, if there are actual recipes in my chats, then please do display them,
+      // unless I already have them."
+      ['waLinksAlreadyImported','waTextsAlreadyHad','waTextTitle','renderWaHarvest','waHarvestAcc'].forEach(function(f){ if(typeof window[f]!=='function') throw new Error(f+' is not defined'); });
+      var mine=normalizeRecipe({ id:9300801, uid:'st-wa-1', name:'ST Shakshuka of Tzvia', source:'https://www.food.example.invalid/item/111?utm_source=wa', ingredients:[{a:'4',n:'eggs'}], steps:['cook'] });
+      var said=normalizeRecipe({ id:9300802, uid:'st-wa-2', name:'ST Lentil soup', source:'From https://m.soups.example.invalid/lentil/ via a friend', ingredients:[{a:'1',n:'lentils'}], steps:['cook'] });
+      var coll=normalizeRecipe({ id:9300803, uid:'st-wa-3', name:'ST Round-up', source:'https://roundup.example.invalid/all', parts:[
+        { name:'ST Plum cake', source:'https://cakes.example.invalid/plum', ingredients:[{a:'1',n:'plums'}], steps:['bake'] },
+        { name:'ST Apple cake', source:'https://cakes.example.invalid/apple', ingredients:[{a:'1',n:'apples'}], steps:['bake'] } ] });
+      var msg=function(t){ return { who:'ST', date:'1/1/26', group:'ST group', text:t }; };
+      var rec=function(title){ return title+'\nמצרכים:\n2 כוסות קמח\n1 כפית מלח\n3 ביצים\n200 גרם חמאה\nאופן ההכנה:\nמערבבים את הקמח והמלח, מוסיפים את הביצים ומערבבים היטב.\nאופים 30 דקות ב-180 מעלות.'; };
+      var acc=waHarvestAcc();
+      [ 'look https://food.example.invalid/item/111 yum', 'here https://soups.example.invalid/lentil', 'try https://cakes.example.invalid/plum?fbclid=x',
+        'new one https://new.example.invalid/recipe/5', rec('ST Lentil soup'), rec('🍰 ST Brand new cake:') ].forEach(function(t){ acc.add(msg(t)); });
+      var real={ recipes:recipes.slice(), wa:JSON.stringify(_waHarvest) };
+      recipes.push(mine, said, coll);
+      var body=document.getElementById('waLinksBody'), madeBody=false;
+      if(!body){ body=document.createElement('div'); body.id='waLinksBody'; document.body.appendChild(body); madeBody=true; }
+      try{
+        var links=waLinksAlreadyImported(acc.links(), recipes), texts=waTextsAlreadyHad(acc.textList(), recipes);
+        var known=links.filter(function(l){ return l.imported; }).map(function(l){ return l.domain; }).sort();
+        if(known.join('|')!=='cakes.example.invalid|food.example.invalid|soups.example.invalid')
+          throw new Error('the links the kitchen has (a recipe\'s, a sentence\'s, a collection recipe\'s; www./m./tracking aside) are not all known: '+JSON.stringify(links.map(function(l){ return [l.domain,l.imported]; })));
+        if(links.some(function(l){ return /new\.example/.test(l.url) && l.imported; })) throw new Error('a new link counts as one the kitchen has');
+        if(waTextTitle(rec('🍰 ST Brand new cake:'))!=='ST Brand new cake') throw new Error('a written recipe\'s title is read as '+JSON.stringify(waTextTitle(rec('🍰 ST Brand new cake:'))));
+        if(texts.length!==2) throw new Error(texts.length+' written recipes found, not 2');
+        var had=texts.filter(function(c){ return c.have; });
+        if(had.length!==1 || !/Lentil/.test(had[0].text)) throw new Error('the written recipe the kitchen has (by its name) is not known: '+JSON.stringify(texts.map(function(c){ return [waTextTitle(c.text), c.have]; })));
+        _waHarvest.links=links; _waHarvest.texts=texts; _waHarvest.dismissed={}; _waHarvest.selected={}; _waHarvest.seen={};
+        _waHarvest.hideImported=true; _waHarvest.hideNoise=true; _waHarvest.tabChosen=false; _waHarvest.tab='links';
+        renderWaHarvest();
+        if(_waHarvest.tab!=='texts') throw new Error('with a written recipe the kitchen does not have, the panel does not open on the written ones');
+        var rows=function(){ return body.querySelectorAll('.wa-row').length; };
+        if(rows()!==1 || !/Brand new cake/.test(body.textContent)) throw new Error('the written recipes shown are not just the new one ('+rows()+' rows)');
+        if(!/leave out the 4 already in your recipes/.test(body.textContent)) throw new Error('it does not say how many were left out: '+(body.querySelector('.wa-have')||{}).textContent);
+        waHarvestTab('links');
+        if(rows()!==1 || !/new\.example\.invalid/.test(body.textContent)) throw new Error('the links shown are not just the new one ('+rows()+' rows)');
+        // the way to see them again
+        _waHarvest.hideImported=false; renderWaHarvest();
+        if(rows()!==4) throw new Error('with "leave out" unticked, the links the kitchen has do not come back ('+rows()+')');
+        waHarvestTab('texts');
+        if(rows()!==2 || !/already saved/.test(body.textContent)) throw new Error('with "leave out" unticked, the written recipe the kitchen has is not shown as saved');
+      } finally {
+        recipes.length=0; real.recipes.forEach(function(r){ recipes.push(r); });
+        var w=JSON.parse(real.wa); Object.keys(_waHarvest).forEach(function(k){ delete _waHarvest[k]; }); Object.assign(_waHarvest, w);
+        if(madeBody) body.remove(); else { try{ renderWaHarvest(); }catch(e){} }
+      }
+    } },
   { id:'export_docx_build', group:'Import/Export', name:'Word (.docx) builds a valid ZIP',
     test: async()=>{
       if(typeof makeDocxBlob!=='function') throw new Error('makeDocxBlob not defined');
