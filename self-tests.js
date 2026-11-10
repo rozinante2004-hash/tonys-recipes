@@ -14799,6 +14799,69 @@ window.SELF_TESTS = [
         if(h.indexOf(src)===-1) throw new Error('the source "'+src+'" went missing from the credit');
       });
     } },
+  { id:'coll_toc', group:'Features', name:'📑 A collection opens with its contents — each line jumps to its recipe, each recipe has ↑ Contents, it follows the collection; in print, the shared page and Word too (v39.52)',
+    test: async()=>{
+      // v39.52 — Tony, 7 Nov 2026: "a TOC, which lists the recipes in a collection and allows me to jump to each of them by
+      // clicking the relevant line. Each of the recipes in the collection should also have a \"jump to start\" link… if a
+      // recipe is added to a collection, or is removed from one, the TOC and the linkage should behave accordingly"; and in
+      // printed, Word and shared copies — "If it is in a digital format, like Word, the links should be functional as well".
+      ['collectionTocHtml','collJump','recipePageBody','buildPrintHtml','makeDocxBlob','linkedLinesHtml'].forEach(function(f){ if(typeof window[f]!=='function') throw new Error(f+' is not defined'); });
+      var mk=function(n){ return { name:n, ingredients:[{a:'1',n:'thing for '+n}], steps:['make '+n] }; };
+      var coll=normalizeRecipe({ id:9300501, uid:'st-toc', name:'ST soups', category:'Soup', parts:[mk('ST Leek soup'), mk('מרק עדשים'), mk('ST Pumpkin soup')] });
+      var single=normalizeRecipe({ id:9300502, uid:'st-toc2', name:'ST plain', ingredients:[{a:'1',n:'x'}], steps:['y'] });
+      var realRecipes=recipes.slice(), realScroll=Element.prototype.scrollIntoView, scrolled=[];
+      recipes.push(coll, single);
+      Element.prototype.scrollIntoView=function(){ scrolled.push(this); };
+      var ov=document.getElementById('viewOverlay');
+      try{
+        var tocNames=function(root){ var t=root.querySelector('[data-coll-toc]'); return t ? Array.prototype.map.call(t.querySelectorAll('li a'), function(a){ return a.textContent.trim(); }) : null; };
+        openView(coll.id); await wait(150);
+        var names=tocNames(ov);
+        if(!names) throw new Error('the open collection has no contents');
+        if(names.join('|')!=='ST Leek soup|מרק עדשים|ST Pumpkin soup') throw new Error('the contents list '+JSON.stringify(names));
+        var partsEl=ov.querySelectorAll('[data-coll-part]');
+        if(partsEl.length!==3) throw new Error(partsEl.length+' recipes can be jumped to, not 3');
+        var backs=ov.querySelectorAll('[data-coll-part] a.coll-top');
+        if(backs.length!==3) throw new Error(backs.length+' of 3 recipes have ↑ Contents');
+        ov.querySelectorAll('[data-coll-toc] li a')[1].click();
+        if(scrolled[scrolled.length-1]!==ov.querySelector('[data-coll-part="1"]')) throw new Error('the second line does not take you to the second recipe');
+        backs[2].click();
+        if(scrolled[scrolled.length-1]!==ov.querySelector('[data-coll-toc]')) throw new Error('↑ Contents does not take you back to the contents');
+        // It follows the collection: a recipe added, then one taken away.
+        coll.parts.push(normalizePart(mk('ST Onion soup'))); closeM('viewOverlay'); openView(coll.id); await wait(150);
+        if((tocNames(ov)||[]).join('|')!=='ST Leek soup|מרק עדשים|ST Pumpkin soup|ST Onion soup') throw new Error('a recipe added to the collection is not in its contents: '+JSON.stringify(tocNames(ov)));
+        coll.parts.splice(1,1); closeM('viewOverlay'); openView(coll.id); await wait(150);
+        if((tocNames(ov)||[]).join('|')!=='ST Leek soup|ST Pumpkin soup|ST Onion soup') throw new Error('a recipe taken out is still in the contents: '+JSON.stringify(tocNames(ov)));
+        closeM('viewOverlay'); openView(single.id); await wait(150);
+        if(ov.querySelector('[data-coll-toc]')) throw new Error('an ordinary recipe shows a contents list');
+        closeM('viewOverlay');
+        // A linked kitchen's (or a sent) collection.
+        var box=document.createElement('div'); box.innerHTML=linkedLinesHtml(coll);
+        if((tocNames(box)||[]).length!==3 || box.querySelectorAll('[data-coll-part] a.coll-top').length!==3) throw new Error('a linked kitchen\'s collection has no contents or no ↑ Contents');
+        // Printed: the list (its lines link to the recipes on the page), each recipe under its own name.
+        var pr=buildPrintHtml([coll]);
+        if(!/class="toc"/.test(pr) || !/href="#r0p2"/.test(pr) || !/id="r0p2"/.test(pr) || pr.indexOf('ST Pumpkin soup')===-1) throw new Error('the printout has no working contents');
+        if(/class="toc"/.test(buildPrintHtml([single]))) throw new Error('an ordinary recipe prints a contents list');
+        // The shared web page.
+        var pg=buildRecipePage(coll);
+        if(!/href="#part1"/.test(pg) || !/id="part1"/.test(pg) || !/href="#toc"/.test(pg)) throw new Error('the shared page has no working contents');
+        // Word: every line of the contents is a link to a bookmark that is there, and every recipe links back.
+        var bytes=new Uint8Array(await makeDocxBlob([single, coll]).arrayBuffer());
+        var txt=new TextDecoder().decode(bytes), a=txt.indexOf('<w:document'), z=txt.indexOf('</w:document>');
+        var docXml=txt.slice(a, z+13);
+        var doc=new DOMParser().parseFromString(docXml, 'application/xml');
+        if(doc.getElementsByTagName('parsererror').length) throw new Error('the Word document is not well-formed with the contents in it');
+        var anchors=(docXml.match(/w:anchor="([^"]+)"/g)||[]).map(function(x){ return x.slice(10,-1); });
+        var marks=(docXml.match(/w:bookmarkStart w:id="\d+" w:name="([^"]+)"/g)||[]).map(function(x){ return x.replace(/.*w:name="/,'').slice(0,-1); });
+        if(anchors.length<6) throw new Error('the Word contents has '+anchors.length+' links, not 3 lines and 3 ways back');
+        var dead=anchors.filter(function(n){ return marks.indexOf(n)===-1; });
+        if(dead.length) throw new Error('Word links that lead nowhere: '+dead.join(', '));
+      } finally {
+        Element.prototype.scrollIntoView=realScroll;
+        recipes.length=0; realRecipes.forEach(function(r){ recipes.push(r); });
+        if(ov && ov.classList.contains('open')) closeM('viewOverlay');
+      }
+    } },
   { id:'export_docx_build', group:'Import/Export', name:'Word (.docx) builds a valid ZIP',
     test: async()=>{
       if(typeof makeDocxBlob!=='function') throw new Error('makeDocxBlob not defined');

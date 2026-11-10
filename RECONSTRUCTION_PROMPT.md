@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v39.51` — app. **Worker: v102**, deployed separately and versioned separately
+**Current version:** `v39.52` — app. **Worker: v102**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -408,6 +408,12 @@ under its plain path only (a `?url=` request goes network-first).
   **Pace and pitch (v39.36, Tony's choice "E" from five heard on his phone):** FARM_VOICE_TUNE child speed 0.8, pitch
   1.8 (the top; above it speech cracks); female 0.74 / 1.4; male 0.7 / 0.7 (only slower: he stays deep, v38.01); each
   animal adds ±0.3 × (its pitch − 1), kept within 0.55–1.8.
+- **📑 A collection's contents (v39.52):** `collectionTocHtml(parts)` at the top of every collection (own, a linked
+  kitchen's, a sent one — `linkedLinesHtml`), drawn from the parts every time (nothing stored, so existing collections
+  have it and it follows every change); each line a link; each part (`data-coll-part`) has "↑ Contents"
+  (`collTopLinkHtml`); `collJump` scrolls within the window it was tapped in. Print (`buildPrintHtml`), the shared web page
+  (`recipePageBody`) and Word (`makeDocxBlob`: `w:hyperlink w:anchor` → `w:bookmarkStart`, unique per export) give each
+  part its own heading after the same contents, with working links where the format has them. Self Test `coll_toc`.
 - **A page that links to its recipes (v36.2; v39.48):** the URL import passes the page's links into
   `extractRecipesFromText(…, { roundup })`; when the outline's entries are short (`slicesAreHeadings`: median under
   500 characters) the linked pages are opened first (`extractRecipesFromLinks(…, outline)`), before any entry is read.

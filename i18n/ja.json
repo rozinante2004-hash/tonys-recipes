@@ -3118,6 +3118,10 @@
   "🪵 Keeping {1} day{2} of log": "🪵 ログを{1}日{2}分保持",
   "🪵 Logging & debugging": "🪵 ログとデバッグ",
   "🪵 The log has something worth reporting": "🪵 ログに報告すべき内容があります",
-  "🫙 Low FODMAP": "🫙 低FODMAP"
+  "🫙 Low FODMAP": "🫙 低FODMAP",
+  "📑 Contents": "📑 目次",
+  "↑ Contents": "↑ 目次",
+  "Back to the contents": "目次に戻る",
+  "Contents": "目次"
  }
 }

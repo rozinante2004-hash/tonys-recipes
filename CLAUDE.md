@@ -1486,6 +1486,18 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
     Tests (00:48). Every job success: Cloudflare Pages for the beta (00:49); on main: Deploy to GitHub Pages and pages
     build (00:49), Translate new phrases (00:50), Publish languages (00:51 — 4ce08d6 on main, test fast-forwarded; its
     Deploy to GitHub Pages, pages build and Cloudflare Pages for test 00:51–00:52), Self Tests on main (01:07).
+  - **v39.52 — 📑 a collection's contents** (Tuesday 10 Nov 2026, item 1 of the plan below; started 11:06 Israel time by
+    the scheduled reminder). Every collection opens with its contents (its recipes in order, each line a link that jumps
+    to it); each recipe has "↑ Contents" at its top right. Drawn from the parts each time, so his existing collections
+    have it and adding, removing, lifting out or splitting changes it at once; a linked kitchen's and a sent collection
+    too (`linkedLinesHtml`). **Copies:** print, the shared web page and Word used to flatten a collection into one list
+    of ingredients and one method — now each recipe has its own heading after the contents; on the web page and in Word
+    each line is a working link (Word: `w:hyperlink w:anchor` to a `w:bookmarkStart`, names unique per export) and each
+    recipe links back; print keeps the list (the links work in the browser window before printing). Self Test `coll_toc`
+    (opens a collection, jumps both ways with scrollIntoView recorded, adds and removes a recipe, an ordinary recipe has
+    none, a linked one has it, print, page, and the Word XML well-formed with every link landing on a bookmark);
+    knock-outs (no contents, no ↑ Contents, a line that does not jump, the page flattened) each fail it. Screens at 393 px
+    light and dark checked. 4 phrases by hand in 11 languages (tr/tr52.py; and zh's "— should say Verified" put back).
   - **Planned for Tuesday 10 Nov 2026, after 11:00 Israel time — NOT before** (Tony, 7 Nov 2026, ~00:45: "as I am
     already at 75% of my weekly quota, I would like you to only log the request and plan it for Tuesday, after 11:00,
     when it resets"; a reminder into this session is scheduled for 11:05, trig_019vabk7G3ZPSwUAMaDctuxi). Two features:

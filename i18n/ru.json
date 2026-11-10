@@ -3109,6 +3109,10 @@
   "🪵 Keeping {1} day{2} of log": "🪵 Храним лог за последние {1} дн{2}",
   "🪵 Logging & debugging": "🪵 Логирование и отладка",
   "🪵 The log has something worth reporting": "🪵 В логе есть, что стоит сообщить",
-  "🫙 Low FODMAP": "🫙 Низкий FODMAP"
+  "🫙 Low FODMAP": "🫙 Низкий FODMAP",
+  "📑 Contents": "📑 Содержание",
+  "↑ Contents": "↑ К содержанию",
+  "Back to the contents": "Назад к содержанию",
+  "Contents": "Содержание"
  }
 }

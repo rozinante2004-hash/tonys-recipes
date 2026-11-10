@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.51 -->
+<!-- Tony's Recipes Collection v39.52 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -7110,7 +7110,7 @@ window.linkedReload = linkedReload;
 window.renderLinkedInAll = renderLinkedInAll; window.linkedInAllOn = linkedInAllOn; window.linkedPhotoLoad = linkedPhotoLoad;
 function linkedLinesHtml(r) {
   var parts = isCollection(r) ? recipeParts(r) : [r];
-  return parts.map(function(p) {
+  return (parts.length > 1 ? collectionTocHtml(parts) : '') + parts.map(function(p, pi) {
     var num = 0;
     var ings = (p.ingredients || []).map(function(i) {
       if (isSubLine(i)) return '<li class="line-sub" dir="auto">' + escB(i.sub) + '</li>';
@@ -7121,7 +7121,10 @@ function linkedLinesHtml(r) {
       num++;
       return '<li dir="auto"><span class="step-num">' + num + '</span><span class="step-text">' + escB(stepText(s)) + '</span></li>';
     }).join('');
-    return (parts.length > 1 ? '<div dir="auto" data-no-i18n style="font-family:Georgia,serif;font-size:18px;font-weight:700;color:var(--heading);margin:14px 0 6px;">' + escH(p.name) + '</div>' : '')
+    // v39.52 — the same contents and the way back to them as one's own collection
+    return (parts.length > 1 ? '<div data-coll-part="' + pi + '" tabindex="-1" style="display:flex;align-items:baseline;gap:10px;margin:14px 0 6px;">'
+        + '<div dir="auto" data-no-i18n style="flex:1;min-width:0;font-family:Georgia,serif;font-size:18px;font-weight:700;color:var(--heading);">' + escH(p.name) + '</div>'
+        + collTopLinkHtml() + '</div>' : '')
       + ((ings || steps) ? '<div class="recipe-columns"' + (recipeIsRTL(r) ? ' dir="rtl"' : '') + '>'
       + '<div class="recipe-col-ings"><div class="modal-section-title">Ingredients</div><ul class="ingredients-list" data-no-i18n>' + ings + '</ul></div>'
       + '<div class="recipe-col-steps"><div class="modal-section-title">Method</div><ol class="steps-list" dir="auto" data-no-i18n>' + steps + '</ol></div></div>' : '');
@@ -10780,7 +10783,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.51';
+var APP_VERSION = 'v39.52';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -12726,6 +12729,13 @@ body:has(.modal-overlay.open) #pwaIosBanner, body:has(#askOverlay) #pwaIosBanner
 .part-actions { margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--border); }
 .part-actions-label { font-size: 10.5px; letter-spacing: 0.6px; text-transform: uppercase;
   color: var(--muted); margin-bottom: 6px; font-weight: 600; }
+.coll-toc { margin: 4px 0 16px; padding: 12px 16px 10px; border: 1px solid var(--border); border-radius: 12px; background: var(--card-bg); scroll-margin-top: 72px; }
+.coll-toc-title { font-family: 'Playfair Display', 'Frank Ruhl Libre', serif; font-weight: 700; font-size: 15px; color: var(--heading); margin-bottom: 6px; }
+.coll-toc ol { margin: 0; padding-inline-start: 22px; }
+.coll-toc li { margin: 3px 0; line-height: 1.45; }
+.coll-toc a, a.coll-top { color: var(--terracotta); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+a.coll-top { flex-shrink: 0; font-size: 12px; white-space: nowrap; padding: 2px 0; }
+[data-coll-part] { scroll-margin-top: 72px; }
 .collection-actions-label { margin: 18px 0 8px; padding-top: 12px; border-top: 2px solid var(--terracotta);
   font-size: 13px; font-weight: 700; color: var(--heading); }
 .collection-actions-label span { display: block; font-weight: 400; font-size: 11.5px;
@@ -14255,7 +14265,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.51</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.52</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14343,7 +14353,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.51</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.52</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -16287,17 +16297,37 @@ function buildRecipePage(r) {
     + 'ol li{margin-bottom:12px;unicode-bidi:plaintext;text-align:start;}'
     + '.notes{background:#FFF8E8;border-inline-start:3px solid #D4A843;padding:12px 14px;margin-top:22px;font-size:14px;unicode-bidi:plaintext;text-align:start;}'
     + '.foot{color:#A79E93;font-size:11px;text-align:center;padding:18px;}'
-    + '@media print{body{background:#fff}.wrap{box-shadow:none}}'
+    + '.toc{border:1px solid #eee;border-radius:10px;padding:12px 18px;margin:4px 0 8px;}'
+    + '.toc b{color:#5C3D2E;} .toc ol{margin:6px 0 0;} .toc li{margin:2px 0;}'
+    + 'a{color:#C1440E;} .part{scroll-margin-top:12px;} h3{font-family:Georgia,serif;font-size:21px;color:#5C3D2E;margin:34px 0 2px;unicode-bidi:plaintext;text-align:start;}'
+    + '.totop{text-align:end;font-size:12px;margin-top:8px;}'
+    + '@media print{body{background:#fff}.wrap{box-shadow:none}.totop{display:none}}'
     + '</style></head><body dir="auto"><div class="wrap">' + img + '<div class="pad">'
     + '<h1 dir="auto"' + langAttr(r.name) + '>' + escH(r.name) + '</h1>'
     + '<div class="meta">' + escH(r.category) + ' &middot; ' + escH(r.difficulty)
     + ' &middot; ' + escH(r.prep) + ' &middot; ' + escH(r.servings) + ' servings</div>'
-    + '<h2>Ingredients</h2><ul>' + ings + '</ul>'
-    + '<h2>Method</h2><ol>' + steps + '</ol>'
+    + recipePageBody(r, ings, steps)
     + (r.notes ? '<div class="notes" dir="auto"' + langAttr(r.notes) + '>' + escH(r.notes) + '</div>' : '')
     + (r.source ? '<div class="meta" style="margin-top:18px;">Source: ' + escH(r.source) + '</div>' : '')
     + '</div><div class="foot">Shared from ' + escH(kitchenTitle()) + '</div></div></body></html>';
 }
+// v39.52 — a collection's shared page: its contents (each line a link to its recipe on the page), then each recipe
+// under its own name with "↑ Contents"; an ordinary recipe is as it always was.
+function recipePageBody(r, ings, steps) {
+  var parts = (isCollection(r) && recipeParts(r).length > 1) ? recipeParts(r) : null;
+  if (!parts) return '<h2>Ingredients</h2><ul>' + ings + '</ul><h2>Method</h2><ol>' + steps + '</ol>';
+  var li = function(list){ return (list || []).filter(function(i){ return !isSubLine(i); }); };
+  return '<div class="toc" id="toc"><b>Contents</b><ol>'
+    + parts.map(function(p, pi){ return '<li><a href="#part' + pi + '" dir="auto">' + escH(p.name) + '</a></li>'; }).join('')
+    + '</ol></div>'
+    + parts.map(function(p, pi) {
+        return '<div class="part" id="part' + pi + '"><h3 dir="auto"' + langAttr(p.name) + '>' + escH(p.name) + '</h3>'
+          + '<h2>Ingredients</h2><ul>' + li(p.ingredients).map(function(i){ return '<li><span>' + escB(i.n) + '</span><b>' + escB(i.a) + '</b></li>'; }).join('') + '</ul>'
+          + '<h2>Method</h2><ol>' + li(p.steps).map(function(st){ return '<li>' + escB(stepText(st)) + '</li>'; }).join('') + '</ol>'
+          + '<div class="totop"><a href="#toc">\u2191 Contents</a></div></div>';
+      }).join('');
+}
+window.recipePageBody = recipePageBody;
 function shareAsPage(id) {
   // findRecipeRef — see doWhatsApp (v36.13).
   var r = findRecipeRef(id);
@@ -17889,6 +17919,8 @@ window.i18nPatternsFromDict = i18nPatternsFromDict; window.i18nAsk = i18nAsk;
 // translating a string nobody sees. A `{1}` makes it a shape, matched the same
 // way a built toast is.
 var I18N_EXTRA = [
+  // v39.52 — a collection's contents (drawn only for a collection, which no harvest opens)
+  '\uD83D\uDCD1 Contents', '\u2191 Contents', 'Back to the contents', 'Contents',
   // v39.50 — under the progress when the phone would not keep the screen on
   '\uD83D\uDCF1 Keep the app open, and touch the screen now and then \u2014 this phone would not keep it on by itself (Low Power Mode does that).',
   // v39.49 — under the progress while several recipes are read (spinnerLong)
@@ -22312,6 +22344,38 @@ function stepLinesHtml(lines, pfx, timerPfx, ings) {
 }
 window.ingredientLinesHtml = ingredientLinesHtml; window.stepLinesHtml = stepLinesHtml;
 
+// v39.52 — A TABLE OF CONTENTS AT THE TOP OF EVERY COLLECTION (Tony, 7 Nov 2026: "a TOC, which lists the recipes in
+// a collection and allows me to jump to each of them by clicking the relevant line. Each of the recipes in the
+// collection should also have a 'jump to start' link… if a recipe is added to a collection, or is removed from one,
+// the TOC and the linkage should behave accordingly… for new collections and… my existing collections as well").
+// Drawn from the collection's recipes every time it is drawn, so it is always the collection as it is now — new or
+// old, added to, taken from, split — with nothing stored. The lines are links (they look and behave like links); the
+// jump stays inside the window it was tapped in (collJump), so two windows showing collections never mix them up.
+function collectionTocHtml(parts) {
+  if (!Array.isArray(parts) || parts.length < 2) return '';
+  return '<nav class="coll-toc" data-coll-toc tabindex="-1" aria-label="Contents">'
+    + '<div class="coll-toc-title">\uD83D\uDCD1 Contents</div><ol>'
+    + parts.map(function(p, i) {
+        return '<li><a href="#coll-part-' + i + '" onclick="return collJump(event,' + i + ')"><span dir="auto" data-no-i18n>'
+          + escH((p && p.name) || ('#' + (i + 1))) + '</span></a></li>';
+      }).join('')
+    + '</ol></nav>';
+}
+function collTopLinkHtml() {
+  return '<a class="coll-top" href="#coll-toc" onclick="return collJump(event,-1)" title="Back to the contents">\u2191 Contents</a>';
+}
+function collJump(ev, i) {
+  if (ev && ev.preventDefault) ev.preventDefault();
+  var from = ev && ev.target && ev.target.closest ? ev.target : null;
+  var scope = (from && from.closest('.modal, .modal-overlay')) || document;
+  var to = scope.querySelector(i < 0 ? '[data-coll-toc]' : '[data-coll-part="' + i + '"]');
+  if (!to) return false;
+  try { to.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) { to.scrollIntoView(); }
+  try { to.focus({ preventScroll: true }); } catch (e) {}
+  return false;
+}
+window.collectionTocHtml = collectionTocHtml; window.collJump = collJump; window.collTopLinkHtml = collTopLinkHtml;
+
 function collectionSectionsHtml(r) {
   var parts = recipeParts(r);
   return parts.map(function(p, pi) {
@@ -22360,7 +22424,7 @@ function collectionSectionsHtml(r) {
         + '<ol class="steps-list" dir="auto">' + steps + '</ol></div>'
         + '</div>';
 
-    return '<div class="collection-part" style="border:1px solid var(--border);border-radius:12px;'
+    return '<div class="collection-part" data-coll-part="' + pi + '" tabindex="-1" style="border:1px solid var(--border);border-radius:12px;'
       + 'padding:14px 16px;margin-bottom:14px;background:var(--card-bg);">'
       + '<div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:8px;">'
       + '<div style="flex:1;min-width:0;">'
@@ -22373,6 +22437,7 @@ function collectionSectionsHtml(r) {
       + srcLine
       + '</div>'
       + (p.fav ? '<div style="flex-shrink:0;font-size:15px;" title="Favourite">❤️</div>' : '')
+      + (parts.length > 1 ? collTopLinkHtml() : '')   // v39.52 — back to the contents
       + '</div>'
       + (p.notes ? '<div dir="auto" style="font-size:12.5px;color:var(--muted);margin-bottom:8px;">' + escH(p.notes) + '</div>' : '')
       + body
@@ -23057,6 +23122,7 @@ function drawView(){
           <button class="action-btn" style="font-size:11.5px;padding:5px 9px;margin-inline-start:8px;"
             onclick="splitCollection(${r.id})" title="Turn each into its own recipe">✂️ Split them up</button>
         </div>
+        ${collectionTocHtml(recipeParts(r))}
         ${collectionSectionsHtml(r)}
       </div>` : `
       <div class="recipe-columns"${recipeIsRTL(r) ? ' dir="rtl"' : ''}>
@@ -23855,12 +23921,30 @@ function makeDocxBlob(recipeList){
       ? recipeParts(r)
       : [{ name: null, ingredients: r.ingredients, steps: r.steps, by: '', servings: '' }];
 
+    // v39.52 — a collection starts with its contents: each line a link to its recipe in this document (a Word
+    // bookmark), and each recipe ends with a link back. Names unique across the whole export (idx: which recipe).
+    var bm = function(pidx){ return 'mkn_' + idx + '_' + (pidx < 0 ? 'toc' : pidx); };
+    var bmId = function(pidx){ return 9000 + idx * 200 + (pidx < 0 ? 199 : pidx); };
+    var LINK = `<w:rPr><w:color w:val="C1440E"/><w:u w:val="single"/></w:rPr>`;
+    var withToc = docParts.length > 1 && docParts.every(function(p){ return p && p.name; });
+    if (withToc) {
+      bodyXml+=`<w:p><w:pPr><w:pStyle w:val="Heading2"/></w:pPr><w:bookmarkStart w:id="${bmId(-1)}" w:name="${bm(-1)}"/>`
+        + `<w:r><w:t>Contents</w:t></w:r><w:bookmarkEnd w:id="${bmId(-1)}"/></w:p>`;
+      docParts.forEach(function(part, pidx) {
+        bodyXml+=`<w:p><w:pPr>${pBidi(part.name)}</w:pPr><w:r><w:t xml:space="preserve">${pidx + 1}. </w:t></w:r>`
+          + `<w:hyperlink w:anchor="${bm(pidx)}" w:history="1"><w:r><w:rPr><w:color w:val="C1440E"/><w:u w:val="single"/>${rRtl(part.name)}</w:rPr>`
+          + `<w:t xml:space="preserve">${esc(part.name)}</w:t></w:r></w:hyperlink></w:p>`;
+      });
+    }
+
     docParts.forEach(function(part, pidx) {
       if (part.name) {
         if (pidx) bodyXml+=`<w:p></w:p>`;
         var sub = [part.by, part.servings ? ('serves ' + part.servings) : ''].filter(Boolean).join(' · ');
         bodyXml+=`<w:p><w:pPr><w:pStyle w:val="Heading2"/>${pBidi(part.name)}</w:pPr>`
-          + `<w:r><w:rPr>${rRtl(part.name)}</w:rPr><w:t>${esc(part.name)}</w:t></w:r></w:p>`;
+          + (withToc ? `<w:bookmarkStart w:id="${bmId(pidx)}" w:name="${bm(pidx)}"/>` : '')
+          + `<w:r><w:rPr>${rRtl(part.name)}</w:rPr><w:t>${esc(part.name)}</w:t></w:r>`
+          + (withToc ? `<w:bookmarkEnd w:id="${bmId(pidx)}"/>` : '') + `</w:p>`;
         if (sub) bodyXml+=`<w:p><w:pPr>${pBidi(sub)}</w:pPr><w:r><w:rPr><w:i/><w:color w:val="888888"/>${rRtl(sub)}</w:rPr>`
           + `<w:t>${esc(sub)}</w:t></w:r></w:p>`;
       }
@@ -23895,6 +23979,7 @@ function makeDocxBlob(recipeList){
           + `<w:r><w:rPr><w:b/>${rRtl(st)}</w:rPr><w:t xml:space="preserve">${wn}. </w:t></w:r>`
           + wRuns(st, rRtl(st)) + `</w:p>`;
       });
+      if (withToc) bodyXml+=`<w:p><w:pPr><w:jc w:val="right"/></w:pPr><w:hyperlink w:anchor="${bm(-1)}" w:history="1"><w:r>${LINK}<w:t xml:space="preserve">\u2191 Contents</w:t></w:r></w:hyperlink></w:p>`;
     });
 
     // Notes section
@@ -33663,13 +33748,20 @@ function buildPrintHtml(list) {
     + '.recipe + .recipe{page-break-before:always;margin-top:48px;}'
     + '.sub{font-weight:700;color:#C1440E;font-size:13px;padding-top:10px;}'
     + '.ind{padding-inline-start:18px;}'
-    + '@media print{button{display:none;}}';
+    // v39.52 — a collection prints its contents first, then each of its recipes under its own name
+    + '.toc{border:1px solid #E8E0D5;border-radius:8px;padding:10px 16px;margin:8px 0 18px;}'
+    + '.toc-title{font-weight:700;color:#5C3D2E;margin-bottom:4px;}'
+    + '.toc ol{margin:0;padding-inline-start:22px;} .toc li{margin:2px 0;unicode-bidi:plaintext;text-align:start;}'
+    + 'a{color:#C1440E;} .part{margin-top:26px;} .part-name{font-size:21px;color:#5C3D2E;border:none;margin:0 0 2px;unicode-bidi:plaintext;text-align:start;}'
+    + 'h3{font-size:15px;color:#C1440E;border-bottom:1px solid #E8E0D5;padding-bottom:3px;margin:16px 0 8px;}'
+    + '.totop{font-size:12px;text-align:end;margin-top:6px;}'
+    + '@media print{button{display:none;}.totop{display:none;}}';
 
   // v36.4 - a printout is read by a person, so it keeps the headings and the
   // indentation. allIngredients/allSteps answer "what can I cook with" and
   // would drop them silently.
-  var body = list.map(function(r) {
-    var ings = ingredientLines(r).map(function(i){
+  var linesHtml = function(ingList, stepList) {
+    var ings = (ingList || []).map(function(i){
       if (isSubLine(i))
         return '<tr><td class="sub' + (lineIndented(i) ? ' ind' : '')
           + '" dir="auto" colspan="2">' + escB(i.sub) + '</td></tr>';
@@ -33678,7 +33770,7 @@ function buildPrintHtml(list) {
         + ' style="padding:4px 0;">' + escB(i.n) + '</td></tr>';
     }).join('');
     var _pn = 0;
-    var steps = stepLines(r).map(function(s){
+    var steps = (stepList || []).map(function(s){
       if (isSubLine(s)) return '<div class="sub' + (lineIndented(s) ? ' ind' : '')
         + '" dir="auto">' + escB(s.sub) + '</div>';
       _pn++;
@@ -33687,11 +33779,33 @@ function buildPrintHtml(list) {
         + '<span style="min-width:26px;height:26px;background:#C1440E;color:white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;flex-shrink:0;">' + _pn + '</span>'
         + '<span dir="auto">' + escB(stepText(s)) + '</span></div>';
     }).join('');
+    return { ings: ings, steps: steps };
+  };
+  var body = list.map(function(r, ri) {
+    var content;
+    var parts = (isCollection(r) && recipeParts(r).length > 1) ? recipeParts(r) : null;
+    if (parts) {
+      // v39.52 — the contents (links work in a browser before printing), then each recipe, each with the way back
+      content = '<div class="toc" id="toc' + ri + '"><div class="toc-title">Contents</div><ol>'
+        + parts.map(function(p, pi){ return '<li><a href="#r' + ri + 'p' + pi + '" dir="auto">' + escH(p.name) + '</a></li>'; }).join('')
+        + '</ol></div>'
+        + parts.map(function(p, pi) {
+            var L = linesHtml(p.ingredients, p.steps);
+            var sub = [p.by, p.servings ? '\uD83C\uDF7D ' + p.servings : '', p.prep ? '\u23F1 ' + p.prep : ''].filter(Boolean).join(' · ');
+            return '<div class="part" id="r' + ri + 'p' + pi + '"><h2 class="part-name" dir="auto">' + escH(p.name) + '</h2>'
+              + (sub ? '<div class="meta" dir="auto">' + escH(sub) + '</div>' : '')
+              + (p.notes ? '<div class="notes"><div dir="auto">' + escH(p.notes) + '</div></div>' : '')
+              + '<h3>Ingredients</h3><table>' + L.ings + '</table><h3>Method</h3>' + L.steps
+              + '<div class="totop"><a href="#toc' + ri + '">\u2191 Contents</a></div></div>';
+          }).join('');
+    } else {
+      var L1 = linesHtml(ingredientLines(r), stepLines(r));
+      content = '<h2>Ingredients</h2><table>' + L1.ings + '</table><h2>Method</h2>' + L1.steps;
+    }
     return '<div class="recipe">'
       + '<h1 dir="auto">' + escH(r.emoji) + ' ' + escH(r.name) + '</h1>'
       + '<div class="meta">' + escH(r.category) + ' | ' + escH(r.difficulty) + ' | ' + escH(r.prep) + ' | ' + escH(r.servings) + ' servings</div>'
-      + '<h2>Ingredients</h2><table>' + ings + '</table>'
-      + '<h2>Method</h2>' + steps
+      + content
       // v36.32 — the caption goes in its own block. Inside the same one, an
       // English "Notes:" is the first strong character dir="auto" finds, so the
       // whole note resolved left-to-right and a Hebrew note sat on the wrong
@@ -34725,6 +34839,7 @@ var HELP_SYSTEM_PROMPT = [
   "- Diet tags on recipes help the diet filters work correctly — use Auto-tag to set them",
   "- The Self Test (⚙️ → 🔧 Troubleshooting → 🧪 Self Test) is useful for diagnosing if something stops working",
   "- The interface language: tap 🌐 next to ? — the app's words change; recipes stay as written. The app speaks English, Hebrew, Arabic, Russian, French, Spanish, German, Italian, Portuguese, Chinese, Japanese and Hungarian, and any language someone adds (🌐 → ➕ Add a language… — translated once, then everyone has it). On a new device whose own language the app speaks, it asks once, before the setup: that language or English (a Hungarian phone is asked Magyar or English) — so the setup, the kitchen rules and the welcome come in that language too",
+  "- 📑 A COLLECTION'S CONTENTS (v39.52): every collection opens with its contents — the list of its recipes, in order; tap a line to jump to that recipe, and each recipe has ↑ Contents at its top right to jump back. It always shows the collection as it is now (a recipe added, removed, made its own or split off changes it at once), in your own collections and in a linked kitchen's. Printing a collection, 📄 Word and 📤 Share → web page start with the same contents and give each recipe its own heading; in Word and on the web page each line is a working link to its recipe and each recipe links back to the contents",
   "- A PAGE THAT LINKS TO ITS RECIPES (v39.48): some recipe round-ups (a list of 20 or 30 dishes, each a name, a line and a 'to the recipe' link) do not hold the recipes themselves. 🔗 From URL (or sharing the page to the app) then opens each recipe's own page and brings them all in as one 📚 collection — up to 30 at a time; if the page links to more, the preview says how many more, and those can be added one at a time from their own pages. It takes a minute or two for a long list ('Opening recipe 7 of 29…'). If it ever finds nothing, the log says why — copy it and send it. (v39.49) While several recipes are read, the screen stays on by itself — keep the app open until it finishes: a phone stops the app while its screen is off or another app is in front, and the import goes on from where it stopped when you come back; a recipe page cut off by that is read again. (v39.50) Some phones will not keep the screen on — Low Power Mode is the usual reason: the progress then says so, and touching the screen now and then keeps it awake; the log says whether the screen was kept on",
   "- WHAT THE TRANSLATIONS HOLD (v39.47): only the app's own words. A recipe's name, a by-line, servings and time, a photographer's credit, the words someone searched for, names and e-mail addresses are never sent to be translated and never kept in the shared translations — the screens that show them mark them as data, and the app refuses anything that looks like data (another alphabet in an English phrase, a © credit, a recipe's own name). On a release, GitHub takes out of the shared translations whatever the app no longer asks for and would not collect today (dates, code, credits, recipe lines, old copies of a phrase with a number in it), and the published language files and their kept versions never hold a name. So the ✏️ Edit translations list stays the app's words, and nothing has to be cleaned by hand. A recipe inside a collection shows its servings and time as the open recipe does (🍽 4 · ⏱ 20 min); a photo credit reads 'Photo: <who> · <licence> · <library>'; after 🔄 Update all supported languages the message gives totals ('🔄 11 language(s) up to date, 24 phrase(s) added — shared with everyone'), and which language got how many is in the log",
   "- (The app's owner) Correcting a translation: in My Kitchen Notes (the copy that holds the translations), switch the interface to that language, then 🌐 → ✏️ Edit translations…, change the words and press 💾 Save — it must say '✅ <language> saved and shared with everyone' — then 🌐 → 🚀 Publish languages now (every copy has it within about ten minutes). What you change is kept on this device until it is shared: closing the window, restarting the app or signing out does not lose it, and the editor brings it back. If Save cannot share it, it says why — usually this device's sign-in: sign out, sign in again with Google and your authenticator's 6-digit code, open the editor and press Save. A Save writes only what you changed, onto the newest shared copy, and the automatic translation of new phrases only fills in what is missing — it never replaces a correction. The same wording wrong in many places (e.g. a menu's name inside many sentences): 🔁 Replace… beside the search — what is in the search box is offered as the words to find; untick the rows that should stay, press 🔁 Replace in N, then 💾 Save",
