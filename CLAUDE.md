@@ -1640,6 +1640,21 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
     `movedOn`/`recipeGone`; §5 `links`, `gathered`/`movedInto`; deleting, the index and moves; §8 the contents list,
     links, the linked window, the editor's 🔗) and the version. 7 new phrases translated into all 11 languages (gaps 0).
     Self Tests 459 passed, 0 failed, 7 skipped.
+  - **v39.60 — the testers' invitation congratulates instead of asking a favour.** Tony, 10 Nov 2026: "I would like to
+    modify the text in the testers' invitation to be less pleading and more congratulatory .. I would like them to feel
+    proud/fortunate about the fact that they are given the opportunity to join the app in its Beta stage, before
+    everyone else." Four options proposed; he chose #4 with his own opening ("Good news: your invitation to the My
+    Kitchen Notes beta is here. It is a feature-rich recipes app that keeps every recipe you love in one place, and you
+    get it before everyone else.") and corrected step 4: "They should add members by from the family access option" —
+    now ⚙️ Settings → 🏠 My household → 👥 Family Access (by e-mail or an invitation link) in both languages (the Hebrew
+    with the app's own menu names: הגדרות ← משק הבית שלי ← ניהול משק בית). (The share icon at the top also offers the
+    kitchen's invitation link during the beta, so the old step was not wrong, but Family Access is the full place.)
+    Subject "Your seat at the table: the My Kitchen Notes beta 🎉" / "שמרנו לכם מקום ליד השולחן: הבטא של My Kitchen Notes
+    🎉"; no "please" left; the other steps kept their meaning. `INVITE_TEXTS_REV` 3, so wording a device saved before
+    is flagged (`#invOld`, its note now says what changed). The invite window is not translated (`data-no-i18n`), so no
+    new phrases. Self Test `beta_by_invitation_only` checks the opening, the subjects, "before everyone else", no
+    "please"/"help me" (Hebrew: no "בבקשה"/"תעזרו לי"), step 4's Family Access path, the revision; 4 knock-outs (old
+    subject, the share button in step 4, a pleading Hebrew opening, revision 2) fail it.
   - **Planned for Tuesday 10 Nov 2026, after 11:00 Israel time — NOT before** (Tony, 7 Nov 2026, ~00:45: "as I am
     already at 75% of my weekly quota, I would like you to only log the request and plan it for Tuesday, after 11:00,
     when it resets"; a reminder into this session is scheduled for 11:05, trig_019vabk7G3ZPSwUAMaDctuxi). Two features:

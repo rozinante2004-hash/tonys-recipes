@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v39.59` — app. **Worker: v102**, deployed separately and versioned separately
+**Current version:** `v39.60` — app. **Worker: v102**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -780,9 +780,15 @@ invitation-only (unless adding to the tester's household)."
 - **Share This App** (`openShareAppModal`, `shareAppClosed()`): while the copy is closed, anyone but the owner sees
   "🔗 Invite someone to my kitchen" (`householdInvite`, Read only) — or, without the right to invite, "ask your
   kitchen's owner" — instead of the app's link; the owner shares the app as before.
-- The invitation's words (`INVITE_TEXTS`, English and Hebrew, `INVITE_TEXTS_REV` 2): sign in with the address the
-  invitation came to; please don't forward it; invite family from inside the app. Wording a device saved before
-  that is flagged in the window (`#invOld`) until "The original words" or a new edit.
+- The invitation's words (`INVITE_TEXTS`, English and Hebrew, `INVITE_TEXTS_REV` 3 — v39.60, Tony's own choice):
+  congratulatory, not asking a favour. Subject "Your seat at the table: the My Kitchen Notes beta 🎉" (Hebrew
+  "שמרנו לכם מקום ליד השולחן: הבטא של My Kitchen Notes 🎉"); it opens "Good news: your invitation to the My Kitchen
+  Notes beta is here. It is a feature-rich recipe app that keeps every recipe you love in one place, and you get it
+  before everyone else." Five steps: sign in with the address the invitation came to (by invitation only, "your
+  address is on the list"); a private collection; ways to add recipes; family through ⚙️ Settings → 🏠 My household →
+  👥 Family Access (by e-mail or an invitation link; a forwarded invitation lets nobody else in); 💬 for notes ("what
+  you tell me shapes the app"). Then the iPhone shortcut and the computer button. Wording a device saved before the
+  current revision is flagged in the window (`#invOld`) until "The original words" or a new edit.
 
 **Linked kitchens and talking to them (v38.49 – v38.53)**
 - Linked households' recipes appear in the main list (`renderLinkedInAll`, `.linked-card` on `--linked-bg/

@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.59 -->
+<!-- Tony's Recipes Collection v39.60 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -11025,7 +11025,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.59';
+var APP_VERSION = 'v39.60';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -14533,7 +14533,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.59</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.60</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14621,7 +14621,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.59</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.60</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -33810,27 +33810,32 @@ function copyAppLink() {
 var INVITE_DRAFTS_KEY = 'mkn_invite_drafts', INVITE_SENT_KEY = 'mkn_invite_sent';
 // v38.69 — the original words changed (invitation only, sign in with this address, invite family from inside):
 // wording saved on this device before that says so in the window, until "The original words" or a new edit.
-var INVITE_TEXTS_REV = 2, INVITE_REG_KEY = 'mkn_invite_reg';
+// v39.60 — rev 3: the congratulatory wording (Tony's), family through 👥 Family Access.
+var INVITE_TEXTS_REV = 3, INVITE_REG_KEY = 'mkn_invite_reg';
 var INVITE_TEXTS = {
-  en: { subject: 'Would you help me test My Kitchen Notes?', body: [
-    'Hi! I’d love your help testing My Kitchen Notes, a recipe app I’ve been building.',
+  // v39.60 — Tony, 10 Nov 2026: "less pleading and more congratulatory … I would like them to feel proud/fortunate
+  // about the fact that they are given the opportunity to join the app in its Beta stage, before everyone else." His
+  // choice (option 4, his opening), and step 4 pointing to Family Access ("They should add members by from the family
+  // access option").
+  en: { subject: 'Your seat at the table: the My Kitchen Notes beta \u{1F389}', body: [
+    'Good news: your invitation to the My Kitchen Notes beta is here. It is a feature-rich recipe app that keeps every recipe you love in one place, and you get it before everyone else.',
     '',
-    '1. Open {link} and sign in with Google or with your e-mail address. Please use this address, the one this invitation came to: the beta is by invitation only, and the app lets in the addresses I invited.',
-    '2. Start your own collection. It’s private to you and to the people you invite.',
+    '1. Open {link} and sign in with Google or with this e-mail address, the one this invitation came to. The beta is by invitation only, and your address is on the list.',
+    '2. Start your own collection. It’s private: only you and the people you invite can see it.',
     '3. Add recipes any way you like: paste a link, share from Instagram or Facebook, type one in, or photograph a page.',
-    '4. Cooking with family? Invite them to your kitchen from inside the app (the share button at the top). Please don’t forward this e-mail: it won’t let anyone else in.',
-    '5. Something odd, or an idea? Tap the \u{1F4AC} button at the bottom left and tell me. I read every note.',
+    '4. Cooking with family? Bring them into your kitchen from inside the app: ⚙️ Settings → \u{1F3E0} My household → \u{1F465} Family Access. Add them by e-mail, or send them an invitation link. This invitation is yours alone: if it’s forwarded, it won’t let anyone else in.',
+    '5. Spotted something odd, or have an idea? Tap \u{1F4AC} at the bottom left. As one of the first users, what you tell me shapes the app. I read every note.',
     '',
     'On an iPhone, the app will offer a one-tap "Save to My Kitchen Notes" shortcut for the Share menu. On a computer, it will offer the Save-recipe button for Chrome or Firefox.'
   ].join('\n') },
-  he: { subject: 'תעזרו לי לבדוק את My Kitchen Notes?', body: [
-    'שלום! אשמח לעזרתכם בבדיקת My Kitchen Notes, אפליקציית מתכונים שאני בונה.',
+  he: { subject: 'שמרנו לכם מקום ליד השולחן: הבטא של My Kitchen Notes \u{1F389}', body: [
+    'חדשות טובות: ההזמנה שלכם לבטא של My Kitchen Notes הגיעה. זו אפליקציית מתכונים עשירה ביכולות, שמרכזת את כל המתכונים שאתם אוהבים במקום אחד, ואתם מקבלים אותה לפני כולם.',
     '',
-    '1. היכנסו ל־{link} והתחברו עם Google או עם כתובת המייל שלכם. השתמשו בבקשה בכתובת הזו, שאליה נשלחה ההזמנה: הבטא פתוחה בהזמנה בלבד, והאפליקציה מכניסה את הכתובות שהזמנתי.',
-    '2. פתחו אוסף מתכונים משלכם. הוא פרטי, רק לכם ולמי שתזמינו.',
+    '1. היכנסו ל־{link} והתחברו עם Google או עם כתובת המייל הזו, שאליה נשלחה ההזמנה. הבטא פתוחה בהזמנה בלבד, והכתובת שלכם ברשימה.',
+    '2. פתחו אוסף מתכונים משלכם. הוא פרטי: רק אתם ומי שתזמינו תראו אותו.',
     '3. הוסיפו מתכונים איך שנוח לכם: הדביקו קישור, שתפו מאינסטגרם או מפייסבוק, הקלידו מתכון, או צלמו דף מספר בישול.',
-    '4. מבשלים עם המשפחה? הזמינו אותם למטבח שלכם מתוך האפליקציה (כפתור השיתוף למעלה). בבקשה אל תעבירו את המייל הזה הלאה: הוא לא יכניס אף אחד אחר.',
-    '5. נתקלתם במשהו מוזר, או יש לכם רעיון? לחצו על כפתור ה־\u{1F4AC} בפינה השמאלית התחתונה וכתבו לי. כל הערה נקראת.',
+    '4. מבשלים עם המשפחה? צרפו אותם למטבח שלכם מתוך האפליקציה: ⚙️ הגדרות ← \u{1F3E0} משק הבית שלי ← \u{1F465} ניהול משק בית. הוסיפו אותם לפי כתובת המייל, או שלחו להם קישור הזמנה. ההזמנה הזו אישית: אם תועבר הלאה, היא לא תכניס אף אחד אחר.',
+    '5. נתקלתם במשהו מוזר, או יש לכם רעיון? לחצו על \u{1F4AC} בפינה השמאלית התחתונה. כמשתמשים הראשונים, מה שתכתבו לי יעצב את האפליקציה. כל הערה נקראת.',
     '',
     'באייפון, האפליקציה תציע קיצור דרך בלחיצה אחת, "Save to My Kitchen Notes", לתפריט השיתוף. במחשב, היא תציע את כפתור שמירת המתכונים ל־Chrome או ל־Firefox.'
   ].join('\n') }
@@ -33971,7 +33976,7 @@ function openInviteTesters(pre) {
     + '<p class="inv-note">Its link is this copy’s, so the households it brings in show under \u{1F4CA} Households as shared by you. Change the words as you like: this device keeps your version.</p>'
     // v38.69 — who may start a kitchen
     + '<p class="inv-note" id="invOnly">The beta is by invitation only: each address in To may start a kitchen, signed in with that address. Nobody else can, even with a forwarded invitation; joining a tester’s kitchen still works.</p>'
-    + '<p class="inv-note" id="invOld" hidden>Your saved wording is from before the beta became invitation-only. Press “The original words” to see the new text (it asks testers to sign in with the address the invitation came to, and to invite family from inside the app).</p>'
+    + '<p class="inv-note" id="invOld" hidden>Your saved wording is older than the app’s current invitation. Press “The original words” to see the new text (it congratulates testers on joining before everyone else, asks them to sign in with the address the invitation came to, and to add family in 👥 Family Access).</p>'
     + '<div class="inv-row" role="group" aria-label="Language">'
     +   '<button type="button" class="ask-btn ghost inv-lang" data-lang="en" aria-pressed="true">English</button>'
     +   '<button type="button" class="ask-btn ghost inv-lang" data-lang="he" lang="he" aria-pressed="false">עברית</button>'

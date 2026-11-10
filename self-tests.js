@@ -11460,10 +11460,10 @@ window.SELF_TESTS = [
         var body=document.getElementById('invBody'), subj=document.getElementById('invSubject'), link=inviteLink();
         if(link.indexOf(APP_CONFIG.siteOrigin)!==0) throw new Error('the link is not this copy’s address: '+link);
         if(typeof _household!=='undefined' && _household && _household.code && link.indexOf('?ref='+_household.code)===-1) throw new Error('the link does not say who invited: '+link);
-        if(body.value.indexOf(link)===-1 || body.dir!=='ltr' || !/test My Kitchen Notes/.test(subj.value)) throw new Error('English: '+body.value.slice(0,120));
-        body.value=body.value.replace('Hi!','Hello friend!'); body.dispatchEvent(new Event('change'));
+        if(body.value.indexOf(link)===-1 || body.dir!=='ltr' || !/the My Kitchen Notes beta/.test(subj.value)) throw new Error('English: '+body.value.slice(0,120));
+        body.value=body.value.replace('Good news:','Hello friend! Good news:'); body.dispatchEvent(new Event('change'));
         document.querySelector('#inviteOverlay .inv-lang[data-lang="he"]').click();
-        if(body.dir!=='rtl' || body.value.indexOf(link)===-1 || !/שלום/.test(body.value)) throw new Error('Hebrew: '+body.value.slice(0,80));
+        if(body.dir!=='rtl' || body.value.indexOf(link)===-1 || !/חדשות טובות/.test(body.value)) throw new Error('Hebrew: '+body.value.slice(0,80));
         document.querySelector('#inviteOverlay .inv-lang[data-lang="en"]').click();
         if(!/^Hello friend!/.test(body.value)) throw new Error('his wording was not kept');
         var kept=JSON.parse(localStorage.getItem(INVITE_DRAFTS_KEY)||'{}');
@@ -11593,8 +11593,15 @@ window.SELF_TESTS = [
         closeM('shareAppOverlay');
         // the invitation's words, in both languages
         var en=INVITE_TEXTS.en.body, he=INVITE_TEXTS.he.body;
-        if(!/by invitation only/.test(en) || !/the one this invitation came to/.test(en) || !/don’t forward/.test(en) || !/Invite them to your kitchen/.test(en) || !/\n5\. /.test(en)) throw new Error('English: '+en);
-        if(!/בהזמנה בלבד/.test(he) || !/שאליה נשלחה ההזמנה/.test(he) || !/אל תעבירו/.test(he) || !/הזמינו אותם למטבח/.test(he) || !/\n5\. /.test(he)) throw new Error('Hebrew: '+he);
+        if(!/by invitation only/.test(en) || !/the one this invitation came to/.test(en) || !/forwarded, it won’t let anyone else in/.test(en) || !/\n5\. /.test(en)) throw new Error('English: '+en);
+        // v39.60 — congratulatory, not pleading (Tony's choice), and family through Family Access, not the share button
+        if(!/^Good news: your invitation to the My Kitchen Notes beta is here\./.test(en) || !/before everyone else/.test(en) || /help me|please/i.test(en+INVITE_TEXTS.en.subject)) throw new Error('English, the tone: '+INVITE_TEXTS.en.subject+' / '+en.slice(0,160));
+        if(!/\n4\. [^\n]*My household \u2192 \u{1F465} Family Access\. Add them by e-mail, or send them an invitation link\./u.test(en) || /share button/.test(en)) throw new Error('English, step 4: '+en);
+        if(!/Your seat at the table/.test(INVITE_TEXTS.en.subject) || !/שמרנו לכם מקום ליד השולחן/.test(INVITE_TEXTS.he.subject)) throw new Error('the subjects: '+INVITE_TEXTS.en.subject+' / '+INVITE_TEXTS.he.subject);
+        if(!/בהזמנה בלבד/.test(he) || !/שאליה נשלחה ההזמנה/.test(he) || !/אם תועבר הלאה, היא לא תכניס/.test(he) || !/\n5\. /.test(he)) throw new Error('Hebrew: '+he);
+        if(!/^חדשות טובות: ההזמנה שלכם לבטא/.test(he) || !/לפני כולם/.test(he) || /תעזרו לי|בבקשה/.test(he+INVITE_TEXTS.he.subject)) throw new Error('Hebrew, the tone: '+he.slice(0,160));
+        if(!/\n4\. [^\n]*משק הבית שלי \u2190 \u{1F465} ניהול משק בית\./u.test(he) || /כפתור השיתוף/.test(he)) throw new Error('Hebrew, step 4: '+he);
+        if(INVITE_TEXTS_REV < 3) throw new Error('the revision did not move, so a saved older wording is not flagged: '+INVITE_TEXTS_REV);
         // wording kept from before says the original words changed
         localStorage.setItem(INVITE_DRAFTS_KEY, JSON.stringify({ en:{ subject:'S', body:'B {link}' } }));
         inviteDraftSave('he', 'S2', 'B2');
