@@ -135,6 +135,35 @@ await check('an admin answers one (removes it)',                deleteDoc(doc(er
 await check('…and the other',                                   deleteDoc(doc(erin, 'households/h1/deleteAsks/bob_20_p1')), true);
 await check('the editor still cannot delete a recipe himself',  deleteDoc(doc(bob, 'households/h1/recipes/5')), false);
 
+console.log('Gathering into a collection is an edit, not a deletion (v39.58)');
+// bob still edits, dave reads. Two recipes, a collection that lists the first, a photo for each.
+await check('(two recipes, their photos, and a collection listing the first)', env.withSecurityRulesDisabled(async ctx => {
+  const db = ctx.firestore();
+  await setDoc(doc(db, 'households/h1/recipes/31'), { r: '{}', id: 31 });
+  await setDoc(doc(db, 'households/h1/recipes/32'), { r: '{}', id: 32 });
+  await setDoc(doc(db, 'households/h1/recipes/33'), { r: '{}', id: 33, movedInto: '40' });
+  await setDoc(doc(db, 'households/h1/photos/31'), { data: 'x' });
+  await setDoc(doc(db, 'households/h1/photos/32'), { data: 'x' });
+  await setDoc(doc(db, 'households/h1/recipes/40'), { r: '{}', id: 40, gathered: ['31', '33'] });
+  await setDoc(doc(db, 'households/h1/secretRecipes/34'), { r: '{}', id: 34 });
+  await setDoc(doc(db, 'households/h1/secretRecipes/41'), { r: '{}', id: 41, gathered: ['34'] });
+}), true);
+await check('an editor still cannot delete a recipe outright',            deleteDoc(doc(bob, 'households/h1/recipes/31')), false);
+await check('an editor marks it as moved into the collection',            updateDoc(doc(bob, 'households/h1/recipes/31'), { movedInto: '40' }), true);
+await check('…and removes it: its content is in the collection',          deleteDoc(doc(bob, 'households/h1/recipes/31')), true);
+await check('…and its photo, once the recipe is gone',                    deleteDoc(doc(bob, 'households/h1/photos/31')), true);
+await check('a photo of a recipe still there is not the editor\'s to delete', deleteDoc(doc(bob, 'households/h1/photos/32')), false);
+await check('marked as moved into a collection that does not list it: kept', updateDoc(doc(bob, 'households/h1/recipes/32'), { movedInto: '40' })
+  .then(() => deleteDoc(doc(bob, 'households/h1/recipes/32'))), false);
+await check('…nor into one that is not there',                            updateDoc(doc(bob, 'households/h1/recipes/32'), { movedInto: '99' })
+  .then(() => deleteDoc(doc(bob, 'households/h1/recipes/32'))), false);
+await check('…nor into itself',                                           updateDoc(doc(bob, 'households/h1/recipes/32'), { movedInto: '32' })
+  .then(() => deleteDoc(doc(bob, 'households/h1/recipes/32'))), false);
+await check('someone who only reads cannot, marked and listed though it is', deleteDoc(doc(dave, 'households/h1/recipes/33')), false);
+await check('a secret recipe moved into a secret collection',             updateDoc(doc(bob, 'households/h1/secretRecipes/34'), { movedInto: '41' })
+  .then(() => deleteDoc(doc(bob, 'households/h1/secretRecipes/34'))), true);
+await check('the owner deletes as before',                                deleteDoc(doc(alice, 'households/h1/recipes/32')), true);
+
 console.log('Managing members');
 await check('an admin makes a viewer an editor',  updateDoc(doc(erin, 'households/h1/members/dave'), { role: 'editor' }), true);
 await check('an admin cannot make anyone admin',  updateDoc(doc(erin, 'households/h1/members/dave'), { role: 'admin' }), false);

@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.57 -->
+<!-- Tony's Recipes Collection v39.58 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1952,8 +1952,12 @@ function undoBulk() {
 
   // What the operation CREATED has to leave the cloud too, or the next load
   // brings it straight back alongside the recipes it was made from.
+  // v39.58 — when the undo brings back what that was made from (a gathering's recipes, a split collection), it is a move
+  // into them, as the operation itself was; only something new from nothing is a deletion.
+  var back = snap.list.filter(function(r){ return !now[r.id]; });
   recipes.forEach(function(r){
-    if (!before[r.id] && typeof queueCloudDelete === 'function') { try { queueCloudDelete(r.id); } catch(e) {} }
+    if (before[r.id]) return;
+    try { if (back.length && typeof queueCloudMove === 'function') queueCloudMove(r.id, back[0].id); else if (typeof queueCloudDelete === 'function') queueCloudDelete(r.id); } catch(e) {}
   });
   // What it removed is wanted again — take those deletions back off the queue.
   snap.list.forEach(function(r){
@@ -2477,6 +2481,7 @@ function _cloudSnapshotForTest() {
   return {
     base: copy(window._cloudRecipeBase), stamp: copy(window._cloudRecipeStamp),
     ids: copy(window._cloudRecipeIds), del: copy(window._pendingCloudDeletes),
+    moves: copy(window._pendingCloudMoves),   // v39.58
     unreadable: copy(window._cloudUnreadable),
     schema: window._cloudSchema, metaAt: window._lastCloudMetaAt, ls: ls
   };
@@ -2487,6 +2492,7 @@ function _cloudRestoreForTest(s) {
   // `var`s, so window.x and x are one binding.
   window._cloudRecipeBase = copy(s.base); window._cloudRecipeStamp = copy(s.stamp);
   window._cloudRecipeIds = copy(s.ids);   window._pendingCloudDeletes = copy(s.del);
+  window._pendingCloudMoves = copy(s.moves);   // v39.58
   window._cloudUnreadable = copy(s.unreadable);
   window._cloudSchema = s.schema; window._lastCloudMetaAt = s.metaAt;
   try {
@@ -7388,6 +7394,7 @@ function openLinkedRecipeObj(r, hid) {
   ov.classList.add('open');
   ov.scrollTop = 0;
   if (typeof trapFocus === 'function') trapFocus('linkedViewOverlay');
+  viewSizeApply('linked');    // v39.58 — as wide as one's own, and the same corner to drag
   return true;
 }
 // A copy is the reader's own recipe from then on: a new number and identity,
@@ -7820,6 +7827,7 @@ async function giftLook(g, signedOut) {
   ov.classList.add('open');
   ov.scrollTop = 0;
   if (typeof trapFocus === 'function') trapFocus('linkedViewOverlay');
+  viewSizeApply('linked');    // v39.58 — a sent recipe opens in the same window: the same size and corner
   return 'looked';
 }
 function giftSaveViewing() { return _gifts.lookAt ? giftSave(_gifts.lookAt) : false; }
@@ -11017,7 +11025,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.57';
+var APP_VERSION = 'v39.58';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -12124,7 +12132,7 @@ window.addEventListener('unhandledrejection', function(e) {
 @media (min-width: 1000px) {
   /* The recipe view earns extra width once it's showing two columns; every
      other modal keeps its 600px reading measure. */
-  #viewOverlay .modal { max-width: 900px; }
+  #viewOverlay .modal, #linkedViewOverlay .modal { max-width: 900px; }   /* v39.58 — a linked kitchen's recipe the same */
   .recipe-columns { display: grid; grid-template-columns: minmax(240px, 320px) 1fr; gap: 32px; align-items: start; }
   /* A Hebrew recipe reads right-to-left, so the ingredients column belongs on
      the RIGHT. `dir="rtl"` on the grid container flips the column order without
@@ -12366,7 +12374,7 @@ body.banner-shown #envRibbon.env-beta { padding-top: 2px; }
 .view-grip:hover { opacity: 1; color: var(--terracotta); background: rgba(193,68,14,.10); }
 .view-grip:focus-visible { outline: 2px solid var(--terracotta); outline-offset: 1px; opacity: 1; }
 .view-grip[hidden] { display: none; }
-#viewModal.view-sized { animation: none; }
+#viewModal.view-sized, #linkedViewModal.view-sized { animation: none; }
 @media print { .view-grip { display: none !important; } }
 /* v38.08 — an amount in the method, multiplied with the recipe: marked, the original on hover. */
 .step-scaled { font-weight: 700; color: var(--terracotta, #C1440E); border-bottom: 1px dotted currentColor; cursor: help; }
@@ -14525,7 +14533,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.57</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.58</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14613,7 +14621,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.57</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.58</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -22488,6 +22496,13 @@ function openView(id){
 // follows the pointer); click it for full size, and again for the usual size. The
 // size is kept on this device, for every recipe. Phones: no grip — full size already.
 var VIEW_SIZE_KEY = 'tonys_view_size', _viewDrag = null, _viewResizedAt = 0;
+// v39.58 — Tony, 10 Nov 2026: "From my own kitchen, the display modal is wide, easily readable and can be expanded by
+// dragging the lower corner. From a joint kitchen … the modal is narrower and cannot be expanded. Please match." The
+// same width (900 px with two columns) and the same grip for a linked kitchen's recipe (and a sent one, which opens in
+// the same window) — one size, kept for both: the size chosen on this computer is the size of a recipe, whosever it is.
+var VIEW_WINS = { view: { ov: 'viewOverlay', m: 'viewModal', g: 'viewGrip' },
+                  linked: { ov: 'linkedViewOverlay', m: 'linkedViewModal', g: 'linkedViewGrip' } };
+function viewWin(which) { return VIEW_WINS[which] || VIEW_WINS.view; }
 function viewSizeOn() {
   if (window._viewSizeForce !== undefined) return !!window._viewSizeForce;      // the Self Test
   try { return matchMedia('(pointer: fine)').matches && window.innerWidth >= 700; } catch(e) { return false; }
@@ -22495,25 +22510,25 @@ function viewSizeOn() {
 function viewSizeSaved() {
   try { var v = JSON.parse(localStorage.getItem(VIEW_SIZE_KEY) || 'null'); return v && (v.max || (v.w > 0 && v.h > 0)) ? v : null; } catch(e) { return null; }
 }
-function viewSizeSet(v, keep) {
-  var m = document.getElementById('viewModal'); if (!m) return;
+function viewSizeSet(v, keep, which) {
+  var w0 = viewWin(which), m = document.getElementById(w0.m); if (!m) return;
   if (!v) {
     m.style.width = m.style.maxWidth = m.style.height = m.style.maxHeight = '';
     m.classList.remove('view-sized', 'view-max');
   } else {
     // v38.80 — the room inside the window's own scrollbar (Tony's Linux Chrome: 15 px of it; "full size" came out 15 px
     // short of the screen's width and the Self Test said so)
-    var ov = document.getElementById('viewOverlay'), cw = ov && ov.clientWidth, ch = ov && ov.clientHeight;
+    var ov = document.getElementById(w0.ov), cw = ov && ov.clientWidth, ch = ov && ov.clientHeight;
     var W = (cw > 0 ? cw : window.innerWidth) - 16, H = (ch > 0 ? ch : window.innerHeight) - 16;
     var w = v.max ? W : Math.max(Math.min(480, W), Math.min(W, v.w)), h = v.max ? H : Math.max(Math.min(360, H), Math.min(H, v.h));
     m.style.maxWidth = 'none'; m.style.maxHeight = 'none'; m.style.width = Math.round(w) + 'px'; m.style.height = Math.round(h) + 'px';
     m.classList.add('view-sized'); m.classList.toggle('view-max', !!v.max);
   }
   if (keep) { try { if (v) localStorage.setItem(VIEW_SIZE_KEY, JSON.stringify(v)); else localStorage.removeItem(VIEW_SIZE_KEY); } catch(e) {} }
-  viewGripPlace();
+  viewGripPlace(which);
 }
-function viewGripPlace() {
-  var g = document.getElementById('viewGrip'), m = document.getElementById('viewModal'), ov = document.getElementById('viewOverlay');
+function viewGripPlace(which) {
+  var w0 = viewWin(which), g = document.getElementById(w0.g), m = document.getElementById(w0.m), ov = document.getElementById(w0.ov);
   if (!g || !m || !ov) return;
   if (!viewSizeOn() || !ov.classList.contains('open')) { g.hidden = true; return; }
   var r = m.getBoundingClientRect(), max = m.classList.contains('view-max');
@@ -22522,26 +22537,28 @@ function viewGripPlace() {
   g.title = max ? 'Drag to resize — click for the usual size' : 'Drag to make the recipe bigger or smaller — click for full size';
   g.setAttribute('aria-label', max ? 'Usual size' : 'Full size');
 }
-function viewGripEnsure() {
-  var ov = document.getElementById('viewOverlay');
-  if (!ov || document.getElementById('viewGrip')) return;
+function viewGripEnsure(which) {
+  var key = VIEW_WINS[which] ? which : 'view', w0 = viewWin(key), ov = document.getElementById(w0.ov);
+  if (!ov || document.getElementById(w0.g)) return;
   var g = document.createElement('button');
-  g.type = 'button'; g.id = 'viewGrip'; g.className = 'view-grip'; g.hidden = true;
+  g.type = 'button'; g.id = w0.g; g.className = 'view-grip'; g.hidden = true;
+  g.setAttribute('data-win', key);
   g.innerHTML = '<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M15 5 5 15M15 10 10 15M15 0.5 0.5 15" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" fill="none"/></svg>';
   g.addEventListener('click', function(e) { e.stopPropagation(); });       // never the backdrop's close
   g.addEventListener('pointerdown', viewGripDown);
   ov.appendChild(g);
-  try { new ResizeObserver(function(){ viewGripPlace(); }).observe(document.getElementById('viewModal')); } catch(e) {}
+  try { new ResizeObserver(function(){ viewGripPlace(key); }).observe(document.getElementById(w0.m)); } catch(e) {}
   window.addEventListener('resize', function() {
-    var o = document.getElementById('viewOverlay');
-    if (o && o.classList.contains('open')) viewSizeSet(viewSizeOn() ? viewSizeSaved() : null, false);
+    var o = document.getElementById(w0.ov);
+    if (o && o.classList.contains('open')) viewSizeSet(viewSizeOn() ? viewSizeSaved() : null, false, key);
   });
 }
 function viewGripDown(e) {
   if (e.pointerType === 'mouse' && e.button !== 0) return;
   e.preventDefault(); e.stopPropagation();
-  var r = document.getElementById('viewModal').getBoundingClientRect();
-  _viewDrag = { id: e.pointerId, sx: e.clientX, sy: e.clientY, w: r.width, h: r.height, moved: false };
+  var which = (e.currentTarget && e.currentTarget.getAttribute && e.currentTarget.getAttribute('data-win')) || 'view';
+  var r = document.getElementById(viewWin(which).m).getBoundingClientRect();
+  _viewDrag = { id: e.pointerId, sx: e.clientX, sy: e.clientY, w: r.width, h: r.height, moved: false, which: which };
   try { e.currentTarget.setPointerCapture(e.pointerId); } catch(err) {}
   window.addEventListener('pointermove', viewGripMove, true);
   window.addEventListener('pointerup', viewGripUp, true);
@@ -22552,7 +22569,7 @@ function viewGripMove(e) {
   var dx = e.clientX - d.sx, dy = e.clientY - d.sy;
   if (!d.moved && Math.abs(dx) < 4 && Math.abs(dy) < 4) return;
   d.moved = true;
-  viewSizeSet({ w: d.w + 2 * dx, h: d.h + 2 * dy }, false);     // centred: both sides move, the corner follows
+  viewSizeSet({ w: d.w + 2 * dx, h: d.h + 2 * dy }, false, d.which);     // centred: both sides move, the corner follows
 }
 function viewGripUp(e) {
   var d = _viewDrag; if (!d || e.pointerId !== d.id) return;
@@ -22560,15 +22577,15 @@ function viewGripUp(e) {
   window.removeEventListener('pointerup', viewGripUp, true);
   window.removeEventListener('pointercancel', viewGripUp, true);
   _viewDrag = null; _viewResizedAt = Date.now();
-  var m = document.getElementById('viewModal');
-  if (d.moved) { var r = m.getBoundingClientRect(); viewSizeSet({ w: Math.round(r.width), h: Math.round(r.height) }, true); }
-  else viewSizeSet(m.classList.contains('view-max') ? null : { max: true }, true);   // a click: full size, or back
+  var m = document.getElementById(viewWin(d.which).m);
+  if (d.moved) { var r = m.getBoundingClientRect(); viewSizeSet({ w: Math.round(r.width), h: Math.round(r.height) }, true, d.which); }
+  else viewSizeSet(m.classList.contains('view-max') ? null : { max: true }, true, d.which);   // a click: full size, or back
 }
-function viewSizeApply() {
-  viewGripEnsure();
-  viewSizeSet(viewSizeOn() ? viewSizeSaved() : null, false);
-  requestAnimationFrame(viewGripPlace);
-  setTimeout(viewGripPlace, 320);          // after the window's opening slide
+function viewSizeApply(which) {
+  viewGripEnsure(which);
+  viewSizeSet(viewSizeOn() ? viewSizeSaved() : null, false, which);
+  requestAnimationFrame(function(){ viewGripPlace(which); });
+  setTimeout(function(){ viewGripPlace(which); }, 320);          // after the window's opening slide
 }
 window.viewSizeApply = viewSizeApply; window.viewSizeSet = viewSizeSet; window.viewGripPlace = viewGripPlace;
 
@@ -23166,7 +23183,7 @@ async function collectSelectedInto(targetId) {
   // all back alongside the collection that now contains them.
   var goneIds = chosen.map(function(r){ return r.id; });
   recipes = recipes.filter(function(r){ return goneIds.indexOf(r.id) === -1 || r.id === coll.id; });
-  goneIds.forEach(function(id){ if (id !== coll.id) queueCloudDelete(id); });
+  goneIds.forEach(function(id){ if (id !== coll.id) queueCloudMove(id, coll.id); });   // v39.58 — moved, not deleted
 
   cancelSelectMode();
   activeCat = 'All'; renderFilters(); renderGrid(); saveData();
@@ -23504,7 +23521,7 @@ async function splitCollection(collId) {
   var made = parts.map(function(p){ return recipeFromPart(coll, p); });
   // Insert in the order they appeared on the page, newest-first grid and all.
   made.slice().reverse().forEach(function(rec){ recipes.unshift(rec); });
-  if (typeof queueCloudDelete === 'function') { try { queueCloudDelete(coll.id); } catch(e) {} }
+  if (typeof queueCloudMove === 'function') { try { queueCloudMove(coll.id, made.length ? made[0].id : null); } catch(e) {} }   // v39.58
   recipes = recipes.filter(function(x){ return x.id !== collId; });
   if (viewId === collId) closeM('viewOverlay');
   saveData(); renderGrid(); renderFilters();
@@ -29949,9 +29966,51 @@ function queueCloudDelete(id) {
 function unqueueCloudDelete(id) {
   delete _pendingCloudDeletes[id];
   savePendingCloudDeletes();
+  if (_pendingCloudMoves[id] !== undefined) { delete _pendingCloudMoves[id]; savePendingCloudMoves(); }   // v39.58
 }
 window.queueCloudDelete = queueCloudDelete;
 window.unqueueCloudDelete = unqueueCloudDelete;
+
+// ─── v39.58 — A RECIPE MOVED INTO A COLLECTION IS AN EDIT, NOT A DELETION ─────
+// Tony, 10 Nov 2026: "A user who can't delete should still be able to create collections … as the content is retained
+// in the collection, be deleted automatically. Removal of recipes due to a collection creation should be categorized
+// as a read+write activity and not a delete activity." So a recipe gathered into a collection leaves the cloud as a
+// MOVE: its document first says where it went (`movedInto: <the collection's id>`), the collection's document lists it
+// (`gathered: [ids]`, written by saveRecipeDoc in the same save, before), and then it is removed — which
+// firestore.rules lets anyone who adds and changes recipes do, for a document so marked whose collection lists it, and
+// only then. Its content is in the collection; an outright delete stays the owner's and admins'. The same for the way
+// back (✂️ Split them up, ↩︎ Undo of a gathering): the collection moves into the recipes it is made into again.
+var CLOUD_MOVES_KEY = 'tonys_cloud_moves';
+var _pendingCloudMoves = {};
+function loadPendingCloudMoves() {
+  try { var m = JSON.parse(localStorage.getItem(CLOUD_MOVES_KEY) || '{}'); if (m && typeof m === 'object') _pendingCloudMoves = m; } catch(e) {}
+}
+function savePendingCloudMoves() {
+  try { localStorage.setItem(CLOUD_MOVES_KEY, JSON.stringify(_pendingCloudMoves)); } catch(e) {}
+}
+function queueCloudMove(id, intoId) {
+  if (intoId == null || String(intoId) === String(id)) return queueCloudDelete(id);
+  _pendingCloudDeletes[id] = true;
+  _pendingCloudMoves[id] = String(intoId);
+  savePendingCloudDeletes(); savePendingCloudMoves();
+  if (typeof _cloudRecipeStamp === 'object') delete _cloudRecipeStamp[intoId];   // the one it went into is written again, listing it
+}
+// What has moved into this recipe and is still to leave the cloud (its `gathered`).
+function cloudMovesInto(id) {
+  return Object.keys(_pendingCloudMoves).filter(function(k){ return _pendingCloudMoves[k] === String(id) && _pendingCloudDeletes[k]; });
+}
+// The removal itself: the mark first, then the document; one already gone is simply gone.
+async function cloudMoveOut(id, intoId, db) {
+  var ref = cloudDoc(recipeDocId(id), db);
+  try { await ref.update({ movedInto: String(intoId) }); }
+  catch (e) {
+    if (e && (e.code === 'not-found' || /no document|not.?found/i.test(String(e.message || '')))) return;
+    throw e;
+  }
+  await ref.delete();
+}
+loadPendingCloudMoves();
+window.queueCloudMove = queueCloudMove; window.cloudMovesInto = cloudMovesInto; window.cloudMoveOut = cloudMoveOut;
 
 function recipeDocId(id) { return 'recipe_' + id; }
 
@@ -30299,7 +30358,10 @@ async function saveRecipeDoc(r, db, again) {
     if (!cloudWriteAllowed(cloudAt, base, r.updatedAt)) { refused = true; return; }
     // v38.65 — and the server's own time: what a reading device asks for (incrementalCloudLoad). A recipe edited
     // offline days ago and sent today has an old updatedAt, but its syncedAt is today.
-    tx.set(ref, { r: json, updatedAt: stamped, id: r.id, syncedAt: firebase.firestore.FieldValue.serverTimestamp() });
+    var rdoc = { r: json, updatedAt: stamped, id: r.id, syncedAt: firebase.firestore.FieldValue.serverTimestamp() };
+    var into = hh ? cloudMovesInto(r.id) : [];                 // v39.58 — what moved into it, so its removal is a move
+    if (into.length) rdoc.gathered = into;
+    tx.set(ref, rdoc);
     if (other && other.exists && (wantSecret || moving)) tx.delete(otherRef);
     if (ph && ph.exists) { tx.set(herePhoto, ph.data()); tx.delete(otherPhoto); }
   });
@@ -30406,7 +30468,9 @@ async function flushCloudDeletes(db) {
   for (var i = 0; i < ids.length; i++) {
     var id = ids[i];
     try {
-      await cloudDoc(recipeDocId(id), db).delete();
+      var movedTo = (_cloudLayout === 'households') ? _pendingCloudMoves[id] : undefined;   // v39.58
+      if (movedTo !== undefined) await cloudMoveOut(id, movedTo, db);
+      else await cloudDoc(recipeDocId(id), db).delete();
       await cloudDoc(photoDocId(id), db).delete();
       // v38.96 — and wherever else it may be (marked 🔒 on another device): a deleted recipe must not come back
       if (_cloudLayout === 'households') {
@@ -30425,13 +30489,14 @@ async function flushCloudDeletes(db) {
     }
     if (denied.indexOf(id) === -1) deleted.push(id);   // v39.57 — what the index must stop listing
     delete _pendingCloudDeletes[id];
+    delete _pendingCloudMoves[id];                     // v39.58
     delete _cloudRecipeIds[id];
     delete _cloudRecipeBase[id];
     delete _cloudRecipeStamp[id];
     delete _cloudPhotoIds[id];
     delete _cloudPhotoStamps[id];
   }
-  savePendingCloudDeletes();
+  savePendingCloudDeletes(); savePendingCloudMoves();
   return { attempted: ids.length, denied: denied, deleted: deleted };
 }
 
@@ -35514,7 +35579,8 @@ var HELP_SYSTEM_PROMPT = [
   "- Diet tags on recipes help the diet filters work correctly — use Auto-tag to set them",
   "- The Self Test (⚙️ → 🔧 Troubleshooting → 🧪 Self Test) is useful for diagnosing if something stops working",
   "- The interface language: tap 🌐 next to ? — the app's words change; recipes stay as written. The app speaks English, Hebrew, Arabic, Russian, French, Spanish, German, Italian, Portuguese, Chinese, Japanese and Hungarian, and any language someone adds (🌐 → ➕ Add a language… — translated once, then everyone has it). On a new device whose own language the app speaks, it asks once, before the setup: that language or English (a Hungarian phone is asked Magyar or English) — so the setup, the kitchen rules and the welcome come in that language too",
-  "- 🗑️ ASK AN ADMIN TO DELETE (v39.55): in a shared kitchen only its owner and admins delete recipes and collections. For everyone else every 🗑️ Delete — on a recipe, on a collection, on one recipe inside a collection, and Select → Delete — reads 🗑️ Ask an admin to delete: it asks first, then sends the kitchen's owner and admins your request (asking again about the same recipe sends nothing new), and says it was sent; nothing is deleted on your device. The owner and admins are told when the app opens (a tap opens the list), and find the requests in ··· More → 🏡 Kitchens and people → 🗑️ Requests to delete (shown while there are some): each says what it is and who asked, with 🗑️ Delete it (one tap; a recipe can be brought back with ↩︎ Undo, a recipe taken out of a collection from the collection's 🕘 Version history) and Keep it; either clears the request. A request for a recipe that is already gone says so, with Clear",
+  "- 🗑️ ASK AN ADMIN TO DELETE (v39.55): in a shared kitchen only its owner and admins delete recipes and collections. For everyone else every 🗑️ Delete — on a recipe, on a collection, on one recipe inside a collection, and Select → Delete — reads 🗑️ Ask an admin to delete: it asks first, then sends the kitchen's owner and admins your request (asking again about the same recipe sends nothing new), and says it was sent; nothing is deleted on your device. The owner and admins are told when the app opens (a tap opens the list), and find the requests in ··· More → 🏡 Kitchens and people → 🗑️ Requests to delete (shown while there are some): each says what it is and who asked, with 🗑️ Delete it (one tap; a recipe can be brought back with ↩︎ Undo, a recipe taken out of a collection from the collection's 🕘 Version history) and Keep it; either clears the request. A request for a recipe that is already gone says so, with Clear. (v39.58) Gathering recipes into a collection is not deleting: anyone who may add and change recipes can make a collection or add recipes to one (Select → 📚 New collection / 📚 Add to collection), and the recipes gathered leave the list on their own as always — their content is in the collection — with no request and no refusal; ✂️ Split them up and ↩︎ Undo work for them the same way.",
+  "- 🤝 A LINKED KITCHEN'S RECIPE (v39.58) opens in a window like your own recipes: as wide (two columns on a computer), and on a computer with the same corner at the bottom right to drag it bigger or smaller (a click on it: full size, and back). The size you choose is kept on this device for every recipe, yours or a linked kitchen's. A recipe sent to you opens the same way.",
   "- 🔗 LINKS BETWEEN RECIPES (v39.53): words in a recipe can lead to another recipe — say 'tahini sauce' in the falafel's ingredients to your Tahini sauce recipe. In ✏️ Edit, mark the words (in an ingredient, the Method or the Notes), then tap 🔗 (beside B above the Steps box, beside + Add ingredient, or beside Notes) or press Ctrl+K (⌘K on a Mac). A list of all your recipes opens — the recipes inside your collections, and the linked kitchens' recipes too — with a search box at the top; tap one and the words are a link. The links are listed under the Notes (🔗 Links to other recipes), each with ✕ to remove it. In the recipe the words look like a web link, wherever they appear in it; tap one and that recipe opens (a recipe inside a collection: the collection, at that recipe), with ← Back at the top to return to where you were. If the recipe it leads to is deleted, or a linked kitchen stops sharing it, the words show as plain words; they work again if it comes back (↩︎ Undo). The recipe's text itself does not change, so search, printing, Word, sharing and Bring! see the words as before",
   "- 📑 A COLLECTION'S CONTENTS (v39.52): every collection opens with its contents — the list of its recipes, in order; tap a line to jump to that recipe, and each recipe has ↑ Contents at its top right to jump back. It always shows the collection as it is now (a recipe added, removed, made its own or split off changes it at once), in your own collections and in a linked kitchen's. Printing a collection, 📄 Word and 📤 Share → web page start with the same contents and give each recipe its own heading; in Word and on the web page each line is a working link to its recipe and each recipe links back to the contents",
   "- A PAGE THAT LINKS TO ITS RECIPES (v39.48): some recipe round-ups (a list of 20 or 30 dishes, each a name, a line and a 'to the recipe' link) do not hold the recipes themselves. 🔗 From URL (or sharing the page to the app) then opens each recipe's own page and brings them all in as one 📚 collection — up to 30 at a time; if the page links to more, the preview says how many more, and those can be added one at a time from their own pages. It takes a minute or two for a long list ('Opening recipe 7 of 29…'). If it ever finds nothing, the log says why — copy it and send it. (v39.49) While several recipes are read, the screen stays on by itself — keep the app open until it finishes: a phone stops the app while its screen is off or another app is in front, and the import goes on from where it stopped when you come back; a recipe page cut off by that is read again. (v39.50) Some phones will not keep the screen on — Low Power Mode is the usual reason: the progress then says so, and touching the screen now and then keeps it awake; the log says whether the screen was kept on (v39.54) An import that starts by itself from a shared link has had no tap yet, and a phone gives the screen lock only after one: the progress then says to tap the screen once, and that tap keeps it on until the import finishes.",

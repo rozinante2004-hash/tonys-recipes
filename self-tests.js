@@ -975,6 +975,57 @@ window.SELF_TESTS = [
       }
     } },
 
+  { id:'linked_window_like_own', group:'UI', name:'🤝 A linked kitchen\'s recipe opens in a window like one\'s own — as wide, with the same corner to drag, one size kept for both (v39.58)',
+    test: async()=>{
+      // v39.58 — Tony, 10 Nov 2026: "From my own kitchen, the display modal is wide, easily readable and can be expanded
+      // by dragging the lower corner. From a joint kitchen … the modal is narrower and cannot be expanded. Please match."
+      if(!recipes.length) throw new Error('No recipes to view');
+      ['openLinkedRecipeObj','viewSizeApply','viewSizeSet'].forEach(function(f){ if(typeof window[f]!=='function') throw new Error(f+' is not defined'); });
+      var kept=null; try{ kept=localStorage.getItem(VIEW_SIZE_KEY); }catch(e){}
+      var forceWas=window._viewSizeForce, real={ hh:window._household, cache:_linkCache.stLW };
+      function pe(target, type, x, y){ target.dispatchEvent(new PointerEvent(type, { pointerId:7, pointerType:'mouse', isPrimary:true, button:0, buttons:type==='pointerup'?0:1, clientX:x, clientY:y, bubbles:true, cancelable:true })); }
+      var mine=recipes[0], theirs=normalizeRecipe(JSON.parse(JSON.stringify(mine))); theirs.id=771; theirs.uid='st-lw-theirs';
+      window._household=Object.assign({}, real.hh||{}, { hid:(real.hh&&real.hh.hid)||'stLWmine', links:[{ hid:'stLW', name:'ST kitchen' }] });
+      _linkCache.stLW={ at:Date.now(), list:[theirs], photos:{} };
+      var vm=document.getElementById('viewModal'), lm=document.getElementById('linkedViewModal');
+      var maxW=function(el){ return getComputedStyle(el).maxWidth; };
+      try{
+        window._viewSizeForce=true; localStorage.removeItem(VIEW_SIZE_KEY);
+        openView(mine.id); await wait(400);
+        var ownMax=maxW(vm), ownW=vm.getBoundingClientRect().width;
+        closeM('viewOverlay');
+        openLinkedRecipeObj(theirs, 'stLW'); await wait(400);
+        if(maxW(lm)!==ownMax) throw new Error('a linked kitchen\'s recipe is limited to '+maxW(lm)+', one\'s own to '+ownMax);
+        if(Math.abs(lm.getBoundingClientRect().width-ownW)>3) throw new Error('the same recipe opens '+Math.round(lm.getBoundingClientRect().width)+' px wide from a linked kitchen, '+Math.round(ownW)+' px from one\'s own');
+        var g=document.getElementById('linkedViewGrip'), r0=lm.getBoundingClientRect(), gr=g && g.getBoundingClientRect();
+        if(!g || g.hidden) throw new Error('a linked kitchen\'s recipe has no corner to drag');
+        if(Math.abs(gr.right-r0.right)>6 || Math.abs(gr.bottom-r0.bottom)>6) throw new Error('its grip is not in the window\'s corner');
+        var ovEl=document.getElementById('linkedViewOverlay'), W=(ovEl && ovEl.clientWidth) || window.innerWidth, H=(ovEl && ovEl.clientHeight) || window.innerHeight;
+        var want={ w:Math.min(W-16, r0.width+120), h:Math.min(H-16, r0.height+80) };
+        pe(g, 'pointerdown', gr.left+10, gr.top+10); pe(document.body, 'pointermove', gr.left+40, gr.top+30); pe(document.body, 'pointermove', gr.left+70, gr.top+50);
+        pe(document.body, 'pointerup', gr.left+70, gr.top+50);
+        var r1=lm.getBoundingClientRect();
+        if(Math.abs(r1.width-want.w)>3 || Math.abs(r1.height-want.h)>3) throw new Error('dragged, the linked kitchen\'s window is '+[Math.round(r1.width),Math.round(r1.height)]+', not '+[Math.round(want.w),Math.round(want.h)]);
+        if(!ovEl.classList.contains('open')) throw new Error('resizing closed it');
+        closeM('linkedViewOverlay');
+        // one size for a recipe, whosever it is
+        openView(mine.id); await wait(400);
+        var r2=vm.getBoundingClientRect();
+        if(Math.abs(r2.width-r1.width)>3 || Math.abs(r2.height-r1.height)>3) throw new Error('one\'s own recipe does not open at the size chosen on the linked one');
+        closeM('viewOverlay');
+        // a phone: no grip on either
+        window._viewSizeForce=false; openLinkedRecipeObj(theirs, 'stLW'); await wait(300);
+        if(!g.hidden || lm.style.width) throw new Error('on a phone a linked kitchen\'s recipe got the grip or a set size');
+      } finally {
+        var lo=document.getElementById('linkedViewOverlay'); if(lo && lo.classList.contains('open')) closeM('linkedViewOverlay');
+        var vo=document.getElementById('viewOverlay'); if(vo && vo.classList.contains('open')) closeM('viewOverlay');
+        if(forceWas===undefined) delete window._viewSizeForce; else window._viewSizeForce=forceWas;
+        try{ if(kept===null) localStorage.removeItem(VIEW_SIZE_KEY); else localStorage.setItem(VIEW_SIZE_KEY, kept); }catch(e){}
+        viewSizeSet(null, false); viewSizeSet(null, false, 'linked');
+        window._household=real.hh; if(real.cache) _linkCache.stLW=real.cache; else delete _linkCache.stLW;
+      }
+    } },
+
   { id:'method_scales_with_recipe', group:'UI', name:'✖️ Multiplying a recipe multiplies the amounts in its method too — "2 spoons of milk" says 4 at ×2; times, heat and tin sizes stay (v38.08)',
     test: async()=>{
       var real={ recipes:recipes.slice(), mult:viewMult };
@@ -4452,12 +4503,13 @@ window.SELF_TESTS = [
 
       var snapshot = recipes.slice(), snapId = nextId;
       var realSave=window.saveData, realGrid=window.renderGrid, realF=window.renderFilters,
-          realToast=window.toast, realQ=window.queueCloudDelete, realU=window.unqueueCloudDelete;
+          realToast=window.toast, realQ=window.queueCloudDelete, realU=window.unqueueCloudDelete, realM=window.queueCloudMove;
       var queued=[], unqueued=[];
       try{
         window.saveData=function(){}; window.renderGrid=function(){}; window.renderFilters=function(){};
         window.toast=function(){};
         window.queueCloudDelete=function(id){ queued.push(id); };
+        window.queueCloudMove=function(id){ queued.push(id); };   // v39.58 — a split, and its Undo, leave as moves
         window.unqueueCloudDelete=function(id){ unqueued.push(id); };
 
         // (1) A split: the collection goes, three recipes appear. Undo puts the
@@ -4517,7 +4569,7 @@ window.SELF_TESTS = [
       } finally {
         recipes = snapshot; nextId = snapId;
         window.saveData=realSave; window.renderGrid=realGrid; window.renderFilters=realF;
-        window.toast=realToast; window.queueCloudDelete=realQ; window.unqueueCloudDelete=realU;
+        window.toast=realToast; window.queueCloudDelete=realQ; window.unqueueCloudDelete=realU; window.queueCloudMove=realM;
       }
 
       // (4) Every operation that rearranges the list offers it, and none of them
@@ -15174,6 +15226,92 @@ window.SELF_TESTS = [
         recipes.length=0; real.recipes.forEach(function(r){ recipes.push(r); });
         var w=JSON.parse(real.wa); Object.keys(_waHarvest).forEach(function(k){ delete _waHarvest[k]; }); Object.assign(_waHarvest, w);
         if(madeBody) body.remove(); else { try{ renderWaHarvest(); }catch(e){} }
+      }
+    } },
+  { id:'gather_is_a_move', group:'Sharing', name:'📚 Gathering recipes into a collection is an edit, not a deletion — whoever adds and changes recipes may; the originals leave the cloud as moves the collection vouches for; Split and Undo move them back (v39.58)',
+    test: async()=>{
+      // v39.58 — Tony, 10 Nov 2026: "A user who can't delete should still be able to create collections … as the content is
+      // retained in the collection, be deleted automatically. Removal of recipes due to a collection creation should be
+      // categorized as a read+write activity and not a delete activity." (The server's side: firestore.rules, movedOn —
+      // checked on the emulator, and end to end in tests/e2e-sync.mjs.)
+      ['queueCloudMove','cloudMovesInto','cloudMoveOut','flushCloudDeletes','saveRecipeDoc','collectSelectedInto','splitCollection','undoBulk'].forEach(function(f){ if(typeof window[f]!=='function') throw new Error(f+' is not defined'); });
+      var a=normalizeRecipe({ id:9301001, uid:'st-gm-a', name:'ST Leek soup', ingredients:[{a:'1',n:'leek'}], steps:['cook'] });
+      var b=normalizeRecipe({ id:9301002, uid:'st-gm-b', name:'ST Onion soup', ingredients:[{a:'2',n:'onions'}], steps:['fry'] });
+      // A stand-in for the cloud: records what is written, updated and deleted, in order.
+      var calls=[], docs={};
+      var refOf=function(path){ return { path:path,
+        update:async function(d){ if(!(path in docs)){ var e=new Error('No document to update'); e.code='not-found'; throw e; } calls.push('update '+path+' '+JSON.stringify(d)); Object.assign(docs[path], d); },
+        delete:async function(){ calls.push('delete '+path); delete docs[path]; },
+        get:async function(){ return { exists: path in docs, data:function(){ return docs[path]; } }; } }; };
+      var fake={ collection:function(c){ return { doc:function(id){ return refOf(c+'/'+id); } }; },
+        runTransaction:async function(fn){ return fn({ get:async function(r){ return r.get(); }, set:function(r,d){ calls.push('set '+r.path+(d.gathered?' gathered='+JSON.stringify(d.gathered):'')); docs[r.path]=d; }, delete:function(r){ delete docs[r.path]; } }); } };
+      var real={ recipes:recipes.slice(), hh:window._household, user:window._fbUser, hid:window._cloudHid, ask:window.askConfirm, prompt:window.askPrompt, photo:window.chooseCollectionPhoto,
+                 toast:window.toast, toastA:window.toastAction, save:window.saveData, grid:window.renderGrid, filt:window.renderFilters, fb:window.firebase, cloud:_cloudSnapshotForTest(), sel:selectMode,
+                 undo:window._pendingBulkUndo };
+      recipes.push(a, b);
+      window._household=Object.assign({}, real.hh||{}, { hid:'stGM', role:'editor', links:[] }); window._cloudHid='stGM';
+      window._fbUser={ uid:'stGMme', displayName:'ST' };
+      window.askConfirm=async function(){ return true; }; window.askPrompt=async function(){ return 'ST gathered'; }; window.chooseCollectionPhoto=async function(){};
+      window.toast=function(){}; window.toastAction=function(){}; window.saveData=function(){}; window.renderGrid=function(){}; window.renderFilters=function(){};
+      if(!window.firebase || !window.firebase.firestore || !window.firebase.firestore.FieldValue) window.firebase={ firestore:{ FieldValue:{ serverTimestamp:function(){ return 'now'; } } } };
+      _pendingCloudDeletes={}; _pendingCloudMoves={};
+      try{
+        if(_cloudLayout!=='households') throw new Error('(this copy is not in the household layout)');
+        if(hhMayDelete()) throw new Error('(the editor counts as someone who may delete)');
+        selectedIds.clear(); selectedIds.add(a.id); selectedIds.add(b.id);
+        await collectSelectedInto(null); await wait(30);
+        var coll=recipes.find(function(r){ return r.name==='ST gathered'; });
+        if(!coll || recipeParts(coll).length!==2) throw new Error('an editor could not gather two recipes into a collection');
+        if(recipes.some(function(r){ return r.id===a.id || r.id===b.id; })) throw new Error('the gathered recipes are still in the list on their own');
+        if(_pendingCloudMoves[a.id]!==String(coll.id) || _pendingCloudMoves[b.id]!==String(coll.id)) throw new Error('the gathered recipes leave as deletions, not as moves into the collection: '+JSON.stringify(_pendingCloudMoves));
+        var into=cloudMovesInto(coll.id).sort();
+        if(into.join(',')!==[String(a.id),String(b.id)].sort().join(',')) throw new Error('the collection does not know what moved into it: '+JSON.stringify(into));
+        // what the save does, in order: the collection's document listing them, then each original marked and removed
+        docs['households/stGM/recipes/'+a.id]={ r:'{}' }; docs['households/stGM/recipes/'+b.id]={ r:'{}' }; docs['households/stGM/photos/'+a.id]={ data:'x' };
+        await saveRecipeDoc(coll, fake);
+        if(!calls.some(function(c){ return c.indexOf('set households/stGM/recipes/'+coll.id)===0 && /gathered=/.test(c) && c.indexOf('"'+a.id+'"')>-1 && c.indexOf('"'+b.id+'"')>-1; })) throw new Error('the collection\'s document does not list the recipes moved into it: '+JSON.stringify(calls));
+        calls.length=0;
+        var res=await flushCloudDeletes(fake);
+        var ia=calls.indexOf('update households/stGM/recipes/'+a.id+' {"movedInto":"'+coll.id+'"}'), da=calls.indexOf('delete households/stGM/recipes/'+a.id);
+        if(ia===-1 || da===-1 || ia>da) throw new Error('an original is not marked as moved before it is removed: '+JSON.stringify(calls));
+        if(calls.indexOf('delete households/stGM/photos/'+a.id)===-1) throw new Error('the moved recipe\'s photo is left behind');
+        if((res.denied||[]).length || (res.deleted||[]).length!==2) throw new Error('the flush did not count both as gone: '+JSON.stringify(res));
+        if(Object.keys(_pendingCloudMoves).length) throw new Error('moves still waiting after the flush');
+        // one already gone from the cloud: nothing to mark, nothing refused
+        queueCloudMove(4242424, coll.id); calls.length=0;
+        var r2=await flushCloudDeletes(fake);
+        if((r2.denied||[]).length || calls.some(function(c){ return /recipes\/4242424/.test(c) && /^delete/.test(c); })) throw new Error('a moved recipe already gone from the cloud is deleted or refused: '+JSON.stringify(calls));
+        // the way back: Split moves the collection into the recipes it becomes
+        await splitCollection(coll.id); await wait(30);
+        var made=recipes.filter(function(r){ return r.name==='ST Leek soup' || r.name==='ST Onion soup'; });
+        if(made.length!==2) throw new Error('the split did not give the two recipes back');
+        if(_pendingCloudMoves[coll.id]===undefined || made.map(function(r){ return String(r.id); }).indexOf(_pendingCloudMoves[coll.id])===-1)
+          throw new Error('a split collection leaves as a deletion, not a move into its recipes: '+JSON.stringify(_pendingCloudMoves));
+        // Undo of the split: the two recipes move back into the collection, which is not leaving any more
+        undoBulk(); await wait(20);
+        if(!recipes.some(function(r){ return r.id===coll.id; })) throw new Error('Undo of the split did not bring the collection back');
+        if(made.some(function(r){ return _pendingCloudMoves[r.id]!==String(coll.id); })) throw new Error('undoing a split deletes the recipes instead of moving them back into the collection: '+JSON.stringify(_pendingCloudMoves));
+        if(_pendingCloudDeletes[coll.id] || _pendingCloudMoves[coll.id]!==undefined) throw new Error('after Undo of the split the collection is still on its way out');
+        // and Undo of a gathering: the new collection moves into the recipes brought back
+        _pendingCloudDeletes={}; _pendingCloudMoves={};
+        var c=normalizeRecipe({ id:9301003, uid:'st-gm-c', name:'ST Pea soup', ingredients:[{a:'1',n:'peas'}], steps:['cook'] });
+        var d=normalizeRecipe({ id:9301004, uid:'st-gm-d', name:'ST Bean soup', ingredients:[{a:'1',n:'beans'}], steps:['cook'] });
+        recipes.push(c, d); selectedIds.clear(); selectedIds.add(c.id); selectedIds.add(d.id);
+        window.askPrompt=async function(){ return 'ST gathered again'; };
+        await collectSelectedInto(null); await wait(30);
+        var coll2=recipes.find(function(r){ return r.name==='ST gathered again'; });
+        if(!coll2) throw new Error('the second gathering did not happen');
+        undoBulk(); await wait(20);
+        if(!recipes.some(function(r){ return r.id===c.id; }) || recipes.some(function(r){ return r.id===coll2.id; })) throw new Error('Undo of the gathering did not put the recipes back');
+        if([String(c.id),String(d.id)].indexOf(_pendingCloudMoves[coll2.id])===-1) throw new Error('undoing a gathering deletes the collection instead of moving it into the recipes brought back: '+JSON.stringify(_pendingCloudMoves));
+        if(_pendingCloudDeletes[c.id] || _pendingCloudDeletes[d.id]) throw new Error('after Undo the recipes brought back are still on their way out');
+      } finally {
+        if(selectMode && !real.sel) cancelSelectMode();
+        window._household=real.hh; window._fbUser=real.user; window._cloudHid=real.hid; window.askConfirm=real.ask; window.askPrompt=real.prompt; window.chooseCollectionPhoto=real.photo;
+        window.toast=real.toast; window.toastAction=real.toastA; window.saveData=real.save; window.renderGrid=real.grid; window.renderFilters=real.filt;
+        if(real.fb!==window.firebase) window.firebase=real.fb;
+        recipes=real.recipes.slice(); window._pendingBulkUndo=real.undo;
+        _cloudRestoreForTest(real.cloud);
       }
     } },
   { id:'export_docx_build', group:'Import/Export', name:'Word (.docx) builds a valid ZIP',

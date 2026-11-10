@@ -430,6 +430,47 @@ try {
   await tapRefreshWhenOffered(B);
   ok('…and from the other device', await until(async () => !(await names(B)).includes('E2E to delete')), JSON.stringify(await names(B)));
 
+  if (SERVE_HH) {
+    // v39.58 — Tony, 10 Nov 2026: a writer who may not delete still creates collections; the recipes gathered into one
+    // leave as a MOVE (read+write), not a deletion — and so does the way back (✂️ Split them up).
+    console.log('A writer gathers recipes into a collection');
+    const pair = await inPage(B, () => {
+      const a = nextId++, b = nextId++;
+      recipes.push(normalizeRecipe({ id: a, name: 'E2E gather one', ingredients: [{ a: '1', n: 'leek' }], steps: ['cook'], updatedAt: Date.now() }));
+      recipes.push(normalizeRecipe({ id: b, name: 'E2E gather two', ingredients: [{ a: '2', n: 'onions' }], steps: ['fry'], updatedAt: Date.now() }));
+      saveData(); return [a, b];
+    });
+    ok('the writer\'s two recipes reach the cloud', await until(async () => !!(await cloudRecipe(pair[0])) && !!(await cloudRecipe(pair[1]))));
+    const collId = await inPage(B, async (ids) => {
+      window.askConfirm = async () => true; window.askPrompt = async () => 'E2E gathered';
+      window.chooseCollectionPhoto = async () => {};
+      selectedIds.clear(); ids.forEach(id => selectedIds.add(id));
+      await collectSelectedInto(null);
+      const c = recipes.find(r => r.name === 'E2E gathered'); return c ? c.id : null;
+    }, pair);
+    ok('the collection is made on the writer\'s device', !!collId);
+    ok('…and reaches the cloud, with both recipes in it', await until(async () => {
+      const c = await cloudRecipe(collId); return !!(c && Array.isArray(c.parts) && c.parts.length === 2);
+    }));
+    ok('the two recipes leave the cloud — moved, not refused', await until(async () => !(await cloudRecipe(pair[0])) && !(await cloudRecipe(pair[1]))),
+       JSON.stringify([!!(await cloudRecipe(pair[0])), !!(await cloudRecipe(pair[1]))]));
+    ok('…and nobody is told off (no "not permitted")', await inPage(B, () => !document.getElementById('serviceErrorOverlay')));
+    // (the owner's device still shows the conflict from "Two devices change the same recipe" above — read and closed)
+    await inPage(A, () => { const o = document.getElementById('serviceErrorOverlay'); if (o) o.remove(); });
+    await tapRefreshWhenOffered(A);
+    ok('the owner\'s device has the collection, not the two on their own', await until(async () => {
+      const n = await names(A); return n.includes('E2E gathered') && !n.includes('E2E gather one') && !n.includes('E2E gather two');
+    }), JSON.stringify(await names(A)));
+    console.log('…and splits it up again');
+    await inPage(B, async (id) => { window.askConfirm = async () => true; await splitCollection(id); }, collId);
+    ok('the collection leaves the cloud — moved into its recipes, not refused', await until(async () => !(await cloudRecipe(collId))));
+    ok('…and nobody is told off', await inPage(B, () => !document.getElementById('serviceErrorOverlay')));
+    await tapRefreshWhenOffered(A);
+    ok('the owner\'s device has the two recipes again, and no collection', await until(async () => {
+      const n = await names(A); return !n.includes('E2E gathered') && n.includes('E2E gather one') && n.includes('E2E gather two');
+    }), JSON.stringify(await names(A)));
+  }
+
   console.log('A read-only member');
   const C = await device('C (reader)', READER);
   ok('a reader signs in and sees the recipes', (await names(C)).includes('E2E seed stew'), JSON.stringify(await names(C)));

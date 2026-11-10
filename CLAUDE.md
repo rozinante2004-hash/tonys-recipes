@@ -1602,6 +1602,33 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
     Tests 457 passed. Knock-out: without the fix the household end-to-end check fails as on CI. To tell Tony: devices
     other than the one that deleted may still hold recipes deleted before v39.57 (they leave at a full read, or
     can be deleted again).
+  - **v39.58 — gathering recipes into a collection is an edit, not a deletion; a linked kitchen's recipe window like
+    one's own.** (1) Tony, 10 Nov 2026, on the v39.55 note that gathering still removed the originals by deleting: "A
+    user who can't delete should still be able to create collections. The recipes that are to be deleted should send a
+    delete request to the admin … or, even better, as the content is retained in the collection, be deleted
+    automatically. Removal of recipes due to a collection creation should be categorized as a read+write activity and
+    not a delete activity." Done the better way: a gathered recipe leaves the cloud as a MOVE — `queueCloudMove(id,
+    into)` (`_pendingCloudMoves`, kept in localStorage `tonys_cloud_moves`), the collection's document lists it
+    (`gathered: [ids]`, written by `saveRecipeDoc` in the same save, before the flush), and `flushCloudDeletes` →
+    `cloudMoveOut` marks the original (`movedInto`) then removes it (a document already gone: nothing to do). **Rules**
+    (`movedOn`, households part): an editor may delete a recipe document (or a secret one) marked `movedInto` a recipe
+    whose document lists it in `gathered`; its photo (`recipeGone`) once the recipe document is gone; an outright delete
+    stays the owner's and admins'. The way back is the same move: ✂️ Split them up moves the collection into its first
+    recipe, and ↩︎ Undo of a gathering or a split moves what it made into what it brings back (`undoBulk`). Checked: 12
+    emulator rules checks (incl. marked-but-not-listed, a missing collection, into itself, a reader, secret); the
+    household end-to-end test (a writer gathers two recipes: the collection reaches the cloud, both originals leave it,
+    no "not permitted", the owner's device shows the collection only; then splits it: the collection leaves, the owner's
+    device has the two again) — and with the rule taken out, those checks fail; Self Test `gather_is_a_move` (stand-in
+    database: the move queued, the collection listing them, mark-then-remove order, the photo, an already-gone one,
+    Split and both Undos) with 4 knock-outs. Not changed: Undo of something new from nothing (an import) is still a
+    deletion.
+    (2) Tony, same day: "From my own kitchen, the display modal is wide, easily readable and can be expanded by dragging
+    the lower corner. From a joint kitchen I can see, the modal is narrower and cannot be expanded. Please match the
+    remote kitchen's display to the ones in my own kitchen." The linked kitchen's window (`linkedViewOverlay`, also a
+    sent recipe's) now has the same 900 px width with two columns, and the same corner grip (the resize code takes a
+    window: `VIEW_WINS`, `viewSizeApply('linked')`), one size kept for both. Self Test `linked_window_like_own` (same
+    width as one's own for the same recipe, a grip in the corner, a drag, the size shared, none on a phone); knock-outs
+    (no grip, 600 px) fail it. Screen at 1280 px checked.
   - **Planned for Tuesday 10 Nov 2026, after 11:00 Israel time — NOT before** (Tony, 7 Nov 2026, ~00:45: "as I am
     already at 75% of my weekly quota, I would like you to only log the request and plan it for Tuesday, after 11:00,
     when it resets"; a reminder into this session is scheduled for 11:05, trig_019vabk7G3ZPSwUAMaDctuxi). Two features:

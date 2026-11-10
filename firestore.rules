@@ -312,15 +312,34 @@ service cloud.firestore {
 
       // The household's content. Editors add and change; only admins delete —
       // the same line today's rules draw between write and delete.
+      // v39.58 — Tony, 10 Nov 2026: removing recipes because they were gathered into a collection "should be categorized
+      // as a read+write activity and not a delete activity" — the content is kept in the collection. So an editor may
+      // remove a recipe's document that says where it moved (`movedInto`, the editor's own update just before) when that
+      // recipe's document — the collection — lists it in `gathered`. The way back (a split collection, an undone
+      // gathering) is the same: the collection moves into one of the recipes it became. Its photo may go once the recipe
+      // document is gone. Anything else is still deleted by the owner and admins only.
+      function movedOn(hid, id) {
+        return atLeast(hid, 'editor')
+          && resource.data.get('movedInto', '') is string && resource.data.get('movedInto', '') != '' && resource.data.movedInto != id
+          && ( (existsAfter(/databases/$(database)/documents/households/$(hid)/recipes/$(resource.data.movedInto))
+                && id in getAfter(/databases/$(database)/documents/households/$(hid)/recipes/$(resource.data.movedInto)).data.get('gathered', []))
+            || (existsAfter(/databases/$(database)/documents/households/$(hid)/secretRecipes/$(resource.data.movedInto))
+                && id in getAfter(/databases/$(database)/documents/households/$(hid)/secretRecipes/$(resource.data.movedInto)).data.get('gathered', [])) );
+      }
+      function recipeGone(hid, id) {
+        return atLeast(hid, 'editor')
+          && !exists(/databases/$(database)/documents/households/$(hid)/recipes/$(id))
+          && !exists(/databases/$(database)/documents/households/$(hid)/secretRecipes/$(id));
+      }
       match /recipes/{id} {
         allow read: if isMember(hid) || linkedReader(hid) || beingDeleted(hid);   // v37.53 — a linked household reads
         allow create, update: if atLeast(hid, 'editor');
-        allow delete: if atLeast(hid, 'admin') || beingDeleted(hid);
+        allow delete: if atLeast(hid, 'admin') || beingDeleted(hid) || movedOn(hid, id);
       }
       match /photos/{id} {
         allow read: if isMember(hid) || linkedReader(hid) || beingDeleted(hid);   // v37.53 — a linked household reads
         allow create, update: if atLeast(hid, 'editor');
-        allow delete: if atLeast(hid, 'admin') || beingDeleted(hid);
+        allow delete: if atLeast(hid, 'admin') || beingDeleted(hid) || recipeGone(hid, id);
       }
       // v38.96 — 🔒 secret recipes (Tony, 25 Oct: "invisible to shared kitchens"): kept apart, where only the
       // household itself reads — no linked household, whatever it asks. Their ids are in state/secretIndex (state is
@@ -328,12 +347,12 @@ service cloud.firestore {
       match /secretRecipes/{id} {
         allow read: if isMember(hid) || beingDeleted(hid);
         allow create, update: if atLeast(hid, 'editor');
-        allow delete: if atLeast(hid, 'admin') || beingDeleted(hid);
+        allow delete: if atLeast(hid, 'admin') || beingDeleted(hid) || movedOn(hid, id);   // v39.58
       }
       match /secretPhotos/{id} {
         allow read: if isMember(hid) || beingDeleted(hid);
         allow create, update: if atLeast(hid, 'editor');
-        allow delete: if atLeast(hid, 'admin') || beingDeleted(hid);
+        allow delete: if atLeast(hid, 'admin') || beingDeleted(hid) || recipeGone(hid, id);   // v39.58
       }
       match /chats/{id} {
         allow read: if isMember(hid) || beingDeleted(hid);
