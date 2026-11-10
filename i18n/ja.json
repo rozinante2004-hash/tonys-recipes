@@ -3122,6 +3122,22 @@
   "📑 Contents": "📑 目次",
   "↑ Contents": "↑ 目次",
   "Back to the contents": "目次に戻る",
-  "Contents": "目次"
+  "Contents": "目次",
+  "Back to the recipe you came from": "来たレシピに戻る",
+  "Link the marked words to another recipe (Ctrl+K)": "選んだ言葉を別のレシピにリンク（Ctrl+K）",
+  "Link to a recipe": "レシピにリンク",
+  "Mark a few words, not a whole sentence": "文全体ではなく、いくつかの言葉を選んでください",
+  "Mark the words first — in an ingredient, the method or the notes — then tap 🔗": "まず言葉を選んでください（材料、作り方、メモのどこでも）。それから 🔗 をタップ",
+  "Mark words in an ingredient, the method or the notes, then tap 🔗 (or press Ctrl+K) to link them to another recipe.": "材料、作り方、メモの中の言葉を選んで 🔗 をタップ（または Ctrl+K）すると、別のレシピにリンクできます。",
+  "Mark words on one line": "1行の中の言葉を選んでください",
+  "No recipe by that name": "その名前のレシピはありません",
+  "Remove this link": "このリンクを削除",
+  "Search your recipes": "自分のレシピを検索",
+  "The words:": "言葉：",
+  "not among your recipes now": "今は自分のレシピにありません",
+  "← Back": "← 戻る",
+  "🔗 Link to a recipe": "🔗 レシピにリンク",
+  "🔗 Linked to “{1}”": "🔗「{1}」にリンクしました",
+  "🔗 Links to other recipes": "🔗 ほかのレシピへのリンク"
  }
 }

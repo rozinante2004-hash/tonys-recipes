@@ -1498,6 +1498,31 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
     none, a linked one has it, print, page, and the Word XML well-formed with every link landing on a bookmark);
     knock-outs (no contents, no ↑ Contents, a line that does not jump, the page flattened) each fail it. Screens at 393 px
     light and dark checked. 4 phrases by hand in 11 languages (tr/tr52.py; and zh's "— should say Verified" put back).
+  - **v39.52 on Test (10 Nov 2026):** 29ce829 pushed 11:18; Cloudflare Pages for test 11:19, Self Tests 11:36 — success.
+    Releasing it needs Tony's yes.
+  - **v39.53 — 🔗 links between recipes** (Tuesday 10 Nov 2026, item 2 of the plan below). Mark words in an ingredient,
+    the Method or the Notes; 🔗 (beside B in both toolbars, and beside Notes) or Ctrl+K / ⌘K opens a list of every recipe
+    — his own, each recipe inside his collections, and the linked kitchens' (theirs, and the recipes inside their
+    collections) — with a search box; the recipes named like the marked words come first; the recipe being edited is
+    not offered. One pick makes the link; the editor lists the links under the Notes ("🔗 Links to other recipes"), each
+    with ✕. **Stored beside the text, never in it:** `links: [{t: words, to: uid, h: linked kitchen's id}]` on a recipe
+    and on a part (normalizeRecipe / normalizePart keep it only when there are some; recipeToPart, recipeFromPart and
+    the collapse of a one-part collection carry it); so search, AI, Bring!, translation, print, Word and the shared page
+    see the recipe as before. **Drawn** by `rlPrep(links, ctx)` once per recipe (only the links whose recipe is there
+    now, `recipeLinkTarget`) and `rlHtml` per line (text only, never inside a tag; not inside a longer Latin/Cyrillic/
+    Greek word — "egg" is not in "eggplant" — but a plural counts; Hebrew prefixes allowed): ingredients, steps and notes
+    in his own view, in each part of a collection, and in a linked kitchen's recipe (its links without `h` are to its own
+    recipes; a sent recipe's are not drawn). A link looks like a web link (terracotta, underlined). **A tap**
+    (`recipeLinkGo`, which stops the tap reaching "the line I am on") opens the recipe — a part: its collection, scrolled
+    to it; a linked kitchen's: in its window over ours — and "← Back" beside ✕ returns to where he was (scroll position
+    and ticks kept; `_rlBack`, up to 30 steps; ✕ or opening a recipe from the list ends it). **Gone:** a deleted recipe
+    (or one in a kitchen no longer linked) leaves its words plain; Undo brings back the same uid, so the link works
+    again. Saving keeps only the links whose words are still in the recipe (`rlKeepUsed`). A copy of a linked kitchen's
+    recipe (Save a copy) or a sent one keeps its links pointing at that kitchen (`rlRehome`). Self Test `recipe_links`
+    (draws, egg/eggplant, ghost target plain, tap + ← Back, to a part, to a linked kitchen's recipe and back, deleted
+    → plain → Undo → link, unlinked kitchen → plain, ✕ ends the trail, Ctrl+K → list with parts and linked kitchens but
+    not itself, search narrows, pick, dirty, 🔗 with nothing marked says so, save keeps only used links, into/out of a
+    collection); 10 knock-outs each fail it. 16 phrases by hand in 11 languages (tr/tr53.py).
   - **Planned for Tuesday 10 Nov 2026, after 11:00 Israel time — NOT before** (Tony, 7 Nov 2026, ~00:45: "as I am
     already at 75% of my weekly quota, I would like you to only log the request and plan it for Tuesday, after 11:00,
     when it resets"; a reminder into this session is scheduled for 11:05, trig_019vabk7G3ZPSwUAMaDctuxi). Two features:

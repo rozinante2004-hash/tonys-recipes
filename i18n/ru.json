@@ -3113,6 +3113,22 @@
   "📑 Contents": "📑 Содержание",
   "↑ Contents": "↑ К содержанию",
   "Back to the contents": "Назад к содержанию",
-  "Contents": "Содержание"
+  "Contents": "Содержание",
+  "Back to the recipe you came from": "Назад к рецепту, из которого вы пришли",
+  "Link the marked words to another recipe (Ctrl+K)": "Связать выделенные слова с другим рецептом (Ctrl+K)",
+  "Link to a recipe": "Связать с рецептом",
+  "Mark a few words, not a whole sentence": "Выделите несколько слов, а не целое предложение",
+  "Mark the words first — in an ingredient, the method or the notes — then tap 🔗": "Сначала выделите слова — в ингредиенте, способе приготовления или заметках, — затем нажмите 🔗",
+  "Mark words in an ingredient, the method or the notes, then tap 🔗 (or press Ctrl+K) to link them to another recipe.": "Выделите слова в ингредиенте, способе приготовления или заметках, затем нажмите 🔗 (или Ctrl+K), чтобы связать их с другим рецептом.",
+  "Mark words on one line": "Выделите слова в одной строке",
+  "No recipe by that name": "Нет рецепта с таким названием",
+  "Remove this link": "Убрать эту ссылку",
+  "Search your recipes": "Поиск по вашим рецептам",
+  "The words:": "Слова:",
+  "not among your recipes now": "сейчас нет среди ваших рецептов",
+  "← Back": "← Назад",
+  "🔗 Link to a recipe": "🔗 Связать с рецептом",
+  "🔗 Linked to “{1}”": "🔗 Связано с «{1}»",
+  "🔗 Links to other recipes": "🔗 Ссылки на другие рецепты"
  }
 }

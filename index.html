@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.52 -->
+<!-- Tony's Recipes Collection v39.53 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -7108,18 +7108,19 @@ function linkedReload(h) {
 }
 window.linkedReload = linkedReload;
 window.renderLinkedInAll = renderLinkedInAll; window.linkedInAllOn = linkedInAllOn; window.linkedPhotoLoad = linkedPhotoLoad;
-function linkedLinesHtml(r) {
+// hid: the linked kitchen whose recipe it is — its links lead to recipes there (v39.53); none: a sent recipe, no links
+function linkedLinesHtml(r, hid) {
   var parts = isCollection(r) ? recipeParts(r) : [r];
   return (parts.length > 1 ? collectionTocHtml(parts) : '') + parts.map(function(p, pi) {
-    var num = 0;
+    var num = 0, lk = rlPrep(p.links, hid === undefined ? false : hid);
     var ings = (p.ingredients || []).map(function(i) {
       if (isSubLine(i)) return '<li class="line-sub" dir="auto">' + escB(i.sub) + '</li>';
-      return '<li dir="auto"><span class="line-text">' + escB(i.n) + '</span><span class="ing-amount">' + escB(i.a || '') + '</span></li>';
+      return '<li dir="auto"><span class="line-text">' + rlHtml(escB(i.n), lk) + '</span><span class="ing-amount">' + escB(i.a || '') + '</span></li>';
     }).join('');
     var steps = (p.steps || []).map(function(s) {
       if (isSubLine(s)) return '<li class="line-sub" dir="auto">' + escB(s.sub) + '</li>';
       num++;
-      return '<li dir="auto"><span class="step-num">' + num + '</span><span class="step-text">' + escB(stepText(s)) + '</span></li>';
+      return '<li dir="auto"><span class="step-num">' + num + '</span><span class="step-text">' + rlHtml(escB(stepText(s)), lk) + '</span></li>';
     }).join('');
     // v39.52 — the same contents and the way back to them as one's own collection
     return (parts.length > 1 ? '<div data-coll-part="' + pi + '" tabindex="-1" style="display:flex;align-items:baseline;gap:10px;margin:14px 0 6px;">'
@@ -7133,12 +7134,20 @@ function linkedLinesHtml(r) {
 function openLinkedRecipe(i, hid) {
   var r = (_linkedAllShown[hid] || [])[i];
   if (!r) return false;
+  if (!_rlMoving) _rlBack = [];
+  return openLinkedRecipeObj(r, hid);
+}
+// v39.53 — any recipe of a linked kitchen (a link leads to one that may not be among the cards shown)
+function openLinkedRecipeObj(r, hid) {
+  if (!r) return false;
+  var lk = rlPrep(r.links, hid);
   var l = hhLinks().filter(function(x){ return x.hid === hid; })[0] || {};
   var c = _linkCache[hid] || { photos: {} };
   var src = c.photos[r.id] || (/^https?:/i.test(r.photo || '') ? r.photo : '');
   _linkedViewing = { r: r, hid: hid, photo: src };
   document.getElementById('linkedViewModal').innerHTML =
       '<div style="position:sticky;top:60px;display:flex;justify-content:flex-end;padding:0 8px;z-index:20;pointer-events:none;">'
+    +   rlBackHtml()
     +   '<button onclick="closeM(\'linkedViewOverlay\')" aria-label="Close" style="pointer-events:auto;width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,0.95);border:none;cursor:pointer;font-size:18px;color:var(--warm-brown);box-shadow:0 2px 12px rgba(0,0,0,0.3);">✕</button></div>'
     + '<div class="modal-hero" style="background:' + escA(r.bg) + ';">'
     +   (src ? '<img\u0020src="' + escA(src) + '" alt="">' : '<span class="emoji-over">' + escH(r.emoji) + '</span>') + '</div>'
@@ -7152,8 +7161,8 @@ function openLinkedRecipe(i, hid) {
           + '<span class="difficulty ' + escA(String(r.difficulty || '').toLowerCase()) + '">' + escH(r.difficulty) + '</span>') + '</div>'
     +   (r.source ? '<div class="source-link" style="margin-bottom:8px;font-size:12px;"><bdi style="color:var(--muted);">Source:</bdi> '
           + '<span dir="auto" data-no-i18n>' + sourceHtml(r.source) + '</span></div>' : '')
-    +   (r.notes ? '<div dir="auto" data-no-i18n style="background:var(--note-bg);border-inline-start:3px solid var(--note-border);padding:10px 14px;margin-bottom:14px;font-size:13px;line-height:1.6;">' + escH(r.notes) + '</div>' : '')
-    +   linkedLinesHtml(r)
+    +   (r.notes ? '<div dir="auto" data-no-i18n style="background:var(--note-bg);border-inline-start:3px solid var(--note-border);padding:10px 14px;margin-bottom:14px;font-size:13px;line-height:1.6;">' + rlHtml(escH(r.notes), lk) + '</div>' : '')
+    +   linkedLinesHtml(r, hid)
     +   '<div class="recipe-actions" style="margin-top:16px;">'
     +     '<button class="action-btn" id="linkedCopyBtn" onclick="saveLinkedCopy()">\u{1F4E5} Save a copy to my recipes</button>'
     +   '</div>'
@@ -7177,6 +7186,7 @@ function saveLinkedCopy() {
   ['_ph', '_po', 'hp', 'originalPhoto', 'history', 'cookLog', 'lastCooked', 'cookCount'].forEach(function(k){ delete c[k]; });
   c.id = nextId++; c.uid = newUid(); c.fav = false; c.photo = v.photo || ''; c.updatedAt = Date.now();
   if (Array.isArray(c.parts)) c.parts.forEach(function(p){ p.uid = newUid(); p.fav = false; delete p.cookCount; delete p.lastCooked; });
+  rlRehome(c, v.hid);   // v39.53 — its links lead to their recipes still
   var made = normalizeRecipe(c);
   recipes.unshift(made);
   if (typeof insightAdded === 'function') insightAdded(made, 'linked');
@@ -7189,7 +7199,7 @@ function saveLinkedCopy() {
 window.hhLoadLinks = hhLoadLinks; window.hhSendLinkRequest = hhSendLinkRequest; window.openConnectHousehold = openConnectHousehold;
 window.hhCheckLinkRequests = hhCheckLinkRequests; window.hhAnswerLinkRequest = hhAnswerLinkRequest; window.hhAcceptLink = hhAcceptLink;
 window.hhRemoveLink = hhRemoveLink; window.hhWithdrawLinkRequest = hhWithdrawLinkRequest; window.hhLinkTarget = hhLinkTarget;
-window.openLinkedRecipe = openLinkedRecipe; window.saveLinkedCopy = saveLinkedCopy;
+window.openLinkedRecipe = openLinkedRecipe; window.openLinkedRecipeObj = openLinkedRecipeObj; window.saveLinkedCopy = saveLinkedCopy;
 
 // ─── SENT RECIPES (v39.10) ───────────────────────────────────────────────────
 // Tony, 29 Oct 2026: "sending a recipe between registered users … the recipient just needs to click a "Save to my
@@ -7510,6 +7520,7 @@ async function giftSave(g) {
   var c = JSON.parse(JSON.stringify(d.recipe || {}));
   c.name = name; c.id = nextId++; c.uid = newUid(); c.fav = false; c.photo = photo; c.updatedAt = Date.now();
   if (Array.isArray(c.parts)) c.parts.forEach(function(p){ p.uid = newUid(); p.fav = false; });
+  rlRehome(c, typeof d.from === 'string' ? d.from : '');   // v39.53 — links to the sender's recipes: theirs, not ours
   c.notes = (c.notes ? c.notes + '\n\n' : '') + '\u{1F4E8} ' + (d.fromName || '') + ' · ' + new Date().toLocaleDateString();
   var made = normalizeRecipe(c);
   recipes.unshift(made);
@@ -10783,7 +10794,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.52';
+var APP_VERSION = 'v39.53';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -12736,6 +12747,32 @@ body:has(.modal-overlay.open) #pwaIosBanner, body:has(#askOverlay) #pwaIosBanner
 .coll-toc a, a.coll-top { color: var(--terracotta); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
 a.coll-top { flex-shrink: 0; font-size: 12px; white-space: nowrap; padding: 2px 0; }
 [data-coll-part] { scroll-margin-top: 72px; }
+/* v39.53 — words that lead to another recipe look like a web link; ← Back beside ✕; the picker; the editor's list */
+a.rlink { color: var(--terracotta); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+a.rlink:hover { text-decoration-thickness: 2px; }
+.rl-back { pointer-events: auto; margin-inline-end: auto; height: 44px; padding: 0 16px; border-radius: 22px; border: none; background: rgba(255,255,255,0.95); color: #5C3D2E; font: 700 15px 'DM Sans','Heebo',sans-serif; box-shadow: 0 2px 12px rgba(0,0,0,0.3); cursor: pointer; touch-action: manipulation; flex-shrink: 0; }
+.rl-pick { max-width: 520px; padding: 16px; display: flex; flex-direction: column; gap: 10px; max-height: min(86vh, 640px); }
+.rl-pick-head { display: flex; align-items: center; gap: 8px; }
+.rl-pick-title { flex: 1; font-family: Georgia, serif; font-size: 19px; font-weight: 700; color: var(--heading); }
+.rl-pick-x { width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--border); background: var(--card-bg); color: var(--ink); font-size: 16px; cursor: pointer; flex-shrink: 0; }
+.rl-pick-words { font-size: 13px; color: var(--muted); }
+.rl-pick-words b { color: var(--ink); }
+.rl-pick-list { overflow-y: auto; min-height: 120px; flex: 1; border: 1px solid var(--border); border-radius: 10px; background: var(--card-bg); }
+.rl-pick-item { display: flex; align-items: center; gap: 10px; width: 100%; text-align: start; padding: 10px 12px; border: none; border-bottom: 1px solid var(--border); background: none; color: var(--ink); font: 14px 'DM Sans','Heebo',sans-serif; cursor: pointer; }
+.rl-pick-item:last-child { border-bottom: none; }
+.rl-pick-item:hover, .rl-pick-item:focus-visible { background: var(--bg); }
+.rl-pick-emoji { font-size: 20px; flex-shrink: 0; }
+.rl-pick-name { display: flex; flex-direction: column; min-width: 0; }
+.rl-pick-name small { font-size: 11.5px; color: var(--muted); }
+.rl-pick-none { padding: 16px; font-size: 13px; color: var(--muted); text-align: center; }
+.rl-edit { border: 1.5px dashed var(--border); border-radius: 10px; padding: 8px 10px; }
+.rl-edit-row { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink); padding: 3px 0; flex-wrap: wrap; }
+.rl-edit-words { font-weight: 600; }
+.rl-edit-arrow { color: var(--muted); }
+.rl-edit-to { color: var(--terracotta); text-decoration: underline; text-underline-offset: 2px; }
+.rl-edit-gone { color: var(--muted); font-style: italic; }
+.rl-edit-x { margin-inline-start: auto; width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--border); background: var(--card-bg); color: var(--muted); cursor: pointer; flex-shrink: 0; }
+.rl-edit-hint { font-size: 12px; color: var(--muted); line-height: 1.5; }
 .collection-actions-label { margin: 18px 0 8px; padding-top: 12px; border-top: 2px solid var(--terracotta);
   font-size: 13px; font-weight: 700; color: var(--heading); }
 .collection-actions-label span { display: block; font-weight: 400; font-size: 11.5px;
@@ -14265,7 +14302,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.52</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.53</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14353,7 +14390,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.52</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.53</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -14824,6 +14861,7 @@ body.banner-shown .header {
         <div style="display:flex;gap:8px;">
           <button type="button" onclick="addIngRow()" style="flex:2;font-size:13px;color:var(--terracotta);background:none;border:1.5px dashed var(--terracotta);border-radius:8px;padding:6px 14px;cursor:pointer;font-family:'DM Sans','Heebo',sans-serif;">+ Add ingredient</button>
           <button type="button" class="step-tool-btn bold-tool-btn" onmousedown="event.preventDefault()" onclick="boldTool('ings')" aria-label="Bold" title="Bold — the selected words of the ingredient you are in, or its word under the cursor (Ctrl+B)" style="flex:none;padding:6px 14px;font-size:14px;"><b>B</b></button>
+          <button type="button" class="step-tool-btn rl-tool-btn" style="flex:none;padding:6px 12px;font-size:14px;" onmousedown="event.preventDefault()" onpointerdown="event.preventDefault()" onclick="rlTool()" aria-label="Link to a recipe" title="Link the marked words to another recipe (Ctrl+K)">🔗</button>
           <button type="button" onclick="addIngSubRow('')" title="A heading that groups the lines below it, e.g. Brine option #1" style="flex:1;font-size:13px;color:var(--muted);background:none;border:1.5px dashed var(--border);border-radius:8px;padding:6px 10px;cursor:pointer;font-family:'DM Sans','Heebo',sans-serif;">&#9656; Sub-title</button>
         </div>
         <!-- Hidden textarea for backward compatibility with saveRecipe parser -->
@@ -14832,6 +14870,7 @@ body.banner-shown .header {
         <label class="form-label">Steps — one per line</label>
         <div style="display:flex;gap:6px;margin-bottom:6px;align-items:center;flex-wrap:wrap;">
           <button type="button" class="step-tool-btn bold-tool-btn" onmousedown="event.preventDefault()" onclick="boldTool('steps')" aria-label="Bold" title="Bold — the selected words, or the word the cursor is in (Ctrl+B)"><b>B</b></button>
+          <button type="button" class="step-tool-btn rl-tool-btn" onmousedown="event.preventDefault()" onpointerdown="event.preventDefault()" onclick="rlTool()" aria-label="Link to a recipe" title="Link the marked words to another recipe (Ctrl+K)">🔗</button>
           <button type="button" class="step-tool-btn" onmousedown="event.preventDefault()" onclick="stepToolSub()" title="Make this line — or every selected line — a sub-title (no step number)">&#9656; Sub-title</button>
           <button type="button" class="step-tool-btn" onmousedown="event.preventDefault()" onclick="stepToolIndent(1)" aria-label="Indent this line, or the selected lines" title="Indent this line, or the selected lines">&#8677;</button>
           <button type="button" class="step-tool-btn" onmousedown="event.preventDefault()" onclick="stepToolIndent(-1)" aria-label="Outdent this line, or the selected lines" title="Outdent this line, or the selected lines">&#8676;</button>
@@ -14844,8 +14883,14 @@ body.banner-shown .header {
         <input class="form-input" id="f-source" dir="auto" placeholder="e.g. https://www.example.com/recipe or 'AI generated'">
       </div>
       <div class="form-group">
-        <label class="form-label">Notes <span style="font-size:11px;color:var(--muted);font-weight:400;">(personal notes, tips, variations…)</span></label>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;"><label class="form-label" for="f-notes" style="margin:0;flex:1;">Notes <span style="font-size:11px;color:var(--muted);font-weight:400;">(personal notes, tips, variations…)</span></label>
+          <button type="button" class="step-tool-btn rl-tool-btn" onmousedown="event.preventDefault()" onpointerdown="event.preventDefault()" onclick="rlTool()" aria-label="Link to a recipe" title="Link the marked words to another recipe (Ctrl+K)">🔗</button></div>
         <textarea class="form-textarea" id="f-notes" dir="auto" placeholder="e.g. Kids loved this! Next time add more garlic. Works great as leftovers." style="min-height:80px;"></textarea>
+      </div>
+      <!-- v39.53 — Tony: words of a recipe that lead to another recipe -->
+      <div class="form-group">
+        <div class="form-label">🔗 Links to other recipes</div>
+        <div id="f-links" class="rl-edit"></div>
       </div>
       <div class="form-group" style="display:flex;align-items:center;gap:10px;padding:4px 0;">
         <label style="font-size:13px;font-weight:500;color:var(--ink);cursor:pointer;display:flex;align-items:center;gap:8px;">
@@ -17919,6 +17964,12 @@ window.i18nPatternsFromDict = i18nPatternsFromDict; window.i18nAsk = i18nAsk;
 // translating a string nobody sees. A `{1}` makes it a shape, matched the same
 // way a built toast is.
 var I18N_EXTRA = [
+  // v39.53 — links between recipes: the picker, the editor's list, ← Back and what they say (drawn by code)
+  '\uD83D\uDD17 Link to a recipe', 'The words:', 'Search your recipes', 'No recipe by that name', 'not among your recipes now',
+  'Remove this link', '\u2190 Back', 'Back to the recipe you came from', 'Link to a recipe', 'That recipe is no longer here',
+  'Mark words in an ingredient, the method or the notes, then tap \uD83D\uDD17 (or press Ctrl+K) to link them to another recipe.',
+  'Mark the words first \u2014 in an ingredient, the method or the notes \u2014 then tap \uD83D\uDD17',
+  'Mark words on one line', 'Mark a few words, not a whole sentence', '\uD83D\uDD17 Linked to \u201C{1}\u201D',
   // v39.52 — a collection's contents (drawn only for a collection, which no harvest opens)
   '\uD83D\uDCD1 Contents', '\u2191 Contents', 'Back to the contents', 'Contents',
   // v39.50 — under the progress when the phone would not keep the screen on
@@ -22132,6 +22183,7 @@ function toggleFav(e,id){
 // ═══════════════════════════════════
 function openView(id){
   if (typeof insightCount === 'function') insightCount('view');   // v38.15 — what the testers use
+  if (!_rlMoving) _rlBack = [];   // v39.53 — opened from the list, not by a link: no way "back" to show
   viewId=id;
   // Restore saved scaling for this recipe
   try { viewMult = parseFloat(localStorage.getItem('scale_'+id)||'1')||1; } catch(e){ viewMult=1; }
@@ -22298,7 +22350,7 @@ window.conflictBannerHtml = conflictBannerHtml;
 // `pfx` is the tick namespace ('ing' or 'ing-p0'), which is what stops ticking
 // the soup's onion from ticking the risotto's. Keys are the index in the LINES
 // array, so they stay stable whether or not headings are present.
-function ingredientLinesHtml(lines, pfx, awkOut) {
+function ingredientLinesHtml(lines, pfx, awkOut, lk) {   // lk: rlPrep — the recipe's links (v39.53)
   return (lines || []).map(function(i, ii) {
     if (isSubLine(i)) return '<li class="line-sub' + (lineIndented(i) ? ' line-sub-indent' : '')
       + '" dir="auto">' + escB(i.sub) + '</li>';
@@ -22311,12 +22363,12 @@ function ingredientLinesHtml(lines, pfx, awkOut) {
       + ' data-line="' + key + '" onclick="markLine(\'' + pfx + '\',' + ii + ')">'
       + '<button class="tick-box" role="checkbox" aria-checked="false" aria-label="Mark ' + escA(noBold(i.n)) + ' as added" '
       + 'onclick="toggleTick(\'' + key + '\',event)"></button>'
-      + '<span class="line-text">' + escB(i.n) + '</span><span class="ing-amount">' + (amBold ? '<strong>' + escH(sc) + '</strong>' : escH(sc)) + '</span></li>';
+      + '<span class="line-text">' + rlHtml(escB(i.n), lk) + '</span><span class="ing-amount">' + (amBold ? '<strong>' + escH(sc) + '</strong>' : escH(sc)) + '</span></li>';
   }).join('');
 }
 // The step number counts REAL steps only — a heading takes no number, so
 // "Brine option #1" sitting between steps 3 and 4 must not make the next one 5.
-function stepLinesHtml(lines, pfx, timerPfx, ings) {
+function stepLinesHtml(lines, pfx, timerPfx, ings, lk) {
   var num = 0, ingSet = viewMult !== 1 ? stepIngWords(ings) : null;    // v38.08 — the method scales too
   return (lines || []).map(function(s, si) {
     if (isSubLine(s)) return '<li class="line-sub' + (lineIndented(s) ? ' line-sub-indent' : '')
@@ -22339,7 +22391,7 @@ function stepLinesHtml(lines, pfx, timerPfx, ings) {
       + '<button class="tick-box" role="checkbox" aria-checked="false" aria-label="Mark step ' + num + ' as done" '
       + 'onclick="toggleTick(\'' + key + '\',event)"></button>'
       + '<span class="step-num">' + num + '</span>'
-      + '<span class="step-text">' + boldHtml(ingSet ? scaleStepHtml(txt, viewMult, ingSet) : escH(txt)) + (timers ? '<br>' + timers : '') + '</span></li>';
+      + '<span class="step-text">' + rlHtml(boldHtml(ingSet ? scaleStepHtml(txt, viewMult, ingSet) : escH(txt)), lk) + (timers ? '<br>' + timers : '') + '</span></li>';
   }).join('');
 }
 window.ingredientLinesHtml = ingredientLinesHtml; window.stepLinesHtml = stepLinesHtml;
@@ -22376,12 +22428,176 @@ function collJump(ev, i) {
 }
 window.collectionTocHtml = collectionTocHtml; window.collJump = collJump; window.collTopLinkHtml = collTopLinkHtml;
 
+// ─── v39.53 — LINKS BETWEEN RECIPES ──────────────────────────────────────────
+// Tony, 7 Nov 2026: words in a recipe's ingredients, method or notes can lead to another recipe — mark the words, and
+// 🔗 (or Ctrl+K) opens a list of all his recipes and the linked kitchens', with a search box; one pick makes the link. It
+// looks like a web link; a tap opens that recipe with ← Back; a link to a recipe that was deleted (or is no longer shared
+// with him) reads as the plain words, and works again when the recipe comes back (Undo).
+//
+// The words stay plain text. A recipe — or one recipe inside a collection — carries a short list beside them, `links:
+// [{t: the words, to: the recipe's uid, h: the linked kitchen's id when the recipe is theirs}]`, and the words are a link
+// wherever they appear in that recipe. So search, the AI, Bring!, translation, print and Word read the recipe exactly
+// as before, and nothing ever has to take links back out of the text. A uid rather than a number: it is the identity a
+// recipe keeps when it goes into a collection, comes out of one or is restored by Undo, so the link follows it there.
+var RL_MAX = 60, RL_TEXT_MAX = 80;
+var RL_WORD = 'A-Za-z0-9\\u00C0-\\u024F\\u0370-\\u03FF\\u0400-\\u04FF';   // letters that make a word longer (not Hebrew's ו/ב/ה…)
+function recipeLinksClean(list) {
+  if (!Array.isArray(list)) return [];
+  var seen = {}, out = [];
+  list.forEach(function(l) {
+    if (!l || typeof l !== 'object') return;
+    var t = noBold(String(l.t == null ? '' : l.t)).replace(/\s+/g, ' ').trim(), to = typeof l.to === 'string' ? l.to : '';
+    if (!t || t.length > RL_TEXT_MAX || !to || seen[t.toLowerCase()]) return;
+    seen[t.toLowerCase()] = 1;
+    var o = { t: t, to: to };
+    if (typeof l.h === 'string' && l.h) o.h = l.h;
+    out.push(o);
+  });
+  return out.slice(0, RL_MAX);
+}
+// A recipe of `list` by its uid — itself, or one recipe inside one of its collections (pi: which).
+function rlFindIn(list, uid, h) {
+  if (!uid || !Array.isArray(list)) return null;
+  for (var i = 0; i < list.length; i++) if (list[i] && list[i].uid === uid) return { h: h, r: list[i], pi: -1, name: list[i].name };
+  for (var j = 0; j < list.length; j++) {
+    var ps = recipeParts(list[j]);
+    for (var k = 0; k < ps.length; k++) if (ps[k] && ps[k].uid === uid) return { h: h, r: list[j], pi: k, name: ps[k].name };
+  }
+  return null;
+}
+// Where a link leads now, or null: deleted, or in a kitchen no longer linked. `ctx`: the kitchen whose recipe holds the
+// link ('' = ours) — a linked kitchen's links without `h` are to its own recipes, and theirs to ours carry our id.
+function recipeLinkTarget(l, ctx) {
+  if (!l) return null;
+  var h = l.h || ctx || '';
+  if (h && _household && h === _household.hid) h = '';
+  if (!h) return rlFindIn(recipes, l.to, '');
+  if (!hhLinks().some(function(x){ return x.hid === h; })) return null;
+  var c = _linkCache[h];
+  return c ? rlFindIn(c.list || [], l.to, h) : null;
+}
+// Once per recipe drawn: its links that lead somewhere, and one pattern that finds their words. ctx === false: none
+// (a recipe sent from another kitchen — its links are to recipes there).
+function rlPrep(links, ctx) {
+  if (ctx === false || !Array.isArray(links) || !links.length) return null;
+  var live = [];
+  links.forEach(function(l) {
+    var at = recipeLinkTarget(l, ctx);
+    if (at) live.push({ l: l, at: at, k: escH(l.t).toLowerCase() });
+  });
+  if (!live.length) return null;
+  live.sort(function(a, b){ return b.k.length - a.k.length; });          // "chicken stock" before "chicken"
+  var alt = live.map(function(x){ return x.k.replace(/[.*+?^${}()|[\]\\\/]/g, '\\$&'); }).join('|');
+  try {
+    // not inside a longer word ("egg" is not in "eggplant"), but a plural is the same thing ("eggs")
+    return { live: live, re: new RegExp('(^|[^' + RL_WORD + '])(' + alt + ')((?:e?s)?)(?![' + RL_WORD + '])', 'gi') };
+  } catch (e) { return null; }
+}
+// The line as drawn (escaped, bold marked) with the linked words made links — only in its text, never inside a tag.
+function rlHtml(html, lk) {
+  if (!lk) return html;
+  return String(html).split(/(<[^>]*>)/).map(function(seg) {
+    if (!seg || seg.charAt(0) === '<') return seg;
+    return seg.replace(lk.re, function(m, pre, w, pl) {
+      var k = w.toLowerCase(), x = null;
+      for (var i = 0; i < lk.live.length; i++) if (lk.live[i].k === k) { x = lk.live[i]; break; }
+      if (!x) return m;
+      return pre + '<a class="rlink" href="#" data-no-i18n data-rl-to="' + escA(x.l.to) + '" data-rl-h="' + escA(x.at.h)
+        + '" title="' + escA('→ ' + x.at.name) + '" onclick="return recipeLinkGo(event,this)">' + w + pl + '</a>';
+    });
+  }).join('');
+}
+
+// Following a link, and ← Back. One trail for both windows (ours, and a linked kitchen's on top of it); ✕ ends it.
+var _rlBack = [], _rlMoving = false;
+function rlScroller(ovId) {
+  var ov = document.getElementById(ovId), m = ov && ov.querySelector('.modal');
+  return { ov: ov, m: m };
+}
+function rlWhere(el) {
+  if (el && el.closest && el.closest('#linkedViewOverlay') && _linkedViewing) {
+    var s = rlScroller('linkedViewOverlay');
+    return { h: _linkedViewing.hid, uid: _linkedViewing.r.uid, top: s.m ? s.m.scrollTop : 0, otop: s.ov ? s.ov.scrollTop : 0 };
+  }
+  var v = rlScroller('viewOverlay');
+  return { h: '', id: viewId, top: v.m ? v.m.scrollTop : 0, otop: v.ov ? v.ov.scrollTop : 0, ticks: Object.assign({}, _ticks) };
+}
+function rlPlace(ovId, pi, back) {
+  var s = rlScroller(ovId);
+  if (!s.ov) return;
+  if (back) { if (s.m) s.m.scrollTop = back.top || 0; s.ov.scrollTop = back.otop || 0; return; }
+  if (s.m) s.m.scrollTop = 0; s.ov.scrollTop = 0;
+  if (pi >= 0) {
+    var p = s.ov.querySelector('[data-coll-part="' + pi + '"]');
+    if (p) { try { p.scrollIntoView({ block: 'start' }); } catch (e) { p.scrollIntoView(); } }
+  }
+}
+function rlShow(at, back) {
+  _rlMoving = true;
+  try {
+    var lov = document.getElementById('linkedViewOverlay'), vo = document.getElementById('viewOverlay');
+    if (!at.h) {
+      if (lov && lov.classList.contains('open')) closeM('linkedViewOverlay');
+      if (viewId !== at.r.id || !vo.classList.contains('open')) { _ticks = (back && back.ticks) || {}; openView(at.r.id); }
+      else drawView();                                  // the same recipe: its ← Back is drawn again
+      rlPlace('viewOverlay', at.pi, back);
+    } else {
+      openLinkedRecipeObj(at.r, at.h);
+      rlPlace('linkedViewOverlay', at.pi, back);
+    }
+  } finally { _rlMoving = false; }
+}
+function recipeLinkGo(ev, el) {
+  if (ev) { if (ev.preventDefault) ev.preventDefault(); if (ev.stopPropagation) ev.stopPropagation(); }   // not also "the line I am on"
+  var at = el && recipeLinkTarget({ to: el.getAttribute('data-rl-to'), h: el.getAttribute('data-rl-h') || '' }, '');
+  if (!at) { toast('That recipe is no longer here', 4000); return false; }
+  _rlBack.push(rlWhere(el));
+  if (_rlBack.length > 30) _rlBack.shift();
+  rlShow(at, null);
+  return false;
+}
+function recipeLinkBack() {
+  while (_rlBack.length) {
+    var b = _rlBack.pop(), at = null;
+    if (b.h) at = rlFindIn(((_linkCache[b.h] || {}).list) || [], b.uid, b.h);
+    else { var r = recipes.find(function(x){ return x.id === b.id; }); at = r ? { h: '', r: r, pi: -1, name: r.name } : null; }
+    if (at) { rlShow(at, b); return false; }
+  }
+  rlBackForget();
+  toast('That recipe is no longer here', 4000);
+  return false;
+}
+function rlBackForget() {
+  _rlBack = [];
+  document.querySelectorAll('.rl-back').forEach(function(b){ b.remove(); });
+}
+// A copy of another kitchen's recipe: its links to recipes there now say so (h), and its links to ours are ours.
+// They lead somewhere while that kitchen is linked with ours, and read as plain words otherwise.
+function rlRehome(rec, from) {
+  var one = function(x) {
+    if (!x || !Array.isArray(x.links)) return;
+    x.links = x.links.map(function(l) {
+      var h = (l && l.h) || from || '', o = { t: l && l.t, to: l && l.to };
+      if (h && !(_household && h === _household.hid)) o.h = h;
+      return o;
+    });
+  };
+  one(rec);
+  if (rec && Array.isArray(rec.parts)) rec.parts.forEach(one);
+  return rec;
+}
+function rlBackHtml() {
+  return _rlBack.length ? '<button type="button" class="rl-back" onclick="recipeLinkBack()" title="Back to the recipe you came from">← Back</button>' : '';
+}
+window.recipeLinksClean = recipeLinksClean; window.recipeLinkTarget = recipeLinkTarget; window.rlPrep = rlPrep; window.rlHtml = rlHtml;
+window.recipeLinkGo = recipeLinkGo; window.recipeLinkBack = recipeLinkBack; window.rlBackForget = rlBackForget;
+
 function collectionSectionsHtml(r) {
   var parts = recipeParts(r);
   return parts.map(function(p, pi) {
-    var awk = [];
-    var ings  = ingredientLinesHtml(p.ingredients, 'ing-p' + pi, awk);
-    var steps = stepLinesHtml(p.steps, 'step-p' + pi, 'p' + pi + '-', p.ingredients);
+    var awk = [], lk = rlPrep(p.links, '');            // v39.53 — each recipe's own links
+    var ings  = ingredientLinesHtml(p.ingredients, 'ing-p' + pi, awk, lk);
+    var steps = stepLinesHtml(p.steps, 'step-p' + pi, 'p' + pi + '-', p.ingredients, lk);
 
     var awkNote = awk.length
       ? '<div class="scale-warning" dir="auto">⚠️ ' + escH(awk.slice(0,3).join(', '))
@@ -22439,7 +22655,7 @@ function collectionSectionsHtml(r) {
       + (p.fav ? '<div style="flex-shrink:0;font-size:15px;" title="Favourite">❤️</div>' : '')
       + (parts.length > 1 ? collTopLinkHtml() : '')   // v39.52 — back to the contents
       + '</div>'
-      + (p.notes ? '<div dir="auto" style="font-size:12.5px;color:var(--muted);margin-bottom:8px;">' + escH(p.notes) + '</div>' : '')
+      + (p.notes ? '<div dir="auto" style="font-size:12.5px;color:var(--muted);margin-bottom:8px;">' + rlHtml(escH(p.notes), lk) + '</div>' : '')
       + body
       + partActionsHtml(r, p)
       + '</div>';
@@ -22533,6 +22749,7 @@ function editPart(ref) {
   if (clipBox) clipBox.checked = !!f.part.isClip;
   if (typeof renderDietButtons === 'function') { try { renderDietButtons(f.part.diets || []); } catch(e) {} }
   loadIngsTable(f.part.ingredients);
+  _editLinks = recipeLinksClean(f.part.links); rlEditDraw();   // v39.53 — its own links
   // openAddModal snapshotted an EMPTY form; everything above is the part being
   // loaded, not an edit. Re-take it, or closing without touching anything would
   // claim there are unsaved changes.
@@ -22563,7 +22780,8 @@ function recipeToPart(r) {
     source: r.source, isClip: r.isClip, diets: r.diets,
     // v36.12 — a Dinner and a Dessert gathered together stay a Dinner and a
     // Dessert, rather than both becoming whatever the first one was.
-    category: r.category, difficulty: r.difficulty
+    category: r.category, difficulty: r.difficulty,
+    links: r.links                    // v39.53 — and its links to other recipes
   }, 0);
 }
 // A selected COLLECTION contributes its recipes rather than becoming a part of
@@ -22858,6 +23076,7 @@ function recipeFromPart(coll, part) {
   return normalizeRecipe({
     id: nextId++,
     uid: part.uid,                    // the identity it has carried since import
+    links: part.links,                // v39.53 — its links to other recipes
     name: part.name,
     emoji: emojiFor(part.name, part.category || coll.category),
     category: part.category || coll.category,
@@ -22930,6 +23149,7 @@ function collapseCollectionIfThin(coll) {
     if (last.name) coll.name = last.name;
     coll.ingredients = last.ingredients;
     coll.steps = last.steps;
+    if (last.links && last.links.length) coll.links = last.links; else delete coll.links;   // v39.53
     if (last.servings) coll.servings = last.servings;
     if (last.prep) coll.prep = last.prep;
     coll.parts = [];
@@ -23007,8 +23227,8 @@ window.splitCollection = splitCollection;
 
 function drawView(){
   const r=recipes.find(x=>x.id===viewId); if(!r)return;
-  var _awkward = [];
-  const ings = ingredientLinesHtml(r.ingredients, 'ing', _awkward);
+  var _awkward = [], lkR = rlPrep(r.links, '');   // v39.53 — its links to other recipes
+  const ings = ingredientLinesHtml(r.ingredients, 'ing', _awkward, lkR);
   // 3.3 — don't pretend "1.5 eggs" is a measurement; say what to do about it.
   const awkwardNote = _awkward.length
     ? `<div class="scale-warning" dir="auto">⚠️ ${escH(_awkward.slice(0,3).join(', '))}`
@@ -23018,6 +23238,7 @@ function drawView(){
   requestWakeLock();
   document.getElementById('viewModal').innerHTML=`
     <div style="position:sticky;top:60px;display:flex;justify-content:flex-end;padding:0 8px;z-index:20;pointer-events:none;">
+      ${rlBackHtml()}
       <button onclick="closeM('viewOverlay')" style="pointer-events:auto;width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,0.95);border:none;cursor:pointer;font-size:18px;color:var(--warm-brown);display:flex;align-items:center;justify-content:center;box-shadow:0 2px 12px rgba(0,0,0,0.3);touch-action:manipulation;flex-shrink:0;">✕</button>
     </div>
     <div class="modal-hero" style="background:${escA(r.bg)};cursor:pointer;" onclick="changeHeroPhoto(${r.id})" title="Tap to change the photo">
@@ -23103,7 +23324,7 @@ function drawView(){
                   + '</div>';
               }).join('')}</div></details>` : '');
       })()}
-      ${r.notes ? `<div style="background:var(--note-bg);border-inline-start:3px solid var(--note-border);border-start-start-radius:0;border-start-end-radius:8px;border-end-end-radius:8px;border-end-start-radius:0;padding:10px 14px;margin-bottom:14px;font-size:13px;color:var(--ink);line-height:1.6;"><span style="font-size:11px;font-weight:600;color:var(--note-label);display:block;margin-bottom:4px;letter-spacing:0.5px;text-align:start;">NOTES</span><div dir="auto"${langAttr(r.notes)} style="unicode-bidi:plaintext;text-align:start;">${escH(r.notes)}</div></div>` : ''}
+      ${r.notes ? `<div style="background:var(--note-bg);border-inline-start:3px solid var(--note-border);border-start-start-radius:0;border-start-end-radius:8px;border-end-end-radius:8px;border-end-start-radius:0;padding:10px 14px;margin-bottom:14px;font-size:13px;color:var(--ink);line-height:1.6;"><span style="font-size:11px;font-weight:600;color:var(--note-label);display:block;margin-bottom:4px;letter-spacing:0.5px;text-align:start;">NOTES</span><div dir="auto"${langAttr(r.notes)} style="unicode-bidi:plaintext;text-align:start;">${rlHtml(escH(r.notes), lkR)}</div></div>` : ''}
       ${(r.history && r.history.length) ? `<details class="cook-log"><summary>🕘 Version history (<span data-no-i18n>${r.history.length}</span>)</summary>
           <div class="cook-log-body">${r.history.map(function(v,vi){
             return '<div class="cook-log-entry">'
@@ -23133,7 +23354,7 @@ function drawView(){
       </div>
       <div class="recipe-col-steps">
       <div class="modal-section-title">Method</div>
-      <ol class="steps-list" dir="auto">${stepLinesHtml(r.steps, 'step', '', r.ingredients)}</ol>
+      <ol class="steps-list" dir="auto">${stepLinesHtml(r.steps, 'step', '', r.ingredients, lkR)}</ol>
       </div>
       </div>`}
       <p class="line-mark-hint">Tap a box to tick a line off · tap the line to mark where you are · double-tap to clear <button id="clearTicksBtn" class="voice-btn" style="display:none;" onclick="clearTicks()">Clear ticks</button>${voiceSupported()?` · <button id="voiceBtn" class="voice-btn" onclick="toggleVoice()">🎤 Voice</button>`:''}</p>
@@ -24564,6 +24785,7 @@ function openAddModal(id){
   document.getElementById('f-steps').value = r ? stepsToText(r.steps) : '';
   if(document.getElementById('f-source'))document.getElementById('f-source').value=r?(r.source||''):'';
   if(document.getElementById('f-notes'))document.getElementById('f-notes').value=r?(r.notes||''):'';
+  _editLinks = recipeLinksClean(r && r.links); _rlSel = null; rlEditDraw();   // v39.53
   // Auto-set isClip if recipe has no ingredients and no steps
   var autoClip = r ? (!r.ingredients||!r.ingredients.length) && (!r.steps||!r.steps.length||r.steps[0]==='Enjoy!') : false;
   if(document.getElementById('f-isclip'))document.getElementById('f-isclip').checked=r?(r.isClip||autoClip):false;
@@ -24585,6 +24807,7 @@ function editFormState() {
   var clip = document.getElementById('f-isclip');
   vals.push(clip ? String(!!clip.checked) : '');
   vals.push(String(selEmoji||''), String(pendingPhoto||'').length, (typeof getSelectedDiets==='function'?getSelectedDiets().join(','):''));
+  vals.push(JSON.stringify(typeof _editLinks !== 'undefined' ? _editLinks : []));   // v39.53 — a link made or taken away is a change
   return vals.join('');
 }
 function editFormIsDirty() {
@@ -24674,6 +24897,8 @@ async function saveRecipe(){
     f.part.difficulty = (document.getElementById('f-diff')||{value:''}).value;
     f.part.ingredients = normalizeIngredientLines(ings);
     f.part.steps = normalizeStepLines(rawSteps);
+    var plinks = rlKeepUsed(_editLinks, f.part.ingredients, f.part.steps, f.part.notes);   // v39.53
+    if (plinks.length) f.part.links = plinks; else delete f.part.links;
     f.coll.updatedAt = Date.now();
     normalizeRecipe(f.coll);
     _editingPartRef = null;
@@ -24751,6 +24976,7 @@ async function saveRecipe(){
         nutrition: nutritionToKeep,  // cleared if ingredients/steps changedrition
         originalPhoto: existing.originalPhoto || '',  // preserve original photo
       };
+      rlSaveInto(recipes[idx]);       // v39.53 — its links to other recipes
     }
     // v38.86 — to the recipe, unless it is open behind the editor already
     var vo = document.getElementById('viewOverlay'), shown = viewId === editingId && vo && vo.classList.contains('open'), savedId = editingId;
@@ -24758,6 +24984,7 @@ async function saveRecipe(){
     if (typeof insightCount === 'function') insightCount('edit');   // v38.30
   } else {
     recipes.unshift({id: nextId++, uid: newUid(),bg:rndBg(),...data});
+    rlSaveInto(recipes[0]);           // v39.53 — its links to other recipes
     if (typeof insightAdded === 'function') insightAdded(recipes[0]);   // v38.15 — how recipes arrive
     var newId = recipes[0].id;
     toast('\u2705 Recipe saved!', function(){ goRecipe(newId); });
@@ -25916,6 +26143,7 @@ function closeM(id){
   document.getElementById(id).classList.remove('open');
   releaseFocus(id);   // 5c.1b — hand focus back to whatever opened THIS one (v36.65)
   if(id==='viewOverlay') { releaseWakeLock(); clearCookTimers(); stopVoice(); _ticks = {}; }
+  if ((id === 'viewOverlay' || id === 'linkedViewOverlay') && !_rlMoving && typeof rlBackForget === 'function') rlBackForget();   // v39.53 — ✕ ends the trail
   if(id==='editOverlay') { _editFormSnapshot = null; _editBaseAt = null; }
   // The harvest import queue advances here, because this is the one funnel every
   // importer closes through — whether it saved a recipe or the user gave up.
@@ -28217,6 +28445,9 @@ function normalizePart(p, idx) {
     // gives every recipe the same tags and they are wrong for most of them.
     diets: Array.isArray(p.diets) ? p.diets.filter(function(d){ return typeof d === 'string' && d; }) : []
   };
+  // v39.53 — a recipe inside a collection has its own links to other recipes (only when it has some)
+  var plk = recipeLinksClean(p.links);
+  if (plk.length) out.links = plk;
   // The SAME coercion as a flat recipe, not a second subtly different one. The
   // AI returns ingredients as bare strings often enough that this matters, and
   // since v36.4 it is also what turns the article's own `g` sub-headings into
@@ -28486,6 +28717,8 @@ function normalizeRecipe(r) {
   if (!Array.isArray(r.diets)) r.diets = [];
   if (typeof r.cookCount !== 'number' || isNaN(r.cookCount)) r.cookCount = 0;
   if (typeof r.notes !== 'string') r.notes = '';
+  // v39.53 — its links to other recipes: only when it has some, so the thousands without carry no new field
+  if (r.links !== undefined) { var lks = recipeLinksClean(r.links); if (lks.length) r.links = lks; else delete r.links; }
   // 3.4 — last few revisions, capped. See pushHistory for why the cap matters.
   if (!Array.isArray(r.history)) r.history = [];
   r.history = r.history.filter(function(v){ return v && typeof v === 'object' && v.name !== undefined; }).slice(0, 3);
@@ -34289,6 +34522,152 @@ document.addEventListener('keydown', function (e) {
 }, true);
 window.boldToggle = boldToggle; window.boldTool = boldTool;
 
+// ─── 🔗 / Ctrl+K — LINK THE MARKED WORDS TO ANOTHER RECIPE (v39.53) ──────────
+// Mark words in an ingredient, the Method or the Notes; 🔗 (or Ctrl+K / ⌘K) opens every recipe of his and of the
+// kitchens linked with his, with a search box; one pick makes the link. The editor holds the recipe's links in
+// _editLinks and lists them under the Notes, each with ✕; saving keeps only those whose words are still in the recipe.
+var _editLinks = [], _rlSel = null, _rlPick = null;
+function rlFieldOk(el) { return !!(el && el.isConnected && el.matches && el.matches('#ingsRows input, #f-steps, #f-notes')); }
+// The marked words are remembered as they are marked: on a phone, a tap on 🔗 may take the focus (and the selection) away.
+function rlRemember() {
+  var el = document.activeElement;
+  if (rlFieldOk(el)) { try { _rlSel = { el: el, a: el.selectionStart, b: el.selectionEnd }; } catch (e) {} }
+}
+document.addEventListener('selectionchange', rlRemember);
+document.addEventListener('keyup', rlRemember, true);
+document.addEventListener('mouseup', rlRemember, true);
+document.addEventListener('touchend', function(){ setTimeout(rlRemember, 0); }, true);
+function rlMarked() {
+  rlRemember();                                   // the field in use now, if any (its selectionchange may not have come yet)
+  var s = _rlSel, el = s && s.el;
+  var ov = document.getElementById('editOverlay');
+  if (!rlFieldOk(el) || !ov || !ov.classList.contains('open')) return null;
+  var raw = String(el.value || '').slice(Math.min(s.a, s.b), Math.max(s.a, s.b));
+  return { el: el, raw: raw, t: noBold(raw).replace(/\s+/g, ' ').trim() };
+}
+function rlTool() {
+  var m = rlMarked();
+  if (!m || !m.t) { toast('Mark the words first — in an ingredient, the method or the notes — then tap 🔗', 5000); return false; }
+  if (/\n/.test(m.raw.trim())) { toast('Mark words on one line', 4000); return false; }
+  if (m.t.length > RL_TEXT_MAX) { toast('Mark a few words, not a whole sentence', 4000); return false; }
+  rlPickOpen(m.t);
+  return false;
+}
+document.addEventListener('keydown', function (e) {
+  if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey || (String(e.key).toLowerCase() !== 'k' && e.code !== 'KeyK')) return;   // a Hebrew keyboard's key is ל
+  if (!rlFieldOk(e.target)) return;
+  e.preventDefault();
+  try { _rlSel = { el: e.target, a: e.target.selectionStart, b: e.target.selectionEnd }; } catch (er) {}
+  rlTool();
+}, true);
+// The recipe being edited — not offered as a link to itself.
+function rlEditingUid() {
+  if (_editingPartRef) { var pr = parsePartRef(_editingPartRef); return pr ? pr.partUid : ''; }
+  var r = editingId ? recipes.find(function(x){ return x.id === editingId; }) : null;
+  return r ? r.uid : '';
+}
+// Every recipe a link can lead to: ours, each recipe inside our collections, and the linked kitchens' (theirs too).
+function rlCandidates() {
+  var out = [], self = rlEditingUid();
+  var add = function(r, p, h, kitchen) {
+    var uid = p ? p.uid : r.uid;
+    if (!uid || (!h && uid === self)) return;
+    out.push({ uid: uid, h: h, name: String((p ? p.name : r.name) || ''), emoji: r.emoji || '🍽️', where: p ? String(r.name || '') : '', kitchen: kitchen || '' });
+  };
+  var all = function(list, h, kitchen) {
+    (list || []).forEach(function(r) {
+      if (!r) return;
+      add(r, null, h, kitchen);
+      recipeParts(r).forEach(function(p){ add(r, p, h, kitchen); });
+    });
+  };
+  all(recipes, '', '');
+  hhLinks().forEach(function(l){ var c = _linkCache[l.hid]; if (c) all(c.list, l.hid, hhLinkName(l)); });
+  return out;
+}
+function rlPickOpen(t) {
+  var ov = document.getElementById('rlPickOverlay');
+  if (!ov) {
+    ov = document.createElement('div');
+    ov.id = 'rlPickOverlay'; ov.className = 'modal-overlay'; ov.style.zIndex = '1250';
+    ov.addEventListener('click', function(e){ if (e.target === ov) closeM('rlPickOverlay'); });
+    document.body.appendChild(ov);
+  }
+  _rlPick = { t: t, all: rlCandidates(), shown: [] };
+  ov.innerHTML = '<div class="modal rl-pick" role="dialog" aria-modal="true" aria-labelledby="rlPickTitle">'
+    + '<div class="rl-pick-head"><div id="rlPickTitle" class="rl-pick-title">🔗 Link to a recipe</div>'
+    + '<button type="button" class="rl-pick-x" onclick="closeM(\'rlPickOverlay\')" aria-label="Close">✕</button></div>'
+    + '<div class="rl-pick-words"><span>The words:</span> <b dir="auto" data-no-i18n>' + escH(t) + '</b></div>'
+    + '<input type="search" id="rlPickQ" class="form-input" dir="auto" placeholder="Search your recipes" aria-label="Search your recipes" autocomplete="off" oninput="rlPickDraw()" onkeydown="rlPickKey(event)">'
+    + '<div id="rlPickList" class="rl-pick-list"></div></div>';
+  ov.classList.add('open');
+  trapFocus('rlPickOverlay');
+  rlPickDraw();
+  setTimeout(function(){ var q = document.getElementById('rlPickQ'); if (q && ov.classList.contains('open')) q.focus(); }, 30);
+}
+function rlPickDraw() {
+  var box = document.getElementById('rlPickList');
+  if (!box || !_rlPick) return;
+  var q = String((document.getElementById('rlPickQ') || {}).value || '').trim().toLowerCase();
+  var words = _rlPick.t.toLowerCase().split(/[\s,.;:()\/\-–—]+/).filter(function(w){ return w.length > 2; });
+  var near = function(c){ var n = c.name.toLowerCase(); return words.some(function(w){ return n.indexOf(w) > -1; }) ? 0 : 1; };
+  var list = _rlPick.all.filter(function(c){ return !q || (c.name + ' ' + c.where + ' ' + c.kitchen).toLowerCase().indexOf(q) > -1; });
+  // the recipes named like the marked words first, then ours before the linked kitchens', then A–Z
+  list.sort(function(a, b){ return near(a) - near(b) || (a.h ? 1 : 0) - (b.h ? 1 : 0) || a.name.localeCompare(b.name); });
+  _rlPick.shown = list.slice(0, 300);
+  box.innerHTML = _rlPick.shown.length ? _rlPick.shown.map(function(c, i) {
+    var where = [c.where ? '📚 ' + c.where : '', c.kitchen ? '🤝 ' + c.kitchen : ''].filter(Boolean).join(' · ');
+    return '<button type="button" class="rl-pick-item" onclick="rlPickChoose(' + i + ')">'
+      + '<span class="rl-pick-emoji" aria-hidden="true">' + escH(c.emoji) + '</span>'
+      + '<span class="rl-pick-name"><span dir="auto" data-no-i18n>' + escH(c.name) + '</span>'
+      + (where ? '<small dir="auto" data-no-i18n>' + escH(where) + '</small>' : '') + '</span></button>';
+  }).join('') : '<div class="rl-pick-none">No recipe by that name</div>';
+}
+function rlPickKey(e) {
+  if (e.key === 'Enter') { e.preventDefault(); if (_rlPick && _rlPick.shown.length) rlPickChoose(0); }
+}
+function rlPickChoose(i) {
+  var c = _rlPick && _rlPick.shown[i];
+  if (!c) return false;
+  var t = _rlPick.t, k = t.toLowerCase(), o = { t: t, to: c.uid };
+  if (c.h) o.h = c.h;
+  _editLinks = _editLinks.filter(function(l){ return String(l.t).toLowerCase() !== k; });
+  _editLinks.push(o);
+  _rlPick = null;
+  closeM('rlPickOverlay');
+  rlEditDraw();
+  toast('🔗 Linked to “' + c.name + '”', 4000);
+  return true;
+}
+// The editor's list of this recipe's links, under the Notes.
+function rlEditDraw() {
+  var box = document.getElementById('f-links');
+  if (!box) return;
+  box.innerHTML = _editLinks.length ? _editLinks.map(function(l, i) {
+    var at = recipeLinkTarget(l, '');
+    return '<div class="rl-edit-row"><span class="rl-edit-words" dir="auto" data-no-i18n>“' + escH(l.t) + '”</span>'
+      + '<span class="rl-edit-arrow" aria-hidden="true">→</span>'
+      + (at ? '<span class="rl-edit-to" dir="auto" data-no-i18n>' + escH(at.name) + '</span>' : '<span class="rl-edit-gone">not among your recipes now</span>')
+      + '<button type="button" class="rl-edit-x" onclick="rlEditRemove(' + i + ')" aria-label="Remove this link" title="Remove this link">✕</button></div>';
+  }).join('') : '<div class="rl-edit-hint">Mark words in an ingredient, the method or the notes, then tap 🔗 (or press Ctrl+K) to link them to another recipe.</div>';
+}
+function rlEditRemove(i) { _editLinks.splice(i, 1); rlEditDraw(); }
+function rlSaveInto(r) {
+  var lk = rlKeepUsed(_editLinks, r.ingredients, r.steps, r.notes);
+  if (lk.length) r.links = lk; else delete r.links;
+}
+// On saving: the links whose words are still in the recipe.
+function rlKeepUsed(links, ings, steps, notes) {
+  var text = [notes].concat(
+    (ings || []).map(function(i){ return isSubLine(i) ? i.sub : (i.a || '') + ' ' + (i.n || ''); }),
+    (steps || []).map(function(st){ return isSubLine(st) ? st.sub : stepText(st); })
+  ).map(function(x){ return noBold(String(x == null ? '' : x)); }).join('\n').replace(/\s+/g, ' ').toLowerCase();
+  return recipeLinksClean(links).filter(function(l){ return text.indexOf(l.t.toLowerCase()) > -1; });
+}
+window.rlTool = rlTool; window.rlPickOpen = rlPickOpen; window.rlPickDraw = rlPickDraw; window.rlPickKey = rlPickKey;
+window.rlPickChoose = rlPickChoose; window.rlEditDraw = rlEditDraw; window.rlEditRemove = rlEditRemove; window.rlKeepUsed = rlKeepUsed;
+window.rlCandidates = rlCandidates;
+
 // ─── PHOTO SEARCH ─────────────────────────────────────────────────────────────
 var _photoSearchSelected = null;
 var _photoSearchResults  = [];
@@ -34839,6 +35218,7 @@ var HELP_SYSTEM_PROMPT = [
   "- Diet tags on recipes help the diet filters work correctly — use Auto-tag to set them",
   "- The Self Test (⚙️ → 🔧 Troubleshooting → 🧪 Self Test) is useful for diagnosing if something stops working",
   "- The interface language: tap 🌐 next to ? — the app's words change; recipes stay as written. The app speaks English, Hebrew, Arabic, Russian, French, Spanish, German, Italian, Portuguese, Chinese, Japanese and Hungarian, and any language someone adds (🌐 → ➕ Add a language… — translated once, then everyone has it). On a new device whose own language the app speaks, it asks once, before the setup: that language or English (a Hungarian phone is asked Magyar or English) — so the setup, the kitchen rules and the welcome come in that language too",
+  "- 🔗 LINKS BETWEEN RECIPES (v39.53): words in a recipe can lead to another recipe — say 'tahini sauce' in the falafel's ingredients to your Tahini sauce recipe. In ✏️ Edit, mark the words (in an ingredient, the Method or the Notes), then tap 🔗 (beside B above the Steps box, beside + Add ingredient, or beside Notes) or press Ctrl+K (⌘K on a Mac). A list of all your recipes opens — the recipes inside your collections, and the linked kitchens' recipes too — with a search box at the top; tap one and the words are a link. The links are listed under the Notes (🔗 Links to other recipes), each with ✕ to remove it. In the recipe the words look like a web link, wherever they appear in it; tap one and that recipe opens (a recipe inside a collection: the collection, at that recipe), with ← Back at the top to return to where you were. If the recipe it leads to is deleted, or a linked kitchen stops sharing it, the words show as plain words; they work again if it comes back (↩︎ Undo). The recipe's text itself does not change, so search, printing, Word, sharing and Bring! see the words as before",
   "- 📑 A COLLECTION'S CONTENTS (v39.52): every collection opens with its contents — the list of its recipes, in order; tap a line to jump to that recipe, and each recipe has ↑ Contents at its top right to jump back. It always shows the collection as it is now (a recipe added, removed, made its own or split off changes it at once), in your own collections and in a linked kitchen's. Printing a collection, 📄 Word and 📤 Share → web page start with the same contents and give each recipe its own heading; in Word and on the web page each line is a working link to its recipe and each recipe links back to the contents",
   "- A PAGE THAT LINKS TO ITS RECIPES (v39.48): some recipe round-ups (a list of 20 or 30 dishes, each a name, a line and a 'to the recipe' link) do not hold the recipes themselves. 🔗 From URL (or sharing the page to the app) then opens each recipe's own page and brings them all in as one 📚 collection — up to 30 at a time; if the page links to more, the preview says how many more, and those can be added one at a time from their own pages. It takes a minute or two for a long list ('Opening recipe 7 of 29…'). If it ever finds nothing, the log says why — copy it and send it. (v39.49) While several recipes are read, the screen stays on by itself — keep the app open until it finishes: a phone stops the app while its screen is off or another app is in front, and the import goes on from where it stopped when you come back; a recipe page cut off by that is read again. (v39.50) Some phones will not keep the screen on — Low Power Mode is the usual reason: the progress then says so, and touching the screen now and then keeps it awake; the log says whether the screen was kept on",
   "- WHAT THE TRANSLATIONS HOLD (v39.47): only the app's own words. A recipe's name, a by-line, servings and time, a photographer's credit, the words someone searched for, names and e-mail addresses are never sent to be translated and never kept in the shared translations — the screens that show them mark them as data, and the app refuses anything that looks like data (another alphabet in an English phrase, a © credit, a recipe's own name). On a release, GitHub takes out of the shared translations whatever the app no longer asks for and would not collect today (dates, code, credits, recipe lines, old copies of a phrase with a number in it), and the published language files and their kept versions never hold a name. So the ✏️ Edit translations list stays the app's words, and nothing has to be cleaned by hand. A recipe inside a collection shows its servings and time as the open recipe does (🍽 4 · ⏱ 20 min); a photo credit reads 'Photo: <who> · <licence> · <library>'; after 🔄 Update all supported languages the message gives totals ('🔄 11 language(s) up to date, 24 phrase(s) added — shared with everyone'), and which language got how many is in the log",

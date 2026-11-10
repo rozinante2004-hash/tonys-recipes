@@ -3251,6 +3251,22 @@
   "📑 Contents": "📑 תוכן העניינים",
   "↑ Contents": "↑ לתוכן העניינים",
   "Back to the contents": "חזרה לתוכן העניינים",
-  "Contents": "תוכן העניינים"
+  "Contents": "תוכן העניינים",
+  "Back to the recipe you came from": "חזרה למתכון שממנו הגעת",
+  "Link the marked words to another recipe (Ctrl+K)": "קישור המילים המסומנות למתכון אחר (Ctrl+K)",
+  "Link to a recipe": "קישור למתכון",
+  "Mark a few words, not a whole sentence": "סמן/י כמה מילים, לא משפט שלם",
+  "Mark the words first — in an ingredient, the method or the notes — then tap 🔗": "קודם סמן/י את המילים — במרכיב, באופן ההכנה או בהערות — ואז הקש/י על 🔗",
+  "Mark words in an ingredient, the method or the notes, then tap 🔗 (or press Ctrl+K) to link them to another recipe.": "סמן/י מילים במרכיב, באופן ההכנה או בהערות, ואז הקש/י על 🔗 (או Ctrl+K) כדי לקשר אותן למתכון אחר.",
+  "Mark words on one line": "סמן/י מילים בשורה אחת",
+  "No recipe by that name": "אין מתכון בשם הזה",
+  "Remove this link": "הסרת הקישור",
+  "Search your recipes": "חפש/י במתכונים שלך",
+  "The words:": "המילים:",
+  "not among your recipes now": "לא נמצא עכשיו במתכונים שלך",
+  "← Back": "→ חזרה",
+  "🔗 Link to a recipe": "🔗 קישור למתכון",
+  "🔗 Linked to “{1}”": "🔗 קושר אל “{1}”",
+  "🔗 Links to other recipes": "🔗 קישורים למתכונים אחרים"
  }
 }

@@ -14862,6 +14862,127 @@ window.SELF_TESTS = [
         if(ov && ov.classList.contains('open')) closeM('viewOverlay');
       }
     } },
+  { id:'recipe_links', group:'Features', name:'🔗 Words in a recipe lead to another recipe — made with 🔗 or Ctrl+K from a searchable list (ours, our collections\' recipes, linked kitchens\'), opened with ← Back, plain words when that recipe is gone and a link again after Undo (v39.53)',
+    test: async()=>{
+      // v39.53 — Tony, 7 Nov 2026: links from words in the ingredients, method steps and notes to another recipe; mark the
+      // words, then a 🔗 control or Ctrl+K opens a list of all his recipes (linked kitchens' too) with a search box; one pick
+      // makes the link; it looks like a web link; a tap opens the recipe "with ← Back"; a link to a deleted recipe shows
+      // as plain words, "and it comes back" with Undo.
+      ['rlPrep','rlHtml','recipeLinkGo','recipeLinkBack','rlTool','rlPickChoose','rlCandidates','rlKeepUsed','openLinkedRecipeObj','recipeLinksClean'].forEach(function(f){ if(typeof window[f]!=='function') throw new Error(f+' is not defined'); });
+      var sauce=normalizeRecipe({ id:9300601, uid:'st-rl-sauce', name:'ST Tahini sauce', ingredients:[{a:'1 cup',n:'tahini'}], steps:['Mix'] });
+      var coll=normalizeRecipe({ id:9300602, uid:'st-rl-coll', name:'ST Breads', parts:[
+        { uid:'st-rl-p1', name:'ST Pita', ingredients:[{a:'1',n:'flour'}], steps:['bake'] },
+        { uid:'st-rl-p2', name:'ST Lafa', ingredients:[{a:'1',n:'flour'}], steps:['bake'] } ] });
+      var main=normalizeRecipe({ id:9300603, uid:'st-rl-main', name:'ST Falafel',
+        ingredients:[{a:'2 tbsp',n:'tahini sauce'},{a:'1',n:'eggplant'},{a:'4',n:'pitas'}],
+        steps:['Fry the balls','Serve in **lafa** with tahini sauce and hummus'], notes:'Good with Tahini Sauce. A ghost recipe too.',
+        links:[{t:'tahini sauce',to:'st-rl-sauce'},{t:'pita',to:'st-rl-p1'},{t:'lafa',to:'st-rl-p2'},{t:'egg',to:'st-rl-sauce'},
+               {t:'ghost recipe',to:'st-rl-nowhere'},{t:'hummus',to:'st-rl-their',h:'stRLlinked'}] });
+      if(!main.links || main.links.length!==6) throw new Error('a recipe\'s links do not survive normalising: '+JSON.stringify(main.links));
+      var part=normalizePart({ name:'x', ingredients:[{a:'1',n:'y'}], steps:['z'], links:[{t:'y',to:'st-rl-sauce'}] });
+      if(!part.links || part.links.length!==1) throw new Error('a recipe inside a collection loses its links');
+      var their=normalizeRecipe({ id:77, uid:'st-rl-their', name:'ST Their hummus', ingredients:[{a:'1',n:'chickpeas'}], steps:['Blend'] });
+      var real={ recipes:recipes.slice(), hh:window._household, cache:_linkCache.stRLlinked, save:window.saveData, grid:window.renderGrid, filt:window.renderFilters, reset:window.resetFilters,
+                 scroll:Element.prototype.scrollIntoView, mark:window.markLine, toast:window.toast, cloud:_cloudSnapshotForTest() };   // (Undo takes a deletion off the cloud's queue)
+      var scrolled=[], marks=0, toasts=[];
+      recipes.push(sauce, coll, main);
+      window._household=Object.assign({}, real.hh||{}, { hid:(real.hh&&real.hh.hid)||'stRLmine', links:[{ hid:'stRLlinked', name:'ST linked kitchen' }] });
+      _linkCache.stRLlinked={ at:Date.now(), list:[their], photos:{} };
+      window.saveData=function(){}; window.renderGrid=function(){}; window.renderFilters=function(){}; window.resetFilters=function(){};
+      Element.prototype.scrollIntoView=function(){ scrolled.push(this); };
+      window.markLine=function(){ marks++; }; window.toast=function(m){ toasts.push(String(m)); };
+      var ov=document.getElementById('viewOverlay'), lov=document.getElementById('linkedViewOverlay');
+      var linksIn=function(root){ return Array.prototype.map.call(root.querySelectorAll('a.rlink'), function(a){ return a.textContent+'>'+a.getAttribute('data-rl-to'); }); };
+      try{
+        openView(main.id); await wait(150);
+        var got=linksIn(ov);
+        ['tahini sauce>st-rl-sauce','pitas>st-rl-p1','lafa>st-rl-p2','Tahini Sauce>st-rl-sauce','hummus>st-rl-their'].forEach(function(w){ if(got.indexOf(w)===-1) throw new Error('not a link: '+w+' — the links are '+JSON.stringify(got)); });
+        if(got.filter(function(x){ return /^tahini sauce>/i.test(x); }).length<3) throw new Error('the words are not a link wherever they are (ingredients, method, notes): '+JSON.stringify(got));
+        if(got.some(function(x){ return /^egg/i.test(x); })) throw new Error('"egg" is a link inside "eggplant"');
+        if(got.some(function(x){ return /ghost/.test(x); })) throw new Error('a link to a recipe that is not there is not plain words');
+        if(ov.querySelector('.rl-back')) throw new Error('← Back shows on a recipe opened from the list');
+        var a0=Array.prototype.find.call(ov.querySelectorAll('.ingredients-list a.rlink'), function(a){ return /tahini/i.test(a.textContent); });
+        if(!a0 || getComputedStyle(a0).textDecorationLine.indexOf('underline')===-1) throw new Error('a link does not look like a web link');
+        a0.click(); await wait(150);
+        if(viewId!==sauce.id) throw new Error('a tap on the link does not open the recipe it leads to');
+        if(marks) throw new Error('a tap on a link also moves "the line I am on"');
+        var back=ov.querySelector('.rl-back');
+        if(!back) throw new Error('the recipe a link opened has no ← Back');
+        back.click(); await wait(150);
+        if(viewId!==main.id) throw new Error('← Back does not return to the recipe the link was in');
+        if(ov.querySelector('.rl-back')) throw new Error('← Back is still shown with nowhere to go back to');
+        // To a recipe inside a collection: the collection, at that recipe.
+        Array.prototype.find.call(ov.querySelectorAll('a.rlink'), function(a){ return a.textContent==='lafa'; }).click(); await wait(150);
+        if(viewId!==coll.id) throw new Error('a link to a recipe in a collection does not open the collection');
+        if(scrolled[scrolled.length-1]!==ov.querySelector('[data-coll-part="1"]')) throw new Error('a link to a recipe in a collection does not go to that recipe');
+        recipeLinkBack(); await wait(150);
+        // A linked kitchen's recipe opens in its window, with ← Back to ours.
+        Array.prototype.find.call(ov.querySelectorAll('a.rlink'), function(a){ return a.textContent==='hummus'; }).click(); await wait(150);
+        if(!lov.classList.contains('open') || (lov.textContent||'').indexOf('ST Their hummus')===-1) throw new Error('a link to a linked kitchen\'s recipe does not open it');
+        if(!lov.querySelector('.rl-back')) throw new Error('a linked kitchen\'s recipe opened by a link has no ← Back');
+        lov.querySelector('.rl-back').click(); await wait(150);
+        if(lov.classList.contains('open') || viewId!==main.id) throw new Error('← Back from a linked kitchen\'s recipe does not return to ours');
+        // Deleted → plain words; Undo → a link again. A kitchen no longer linked → plain words.
+        var di=recipes.indexOf(sauce); _pendingUndo={ items:[{ idx:di, recipe:sauce }], at:Date.now() }; recipes.splice(di,1);
+        drawView(); await wait(60);
+        if(linksIn(ov).some(function(x){ return /st-rl-sauce/.test(x); })) throw new Error('a link to a deleted recipe is still a link');
+        if((ov.textContent||'').indexOf('tahini sauce')===-1) throw new Error('the words of a link to a deleted recipe are gone, not plain');
+        undoDelete(); drawView(); await wait(60);
+        if(!linksIn(ov).some(function(x){ return /st-rl-sauce/.test(x); })) throw new Error('after Undo the link does not work again');
+        window._household.links=[]; drawView(); await wait(60);
+        if(linksIn(ov).some(function(x){ return /st-rl-their/.test(x); })) throw new Error('a link to a kitchen no longer linked is still a link');
+        window._household.links=[{ hid:'stRLlinked', name:'ST linked kitchen' }];
+        // ✕ ends the trail.
+        ov.querySelector('a.rlink').click(); await wait(100);
+        closeM('viewOverlay'); openView(main.id); await wait(100);
+        if(ov.querySelector('.rl-back')) throw new Error('after ✕ the next recipe still offers ← Back');
+        closeM('viewOverlay');
+        // Making one: mark words, Ctrl+K (or 🔗), a searchable list, one pick, saved — and kept only while the words are there.
+        openAddModal(main.id); await wait(100);
+        var ta=document.getElementById('f-steps');
+        if((document.getElementById('f-links').textContent||'').indexOf('tahini sauce')===-1) throw new Error('the editor does not list the recipe\'s links');
+        ta.focus(); var at0=ta.value.indexOf('the balls'); ta.setSelectionRange(at0+4, at0+9);
+        ta.dispatchEvent(new KeyboardEvent('keydown', { key:'k', code:'KeyK', ctrlKey:true, bubbles:true, cancelable:true }));
+        await wait(100);
+        var pov=document.getElementById('rlPickOverlay');
+        if(!pov || !pov.classList.contains('open')) throw new Error('Ctrl+K on marked words does not open the list of recipes');
+        var names=Array.prototype.map.call(pov.querySelectorAll('.rl-pick-item .rl-pick-name > span'), function(x){ return x.textContent; });
+        ['ST Tahini sauce','ST Pita','ST Breads','ST Their hummus'].forEach(function(n){ if(names.indexOf(n)===-1) throw new Error('the list of recipes leaves out '+n+': '+JSON.stringify(names.slice(0,20))); });
+        if(names.indexOf('ST Falafel')>-1) throw new Error('the recipe being edited is offered as a link to itself');
+        var q=document.getElementById('rlPickQ'); q.value='lafa'; q.dispatchEvent(new Event('input'));
+        var after=Array.prototype.map.call(pov.querySelectorAll('.rl-pick-item .rl-pick-name > span'), function(x){ return x.textContent; });
+        if(after.join('|')!=='ST Lafa') throw new Error('the search box does not narrow the list: '+JSON.stringify(after));
+        rlPickChoose(0); await wait(60);
+        if(pov.classList.contains('open')) throw new Error('picking a recipe does not close the list');
+        if(!_editLinks.some(function(l){ return l.t==='balls' && l.to==='st-rl-p2'; })) throw new Error('one pick does not make the link: '+JSON.stringify(_editLinks));
+        if(!editFormIsDirty()) throw new Error('a new link does not count as a change to save');
+        // nothing marked: says so, no list
+        var nt=document.getElementById('f-notes'); nt.focus(); nt.setSelectionRange(0,0); toasts.length=0;
+        rlTool(); await wait(30);
+        if(document.getElementById('rlPickOverlay').classList.contains('open') || !toasts.some(function(m){ return /Mark the words first/.test(m); })) throw new Error('🔗 with nothing marked does not say to mark the words');
+        nt.value='Good with it.';   // the notes' "ghost recipe" and "Tahini Sauce" go; the ingredients' tahini sauce stays
+        await saveRecipe(); await wait(60);
+        var saved=recipes.find(function(x){ return x.id===main.id; });
+        var ts=(saved.links||[]).map(function(l){ return l.t; });
+        if(ts.indexOf('balls')===-1) throw new Error('the new link was not saved: '+JSON.stringify(saved.links));
+        if(ts.indexOf('ghost recipe')>-1) throw new Error('a link whose words are no longer in the recipe was kept');
+        if(ts.indexOf('tahini sauce')===-1) throw new Error('a link whose words are still there was dropped');
+        // A recipe inside a collection keeps its own links through ⤴ Make its own and gathering.
+        var mp=recipeToPart(saved); if(!mp.links || !mp.links.length) throw new Error('a recipe gathered into a collection loses its links');
+        var back2=recipeFromPart(coll, mp); if(!back2.links || !back2.links.length) throw new Error('a recipe made its own again loses its links');
+        nextId--;   // (recipeFromPart took a number)
+      } finally {
+        Element.prototype.scrollIntoView=real.scroll; window.markLine=real.mark; window.toast=real.toast;
+        window.saveData=real.save; window.renderGrid=real.grid; window.renderFilters=real.filt; window.resetFilters=real.reset;
+        window._household=real.hh; if(real.cache) _linkCache.stRLlinked=real.cache; else delete _linkCache.stRLlinked;
+        _editFormSnapshot=null; _editLinks=[]; var eo=document.getElementById('editOverlay'); if(eo) eo.classList.remove('open');
+        var po=document.getElementById('rlPickOverlay'); if(po) po.classList.remove('open');
+        if(lov && lov.classList.contains('open')) closeM('linkedViewOverlay');
+        if(ov && ov.classList.contains('open')) closeM('viewOverlay');
+        recipes.length=0; real.recipes.forEach(function(r){ recipes.push(r); });
+        _pendingUndo=null; _cloudRestoreForTest(real.cloud);
+      }
+    } },
   { id:'export_docx_build', group:'Import/Export', name:'Word (.docx) builds a valid ZIP',
     test: async()=>{
       if(typeof makeDocxBlob!=='function') throw new Error('makeDocxBlob not defined');

@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v39.52` — app. **Worker: v102**, deployed separately and versioned separately
+**Current version:** `v39.53` — app. **Worker: v102**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -408,6 +408,16 @@ under its plain path only (a `?url=` request goes network-first).
   **Pace and pitch (v39.36, Tony's choice "E" from five heard on his phone):** FARM_VOICE_TUNE child speed 0.8, pitch
   1.8 (the top; above it speech cracks); female 0.74 / 1.4; male 0.7 / 0.7 (only slower: he stays deep, v38.01); each
   animal adds ±0.3 × (its pitch − 1), kept within 0.55–1.8.
+- **🔗 Links between recipes (v39.53):** a recipe and a part carry `links: [{t, to: uid, h?: linked kitchen}]` beside
+  their text (the text is never changed). `rlPrep(links, ctx)` keeps the links whose recipe exists now
+  (`recipeLinkTarget`: own recipes and parts by uid; `h` → `_linkCache[h]` while that kitchen is linked) and `rlHtml`
+  makes their words links in each line's text (not inside a longer Latin word; plurals count). `recipeLinkGo` opens the
+  target (a part: its collection, scrolled to it; a linked kitchen's: `openLinkedRecipeObj`) and pushes where he was
+  onto `_rlBack`; "← Back" (`rlBackHtml`, beside ✕) pops it; ✕ or an ordinary open clears it. Editor: 🔗 buttons and
+  Ctrl+K act on the marked words of an ingredient, the Method or the Notes (`rlRemember` keeps the selection for phones);
+  `rlPickOpen` lists `rlCandidates()` with a search box; `_editLinks` is shown under the Notes with ✕ and saved through
+  `rlKeepUsed` (only links whose words remain). `rlRehome` points a copied linked/sent recipe's links at its kitchen.
+  Self Test `recipe_links`.
 - **📑 A collection's contents (v39.52):** `collectionTocHtml(parts)` at the top of every collection (own, a linked
   kitchen's, a sent one — `linkedLinesHtml`), drawn from the parts every time (nothing stored, so existing collections
   have it and it follows every change); each line a link; each part (`data-coll-part`) has "↑ Contents"
