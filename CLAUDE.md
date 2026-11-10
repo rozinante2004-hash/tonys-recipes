@@ -1502,8 +1502,10 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
     Releasing it needs Tony's yes.
   - **v39.53 on Test:** 004de5d, Cloudflare Pages for test 11:43, Self Tests 11:59 — success. **v39.54 on Test:** bc536c4,
     Cloudflare Pages 11:52, Self Tests 12:10 — success. **v39.55:** 84b312a, Cloudflare Pages 12:02, "Publish the database
-    rules" (to the test project, after the emulator checks) 12:02 — success; its Self Tests were still running at
-    v39.56's push. Releasing any of them needs Tony's yes.
+    rules" (to the test project, after the emulator checks) 12:02 — success; its Self Tests FAILED (12:18, the household
+    end-to-end test — see v39.57), and v39.56's (e1f8abd, Cloudflare 12:12) the same way (12:30). **v39.57 on Test:**
+    48567f3, Cloudflare Pages 12:33, Self Tests 12:50 — success: everything from v39.52 to v39.57 is green on Test.
+    Releasing needs Tony's yes.
   - **v39.53 — 🔗 links between recipes** (Tuesday 10 Nov 2026, item 2 of the plan below). Mark words in an ingredient,
     the Method or the Notes; 🔗 (beside B in both toolbars, and beside Notes) or Ctrl+K / ⌘K opens a list of every recipe
     — his own, each recipe inside his collections, and the linked kitchens' (theirs, and the recipes inside their
