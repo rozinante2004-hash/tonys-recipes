@@ -1700,6 +1700,9 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
     share button not closed, no kitchen sent, one's own address allowed, the old isInviteAsk, no language, Feedback
     keeping them, the send hook not called, not marked done) all fail them. Screens: 390 px in English and Hebrew,
     1280 px.
+  - **On Test, green (10 Nov 2026):** v39.60 on 3fe4519 (Cloudflare Pages for test 15:41, Self Tests 16:00); v39.61 +
+    Worker v103 on cd96e4d (Deploy the Worker 16:07 — "live: v103, published: v103", live for every copy from then;
+    Cloudflare Pages for test 16:07; Self Tests 16:25). Not yet on the family's copy or the beta: needs Tony's yes.
   - **Planned for Tuesday 10 Nov 2026, after 11:00 Israel time — NOT before** (Tony, 7 Nov 2026, ~00:45: "as I am
     already at 75% of my weekly quota, I would like you to only log the request and plan it for Tuesday, after 11:00,
     when it resets"; a reminder into this session is scheduled for 11:05, trig_019vabk7G3ZPSwUAMaDctuxi). Two features:
