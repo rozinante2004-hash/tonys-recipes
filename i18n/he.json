@@ -3295,6 +3295,13 @@
   "🗑️ Ask an admin to delete": "🗑️ לבקש ממנהל למחוק",
   "🗑️ Delete it": "🗑️ למחוק",
   "🗑️ Requests to delete": "🗑️ בקשות למחיקה",
-  "🗑️ {1} request(s) to delete recipes — tap to see them.": "🗑️ {1} בקשות למחוק מתכונים — הקישו כדי לראות."
+  "🗑️ {1} request(s) to delete recipes — tap to see them.": "🗑️ {1} בקשות למחוק מתכונים — הקישו כדי לראות.",
+  "A collection opens with its contents — tap a recipe’s name to jump to it, and ↑ Contents to come back.": "אוסף נפתח בתוכן העניינים שלו — הקישו על שם מתכון כדי לקפוץ אליו, ועל ↑ תוכן העניינים כדי לחזור.",
+  "A linked household’s recipe opens just like yours — as wide, and on a computer you can drag its corner to make it bigger.": "מתכון ממשק בית מקושר נפתח בדיוק כמו שלכם — באותו רוחב, ובמחשב אפשר לגרור את הפינה שלו כדי להגדיל אותו.",
+  "Find the recipes hiding in your WhatsApp group chats — the links and the recipes written out — leaving out the ones you already have.": "מצאו את המתכונים שמסתתרים בקבוצות הוואטסאפ שלכם — הקישורים והמתכונים שנכתבו בהן — בלי אלה שכבר יש לכם.",
+  "Link recipes?": "לקשר מתכונים?",
+  "Link words in one recipe to another — “tahini sauce” opens your tahini sauce recipe, and ← Back returns.": "קשרו מילים במתכון אחד למתכון אחר — „רוטב טחינה” פותח את מתכון רוטב הטחינה שלכם, ו־→ חזרה מחזיר.",
+  "Make a collection?": "ליצור אוסף?",
+  "Someone who may not delete recipes asks an admin with one tap — 🗑️ Ask an admin to delete.": "מי שאינו רשאי למחוק מתכונים מבקש ממנהל בהקשה אחת — 🗑️ לבקש ממנהל למחוק."
  }
 }

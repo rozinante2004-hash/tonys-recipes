@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.58 -->
+<!-- Tony's Recipes Collection v39.59 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -11025,7 +11025,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.58';
+var APP_VERSION = 'v39.59';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -14533,7 +14533,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.58</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.59</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14621,7 +14621,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.58</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.59</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -15858,6 +15858,9 @@ body.banner-shown .header {
       <span class="help-suggestion" onclick="askHelpQ('How do I import from a URL?')">Import from URL?</span>
       <span class="help-suggestion" onclick="askHelpQ('How do I export my recipes?')">Export recipes?</span>
       <span class="help-suggestion" onclick="askHelpQ('What AI features are available?')">AI features?</span>
+      <!-- v39.58 — the newest features, where people look first -->
+      <span class="help-suggestion" onclick="askHelpQ('How do I link one recipe to another?')">Link recipes?</span>
+      <span class="help-suggestion" onclick="askHelpQ('How do I make a collection of recipes?')">Make a collection?</span>
     </div>
     <div id="helpAnswer" style="display:none;" class="help-answer"></div>
     <div id="helpLoading" style="display:none;text-align:center;padding:20px;color:var(--muted);font-size:13px;">🤔 Thinking...</div>
@@ -33479,13 +33482,15 @@ function appFeatureSections(all) {
       'A kitchen sound when a message or a request arrives — a spoon on a wine glass, or another; mute it in Settings.',   // v38.82
       'Link with other households you know: each sees the other’s recipes, and you can write to each other in the app.',
       'Keep your own copy of a recipe from a linked household.',
+      'A linked household’s recipe opens just like yours — as wide, and on a computer you can drag its corner to make it bigger.',   // v39.58
+      'Someone who may not delete recipes asks an admin with one tap — 🗑️ Ask an admin to delete.',   // v39.55
       'Ask to join a household, or to link with one, by e-mail or by its identifier (MKN-…) — and accept, decline or block the requests you get.',
       'Share a recipe on WhatsApp, by e-mail, or as a web page that opens anywhere.' ] },
     { icon: '\u{1F4E5}', title: 'Save recipes from anywhere', items: [
       'From a website link, a photo of a cookbook page, screenshots, pasted text or a video.',
       'From Facebook, Instagram and TikTok posts.',
       'Straight from the page you are reading: the browser extension on a computer, the Share button on a phone.' ]
-      .concat(on('whatsapp') ? ['Find the recipes hiding in your WhatsApp group chats.'] : []) },
+      .concat(on('whatsapp') ? ['Find the recipes hiding in your WhatsApp group chats — the links and the recipes written out — leaving out the ones you already have.'] : []) },   // v39.56
     { icon: '\u{1F373}', title: 'Cook', items: [
       'Change the servings: the amounts follow, even in the method — in metric or imperial.',
       'Timers in the steps, voice control for messy hands, and a screen that stays on.',
@@ -33497,6 +33502,8 @@ function appFeatureSections(all) {
       'Ask the help assistant how to do anything in the app.' ] },
     { icon: '\u{1F5C2}', title: 'Keep it tidy', items: [
       'Categories, diets, favourites, collections and a quick search.',
+      'A collection opens with its contents — tap a recipe’s name to jump to it, and ↑ Contents to come back.',   // v39.52
+      'Link words in one recipe to another — “tahini sauce” opens your tahini sauce recipe, and ← Back returns.',   // v39.53
       'A recipe counter that earns medals as your collection grows — from Bronze at 10 recipes to Legendary at 1,000.',
       'Every change is kept: go back to an earlier version of a recipe.' ]
       .concat(on('bring') ? ['Send the ingredients to your Bring! shopping list.'] : [])
@@ -35580,6 +35587,7 @@ var HELP_SYSTEM_PROMPT = [
   "- The Self Test (⚙️ → 🔧 Troubleshooting → 🧪 Self Test) is useful for diagnosing if something stops working",
   "- The interface language: tap 🌐 next to ? — the app's words change; recipes stay as written. The app speaks English, Hebrew, Arabic, Russian, French, Spanish, German, Italian, Portuguese, Chinese, Japanese and Hungarian, and any language someone adds (🌐 → ➕ Add a language… — translated once, then everyone has it). On a new device whose own language the app speaks, it asks once, before the setup: that language or English (a Hungarian phone is asked Magyar or English) — so the setup, the kitchen rules and the welcome come in that language too",
   "- 🗑️ ASK AN ADMIN TO DELETE (v39.55): in a shared kitchen only its owner and admins delete recipes and collections. For everyone else every 🗑️ Delete — on a recipe, on a collection, on one recipe inside a collection, and Select → Delete — reads 🗑️ Ask an admin to delete: it asks first, then sends the kitchen's owner and admins your request (asking again about the same recipe sends nothing new), and says it was sent; nothing is deleted on your device. The owner and admins are told when the app opens (a tap opens the list), and find the requests in ··· More → 🏡 Kitchens and people → 🗑️ Requests to delete (shown while there are some): each says what it is and who asked, with 🗑️ Delete it (one tap; a recipe can be brought back with ↩︎ Undo, a recipe taken out of a collection from the collection's 🕘 Version history) and Keep it; either clears the request. A request for a recipe that is already gone says so, with Clear. (v39.58) Gathering recipes into a collection is not deleting: anyone who may add and change recipes can make a collection or add recipes to one (Select → 📚 New collection / 📚 Add to collection), and the recipes gathered leave the list on their own as always — their content is in the collection — with no request and no refusal; ✂️ Split them up and ↩︎ Undo work for them the same way.",
+  "- 🗑️ A RECIPE DELETED ON ONE DEVICE leaves the others too (v39.57): before v39.57 another phone or computer of the kitchen could keep showing a recipe the owner or an admin had deleted; if one still shows such an old recipe, delete it again there — or, signed in, ⚙️ → 🔧 Troubleshooting → 🧽 Reset this device… (it erases only that device's copy; the recipes come straight back from the cloud, without the deleted one)",
   "- 🤝 A LINKED KITCHEN'S RECIPE (v39.58) opens in a window like your own recipes: as wide (two columns on a computer), and on a computer with the same corner at the bottom right to drag it bigger or smaller (a click on it: full size, and back). The size you choose is kept on this device for every recipe, yours or a linked kitchen's. A recipe sent to you opens the same way.",
   "- 🔗 LINKS BETWEEN RECIPES (v39.53): words in a recipe can lead to another recipe — say 'tahini sauce' in the falafel's ingredients to your Tahini sauce recipe. In ✏️ Edit, mark the words (in an ingredient, the Method or the Notes), then tap 🔗 (beside B above the Steps box, beside + Add ingredient, or beside Notes) or press Ctrl+K (⌘K on a Mac). A list of all your recipes opens — the recipes inside your collections, and the linked kitchens' recipes too — with a search box at the top; tap one and the words are a link. The links are listed under the Notes (🔗 Links to other recipes), each with ✕ to remove it. In the recipe the words look like a web link, wherever they appear in it; tap one and that recipe opens (a recipe inside a collection: the collection, at that recipe), with ← Back at the top to return to where you were. If the recipe it leads to is deleted, or a linked kitchen stops sharing it, the words show as plain words; they work again if it comes back (↩︎ Undo). The recipe's text itself does not change, so search, printing, Word, sharing and Bring! see the words as before",
   "- 📑 A COLLECTION'S CONTENTS (v39.52): every collection opens with its contents — the list of its recipes, in order; tap a line to jump to that recipe, and each recipe has ↑ Contents at its top right to jump back. It always shows the collection as it is now (a recipe added, removed, made its own or split off changes it at once), in your own collections and in a linked kitchen's. Printing a collection, 📄 Word and 📤 Share → web page start with the same contents and give each recipe its own heading; in Word and on the web page each line is a working link to its recipe and each recipe links back to the contents",

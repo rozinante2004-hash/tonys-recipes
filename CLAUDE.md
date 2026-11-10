@@ -1629,6 +1629,17 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
     window: `VIEW_WINS`, `viewSizeApply('linked')`), one size kept for both. Self Test `linked_window_like_own` (same
     width as one's own for the same recipe, a grip in the corner, a drag, the size shared, none on a phone); knock-outs
     (no grip, 600 px) fail it. Screen at 1280 px checked.
+  - **v39.59 — Help and the reconstruction prompt brought up to date with v39.52–v39.58.** Tony, 10 Nov 2026: "Please
+    also update the Help with all the new features and the reconstruction prompt". Help ("What can this app do"): the
+    contents list at the top of a collection (also in print/Word/shared copies), links between recipes (🔗 in the
+    editor, Ctrl+K, ← Back), a linked kitchen's recipe window as wide and resizable as one's own, 🗑️ Ask an admin to
+    delete (and the admins' list of requests), gathering into a collection by anyone who may edit, and the chats line
+    (what the kitchen already has is left out; written recipes shown too). Two Help suggestions ("Link recipes?",
+    "Make a collection?") and a help-assistant line on a recipe deleted on one device that another still shows (from
+    v39.57; 🧽 Reset this device… as the way out). RECONSTRUCTION_PROMPT.md: the core sections (§4d `deleteAsks`,
+    `movedOn`/`recipeGone`; §5 `links`, `gathered`/`movedInto`; deleting, the index and moves; §8 the contents list,
+    links, the linked window, the editor's 🔗) and the version. 7 new phrases translated into all 11 languages (gaps 0).
+    Self Tests 459 passed, 0 failed, 7 skipped.
   - **Planned for Tuesday 10 Nov 2026, after 11:00 Israel time — NOT before** (Tony, 7 Nov 2026, ~00:45: "as I am
     already at 75% of my weekly quota, I would like you to only log the request and plan it for Tuesday, after 11:00,
     when it resets"; a reminder into this session is scheduled for 11:05, trig_019vabk7G3ZPSwUAMaDctuxi). Two features:

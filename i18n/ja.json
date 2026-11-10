@@ -3166,6 +3166,13 @@
   "🗑️ Ask an admin to delete": "🗑️ 管理者に削除を頼む",
   "🗑️ Delete it": "🗑️ 削除する",
   "🗑️ Requests to delete": "🗑️ 削除の依頼",
-  "🗑️ {1} request(s) to delete recipes — tap to see them.": "🗑️ レシピ削除の依頼が {1} 件あります。タップして確認。"
+  "🗑️ {1} request(s) to delete recipes — tap to see them.": "🗑️ レシピ削除の依頼が {1} 件あります。タップして確認。",
+  "A collection opens with its contents — tap a recipe’s name to jump to it, and ↑ Contents to come back.": "コレクションは目次から開きます。レシピ名をタップするとそこへ移動し、↑ 目次 で戻れます。",
+  "A linked household’s recipe opens just like yours — as wide, and on a computer you can drag its corner to make it bigger.": "リンクした家庭のレシピも自分のレシピと同じように開きます。同じ幅で、パソコンでは角をドラッグして大きくできます。",
+  "Find the recipes hiding in your WhatsApp group chats — the links and the recipes written out — leaving out the ones you already have.": "WhatsAppのグループチャットに埋もれたレシピを見つけます。リンクも、メッセージに書かれたレシピも。すでに持っているものは除きます。",
+  "Link recipes?": "レシピをリンクしますか？",
+  "Link words in one recipe to another — “tahini sauce” opens your tahini sauce recipe, and ← Back returns.": "あるレシピの言葉を別のレシピにリンクできます。「タヒニソース」で自分のタヒニソースのレシピが開き、← 戻る で戻れます。",
+  "Make a collection?": "コレクションを作りますか？",
+  "Someone who may not delete recipes asks an admin with one tap — 🗑️ Ask an admin to delete.": "レシピを削除できない人は、ワンタップで管理者に頼めます — 🗑️ 管理者に削除を頼む。"
  }
 }

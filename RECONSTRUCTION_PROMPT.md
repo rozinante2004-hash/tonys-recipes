@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v39.58` — app. **Worker: v102**, deployed separately and versioned separately
+**Current version:** `v39.59` — app. **Worker: v102**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -1646,6 +1646,17 @@ removes it from their own device but **cannot** remove the cloud documents, so i
 their next sync. `flushCloudDeletes` reports the refusal into Sync Health rather than letting it
 look like a bug (§4b).
 
+**Since v39.55 the app does not offer them deleting at all** (`hhMayDelete()`: the owner and admins, as the rule):
+every 🗑️ reads "🗑️ Ask an admin to delete" and writes a request, `households/<hid>/deleteAsks/<uid>_<id>[_<part>]` =
+{ by, name, what: recipe | collection | part, rid, puid, title, at } — created by a member in their own name with
+exactly those keys, read by the asker and the owner/admins, never updated, deleted by the asker or the owner/admins
+(who answer in ··· More → 🏡 Kitchens and people → 🗑️ Requests to delete: one tap deletes, or keep it).
+**And moving is theirs (v39.58):** `movedOn(hid, id)` — an editor may delete `recipes/{id}` (or `secretRecipes/{id}`)
+whose `movedInto` names another recipe document that lists `id` in `gathered` (`existsAfter` guards each look-up);
+`recipeGone(hid, id)` — an editor may delete `photos/{id}` (or `secretPhotos/{id}`) once no recipe document `id` is
+left. Both are checked on the emulator (tests/firestore-households-rules.test.mjs) and end to end
+(tests/e2e-sync.mjs: a writer asks to delete; a writer gathers two recipes and splits them again).
+
 ### Firebase Storage — considered, built, and REMOVED in v34.4
 
 Storage requires the paid **Blaze** plan, which needs a billing account and offers only budget
@@ -1865,6 +1876,9 @@ must be checked against the empty string, because most character-class predicate
   cookLog: [{ id, at, rating, note }],  // 3.5 — one entry per cook, capped at 50
   history: [{...}],           // 3.4 — last 3 revisions. Travels in recipe_<id> (5.4), never in the legacy doc
   isClip: Boolean,            // "clip"/bookmark (no full recipe). The ONLY clip flag (2.3)
+  links: [{ t, to, h }],      // v39.53 — words of this recipe that lead to another recipe: t the words, to its uid,
+                              // h a linked kitchen's id when it is theirs. Only present when there are some; a
+                              // collection's parts carry their own. The text itself never changes (see §8).
   photoCredit: null | { name, url, license, source },  // v30.3 — REQUIRED for open-licence photos (Wikimedia Commons; Openverse before v38.45)
                               // photos: CC-BY makes attribution a licence condition, not a
                               // courtesy. Rendered under the hero by photoCreditHtml().
@@ -1953,6 +1967,16 @@ cloud, unreadable — has its own sentence and changes nothing (`refreshRecipeRe
 `tonys_cloud_deletes`, flushed by `flushCloudDeletes`), never inferred by diffing the cloud
 against memory — a partial read would otherwise look exactly like a mass deletion. Undo takes
 the id back off the queue. Deleting removes `recipe_<id>` *and* `photo_<id>`.
+**The index must drop what was deleted (v39.57):** the save flushes deletions BEFORE it writes the index
+(`writeCloudMeta`, which merges the cloud's own `ids`), and the flush takes each id off the queue as it goes — so
+`flushCloudDeletes` returns `deleted` and `writeCloudMeta(list, nextId, db, gone)` removes those ids. Without it the
+deleted id stayed listed and every OTHER device kept its copy for ever (found end to end, v39.57).
+**Moving is not deleting (v39.58):** a recipe gathered into a collection (and a collection split or a gathering
+undone) leaves the cloud by `queueCloudMove(id, into)` — `_pendingCloudMoves`, localStorage `tonys_cloud_moves`. The
+document it moved into is written with `gathered: [ids]` (by `saveRecipeDoc`, earlier in the same save); the flush
+(`cloudMoveOut`) sets `movedInto: '<into>'` on the original, then deletes it. The rules let anyone who edits do that
+for a document so marked and so listed (§4d) — so a member who may not delete can still make collections, with no
+request and no refusal.
 
 **Sync event log (v35.4):** an **opt-in, off-by-default** record of what sync did — loads,
 saves, refused writes, refreshes, photo sync, sign-in, errors — in `localStorage` under
@@ -2276,7 +2300,20 @@ action bar: ✏️ Edit · 🍳 Cooked! · 🌐 Translate · 📊 Excel · 📄 
 🛒 Send to Bring! · (📸 Show/🗑️ Remove Original when an `originalPhoto` exists). Opening a recipe
 records it in `recent_views` and requests a **screen wake lock** (re‑acquired on visibility).
 
-**Add/Edit modal (`openAddModal`/`saveRecipe`)**: name, emoji picker (first 14 of `EMOJIS`),
+**A collection (v39.52)** opens with 📑 Contents (`collectionTocHtml`: each line a link that jumps to its recipe,
+`collJump`) and each recipe has "↑ Contents"; drawn from the parts every time; the same in print, the shared web page
+and Word (internal hyperlinks to bookmarks). **Links between recipes (v39.53):** the words of a recipe's `links` are
+drawn as links (`rlPrep` once per recipe, `rlHtml` per line — only links whose recipe exists now, so a deleted one
+reads as plain words and Undo revives it); a tap (`recipeLinkGo`) opens the recipe it leads to — one inside a
+collection: the collection, at it; a linked kitchen's: in its window — with "← Back" beside ✕ (`_rlBack`).
+**A linked kitchen's recipe (`linkedViewOverlay`, also a sent one) (v39.58)** opens exactly as wide (900 px with two
+columns) and with the same corner grip as one's own (`VIEW_WINS`, `viewSizeApply('linked')`, one saved size).
+**Whoever may not delete (v39.55)** sees "🗑️ Ask an admin to delete" in place of 🗑️ Delete.
+
+**Add/Edit modal (`openAddModal`/`saveRecipe`)** — since v39.53 with 🔗 (beside B in both toolbars and beside Notes)
+and Ctrl+K / ⌘K: the marked words → a searchable list of every recipe (own, inside collections, linked kitchens';
+`rlCandidates`) → one pick makes a link; the recipe's links are listed under the Notes with ✕, and saving keeps only
+those whose words are still there (`rlKeepUsed`). name, emoji picker (first 14 of `EMOJIS`),
 photo upload (compressed via `compressPhotoToDataUrl`), category, difficulty, prep, servings, an
 **ingredient table** (`addIngRow`/`syncIngsTextarea`/`loadIngsTable` — amount + name rows kept in
 sync with a hidden textarea), a steps textarea (one step per line), diet tag buttons

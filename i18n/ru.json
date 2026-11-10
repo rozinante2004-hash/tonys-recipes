@@ -3157,6 +3157,13 @@
   "🗑️ Ask an admin to delete": "🗑️ Попросить администратора удалить",
   "🗑️ Delete it": "🗑️ Удалить",
   "🗑️ Requests to delete": "🗑️ Запросы на удаление",
-  "🗑️ {1} request(s) to delete recipes — tap to see them.": "🗑️ Запросов на удаление рецептов: {1} — нажмите, чтобы посмотреть."
+  "🗑️ {1} request(s) to delete recipes — tap to see them.": "🗑️ Запросов на удаление рецептов: {1} — нажмите, чтобы посмотреть.",
+  "A collection opens with its contents — tap a recipe’s name to jump to it, and ↑ Contents to come back.": "Коллекция открывается с содержанием — нажмите на название рецепта, чтобы перейти к нему, и на ↑ К содержанию, чтобы вернуться.",
+  "A linked household’s recipe opens just like yours — as wide, and on a computer you can drag its corner to make it bigger.": "Рецепт связанной кухни открывается так же, как ваш, — той же ширины, а на компьютере его угол можно потянуть, чтобы увеличить.",
+  "Find the recipes hiding in your WhatsApp group chats — the links and the recipes written out — leaving out the ones you already have.": "Найдите рецепты, спрятанные в переписке WhatsApp, — ссылки и рецепты, написанные прямо в сообщениях, — кроме тех, что у вас уже есть.",
+  "Link recipes?": "Связать рецепты?",
+  "Link words in one recipe to another — “tahini sauce” opens your tahini sauce recipe, and ← Back returns.": "Свяжите слова одного рецепта с другим — «соус тахини» открывает ваш рецепт соуса тахини, а ← Назад возвращает.",
+  "Make a collection?": "Создать коллекцию?",
+  "Someone who may not delete recipes asks an admin with one tap — 🗑️ Ask an admin to delete.": "Тот, кому нельзя удалять рецепты, просит администратора одним нажатием — 🗑️ Попросить администратора удалить."
  }
 }
