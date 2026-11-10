@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.62 -->
+<!-- Tony's Recipes Collection v39.63 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -11066,7 +11066,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.62';
+var APP_VERSION = 'v39.63';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -13010,7 +13010,7 @@ body:has(.modal-overlay.open) #pwaIosBanner, body:has(#askOverlay) #pwaIosBanner
    collection-level row at the bottom, because "Share" meaning one recipe and
    "Share" meaning all ten look identical otherwise. */
 .part-actions { margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--border); }
-.part-actions-label { font-size: 10.5px; letter-spacing: 0.6px; text-transform: uppercase;
+.part-actions-label { font-size: 12px; letter-spacing: 0.6px; text-transform: uppercase;
   color: var(--muted); margin-bottom: 6px; font-weight: 600; }
 .coll-toc { margin: 4px 0 16px; padding: 12px 16px 10px; border: 1px solid var(--border); border-radius: 12px; background: var(--card-bg); scroll-margin-top: 72px; }
 .coll-toc-title { font-family: 'Playfair Display', 'Frank Ruhl Libre', serif; font-weight: 700; font-size: 15px; color: var(--heading); margin-bottom: 6px; }
@@ -13019,6 +13019,13 @@ body:has(.modal-overlay.open) #pwaIosBanner, body:has(#askOverlay) #pwaIosBanner
 .coll-toc a, a.coll-top { color: var(--terracotta); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
 a.coll-top { flex-shrink: 0; font-size: 12px; white-space: nowrap; padding: 2px 0; }
 [data-coll-part] { scroll-margin-top: 72px; }
+/* v39.63 (audit, 10 Nov 2026) — on a phone the part's "↑ Contents" cleared of the sticky ✕ it scrolled under; the
+   translate window's From and To one under the other ("🔍 Auto-detect" was cut to "Auto-dete" side by side) */
+@media (max-width: 600px) {
+  a.coll-top { margin-inline-end: 44px; }
+  #translateOverlay .tr-grid { grid-template-columns: 1fr !important; }   /* (the grid's own style is inline) */
+  #translateOverlay .tr-arrow { display: none; }
+}
 /* v39.53 — words that lead to another recipe look like a web link; ← Back beside ✕; the picker; the editor's list */
 a.rlink { color: var(--terracotta); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
 a.rlink:hover { text-decoration-thickness: 2px; }
@@ -14574,7 +14581,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.62</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.63</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14662,7 +14669,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.62</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.63</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -15353,7 +15360,7 @@ body.banner-shown .header {
       <div style="font-size:12px;color:var(--muted);margin-top:4px;">Translate to any language — source language is detected automatically.</div>
     </div>
     <div class="modal-body">
-      <div style="display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;margin-bottom:12px;">
+      <div class="tr-grid" style="display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;margin-bottom:12px;">
         <div>
           <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:0.5px;text-transform:uppercase;margin-bottom:4px;" id="translateFromLbl">From</div>
           <select id="translateFrom" class="form-select" style="width:100%;" aria-labelledby="translateFromLbl">
@@ -15380,7 +15387,7 @@ body.banner-shown .header {
 <option value="yi">יידיש Yiddish</option>
           </select>
         </div>
-        <div style="font-size:20px;color:var(--muted);padding-top:18px;">→</div>
+        <div class="tr-arrow" style="font-size:20px;color:var(--muted);padding-top:18px;">→</div>
         <div>
           <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:0.5px;text-transform:uppercase;margin-bottom:4px;" id="translateToLbl">To</div>
           <select id="translateTo" class="form-select" style="width:100%;" aria-labelledby="translateToLbl">
@@ -15481,7 +15488,6 @@ body.banner-shown .header {
         <button class="share-app-btn share-whatsapp-app" onclick="shareAppWhatsApp()">💬 WhatsApp</button>
         <button class="share-app-btn share-copy-link" onclick="copyAppLink()">📋 Copy link</button>
       </div>
-      <div style="font-size:11px;color:var(--muted);text-align:center;margin-top:6px;">Scan QR code to open on another device</div>
       </div>
       <div style="font-size:12px;color:var(--muted);margin-top:14px;line-height:1.6;">
         <strong>📱 To install on iPhone:</strong> Open link in Safari or Chrome → tap Share → "Add to Home Screen"<br>
@@ -33794,9 +33800,14 @@ window.swUpdateNow = swUpdateNow;
 // household that arrives through it says who brought it (the management app's
 // "Shared the app"; rewards for sharing come later).
 function appShareUrl() {
-  var url = window.location.origin + window.location.pathname.replace(/\/$/, '');
+  // v39.63 (audit, 10 Nov 2026) — the copy's own address (as inviteLink), never this page's path: opened at
+  // /index.html the link was "…/index.html/?ref=…", which serves the app at the wrong base (its files, the service
+  // worker's scope). The copy's address is in its settings; a page served elsewhere (a local server) uses its own.
+  var site = (typeof appConfigValue === 'function' && appConfigValue('siteUrl'))
+    || (window.location.origin + window.location.pathname.replace(/index\.html$/, ''));
+  site = String(site).replace(/\/?$/, '/');
   var code = (typeof _household !== 'undefined' && _household && _household.code) || '';
-  return code ? url + '/?ref=' + code : url;
+  return code ? site + '?ref=' + code : site;
 }
 window.appShareUrl = appShareUrl;
 async function openShareAppModal() {
@@ -35805,12 +35816,14 @@ async function askHelp() {
     var answer=await aiCall(q+'\n\nBe concise.',500,null,AI_MODEL_SMALL,helpSystemPrompt());
     answer=answer.trim(); answerEl.innerHTML='';
     var lines=answer.split('\n');
+    // v39.63 (audit) — 🔍 Details beside each numbered or bulleted step; an answer with no steps keeps one per line
+    var stepRe=/^\s*(\d+[.)]|[-*\u2022]|\(\d+\))\s+/, hasSteps=lines.some(function(l){ return stepRe.test(l); });
     lines.forEach(function(line) {
       if(!line.trim()) return;
       var row=document.createElement('div'); row.style.cssText='display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;';
       var lineText=document.createElement('div'); lineText.style.cssText='flex:1;font-size:13px;line-height:1.6;color:var(--ink);padding-top:4px;'; lineText.setAttribute('dir','auto'); lineText.setAttribute('data-no-i18n',''); lineText.innerHTML=helpLineHtml(line);
       row.appendChild(lineText);
-      if(line.trim().length>15 && !line.trim().endsWith(':')) {
+      if(line.trim().length>15 && !line.trim().endsWith(':') && (!hasSteps || stepRe.test(line))) {
         var btn=document.createElement('button'); btn.style.cssText='flex-shrink:0;padding:4px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;font-family:DM Sans,Heebo,sans-serif;font-size:11px;color:var(--muted);cursor:pointer;white-space:nowrap;'; btn.textContent='🔍 Details';
         (function(topic){ btn.onclick=function(){ showHelpDetail(topic,q); }; })(line.trim().replace(/^#+\s*/,'').replace(/\*\*/g,''));
         row.appendChild(btn);

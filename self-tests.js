@@ -11767,6 +11767,45 @@ window.SELF_TESTS = [
       }
     } },
 
+  // v39.63 — the audit of 10 Nov 2026: four small things found on the screen walk
+  { id:'share_link_is_the_copys_address', group:'Sharing', name:'🔗 Share this app: the link is this copy’s own address with the kitchen’s identifier — never this page’s path (opened at /index.html it was “…/index.html/?ref=…”, an address that serves the app at the wrong base) (v39.63)',
+    test: async()=>{
+      var real={ hh:_household };
+      try{
+        _household={ hid:'hT', name:'T', role:'owner', code:'MKN-AAAA-2222' };
+        var u=appShareUrl(), site=String(appConfigValue('siteUrl')||'').replace(/\/?$/,'/');
+        if(!site) throw new Error('this copy has no siteUrl');
+        if(u!==site+'?ref=MKN-AAAA-2222') throw new Error('the link: '+u+' (expected '+site+'?ref=…)');
+        if(/index\.html/.test(u)) throw new Error('the page’s path is in the link: '+u);
+        _household={ hid:'hT', name:'T', role:'owner' };
+        if(appShareUrl()!==site) throw new Error('without an identifier: '+appShareUrl());
+        return u;
+      } finally { _household=real.hh; }
+    } },
+  { id:'help_details_on_steps', group:'UI', name:'💬 A help answer offers 🔍 Details beside its numbered steps, not beside its heading or its closing sentence; an answer with no steps keeps one per line (v39.63)',
+    test: async()=>{
+      var real={ ai:window.aiCall, toast:window.toast };
+      var buttons=function(){ return Array.prototype.filter.call(document.querySelectorAll('#helpAnswer button'), function(b){ return /Details/.test(b.textContent); }); };
+      var wait=async function(n){ for(var w=0; w<60 && buttons().length<n; w++) await new Promise(function(r){ setTimeout(r,50); }); };
+      try{
+        window.toast=function(){};
+        window.aiCall=async function(){ return '**Link one recipe to another**\n\n1. Open the recipe and tap ✏️ Edit.\n2. Select the words and tap 🔗.\n3. Pick the recipe and save.\n\nThe words become a link; ← Back returns you.'; };
+        openHelp(); askHelpQ('How do I link one recipe to another?'); await wait(3); await new Promise(function(r){ setTimeout(r,120); });
+        var b=buttons();
+        if(b.length!==3) throw new Error('an answer with three steps got '+b.length+' Details buttons');
+        var rows=b.map(function(x){ return x.parentNode.textContent.replace(/Details/,'').trim().slice(0,2); });
+        if(rows.join()!=='1.,2.,3.') throw new Error('the buttons are not beside the steps: '+rows.join(' | '));
+        window.aiCall=async function(){ return 'Open ⚙️ Settings and tap Accessibility, then choose the ring you like best.'; };
+        askHelpQ('How do I change the ring?'); await wait(1); await new Promise(function(r){ setTimeout(r,120); });
+        if(buttons().length!==1) throw new Error('an answer with no steps got '+buttons().length+' Details buttons');
+        return 'three steps → three Details; no steps → one';
+      } finally {
+        window.aiCall=real.ai; window.toast=real.toast;
+        var ov=document.getElementById('helpOverlay'); if(ov) ov.classList.remove('open');
+        var a=document.getElementById('helpAnswer'); if(a) a.innerHTML='';
+      }
+    } },
+
   { id:'newcomer_sees_the_app_name', group:'UI', name:'👋 A newcomer meets My Kitchen Notes: the sign-in screen and the window say the app\u2019s name (never the family\u2019s) outside the family copy; the welcome never offers to go where it already is; a wrong password says the way forward and is not an error (v38.47)',
     test: async()=>{
       var logo=document.querySelector('.login-logo'), env=APP_CONFIG.environment;

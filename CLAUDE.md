@@ -1714,6 +1714,42 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
     prompt say so. No new phrases. (The first full run caught the new test leaving a stand-in signed-in user behind when
     it failed — three later tests then altered the sync keys; the user is now restored in `finally`.) Self Tests 461
     passed, 0 failed; the other local checks and the Worker tests pass.
+  - **Released: v39.60–v39.62 + Worker v104 to the family's copy and the beta (11 Nov 2026, 00:22 Israel time, on
+    7adfd86; Tony, 10 Nov: "Then release the latest build to family and beta when green").** Green first on test:
+    3fe4519 (v39.60: Cloudflare Pages for test 15:41, Self Tests 16:00), cd96e4d (v39.61 + Worker v103: Deploy the
+    Worker 16:07 "live: v103, published: v103", Cloudflare 16:07, Self Tests 16:25), c062acd (v39.62 + Worker v104:
+    Deploy the Worker 17:31 "live: v104", Cloudflare 17:31 — **its Self Tests failed on CI**: the new red-dot test left
+    the 10-second "new invitation requests" notice timer behind, and it fired into `feat_switches_off_means_off`, which
+    counts notices; the timer is now one, cleared by the test and silent while a Self Test runs), 7adfd86 (the fix:
+    Cloudflare 17:34, Self Tests 19:52). main and beta fast-forwarded (2cca6b1 / 99558ae → 7adfd86). Every job
+    success: Cloudflare Pages for the beta (00:23); on main: Deploy to GitHub Pages and pages build (00:23), Deploy
+    the Worker (00:23 — v104 was live for every copy since 17:31), Translate new phrases (00:27), Publish languages
+    (00:27 — 4bcc3fa on main, test fast-forwarded; its Deploy to GitHub Pages and pages build 00:28), Self Tests on
+    main: running at 00:35 (its result is noted under v39.63's Test record below). No rules change in these three.
+    To tell Tony: the Worker (v103/v104) was live for the family and the beta from the test pushes — additive only.
+  - **v39.63 + AUDIT-2026-11-10.md — the audit of 10 Nov 2026 (Fable 5.1), and its safe fixes.** Tony: "Please run an
+    exhaustive audit on the code of the app, the worker and all relevant components for safety, security, usability,
+    visualization, functionality, potential cost reductions, and anything else you consider worth auditing. Also
+    consider potential improvements in all aspects. Please put the outcome of the above in a file with explanations on
+    how to implement each by Opus 5.5 and not necessarily by Fable." His answers: report + fix the safe ones, then
+    STOP and ask about the others; priorities usability/look → security/privacy → cost (only Anthropic is paid) → code
+    health; the beta continues for months. **The report:** AUDIT-2026-11-10.md — how it was checked (a walk of 31
+    screens × 4 variants with measurements, `tests/screen-walk.js`; the Worker's gate and every action; the rules
+    whole; the SW, the extension, the workflows; every AI call's cost; code-health numbers), the plan of action, each
+    finding with how Opus 5.5 implements it, and the 14 questions for Tony. **Fixed here (SAFE):** the share link is
+    the copy's own address (`appShareUrl` from `siteUrl`; it was the page's path — "…/index.html/?ref=…" when opened
+    at /index.html); Help's 🔍 Details beside the numbered steps only (not the heading and the closing sentence); the
+    translate window's From/To stacked on phones ("Auto-dete"); a collection part's "↑ Contents" 44 px clear of the
+    sticky ✕ on phones; the leftover "Scan QR code…" hint removed (the QR went in v38.29); "This recipe only" 12 px;
+    `_headers` for the Cloudflare copies (X-Frame-Options DENY, frame-ancestors 'none', nosniff, a referrer policy —
+    frame-ancestors cannot come from a <meta> policy; GitHub Pages takes no headers). Self Tests
+    `share_link_is_the_copys_address`, `help_details_on_steps` (both fail on the old code); every local check passes
+    (463 Self Tests). **Biggest findings (ASK):** CLAUDE.md is 742 KB ≈ 185k tokens read into every session (the
+    likeliest reason for today's three usage-limit stops — propose a rules file + monthly history); the recipe window
+    on a phone puts Ingredients ~740 px down; fetching/photo/video endpoints need only the public key (require a
+    sign-in); website imports ignore the page's own JSON-LD recipe (send it instead of 60 KB of text, or no AI at all);
+    the built page is 1,994 KB of its 2,000 KB budget; the Hebrew interface addresses the person four ways. The
+    scratchpad walk screenshots are not in the repository (tests/screen-walk.js remakes them).
   - **On Test, green (10 Nov 2026):** v39.60 on 3fe4519 (Cloudflare Pages for test 15:41, Self Tests 16:00); v39.61 +
     Worker v103 on cd96e4d (Deploy the Worker 16:07 — "live: v103, published: v103", live for every copy from then;
     Cloudflare Pages for test 16:07; Self Tests 16:25). Not yet on the family's copy or the beta: needs Tony's yes.

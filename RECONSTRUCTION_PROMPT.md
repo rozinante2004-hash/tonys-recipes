@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v39.62` — app. **Worker: v104**, deployed separately and versioned separately
+**Current version:** `v39.63` — app. **Worker: v104**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -793,6 +793,11 @@ invitation-only (unless adding to the tester's household)."
 - App: `householdMayFound()` = owner, or open, or `testerInvited(user)`. The welcome tells someone invited at
   another address to sign in with that one. Joining a tester's kitchen still works (its 14-day invitation link,
   being added by e-mail, a join request).
+- The share link (`appShareUrl`, v39.63): the copy's own address from its settings (`siteUrl`) + `?ref=<identifier>`,
+  never the page's path. `_headers` at the root (copied into every build): the Cloudflare copies answer with
+  `X-Frame-Options: DENY`, `Content-Security-Policy: frame-ancestors 'none'`, `nosniff`, a referrer policy (v39.63).
+- The help window's answers (`askHelp`): 🔍 Details beside numbered/bulleted steps only; an answer with no steps keeps
+  one per line (v39.63). `tests/screen-walk.js` walks every screen in four variants with screenshots and measurements.
 - **Share This App** (`openShareAppModal`, `shareAppClosed()`): while the copy is closed, everyone but the owner (any
   role) gets **✉️ Ask for an invitation for someone else** (v39.61, `openInviteForOther` → `inviteForOtherSend`):
   their e-mail address (checked; never one's own), their name and a word about them (both "if you like"), the

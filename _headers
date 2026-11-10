@@ -1,0 +1,9 @@
+# v39.63 (audit, 10 Nov 2026) — the Cloudflare Pages copies (the test copy, the beta) answer with these headers.
+# frame-ancestors cannot be set from the page's <meta> policy (browsers ignore it there), so the clickjacking guard
+# was the page's own script alone; now the browser refuses the framing before any script runs. GitHub Pages (the
+# family's copy) takes no headers; its guard stays the script. Nothing here changes what the page may load.
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Content-Security-Policy: frame-ancestors 'none'
+  Referrer-Policy: strict-origin-when-cross-origin
