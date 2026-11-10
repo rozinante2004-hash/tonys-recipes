@@ -196,18 +196,21 @@ try {
       // new key every month. v39.47 — nor anything else the app's own rule would no longer collect (i18nKeepable: a
       // date, code, or data — a credit, a recipe's line, another script's words), nor an old key holding a plain number
       // whose {1} form is in the same language (it can never be shown: the app turns every number into {n}), nor a name
-      // or stray line on tools/i18n-retired.json. Only ever for what the app no longer asks for.
+      // or stray line on tools/i18n-retired.json. v39.54 — nor a line a translated template of the same language answers
+      // whole ("🖼️ “Mushrooms” now uses Seasoned Mushrooms’s photo" beside "🖼️ “{1}” now uses {2}’s photo": the app shows
+      // it through the template, so the copy is never read). Only ever for what the app no longer asks for.
       const notAsked = Object.keys(strings).filter(k => !inApp.has(k));
-      const dated = new Set(await page.evaluate(([ks, all]) => {
+      const dated = new Set(await page.evaluate(([ks, dict]) => {
         if (typeof i18nKeepable !== 'function') return ks.filter(k => typeof i18nLooksLikeDate === 'function' && i18nLooksLikeDate(k));
-        const have = new Set(all);
+        const have = new Set(Object.keys(dict));
         return ks.filter(k => {
           if (!i18nKeepable(k)) return true;
+          if (typeof i18nTemplateCovers === 'function' && i18nTemplateCovers(k, dict)) return true;
           if (/\{\d+\}/.test(k) || !/\d/.test(k) || typeof i18nDeriveKey !== 'function') return false;
           const d = i18nDeriveKey(k, []).key;
           return d !== k && have.has(d);
         });
-      }, [notAsked, Object.keys(strings)]));
+      }, [notAsked, strings]));
       notAsked.forEach(k => { if (retiredKey(k)) dated.add(k); });
       const bad = Object.keys(strings).filter(k => ADDRESS.test(k) || ADDRESS.test(String(strings[k])) || named(k, strings[k]) || dated.has(k));
       if (!bad.length) break;

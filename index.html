@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.53 -->
+<!-- Tony's Recipes Collection v39.54 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -520,24 +520,45 @@
       return false;
     } catch (e) { return first; }
   }
+  // v39.54 — only time ON SCREEN counts. Tony's beta log, 8 Nov 2026: "cloud write did not finish in 90s — signIn" at
+  // 19:28, for a write begun at the 17:05 sign-in: a plain timer is frozen while the phone sleeps and fires the moment
+  // it wakes, so two hours in a pocket read as a 90-second stall. Now the count stops while the app is hidden and starts
+  // afresh when it is on screen again (the connection needs its moment then too); and a timer that comes back much later
+  // than it was set for (frozen with no "hidden" before) is taken as the same thing — a fresh 90 s.
   function withSyncWatchdog(promise, phase) {
-    var timer;
-    return Promise.race([
-      Promise.resolve(promise).then(function(v){ clearTimeout(timer); return v; },
-                                    function(e){ clearTimeout(timer); throw e; }),
-      new Promise(function(_, reject){
-        timer = setTimeout(function(){
-          var err = new Error('cloud ' + phase + ' did not finish in '
-            + Math.round(SYNC_WATCHDOG_MS / 1000) + 's');
-          err._syncTimeout = true; err._syncPhase = phase;
-          // syncLog is declared further down this same script; function
-          // declarations hoist, and this runs from a timer long after parse.
-          try { syncLog('error', 'Cloud ' + phase + ' timed out after '
-                + Math.round(SYNC_WATCHDOG_MS / 1000) + 's'); } catch(_) {}
-          reject(err);
-        }, SYNC_WATCHDOG_MS);
-      })
-    ]);
+    var timer = null, due = 0, settled = false, fail = null;
+    var onScreen = function(){ return !(typeof document !== 'undefined' && document.visibilityState === 'hidden'); };
+    function arm() {
+      clearTimeout(timer); timer = null;
+      if (settled || !onScreen()) return;
+      due = Date.now() + SYNC_WATCHDOG_MS;
+      timer = setTimeout(tick, SYNC_WATCHDOG_MS);
+    }
+    function tick() {
+      timer = null;
+      if (settled || !onScreen()) return;
+      if (Date.now() - due > 5000) { arm(); return; }   // asleep in between: not time the write was given
+      if (fail) fail();
+    }
+    function seen() { if (settled) return; if (onScreen()) arm(); else { clearTimeout(timer); timer = null; } }
+    function end() { settled = true; clearTimeout(timer); timer = null; try { document.removeEventListener('visibilitychange', seen); } catch(_) {} }
+    try { document.addEventListener('visibilitychange', seen); } catch(_) {}
+    return new Promise(function(resolve, reject) {
+      fail = function() {
+        end();
+        var err = new Error('cloud ' + phase + ' did not finish in '
+          + Math.round(SYNC_WATCHDOG_MS / 1000) + 's');
+        err._syncTimeout = true; err._syncPhase = phase;
+        // syncLog is declared further down this same script; function
+        // declarations hoist, and this runs from a timer long after parse.
+        try { syncLog('error', 'Cloud ' + phase + ' timed out after '
+              + Math.round(SYNC_WATCHDOG_MS / 1000) + 's on screen'); } catch(_) {}
+        reject(err);
+      };
+      Promise.resolve(promise).then(function(v){ if (settled) return; end(); resolve(v); },
+                                    function(e){ if (settled) return; end(); reject(e); });
+      arm();
+    });
   }
   window.withSyncWatchdog = withSyncWatchdog;
   window.SYNC_WATCHDOG_MS = SYNC_WATCHDOG_MS;
@@ -3472,9 +3493,25 @@ function releaseWakeLock() {
 // back while the app is on screen is asked for once more, and when it is refused the progress says what to do instead
 // (_importWakeRefused → spinnerLong).
 var _importWake = null, _importWakeHolds = 0, _importWakeRefused = false, _importWakeSaid = false, _importWakeRetried = false, _importWakeAsking = false;
+// v39.54 — Tony's beta log, 8 Nov 2026: "The phone would not keep the screen on during the import — NotAllowedError:
+// Permission was denied", on both imports that began by themselves from a shared link (no tap, so Safari would not).
+// Refused for want of a tap, it is asked again at the next touch of the screen (one listener while the import holds),
+// and meanwhile the progress says one tap keeps the screen on. Refused after a touch too: "now and then", as before.
+var _importWakeTouch = false, _importWakeTouchTried = false;
+function importAwakeOnTouch() {
+  importAwakeUntouch();
+  if (!_importWakeHolds || _importWake) return;
+  _importWakeTouchTried = true;
+  importAwakeTake();                               // inside the touch: the phone now may say yes
+}
+function importAwakeUntouch() {
+  if (!_importWakeTouch) return;
+  _importWakeTouch = false;
+  ['pointerdown', 'touchstart', 'keydown'].forEach(function(t){ document.removeEventListener(t, importAwakeOnTouch, true); });
+}
 async function importAwakeHold() {
   _importWakeHolds++;
-  if (_importWakeHolds === 1) { _importWakeSaid = false; _importWakeRetried = false; _importWakeRefused = false; }
+  if (_importWakeHolds === 1) { _importWakeSaid = false; _importWakeRetried = false; _importWakeRefused = false; _importWakeTouchTried = false; importAwakeUntouch(); }
   return importAwakeTake();
 }
 // Asks for the lock without counting a hold: the first hold, a return to the app, a lock the phone took back.
@@ -3501,17 +3538,27 @@ async function importAwakeTake() {
       }
     });
     if (!_importWakeHolds) { lock._mknOurs = true; try { lock.release(); } catch(e) {} _importWake = null; return; }   // the import ended meanwhile
+    var wasRefused = _importWakeRefused;
     _importWakeRefused = false;
     if (!_importWakeSaid) { _importWakeSaid = true; syncLog('import', 'The screen is kept on while the import runs'); }
+    else if (wasRefused && _importWakeTouchTried) syncLog('import', 'After a touch, the screen is kept on while the import runs');   // v39.54
   } catch(err) {
     _importWakeAsking = false;
     _importWakeRefused = true;
     if (!_importWakeSaid) { _importWakeSaid = true; syncLog('import', 'The phone would not keep the screen on during the import',
       ((err && err.name) || '') + ': ' + String((err && err.message) || err).slice(0, 160)); }
+    else if (_importWakeTouchTried) syncLog('import', 'The phone would not keep the screen on, even after a touch');
+    // v39.54 — refused for want of a tap: asked again at the next touch, once
+    if (err && err.name === 'NotAllowedError' && !_importWakeTouchTried && !_importWakeTouch && _importWakeHolds) {
+      _importWakeTouch = true;
+      ['pointerdown', 'touchstart', 'keydown'].forEach(function(t){ document.addEventListener(t, importAwakeOnTouch, true); });
+      syncLog('import', 'The screen lock is asked for again at the next touch of the screen');
+    }
   }
 }
 function importAwakeRelease() {
   _importWakeHolds = Math.max(0, _importWakeHolds - 1);
+  if (!_importWakeHolds) importAwakeUntouch();     // v39.54
   if (!_importWakeHolds && _importWake) { _importWake._mknOurs = true; try { _importWake.release(); } catch(e) {} _importWake = null; }
 }
 // …and a moment's wait for the app to be on the screen again (a phone resumes a stopped app only then).
@@ -3523,6 +3570,7 @@ function whenVisible() {
   });
 }
 window.importAwakeHold = importAwakeHold; window.importAwakeRelease = importAwakeRelease; window.importAwakeTake = importAwakeTake; window.whenVisible = whenVisible;
+window.importAwakeOnTouch = importAwakeOnTouch;
 
 // Re-acquire wake lock if page becomes visible again (iOS releases on background)
 document.addEventListener('visibilitychange', function() {
@@ -10794,7 +10842,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.53';
+var APP_VERSION = 'v39.54';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -14302,7 +14350,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.53</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.54</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14390,7 +14438,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.53</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.54</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -17953,6 +18001,36 @@ function i18nAsk(s) {
 }
 window.i18nPatternsFromDict = i18nPatternsFromDict; window.i18nAsk = i18nAsk;
 
+// v39.54 — A LINE A STORED TEMPLATE ALREADY ANSWERS IS NOT A MISSING PHRASE. The app's publish of 7 Nov 2026 (c3f4d88)
+// brought "🖼️ “Mushrooms” now uses Seasoned Mushrooms’s photo" into Hebrew, beside "🖼️ “{1}” now uses {2}’s photo" — in
+// the file since 27 Sep, and matching it today: a device had noted the line when its templates were not loaded (or long
+// ago), and every later look-up found it answered, but the note stayed on the list it sends. The templates of a
+// dictionary (its translated keys holding {n}, to i18nPatternsFromDict's bar), and whether one of them matches a line
+// whole. The missing list drops such a line as it is read (i18nLoadMissing) and as it is noted (i18nNoteMissing);
+// i18nGapList leaves it out of what is sent unless the app itself asks for that exact line; and the release job
+// (tools/translate-new.mjs) takes a stored one out of the shared translations when the app no longer asks for it.
+var _i18nTpl = { dict: null, n: -1, list: [] };
+function i18nTemplatesOf(dict) {
+  var n = dict ? Object.keys(dict).length : 0;
+  if (_i18nTpl.dict === dict && _i18nTpl.n === n) return _i18nTpl.list;
+  var list = [];
+  Object.keys(dict || {}).forEach(function(k) {
+    if (!dict[k] || !/\{\d+\}/.test(k) || k.length > I18N_MAX_LEN) return;
+    var lit = k.replace(/\{\d+\}/g, '');
+    if (lit.length < 8 || !/[A-Za-z]{3}/.test(lit)) return;
+    var rx = i18nPatternRegex(k);
+    if (rx) list.push({ pat: k, re: rx });
+  });
+  _i18nTpl = { dict: dict, n: n, list: list };
+  return list;
+}
+function i18nTemplateCovers(k, dict) {
+  k = String(k == null ? '' : k);
+  if (!k || !dict) return false;
+  return i18nTemplatesOf(dict).some(function(t){ return t.pat !== k && t.re.test(k); });
+}
+window.i18nTemplatesOf = i18nTemplatesOf; window.i18nTemplateCovers = i18nTemplateCovers;
+
 // ─── STRINGS THE CODE COMPOSES FOR ITSELF (v36.38) ───────────────────────────
 // Last resort, and deliberately short. Everything above finds strings by
 // looking — at the DOM, or at the source of a toast() call. A handful are
@@ -17972,6 +18050,8 @@ var I18N_EXTRA = [
   'Mark words on one line', 'Mark a few words, not a whole sentence', '\uD83D\uDD17 Linked to \u201C{1}\u201D',
   // v39.52 — a collection's contents (drawn only for a collection, which no harvest opens)
   '\uD83D\uDCD1 Contents', '\u2191 Contents', 'Back to the contents', 'Contents',
+  // v39.54 — under the progress while the screen lock waits for a tap
+  '\uD83D\uDCF1 Keep the app open, and tap the screen once \u2014 then it stays on until the import finishes.',
   // v39.50 — under the progress when the phone would not keep the screen on
   '\uD83D\uDCF1 Keep the app open, and touch the screen now and then \u2014 this phone would not keep it on by itself (Low Power Mode does that).',
   // v39.49 — under the progress while several recipes are read (spinnerLong)
@@ -18364,7 +18444,8 @@ function i18nLoadMissing(lang) {
   try {
     var raw = localStorage.getItem(i18nMissKey(lang));
     if (raw) JSON.parse(raw).forEach(function(s){
-      if (i18nKeepable(s)) _i18nMissing[s] = 1; else dropped++;
+      // v39.54 — nor a line the dictionary's templates answer (noted when they were not loaded)
+      if (i18nKeepable(s) && !(_i18nDict && i18nTemplateCovers(s, _i18nDict))) _i18nMissing[s] = 1; else dropped++;
     });
   } catch(e) {}
   // Rewrite it, so the clean-up happens once rather than on every load.
@@ -18384,6 +18465,7 @@ function i18nNoteMissing(src) {
   if (!src || _i18nMissing[src]) return;
   if (!i18nKeepable(src)) return;          // never record what we would not send
   if (i18nIsKitchenData(src)) return;      // v39.47 — nor this kitchen's own words (a recipe's name, a credit)
+  if (_i18nDict && i18nTemplateCovers(src, _i18nDict)) return;   // v39.54 — nor a line a template already answers
   // A string the dictionary answers with the English itself is not missing —
   // rule 7 of the prompt asks the model to do exactly that for proper nouns.
   _i18nMissing[src] = 1;
@@ -19945,7 +20027,8 @@ function i18nGapList(dict, missing, catalogue) {
   (catalogue || i18nFullCatalogue()).forEach(function(s){ inApp[s] = 1; if (!dict || !dict[s]) gaps[s] = 1; });
   // Belt and braces: nothing is ever SENT that would not be recorded — v39.47: nor this kitchen's own words (a recipe's
   // name, a credit) recorded on a device before the app knew to leave them out; an app phrase is sent whatever it says.
-  return Object.keys(gaps).filter(function(k){ return i18nKeepable(k) && !selfTest[k] && (inApp[k] || !i18nIsKitchenData(k)); }).sort();
+  // v39.54 — nor a line a translated template of this dictionary already answers (unless the app asks for that very line)
+  return Object.keys(gaps).filter(function(k){ return i18nKeepable(k) && !selfTest[k] && (inApp[k] || (!i18nIsKitchenData(k) && !i18nTemplateCovers(k, dict))); }).sort();
 }
 async function i18nFillGaps(lang) {
   lang = lang || _i18nLang;
@@ -27514,7 +27597,9 @@ function spinner(msg) {
 // v39.49 — while several recipes are read one after another: a phone stops the app while its screen is off.
 function spinnerLong(msg) {
   return spinner(msg) + '<div style="font-size:12px;color:var(--muted);text-align:center;margin-top:6px;line-height:1.5;">'
-    + (_importWakeRefused   // v39.50 — the phone would not keep the screen on: what to do instead
+    + (_importWakeTouch     // v39.54 — refused for want of a tap: one tap is enough
+      ? '\uD83D\uDCF1 Keep the app open, and tap the screen once \u2014 then it stays on until the import finishes.'
+      : _importWakeRefused  // v39.50 — the phone would not keep the screen on: what to do instead
       ? '\uD83D\uDCF1 Keep the app open, and touch the screen now and then \u2014 this phone would not keep it on by itself (Low Power Mode does that).'
       : '\uD83D\uDCF1 Keep the app open until it finishes \u2014 a phone pauses it while the screen is off.') + '</div>';
 }
@@ -35220,7 +35305,7 @@ var HELP_SYSTEM_PROMPT = [
   "- The interface language: tap 🌐 next to ? — the app's words change; recipes stay as written. The app speaks English, Hebrew, Arabic, Russian, French, Spanish, German, Italian, Portuguese, Chinese, Japanese and Hungarian, and any language someone adds (🌐 → ➕ Add a language… — translated once, then everyone has it). On a new device whose own language the app speaks, it asks once, before the setup: that language or English (a Hungarian phone is asked Magyar or English) — so the setup, the kitchen rules and the welcome come in that language too",
   "- 🔗 LINKS BETWEEN RECIPES (v39.53): words in a recipe can lead to another recipe — say 'tahini sauce' in the falafel's ingredients to your Tahini sauce recipe. In ✏️ Edit, mark the words (in an ingredient, the Method or the Notes), then tap 🔗 (beside B above the Steps box, beside + Add ingredient, or beside Notes) or press Ctrl+K (⌘K on a Mac). A list of all your recipes opens — the recipes inside your collections, and the linked kitchens' recipes too — with a search box at the top; tap one and the words are a link. The links are listed under the Notes (🔗 Links to other recipes), each with ✕ to remove it. In the recipe the words look like a web link, wherever they appear in it; tap one and that recipe opens (a recipe inside a collection: the collection, at that recipe), with ← Back at the top to return to where you were. If the recipe it leads to is deleted, or a linked kitchen stops sharing it, the words show as plain words; they work again if it comes back (↩︎ Undo). The recipe's text itself does not change, so search, printing, Word, sharing and Bring! see the words as before",
   "- 📑 A COLLECTION'S CONTENTS (v39.52): every collection opens with its contents — the list of its recipes, in order; tap a line to jump to that recipe, and each recipe has ↑ Contents at its top right to jump back. It always shows the collection as it is now (a recipe added, removed, made its own or split off changes it at once), in your own collections and in a linked kitchen's. Printing a collection, 📄 Word and 📤 Share → web page start with the same contents and give each recipe its own heading; in Word and on the web page each line is a working link to its recipe and each recipe links back to the contents",
-  "- A PAGE THAT LINKS TO ITS RECIPES (v39.48): some recipe round-ups (a list of 20 or 30 dishes, each a name, a line and a 'to the recipe' link) do not hold the recipes themselves. 🔗 From URL (or sharing the page to the app) then opens each recipe's own page and brings them all in as one 📚 collection — up to 30 at a time; if the page links to more, the preview says how many more, and those can be added one at a time from their own pages. It takes a minute or two for a long list ('Opening recipe 7 of 29…'). If it ever finds nothing, the log says why — copy it and send it. (v39.49) While several recipes are read, the screen stays on by itself — keep the app open until it finishes: a phone stops the app while its screen is off or another app is in front, and the import goes on from where it stopped when you come back; a recipe page cut off by that is read again. (v39.50) Some phones will not keep the screen on — Low Power Mode is the usual reason: the progress then says so, and touching the screen now and then keeps it awake; the log says whether the screen was kept on",
+  "- A PAGE THAT LINKS TO ITS RECIPES (v39.48): some recipe round-ups (a list of 20 or 30 dishes, each a name, a line and a 'to the recipe' link) do not hold the recipes themselves. 🔗 From URL (or sharing the page to the app) then opens each recipe's own page and brings them all in as one 📚 collection — up to 30 at a time; if the page links to more, the preview says how many more, and those can be added one at a time from their own pages. It takes a minute or two for a long list ('Opening recipe 7 of 29…'). If it ever finds nothing, the log says why — copy it and send it. (v39.49) While several recipes are read, the screen stays on by itself — keep the app open until it finishes: a phone stops the app while its screen is off or another app is in front, and the import goes on from where it stopped when you come back; a recipe page cut off by that is read again. (v39.50) Some phones will not keep the screen on — Low Power Mode is the usual reason: the progress then says so, and touching the screen now and then keeps it awake; the log says whether the screen was kept on (v39.54) An import that starts by itself from a shared link has had no tap yet, and a phone gives the screen lock only after one: the progress then says to tap the screen once, and that tap keeps it on until the import finishes.",
   "- WHAT THE TRANSLATIONS HOLD (v39.47): only the app's own words. A recipe's name, a by-line, servings and time, a photographer's credit, the words someone searched for, names and e-mail addresses are never sent to be translated and never kept in the shared translations — the screens that show them mark them as data, and the app refuses anything that looks like data (another alphabet in an English phrase, a © credit, a recipe's own name). On a release, GitHub takes out of the shared translations whatever the app no longer asks for and would not collect today (dates, code, credits, recipe lines, old copies of a phrase with a number in it), and the published language files and their kept versions never hold a name. So the ✏️ Edit translations list stays the app's words, and nothing has to be cleaned by hand. A recipe inside a collection shows its servings and time as the open recipe does (🍽 4 · ⏱ 20 min); a photo credit reads 'Photo: <who> · <licence> · <library>'; after 🔄 Update all supported languages the message gives totals ('🔄 11 language(s) up to date, 24 phrase(s) added — shared with everyone'), and which language got how many is in the log",
   "- (The app's owner) Correcting a translation: in My Kitchen Notes (the copy that holds the translations), switch the interface to that language, then 🌐 → ✏️ Edit translations…, change the words and press 💾 Save — it must say '✅ <language> saved and shared with everyone' — then 🌐 → 🚀 Publish languages now (every copy has it within about ten minutes). What you change is kept on this device until it is shared: closing the window, restarting the app or signing out does not lose it, and the editor brings it back. If Save cannot share it, it says why — usually this device's sign-in: sign out, sign in again with Google and your authenticator's 6-digit code, open the editor and press Save. A Save writes only what you changed, onto the newest shared copy, and the automatic translation of new phrases only fills in what is missing — it never replaces a correction. The same wording wrong in many places (e.g. a menu's name inside many sentences): 🔁 Replace… beside the search — what is in the search box is offered as the words to find; untick the rows that should stay, press 🔁 Replace in N, then 💾 Save",
   "- ✦ All clears the filters; the sort stays as chosen (⇅ Sort), and starts newest first each time the app is opened"

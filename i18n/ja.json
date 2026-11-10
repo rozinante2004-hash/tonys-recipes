@@ -3138,6 +3138,7 @@
   "← Back": "← 戻る",
   "🔗 Link to a recipe": "🔗 レシピにリンク",
   "🔗 Linked to “{1}”": "🔗「{1}」にリンクしました",
-  "🔗 Links to other recipes": "🔗 ほかのレシピへのリンク"
+  "🔗 Links to other recipes": "🔗 ほかのレシピへのリンク",
+  "📱 Keep the app open, and tap the screen once — then it stays on until the import finishes.": "📱 アプリを開いたまま、画面を一度タップしてください。取り込みが終わるまで画面がついたままになります。"
  }
 }

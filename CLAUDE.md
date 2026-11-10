@@ -1523,6 +1523,29 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
     → plain → Undo → link, unlinked kitchen → plain, ✕ ends the trail, Ctrl+K → list with parts and linked kitchens but
     not itself, search narrows, pick, dirty, 🔗 with nothing marked says so, save keeps only used links, into/out of a
     collection); 10 knock-outs each fail it. 16 phrases by hand in 11 languages (tr/tr53.py).
+  - **v39.54 — three small fixes** (Tuesday 10 Nov 2026, items 3 and 4 of the plan below).
+    **(3) A line a stored template already answers is never a missing phrase.** `i18nTemplateCovers(k, dict)`: one of
+    the dictionary's translated keys holding {n} (to i18nPatternsFromDict's bar) matches the line whole (not itself).
+    `i18nGapList` leaves such a line out of what is sent unless the app asks for that very line (an app line keeps its
+    own translation); `i18nLoadMissing` drops one kept from before (counted in the "unusable entries dropped" line);
+    `i18nNoteMissing` does not note one. The release job (`tools/translate-new.mjs`, step 2a) takes a stored key the app
+    no longer asks for out of the shared translations when a translated template of the same language answers it —
+    so "🖼️ “Mushrooms” now uses Seasoned Mushrooms’s photo" goes from Hebrew at the next release. Self Test
+    `i18n_template_covers`; knock-outs (templates never answer, app lines dropped too, the kept list not cleaned,
+    noted anyway) each fail it.
+    **(4a) The screen lock refused for want of a tap is asked for again at the next touch.** NotAllowedError (an import
+    that began by itself from a shared link) → one capture listener (pointerdown / touchstart / keydown) while the import
+    holds; the touch asks once more; the progress says "📱 Keep the app open, and tap the screen once — then it stays on
+    until the import finishes."; refused even after the touch → the v39.50 "now and then" hint. The log: "…asked for
+    again at the next touch", then "After a touch, the screen is kept on…" or "…would not keep the screen on, even after
+    a touch". Listeners off when the import ends. Self Test `import_screen_lock_touch` (and `import_screen_lock_said`
+    expects the tap hint for a NotAllowedError); knock-outs (a touch does nothing, listeners never taken off, no tap
+    hint) each fail it. Help: the import line says a tap keeps the screen on. 1 phrase in 11 languages (tr/tr54.py).
+    **(4b) The 90 s cloud watchdog counts only time on screen.** `withSyncWatchdog`: the timer stops while the app is
+    hidden and starts afresh (a whole 90 s) when it is on screen again; a timer that comes back more than 5 s later than
+    it was set for (frozen in sleep with no "hidden" first) is taken the same way. The log line says "…timed out after
+    90s on screen". Self Test `sync_watchdog_on_screen` (hidden → nothing; back → a fresh window; ten minutes late →
+    not a stall; a finished promise passes); knock-outs (the v39.53 plain timer, a late timer counted) each fail it.
   - **Planned for Tuesday 10 Nov 2026, after 11:00 Israel time — NOT before** (Tony, 7 Nov 2026, ~00:45: "as I am
     already at 75% of my weekly quota, I would like you to only log the request and plan it for Tuesday, after 11:00,
     when it resets"; a reminder into this session is scheduled for 11:05, trig_019vabk7G3ZPSwUAMaDctuxi). Two features:

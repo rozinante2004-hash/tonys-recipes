@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v39.53` — app. **Worker: v102**, deployed separately and versioned separately
+**Current version:** `v39.54` — app. **Worker: v102**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -408,6 +408,13 @@ under its plain path only (a `?url=` request goes network-first).
   **Pace and pitch (v39.36, Tony's choice "E" from five heard on his phone):** FARM_VOICE_TUNE child speed 0.8, pitch
   1.8 (the top; above it speech cracks); female 0.74 / 1.4; male 0.7 / 0.7 (only slower: he stays deep, v38.01); each
   animal adds ±0.3 × (its pitch − 1), kept within 0.55–1.8.
+- **Small fixes (v39.54):** `i18nTemplateCovers(k, dict)` — a translated {n} key of the dictionary matching a line whole;
+  such a line is not noted (`i18nNoteMissing`), dropped from the kept missing list (`i18nLoadMissing`), left out of the
+  gaps unless the app asks for that line itself (`i18nGapList`), and taken out of the shared store by the release job
+  when the app no longer asks for it. The import's screen lock refused with NotAllowedError arms one touch listener
+  (`importAwakeOnTouch`/`importAwakeUntouch`) that asks once more; the progress then says to tap once.
+  `withSyncWatchdog` counts only on-screen time: stopped while hidden, a fresh window when visible again, and a timer
+  more than 5 s late (frozen in sleep) re-arms instead of failing.
 - **🔗 Links between recipes (v39.53):** a recipe and a part carry `links: [{t, to: uid, h?: linked kitchen}]` beside
   their text (the text is never changed). `rlPrep(links, ctx)` keeps the links whose recipe exists now
   (`recipeLinkTarget`: own recipes and parts by uid; `h` → `_linkCache[h]` while that kitchen is linked) and `rlHtml`

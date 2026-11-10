@@ -2354,6 +2354,7 @@
   "📮 Mail to contact@": "📮 Levél ide: contact@",
   "📱 Grid Layout": "📱 Rácsos elrendezés",
   "📱 Keep the app open until it finishes — a phone pauses it while the screen is off.": "📱 Hagyd nyitva az appot, amíg be nem fejezi — telefonon ez megáll, ha kialszik a kijelző.",
+  "📱 Keep the app open, and tap the screen once — then it stays on until the import finishes.": "📱 Hagyd nyitva az alkalmazást, és koppints egyszer a képernyőre — utána bekapcsolva marad, amíg az importálás véget nem ér.",
   "📱 Keep the app open, and touch the screen now and then — this phone would not keep it on by itself (Low Power Mode does that).": "📱 Tartsd nyitva az appot, és időnként érintsd meg a kijelzőt — ez a telefon magától nem tartaná ébren (ezt az energiatakarékos üzemmód okozza).",
   "📱 Phone grid set to {1} per row": "📱 A telefon rácsa {1}/sorra állítva",
   "📱 Save from the iPhone’s Share menu": "📱 Mentés az iPhone Megosztás menüjéből",

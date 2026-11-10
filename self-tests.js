@@ -12621,6 +12621,38 @@ window.SELF_TESTS = [
       } finally { window._fbDb=realDb; window.firebase=realFb; }
     }) },
 
+  { id:'sync_watchdog_on_screen', group:'Cloud Sync', name:'The cloud watchdog counts only time the app is on screen — hidden, it waits; back on screen, a fresh window; a timer frozen while the phone slept is not a stall (v39.54)',
+    test: async()=>{
+      // v39.54 — Tony's beta log, 8 Nov 2026: "cloud write did not finish in 90s — signIn" at 19:28 for a write begun at
+      // the 17:05 sign-in: the timer was frozen while the phone slept and fired as it woke.
+      if(typeof withSyncWatchdog!=='function') throw new Error('withSyncWatchdog not defined');
+      var realMs=window.SYNC_WATCHDOG_MS, realNow=Date.now, vis='visible', had=Object.getOwnPropertyDescriptor(document,'visibilityState');
+      Object.defineProperty(document,'visibilityState',{ configurable:true, get:function(){ return vis; } });
+      var show=function(v){ vis=v; document.dispatchEvent(new Event('visibilitychange')); };
+      var never=new Promise(function(){});
+      try{
+        window.SYNC_WATCHDOG_MS=120;
+        var out=null; withSyncWatchdog(never,'write').catch(function(e){ out=e; });
+        await wait(40); show('hidden'); await wait(250);
+        if(out) throw new Error('the watchdog went off while the app was hidden: '+out.message);
+        show('visible'); await wait(60);
+        if(out) throw new Error('back on screen, the watchdog went off at once — not a fresh window');
+        await wait(160);
+        if(!out || !out._syncTimeout) throw new Error('on screen for the whole window, the watchdog did not go off');
+        // a timer frozen in sleep fires late, with no "hidden" before it: a fresh window, not a stall
+        var out2=null; withSyncWatchdog(never,'read').catch(function(e){ out2=e; });
+        var jump=10*60*1000; Date.now=function(){ return realNow.call(Date)+jump; };
+        await wait(170);
+        if(out2) throw new Error('a timer that came back ten minutes late counted the sleep as a stall');
+        await wait(150);
+        if(!out2 || !out2._syncTimeout) throw new Error('after a late timer, a whole window on screen did not go off');
+        // what finishes in time is unchanged
+        if(await withSyncWatchdog(Promise.resolve('ok'),'read')!=='ok') throw new Error('a finished promise did not pass through');
+      } finally {
+        Date.now=realNow; window.SYNC_WATCHDOG_MS=realMs;
+        if(had) Object.defineProperty(document,'visibilityState',had); else delete document.visibilityState;
+      }
+    } },
   { id:'sync_watchdog', group:'Cloud Sync', name:'A wedged sync is reported, never spun on for ever (5g.3)',
     test: ()=>_inFirstLayout(async()=>{
       if(typeof withSyncWatchdog!=='function') throw new Error('withSyncWatchdog not defined');
@@ -15355,11 +15387,55 @@ window.SELF_TESTS = [
         if(!/4 recipes/.test(res.textContent)) throw new Error('the import did not finish: '+res.textContent.slice(0,120));
         var b=await run('refused');
         if(!/4 recipes/.test(res.textContent)) throw new Error('a refused screen lock stopped the import');
-        if(!hints.some(function(h){ return /touch the screen now and then/.test(h); })) throw new Error('refused, the progress does not say to touch the screen now and then');
+        // v39.54 — refused for want of a tap (NotAllowedError, no touch yet): one tap keeps it on
+        if(!hints.some(function(h){ return /tap the screen once/.test(h); })) throw new Error('refused for want of a tap, the progress does not say to tap the screen once');
         var c=await run('taken');
         if(events.filter(function(e){ return e==='lock'; }).length!==2) throw new Error('a lock the phone took back was not asked for again (once): '+events.join(', '));
       } finally {
         window.aiCall=realAi; window.fetch=realFetch; inp.value=wasUrl; res.innerHTML=wasRes;
+        if(!hadOwn) delete navigator.wakeLock;
+        for(var g=0; g<20 && _importWakeHolds; g++) importAwakeRelease();
+        _importWakeHolds=0; _importWake=null; _importWakeAsking=false; _importWakeRefused=false;
+      }
+    } },
+  { id:'import_screen_lock_touch', group:'Import/Export', name:'A screen lock refused for want of a tap is asked for again at the next touch — once; the progress says one tap keeps the screen on (v39.54)',
+    test: async()=>{
+      // v39.54 — Tony's beta log, 8 Nov 2026: "NotAllowedError: Permission was denied" on both imports that began by
+      // themselves from a shared link (Safari gives the lock only after a tap).
+      ['importAwakeHold','importAwakeRelease','importAwakeOnTouch','spinnerLong'].forEach(function(f){ if(typeof window[f]!=='function') throw new Error(f+' is not defined'); });
+      var hadOwn=Object.prototype.hasOwnProperty.call(navigator,'wakeLock'), asks=0, answer=[], locks=[];
+      Object.defineProperty(navigator,'wakeLock',{ configurable:true, value:{ request:async function(){
+        asks++;
+        var a=answer.shift() || 'no';
+        if(a==='no'){ var e=new Error('Permission was denied'); e.name='NotAllowedError'; throw e; }
+        var ls={}, sn={ released:false, addEventListener:function(n,f){ ls[n]=f; }, release:async function(){ sn.released=true; if(ls.release) ls.release(); } };
+        locks.push(sn); return sn; } } });
+      var touch=function(){ document.dispatchEvent(new PointerEvent('pointerdown', { bubbles:true })); };
+      try{
+        answer=['no','yes'];
+        await importAwakeHold(); await wait(20);
+        if(asks!==1) throw new Error('the lock was asked for '+asks+' times at the start, not once');
+        if(!/tap the screen once/.test(spinnerLong('x'))) throw new Error('refused for want of a tap, the progress does not say one tap keeps the screen on');
+        touch(); await wait(30);
+        if(asks!==2) throw new Error('the next touch did not ask for the lock again');
+        if(!_importWake) throw new Error('the lock given after the touch is not kept');
+        if(/tap the screen once|now and then/.test(spinnerLong('x'))) throw new Error('with the screen kept on, the progress still asks for a tap');
+        touch(); await wait(30);
+        if(asks!==2) throw new Error('every touch asks for the lock again, not only the next one');
+        importAwakeRelease(); await wait(10);
+        if(!locks[0].released) throw new Error('the lock was not given back when the import ended');
+        // refused after the touch too: asked once more only, then "now and then"
+        answer=['no','no','no'];
+        await importAwakeHold(); await wait(20);
+        touch(); await wait(30); touch(); await wait(30);
+        if(asks!==4) throw new Error('refused again after the touch, the lock was asked for '+(asks-2)+' times in the import, not twice');
+        if(!/now and then/.test(spinnerLong('x'))) throw new Error('refused even after a touch, the progress does not say to touch the screen now and then');
+        importAwakeRelease();
+        // the import over: a touch asks nothing
+        answer=['no']; await importAwakeHold(); await wait(20); importAwakeRelease(); var n=asks;
+        touch(); await wait(30);
+        if(asks!==n) throw new Error('after the import ended, a touch still asks for the screen lock');
+      } finally {
         if(!hadOwn) delete navigator.wakeLock;
         for(var g=0; g<20 && _importWakeHolds; g++) importAwakeRelease();
         _importWakeHolds=0; _importWake=null; _importWakeAsking=false; _importWakeRefused=false;
@@ -20417,6 +20493,38 @@ window.SELF_TESTS = [
       if(lines.length!==3) throw new Error('the WhatsApp list\'s lines are not one phrase each: '+JSON.stringify(keys));
       var off=lines.filter(function(k){ return I18N_EXTRA.indexOf(k)===-1 || i18nLooksLikeDate(k); });
       if(off.length) throw new Error('a WhatsApp list line is not the listed phrase: '+JSON.stringify(off));
+    } },
+  { id:'i18n_template_covers', group:'UI', name:'A line a stored template already answers is not a missing phrase — not noted, not kept from before, not sent; a line the app itself asks for still is (v39.54)',
+    test: async()=>{
+      // v39.54 — the publish of 7 Nov 2026 brought "🖼️ “Mushrooms” now uses Seasoned Mushrooms’s photo" into Hebrew beside
+      // "🖼️ “{1}” now uses {2}’s photo", there since 27 Sep.
+      ['i18nTemplateCovers','i18nGapList','i18nLoadMissing','i18nNoteMissing','i18nMissingList'].forEach(function(f){ if(typeof window[f]!=='function') throw new Error(f+' is not defined'); });
+      var dict={ '🖼️ “{1}” now uses {2}’s photo':'🖼️ “{1}” משתמש עכשיו בתמונה של {2}', 'Saved {1} recipes':'נשמרו {1} מתכונים', 'Contents':'תוכן' };
+      var line='🖼️ “Mushrooms” now uses Seasoned Mushrooms’s photo';
+      if(!i18nTemplateCovers(line, dict)) throw new Error('the template does not answer the line it was made for');
+      if(i18nTemplateCovers('🖼️ “{1}” now uses {2}’s photo', dict)) throw new Error('a template counts as answering itself');
+      if(i18nTemplateCovers('Something else entirely', dict)) throw new Error('a line no template fits counts as answered');
+      if(i18nTemplateCovers(line, { '🖼️ “{1}” now uses {2}’s photo':'' })) throw new Error('an untranslated template counts as an answer');
+      var gaps=i18nGapList(dict, [line, 'A new phrase of the app'], ['Contents','Saved all recipes']);
+      if(gaps.indexOf(line)>-1) throw new Error('a line a template answers is sent to be translated');
+      if(gaps.indexOf('A new phrase of the app')===-1) throw new Error('a missing line no template answers is not sent');
+      if(gaps.indexOf('Saved all recipes')===-1) throw new Error('a line the app asks for itself is left out because a template fits it');
+      // kept from before: dropped as the list is read; and not noted again
+      var realDict=_i18nDict, realMissing=_i18nMissing, key=i18nMissKey('st'), was=null;
+      try { was=localStorage.getItem(key); } catch(e) {}
+      try {
+        _i18nDict=dict;
+        try { localStorage.setItem(key, JSON.stringify([line, 'A new phrase of the app'])); } catch(e) {}
+        i18nLoadMissing('st');
+        var l=i18nMissingList();
+        if(l.indexOf(line)>-1) throw new Error('a line a template answers stays on the missing list it was kept on');
+        if(l.indexOf('A new phrase of the app')===-1) throw new Error('a real missing line was dropped with it');
+        i18nNoteMissing('🖼️ “Leeks” now uses Leek soup’s photo');
+        if(i18nMissingList().indexOf('🖼️ “Leeks” now uses Leek soup’s photo')>-1) throw new Error('a line a template answers is noted as missing');
+      } finally {
+        _i18nDict=realDict; _i18nMissing=realMissing;
+        try { if(was===null) localStorage.removeItem(key); else localStorage.setItem(key, was); } catch(e) {}
+      }
     } },
   { id:'i18n_no_data_as_phrases', group:'UI', name:'A photo credit, a recipe\'s name or by-line, a search\'s words or a list of languages never becomes a phrase to translate — the lines around them still do (v39.47)',
     test: async()=>{
