@@ -1,4 +1,7 @@
-// Tony's Recipes — Cloudflare Worker v103
+// Tony's Recipes — Cloudflare Worker v104
+// v104: THE RED DOT FOR INVITATION REQUESTS IN EVERY COPY (Tony, 10 Nov 2026: "Please add a red dot indicator when a new
+//   request is awaiting, as for reports"). meter-admin `notes-new` also says `invitesBy` { project: the new invitation
+//   requests for that copy } — a copy whose app does not read the whole inbox (the test copy) counts its own.
 // v103: A TESTER ASKS FOR AN INVITATION FOR SOMEONE ELSE (Tony, 10 Nov 2026: "change the share button to open a new modal
 //   saying "ask for an invitation for someone else". allowing the user to put in someone else's email. This email will
 //   reach me (perhaps as a new tab in the Households page, called Beta invitation requests) and I will decide whether I
@@ -482,7 +485,7 @@
 //   AI_MAX_TOKENS   – the longest answer one call may ask for (32000; the
 //                     app's largest, reading several recipes at once, asks 8000).
 
-const WORKER_VERSION = 'v103';
+const WORKER_VERSION = 'v104';
 const VIDEO_MAX_MB_DEFAULT = 50;
 const GEMINI_API = 'https://generativelanguage.googleapis.com';
 const GEMINI_MODEL_DEFAULT = 'gemini-2.5-flash';
@@ -3172,7 +3175,10 @@ async function feedbackAdmin(env, db, body, claims) {
     const r = await db.prepare("SELECT COUNT(*) AS n FROM feedback WHERE status = 'new'").first();
     const iv = await db.prepare("SELECT COUNT(*) AS n FROM feedback WHERE status = 'new' AND " + INVITE_ASK_SQL).first();   // v103
     const all = (r && r.n) || 0, invites = (iv && iv.n) || 0;
-    return jsonResp({ new: all, notes: all - invites, invites, server: await serverNotices(env, { owner: true }) });   // v78/v79 — every allowance notice
+    const invitesBy = {};   // v104 — each copy's own
+    (((await db.prepare("SELECT project, COUNT(*) AS n FROM feedback WHERE status = 'new' AND " + INVITE_ASK_SQL + " GROUP BY project").all()) || {}).results || [])
+      .forEach(x => { invitesBy[String(x.project || '')] = x.n || 0; });
+    return jsonResp({ new: all, notes: all - invites, invites, invitesBy, server: await serverNotices(env, { owner: true }) });   // v78/v79 — every allowance notice
   }
   const id = parseInt(body.id, 10);
   if (!(id > 0)) return jsonResp({ error: 'FEEDBACK: which note?' }, 400);
@@ -4283,4 +4289,4 @@ export default {
   }
 };
 
-// ── END OF WORKER v103 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
+// ── END OF WORKER v104 ── If this is the last line in the Cloudflare editor, the whole file was pasted.

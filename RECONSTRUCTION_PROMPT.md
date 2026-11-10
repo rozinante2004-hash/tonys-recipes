@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v39.61` — app. **Worker: v103**, deployed separately and versioned separately
+**Current version:** `v39.62` — app. **Worker: v104**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -293,8 +293,11 @@ hidden / refuses / silent / privacy text.
     asked, the word, "invited before" (this copy's `testerInvites` fingerprints). **✉️ Invite** → `openInviteTesters({
     to, lang })` here, or the copy it came from with `#invite=<address>&lang=he|en`; **🙅 Not now** (status done;
     under All, ↩︎ Back to waiting); 🗑. Sent from the invitation window (`testerInvitesAdd` calls
-    `window.inviteAsksSent(addrs)`): the request is done. The tab's badge counts the waiting ones; the ⚙️ dot counts
-    them with the notes. In the copies where the inbox is not read (the test copy) the tab is there too, with that
+    `window.inviteAsksSent(addrs)`): the request is done. The tab's badge counts the waiting ones, and (v39.62) their own
+    red dot marks the way there as the notes' does — `pathDots` source `invites` on ⚙️ → 👑 App owner → 📊 Households,
+    the owner's only, kept on the device (`mkn_inv_new`, `inviteAsksKnown`), counted at start-up, every 15 minutes and
+    as he marks them; every copy's where the inbox is read, this copy's own elsewhere (Worker v104 `notes-new` →
+    `invitesBy`). The notes' dot counts the notes only. In the copies where the inbox is not read (the test copy) the tab is there too, with that
     copy's own requests only, so it can be tried there. The owner's start-up notice says them apart: "✉️ {n} new
     invitation request(s) — … → ✉️ Beta invitation requests" (Worker `notes-new` → `invites`, `notes`).
   - **⚠️ Errors** (testers' copies report their own errors) and **📈 Use** (v38.30: the trends — every

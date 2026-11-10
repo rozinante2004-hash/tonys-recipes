@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.61 -->
+<!-- Tony's Recipes Collection v39.62 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -6597,10 +6597,11 @@ window.hhSetBlocked = hhSetBlocked; window.hhLoadIncoming = hhLoadIncoming; wind
 // Tony: "the red dots should indicate the entire path to where the new
 // occurrence happened" — ⚙️, the section, the item. Red only: nothing when all
 // is seen (v37.68's green "all read" went). Each source sets its own count.
-var _pathDots = { links: 0, feedback: 0, replies: 0 };
+var _pathDots = { links: 0, feedback: 0, replies: 0, invites: 0 };
 var PATH_DOTS = {
   links:    ['.set-group[data-group="household"] > .set-head', '#linkRequestsItem'],
   feedback: ['.set-group[data-group="owner"] > .set-head', '#settingsDrop [onclick*="openManagement"]'],
+  invites:  ['.set-group[data-group="owner"] > .set-head', '#settingsDrop [onclick*="openManagement"]'],   // v39.62 — a request for an invitation
   replies:  ['.set-group[data-group="help"] > .set-head', '#fbRepliesItem'],     // v38.00 — an answer to my note
   chats:    ['[onclick="toggleDrop(\'moreDrop\')"]', '#kitchenChatsItem'],       // v38.50 — a new message, by this way too
   family:   ['[onclick="toggleDrop(\'moreDrop\')"]', '#familyChatItem'],         // v38.78 — a message in the household
@@ -10059,13 +10060,24 @@ async function feedbackTellOwner() {
   if (_fbNewTold || _selfTestRunning || typeof isAppOwner !== 'function' || !isAppOwner() || !hhDb()) return 0;
   _fbNewTold = true;
   try { await feedbackMoveToInbox(); } catch(e) {}
-  if (!feedbackInboxHere()) { feedbackDot(null); return 0; }
+  inviteAsksKnown(null);                     // v39.62 — the last count straight away, in every copy
+  if (!feedbackInboxHere()) {
+    feedbackDot(null);
+    // v39.62 — a copy that does not read the inbox still hears of its own invitation requests (Worker v104)
+    if (await feedbackCountNew() !== null) {
+      var ih = inviteAsksFromServer();
+      if (typeof ih === 'number') { inviteAsksKnown(ih);
+        if (ih) toast('\u2709\uFE0F ' + ih + ' new invitation request(s) — ⚙️ → 👑 App owner → \u{1F4CA} Households → \u2709\uFE0F Beta invitation requests', 10000, goInviteAsks); }
+    }
+    return 0;
+  }
   feedbackKnown(null);                       // v37.94 — the last count straight away, while the inbox is asked
   var n = await feedbackCountNew(), iv = n ? Math.min(_inviteAsksNew || 0, n) : 0, notes = (n || 0) - iv;
+  if (n !== null) inviteAsksKnown(iv);       // v39.62 — its own red dot; the reports' dot counts the reports
   if (notes) toast('\u{1F4AC} ' + notes + ' new note' + (notes === 1 ? '' : 's') + ' from testers — ⚙️ → 👑 App owner → \u{1F4CA} Households → \u{1F4AC} Feedback', 10000, goFeedback);
   // v39.61 — the invitation requests said apart, with their own way there (after the notes' toast, if there is one)
   if (iv) setTimeout(function(){ toast('\u2709\uFE0F ' + iv + ' new invitation request(s) — ⚙️ → 👑 App owner → \u{1F4CA} Households → \u2709\uFE0F Beta invitation requests', 10000, goInviteAsks); }, notes ? 10500 : 0);
-  feedbackKnown(n);
+  feedbackKnown(n === null ? null : notes);
   return n || 0;
 }
 // Notes kept in this copy's own database (v37.64–67, or by an app that
@@ -10095,7 +10107,21 @@ async function feedbackMoveToInbox() {
 // be asked (just after an update the Worker or the sign-in may not answer yet)
 // is now "not known" (null), never "nothing new"; the last count is kept on the
 // device and shown until a real answer replaces it.
-var _inviteAsksNew = 0;
+var _inviteAsksNew = 0, _inviteAsksHere = null;
+// v39.62 — Tony, 10 Nov 2026: "Please add a red dot indicator when a new request is awaiting, as for reports." The
+// invitation requests waiting, on the same red path as the reports (⚙️ → 👑 App owner → 📊 Households) and the tab's
+// count there — in every copy: where the inbox is read (the family's, the community copy), every copy's requests;
+// elsewhere (the test copy) its own. The owner's only. Kept on the device like the reports' count.
+var INV_NEW_KEY = 'mkn_inv_new', _invLastNew = null;
+function inviteAsksKnown(n) {     // a real count — or null: show the last one known
+  if (typeof n === 'number') { _invLastNew = n; try { localStorage.setItem(INV_NEW_KEY, String(n)); } catch(e) {} }
+  else if (_invLastNew === null) { try { var c = parseInt(localStorage.getItem(INV_NEW_KEY), 10); if (c >= 0) _invLastNew = c; } catch(e) {} }
+  var on = typeof isAppOwner === 'function' && isAppOwner() && typeof _invLastNew === 'number';
+  return pathDots({ invites: on ? _invLastNew : 0 });
+}
+// What the server said: every copy's where the inbox is read, this copy's elsewhere (null: not known).
+function inviteAsksFromServer() { return feedbackInboxHere() ? (_inviteAsksNew || 0) : _inviteAsksHere; }
+window.inviteAsksKnown = inviteAsksKnown;
 async function feedbackCountNew() {
   var n = 0;
   try { n += (await hhDb().collection('feedback').where('status', '==', 'new').limit(100).get()).size; } catch(e) {}
@@ -10109,6 +10135,7 @@ async function feedbackCountNew() {
       if (!r.ok || !d) return null;
       n += d.new || 0;
       _inviteAsksNew = typeof d.invites === 'number' ? d.invites : 0;   // v39.61 — Worker v103: the invitation requests apart
+      _inviteAsksHere = d.invitesBy && typeof d.invitesBy === 'object' ? (+d.invitesBy[APP_CONFIG.firebase.projectId] || 0) : null;   // v39.62 — Worker v104: this copy's
       if (d.server && typeof serverNoticeFrom === 'function') serverNoticeFrom(d.server);   // v38.54 — Worker v78
     }
   } catch(e) { return null; }
@@ -10136,7 +10163,13 @@ setInterval(function(){
   // v38.54 — an app nobody is using does this hourly, not every quarter of an hour.
   if (typeof appIdleFor === 'function' && appIdleFor() > APP_IDLE_MS && Date.now() - _quarterAt < 55 * 60e3) return;
   _quarterAt = Date.now();
-  if (typeof isAppOwner === 'function' && isAppOwner() && hhDb() && feedbackInboxHere()) feedbackCountNew().then(feedbackKnown).catch(function(){});
+  // v39.62 — the reports' count where the inbox is read; the invitation requests' in every copy
+  if (typeof isAppOwner === 'function' && isAppOwner() && hhDb()) feedbackCountNew().then(function(n){
+    if (n === null) return;
+    var iv = inviteAsksFromServer();
+    if (feedbackInboxHere()) feedbackKnown(Math.max(0, n - Math.min(_inviteAsksNew || 0, n)));
+    if (typeof iv === 'number') inviteAsksKnown(iv);
+  }).catch(function(){});
   if (_household && hhDb()) hhLoadIncoming().then(talkLoad).then(linkDotRefresh).catch(function(){});   // v37.80/81 — new link requests and messages
   if (fbSignedInUser()) fbRepliesLoad().catch(function(){});   // v38.00 — answers to my notes (the dot; the window when the app opens)
 }, 15 * 60e3);
@@ -11030,7 +11063,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.61';
+var APP_VERSION = 'v39.62';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -14538,7 +14571,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.61</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.62</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14626,7 +14659,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.61</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.62</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -35674,7 +35707,7 @@ var HELP_SYSTEM_PROMPT = [
   "=== FOR THE APP'S OWNER ===",
   "- ⚙️ → 👑 App owner is shown only to the app's owner: 📊 Households, 🩺 Server allowances, 📲 Phone alerts (which alerts also ring on the phone in the Pushover app, each on or off, and a test — among them the recipe e-mails: Resend refusing or not answering, a quota at 70% or used up), ✉️ Invite testers, 💳 Payments, 🚀 Deployments (a link to every console the app runs on: My Kitchen Notes itself — its site, builds, Firebase project, database, accounts, domain and the mail to contact@ —; the test copy; GitHub's jobs, secrets and the testers' reports; the server and its database; Resend, which sends the recipe e-mails and the invitations; Pushover, the phone alerts; Anthropic; the photo sources; Google Cloud — YouTube and the Gmail API —; and the browser extension's stores), 🔑 Check the app's key, 🔐 Two-step sign-in for the owner, 🧑‍🍳 Preview the first-visit setup (every page of it, nothing recorded), 📧 Gmail Setup, 🛒 Bring!",
   "- 📊 Households (the owner's): every household — in the family app and My Kitchen Notes, every copy's — with its owner, members, 📚 Recipes (how many it keeps, counted by its own app once a day; rest the mouse on the number for when), AI this month against its AI cap, AI in the two months before (e.g. 'AI in Sep · Oct' in November), links, who shared the app, last active. Click a heading (on a phone: Sort by) to sort — by Recipes for the biggest collections first; ⬇ CSV has the recipe counts too. 📈 Use adds every household up, month by month, in sections side by side (one under the other on a phone; one column when there are many months), with how big the collections are. Click a row for its details: the AI allowance, the members, the Extras, and What they use — two narrow tables side by side (one under the other on a phone), a column for each month, in sections (how often, signing in, recipes added and from where, the farm, devices and settings, then every feature and how many times). In The farm, 'Taps on a visitor (each one)' counts every tap and 'Visits with a farm visitor tapped' counts a visit once, however many taps. Extras: 📧 E-mail recipes from their own Gmail makes that household's ✉️ Email send from each member's own Gmail (Google asks each once) instead of the app's 📨 Send — best left off. If the page says this device's sign-in was made without the code from your authenticator app (or with a password): sign out (at the top, beside the sync status) and sign in again with Google — the app asks for the 6-digit code; the owner's tools need both. 🔑 Reset password, beside the owner and beside each member (in the details), e-mails that person a link to choose a new password — for someone who wrote to you that they can't sign in; you never see their password, and the app doesn't say whether the address has an account. For a household of another copy, the button opens that copy, which sends it after you sign in there.",
-  "- 📊 Households → ✉️ Beta invitation requests (the owner's; v39.61): every request for an invitation, apart from 💬 Feedback — a tester's for someone else (who asked, the person's name, a word about them, the invitation's language) and someone's own, from a sent recipe's link. ✉️ Invite opens ✉️ Invite testers with the address and the language filled in — you see it and press Send (a request from another copy opens that copy's app, where its invitations belong); once sent, the request is done. 🙅 Not now sets it aside (under All; ↩︎ Back to waiting); 🗑 removes it. An address invited before says so. The tab counts the waiting ones, and the owner hears of each by e-mail (and a phone alert: 'Someone asks for an invitation'). In the test copy the tab shows that copy's own requests.",
+  "- 📊 Households → ✉️ Beta invitation requests (the owner's; v39.61): every request for an invitation, apart from 💬 Feedback — a tester's for someone else (who asked, the person's name, a word about them, the invitation's language) and someone's own, from a sent recipe's link. ✉️ Invite opens ✉️ Invite testers with the address and the language filled in — you see it and press Send (a request from another copy opens that copy's app, where its invitations belong); once sent, the request is done. 🙅 Not now sets it aside (under All; ↩︎ Back to waiting); 🗑 removes it. An address invited before says so. The tab counts the waiting ones, and while one waits a red dot marks the way to it — ⚙️ → 👑 App owner → 📊 Households — as for testers' notes (v39.62); the owner also hears of each by e-mail (and a phone alert: 'Someone asks for an invitation'). In the test copy the tab and the dot are that copy's own requests.",
   "- 📊 Households → 💬 Feedback and ⚠️ Errors (the owner's): tick several (or Select all shown), then 👀 Seen (n), ✅ Done (n) or 🗑 Delete selected (n) for all of them at once. 👀 Seen = read, off the ⚙️ red dot, still under 'Not done yet'; ✅ Done = also off that list (still under All). Deleting several asks once and sends one alert",
   "- ✉️ Invite testers: the tester invitation in English or עברית, with this copy's link; the wording can be changed (this device keeps it; 'The original words' brings it back). Paste the addresses; 📨 Send sends each person their own e-mail from the app's address (contact@…), by the app's own e-mail service — no Google window — and their replies come to that address; up to 40 a day; the owner's sign-in as his other tools need it (with Google, and the authenticator's code once that is on). a small 📧 Backup: send with Gmail below the buttons sends them from the owner's Gmail instead (Google asks for permission the first time, and may say it has not verified the app: Advanced, then continue). Also ✉️ Mail app, 💬 WhatsApp and 📋 Copy",
   "- The beta is by invitation only when 📊 Households says so: every address in To (however the invitation goes) may then start a kitchen, signed in with that address; the window says how many are invited. Only a fingerprint of each address is kept, never the address. The invitation asks testers to sign in with that address, not to forward it, and to invite family from inside the app",

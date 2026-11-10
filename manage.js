@@ -251,8 +251,13 @@
   function newCount() { return fbNotes().filter(function (n) { return n.status === 'new'; }).length; }
   // v37.68 — the ⚙️ dot follows what is marked here.
   // v37.94 — what is counted here is a real count: kept on the device too (feedbackKnown).
-  // v39.61 — the dot counts the new invitation requests too (they wait for him as well), where the inbox is read
-  function syncDot() { if (S.notes && !S.notesError && !S.notesPartial && (typeof feedbackInboxHere !== 'function' || feedbackInboxHere())) { var c = newCount() + invNew(); if (typeof feedbackKnown === 'function') feedbackKnown(c); else if (typeof feedbackDot === 'function') feedbackDot(c); } }
+  // v39.62 — the reports' dot counts the reports (where the inbox is read); the invitation requests have their own red
+  // dot on the same path, in every copy (Tony: "a red dot indicator when a new request is awaiting, as for reports")
+  function syncDot() {
+    if (!S.notes || S.notesError || S.notesPartial) return;
+    if (typeof feedbackInboxHere !== 'function' || feedbackInboxHere()) { if (typeof feedbackKnown === 'function') feedbackKnown(newCount()); else if (typeof feedbackDot === 'function') feedbackDot(newCount()); }
+    if (typeof inviteAsksKnown === 'function') inviteAsksKnown(invNew());
+  }
   // v39.21 — what to do about a refusal: this device's sign-in when that is the reason (ownerSignInWhy), else the rules
   function refusedHint(err, rules) {
     err = String(err || '');

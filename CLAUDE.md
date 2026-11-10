@@ -1700,6 +1700,20 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
     share button not closed, no kitchen sent, one's own address allowed, the old isInviteAsk, no language, Feedback
     keeping them, the send hook not called, not marked done) all fail them. Screens: 390 px in English and Hebrew,
     1280 px.
+  - **v39.62 + Worker v104 — a red dot for a waiting invitation request, as for reports.** Tony, 10 Nov 2026: "Please
+    add a red dot indicator when a new request is awaiting, as for reports. Then release the latest build to family and
+    beta when green". The requests get their own source on the red path (`pathDots` `invites`: ⚙️ → 👑 App owner → 📊
+    Households, beside the tab's count), the owner's only, remembered on the device (`mkn_inv_new`, `inviteAsksKnown`),
+    counted when the app opens, every 15 minutes, and as he marks them in the tab (`syncDot`). Where the inbox is read
+    (the family's, the community copy) every copy's requests; elsewhere (the test copy, where nothing showed before)
+    this copy's own — Worker v104 `notes-new` adds `invitesBy` { project: count }. The notes' dot now counts the notes
+    only (before, the server's `new` included the requests). A copy that does not read the inbox also says "✉️ {n} new
+    invitation request(s)" at start-up. Self Test `invite_requests_dot` (both kinds of copy, remembered, the owner's only,
+    gone at none, the 15-minute count) with 4 knock-outs; `feedback_notes` clears and restores the new dot (an owner
+    device with a waiting request would have failed it). Worker test for `invitesBy`. Help and the reconstruction
+    prompt say so. No new phrases. (The first full run caught the new test leaving a stand-in signed-in user behind when
+    it failed — three later tests then altered the sync keys; the user is now restored in `finally`.) Self Tests 461
+    passed, 0 failed; the other local checks and the Worker tests pass.
   - **On Test, green (10 Nov 2026):** v39.60 on 3fe4519 (Cloudflare Pages for test 15:41, Self Tests 16:00); v39.61 +
     Worker v103 on cd96e4d (Deploy the Worker 16:07 — "live: v103, published: v103", live for every copy from then;
     Cloudflare Pages for test 16:07; Self Tests 16:25). Not yet on the family's copy or the beta: needs Tony's yes.

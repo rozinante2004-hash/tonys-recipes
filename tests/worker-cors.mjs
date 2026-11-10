@@ -1142,6 +1142,7 @@ console.log('\nAI per household (v60):');
     db.raw.prepare("INSERT INTO feedback (project, uid, email, name, hid, household, text, shot, log, version, env, device, lang, at, status) VALUES ('tonys-recipes-test','','new@person.example','','','','\u2709\uFE0F Asks for an invitation.','','','v39.61','test','x','en',?,'new')").run(Date.now());
     f = await fb({ action: 'meter-admin', op: 'notes-new', idToken: tOwner });
     expect('v103: …the notes and the new invitation requests apart, and the whole as before', f.d && f.d.new === 3 && f.d.notes === 2 && f.d.invites === 1, JSON.stringify(f.d));
+    expect('v104: …and each copy\'s own new invitation requests', f.d && f.d.invitesBy && f.d.invitesBy['tonys-recipes-test'] === 1 && Object.keys(f.d.invitesBy).length === 1, JSON.stringify(f.d && f.d.invitesBy));
     db.raw.prepare("DELETE FROM feedback WHERE email = 'new@person.example'").run();
     expect('v78: …and carries the server\'s notices (an array, empty when all is well)', f.d && Array.isArray(f.d.server), JSON.stringify(f.d));
     {

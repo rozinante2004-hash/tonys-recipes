@@ -2336,7 +2336,7 @@ window.SELF_TESTS = [
         window.isAppOwner=function(){ return true; }; _workerHealth=null;
         window.fetch=async function(){ return new Response('{"error":"METER: not set up"}', { status:503 }); };
         var dot=document.getElementById('feedbackDot');
-        pathDots({ links:0, replies:0 });    // v38.02 — only the notes' own dot is measured here (restored after)
+        pathDots({ links:0, replies:0, invites:0 });    // v38.02 — only the notes' own dot is measured here (restored after; v39.62 — the invitation requests' too)
         if(!feedbackInboxHere()){
           await openManagement();
           if(/Feedback/.test(document.getElementById('manageOverlay').textContent)) throw new Error('the notes are shown in the '+APP_CONFIG.environment+' copy (only the family app reads them)');
@@ -2387,7 +2387,7 @@ window.SELF_TESTS = [
         // v37.94 — the owner's real dot comes back after the Self Test (it was hidden until the next count, 15 minutes).
         _fbLastNew=keptLast;
         try{ if(keptNew===null) localStorage.removeItem(FB_NEW_KEY); else localStorage.setItem(FB_NEW_KEY, keptNew); }catch(e){}
-        feedbackKnown(null);
+        feedbackKnown(null); inviteAsksKnown(null);
         try{ if(keptHidden===null) localStorage.removeItem(FB_HIDDEN_KEY); else localStorage.setItem(FB_HIDDEN_KEY, keptHidden);
              if(keptFirst===null) localStorage.removeItem(FB_FIRST_KEY); else localStorage.setItem(FB_FIRST_KEY, keptFirst); }catch(e){}
         var o=document.getElementById('feedbackOverlay'); if(o) o.remove();
@@ -3093,6 +3093,66 @@ window.SELF_TESTS = [
         if(window.mknManage) mknManage.close();
         _fbLastNew=real.last; try{ if(keptNew===null) localStorage.removeItem(FB_NEW_KEY); else localStorage.setItem(FB_NEW_KEY, keptNew); }catch(e){}
         feedbackKnown(null);
+      }
+    } },
+
+  // v39.62 — Tony, 10 Nov 2026: "Please add a red dot indicator when a new request is awaiting, as for reports."
+  { id:'invite_requests_dot', group:'Sharing', name:'🔴 A new invitation request puts a red dot on the way to it — ⚙️ → 👑 App owner → 📊 Households — as the reports do, in every copy (this copy’s own where the inbox is not read); the owner’s only; kept on the device; gone once none waits (v39.62)',
+    test: async()=>{
+      var here=APP_CONFIG.firebase.projectId;
+      var real={ owner:window.isAppOwner, fetch:window.fetch, h:_workerHealth, inbox:window.feedbackInboxHere, toast:window.toast, db:window.hhDb, told:_fbNewTold,
+                 user:window._fbUser, running:_selfTestRunning, move:window.feedbackMoveToInbox, invLast:_invLastNew, fbLast:_fbLastNew, links:_pathDots.links, replies:_pathDots.replies, chats:_pathDots.chats, family:_pathDots.family, gifts:_pathDots.gifts };
+      var keptInv=null, keptFb=null; try{ keptInv=localStorage.getItem(INV_NEW_KEY); keptFb=localStorage.getItem(FB_NEW_KEY); }catch(e){}
+      var toasts=[], answer={};
+      var head=function(){ return document.querySelector('.set-group[data-group="owner"] > .set-head > .path-dot'); };
+      var item=function(){ return document.querySelector('#settingsDrop [onclick*="openManagement"] > .path-dot'); };
+      var gear=document.getElementById('feedbackDot');
+      try{
+        window.toast=function(m){ toasts.push(String(m)); }; window.feedbackMoveToInbox=async function(){ return 0; };
+        window.hhDb=function(){ return { collection:function(){ return { where:function(){ return { limit:function(){ return { get:async function(){ return { size:0 }; } }; } }; } }; } }; };
+        window.isAppOwner=function(){ return true; }; _workerHealth={ ok:true, feedback:true };
+        window._fbUser={ uid:'uOwner', email:'owner@example.com', getIdToken:async function(){ return 'tok'; } };
+        // the start-up notice stays quiet while the Self Test runs: let it speak here (its toasts are caught above)
+        var tell=async function(){ _fbNewTold=false; _selfTestRunning=false; try { await feedbackTellOwner(); } finally { _selfTestRunning=real.running; } };
+        window.fetch=async function(u, init){ var b={}; try{ b=JSON.parse(init.body); }catch(e){} if(b.op==='notes-new') return new Response(JSON.stringify(answer), { status:200 }); return new Response('{}', { status:404 }); };
+        pathDots({ links:0, replies:0, chats:0, family:0, gifts:0, feedback:0, invites:0 });
+        // a copy that does not read the inbox: its own requests
+        window.feedbackInboxHere=function(){ return false; };
+        var by={}; by[here]=2; by['some-other-copy']=5;
+        answer={ new:9, notes:2, invites:7, invitesBy:by, server:[] };
+        await tell();
+        if(_pathDots.invites!==2 || !head() || !item() || !gear || gear.hidden) throw new Error('no red dot on the way to this copy’s 2 requests: '+JSON.stringify(_pathDots));
+        if(_pathDots.feedback) throw new Error('the reports’ dot shows where the inbox is not read');
+        if(!toasts.some(function(t){ return /✉️ 2 new invitation request/.test(t); })) throw new Error('not said: '+toasts.join(' | '));
+        if(localStorage.getItem(INV_NEW_KEY)!=='2') throw new Error('not kept on the device: '+localStorage.getItem(INV_NEW_KEY));
+        // remembered when the app opens, before the server answers
+        pathDots({ invites:0 }); _invLastNew=null; inviteAsksKnown(null);
+        if(_pathDots.invites!==2 || !item()) throw new Error('the remembered count was not shown');
+        // where the inbox is read: every copy's, and the reports' dot counts the reports only
+        window.feedbackInboxHere=function(){ return true; };
+        toasts=[]; await tell();
+        if(_pathDots.invites!==7 || _pathDots.feedback!==2) throw new Error('the counts where the inbox is read: '+JSON.stringify({ invites:_pathDots.invites, feedback:_pathDots.feedback }));
+        // the owner's only
+        window.isAppOwner=function(){ return false; }; inviteAsksKnown(4);
+        if(_pathDots.invites) throw new Error('someone other than the owner sees it');
+        window.isAppOwner=function(){ return true; };
+        // none waiting: gone (with no report waiting either)
+        feedbackKnown(0); inviteAsksKnown(0);
+        if(head() || item() || !gear.hidden) throw new Error('the dot stays once no request waits');
+        // the 15-minute count keeps it up to date in a copy that does not read the inbox
+        window.feedbackInboxHere=function(){ return false; }; by[here]=1;
+        answer={ new:6, notes:0, invites:6, invitesBy:by, server:[] };
+        var n=await feedbackCountNew(); inviteAsksKnown(inviteAsksFromServer());
+        if(n===null || _pathDots.invites!==1) throw new Error('the count from the server: '+_pathDots.invites);
+        return 'this copy’s own where the inbox is not read, every copy’s where it is; remembered; the owner’s only; gone at none';
+      } finally {
+        window.isAppOwner=real.owner; window.fetch=real.fetch; _workerHealth=real.h; window.feedbackInboxHere=real.inbox; window.toast=real.toast; window.hhDb=real.db;
+        _fbNewTold=real.told; window.feedbackMoveToInbox=real.move; window._fbUser=real.user; _selfTestRunning=real.running;
+        try{ if(keptInv===null) localStorage.removeItem(INV_NEW_KEY); else localStorage.setItem(INV_NEW_KEY, keptInv);
+             if(keptFb===null) localStorage.removeItem(FB_NEW_KEY); else localStorage.setItem(FB_NEW_KEY, keptFb); }catch(e){}
+        _invLastNew=real.invLast; _fbLastNew=real.fbLast;
+        pathDots({ links:real.links, replies:real.replies, chats:real.chats, family:real.family, gifts:real.gifts });
+        feedbackKnown(null); inviteAsksKnown(null);
       }
     } },
 
