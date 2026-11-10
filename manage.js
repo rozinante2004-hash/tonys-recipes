@@ -19,7 +19,8 @@
             errors: null, errorsError: '', errFilter: 'open', useCopy: '',   // v38.15
             picked: {},   // v38.16 — the notes ticked for 📋 Copy reports (v38.88: and 🗑 Delete selected)
             errPicked: {},   // v38.88 — the error reports ticked for 🗑 Delete selected
-            survey: null, surveyError: '' };   // v38.18 — 📝 the end-of-beta question
+            survey: null, surveyError: '',   // v38.18 — 📝 the end-of-beta question
+            invFilter: 'open', invited: {} };   // v39.61 — ✉️ Beta invitation requests: which shown; the addresses invited before
   function esc(v) { return escH(String(v == null ? '' : v)); }
   function money(v) { return '$' + (Number(v) || 0).toFixed(2); }
   // v67 — a copy may have its own allowance (the family's: $10, no first-month extra).
@@ -221,7 +222,9 @@
   }
   // v38.16 — the notes ticked, in the order shown (newest first), and all of each as text.
   function pickedNotes() { return (S.notes || []).filter(function (n) { return S.picked[n.key]; }); }
-  function shownNotes() { return (S.notes || []).filter(function (n) { return S.noteFilter === 'all' || n.status !== 'done'; }); }
+  // v39.61 — the invitation requests have their own tab: 💬 Feedback is the testers' notes only.
+  function fbNotes() { return (S.notes || []).filter(function (n) { return !isInviteAsk(n); }); }
+  function shownNotes() { return fbNotes().filter(function (n) { return S.noteFilter === 'all' || n.status !== 'done'; }); }
   function when(t) { var d = new Date(t || 0); return d.toLocaleString() + ' (UTC ' + d.toISOString().slice(0, 16).replace('T', ' ') + ')'; }
   function reportText(n, i, total) {
     var L = [];
@@ -245,10 +248,11 @@
       + list.map(function (n, i) { return reportText(n, i, list.length); }).join('\n\n');
   }
   function noteBy(key) { return (S.notes || []).filter(function (n) { return n.key === key; })[0]; }
-  function newCount() { return (S.notes || []).filter(function (n) { return n.status === 'new'; }).length; }
+  function newCount() { return fbNotes().filter(function (n) { return n.status === 'new'; }).length; }
   // v37.68 — the ⚙️ dot follows what is marked here.
   // v37.94 — what is counted here is a real count: kept on the device too (feedbackKnown).
-  function syncDot() { if (S.notes && !S.notesError && !S.notesPartial) { if (typeof feedbackKnown === 'function') feedbackKnown(newCount()); else if (typeof feedbackDot === 'function') feedbackDot(newCount()); } }
+  // v39.61 — the dot counts the new invitation requests too (they wait for him as well), where the inbox is read
+  function syncDot() { if (S.notes && !S.notesError && !S.notesPartial && (typeof feedbackInboxHere !== 'function' || feedbackInboxHere())) { var c = newCount() + invNew(); if (typeof feedbackKnown === 'function') feedbackKnown(c); else if (typeof feedbackDot === 'function') feedbackDot(c); } }
   // v39.21 — what to do about a refusal: this device's sign-in when that is the reason (ownerSignInWhy), else the rules
   function refusedHint(err, rules) {
     err = String(err || '');
@@ -263,13 +267,13 @@
     if (S.notesError) return '<div class="mg-note">The notes could not be read: ' + esc(S.notesError)
       + esc(refusedHint(S.notesError, ' \u2014 this copy\u2019s database rules need publishing (⚙️ → 🏠 My household → 👥 Family Access → Show rules).')) + '</div>';
     if (!S.notes) return '<div class="mg-empty">⏳ Reading the notes…</div>';
-    var list = S.notes.filter(function (n) { return S.noteFilter === 'all' || n.status !== 'done'; });
+    var list = shownNotes();
     // v38.16 — Tony: "select several feedback reports and in one click on a "Copy Reports" button,
     // will copy all relevant information, so I could paste it here … in one go".
     var nPicked = pickedNotes().length;
     var filt = '<div class="mg-tools" style="margin-bottom:10px;">'
       + '<button type="button" class="mg-btn' + (S.noteFilter === 'open' ? ' mg-primary' : '') + '" onclick="mknManage.noteFilter(\'open\')">Not done yet</button>'
-      + '<button type="button" class="mg-btn' + (S.noteFilter === 'all' ? ' mg-primary' : '') + '" onclick="mknManage.noteFilter(\'all\')">All (' + S.notes.length + ')</button>'
+      + '<button type="button" class="mg-btn' + (S.noteFilter === 'all' ? ' mg-primary' : '') + '" onclick="mknManage.noteFilter(\'all\')">All (' + fbNotes().length + ')</button>'
       + (list.length ? '<span class="mg-sep"></span>'
         + '<button type="button" class="mg-btn" id="mgPickAll" onclick="mknManage.pickAll(true)">☑ Select all shown</button>'
         + (nPicked ? '<button type="button" class="mg-btn" id="mgPickNone" onclick="mknManage.pickAll(false)">☐ Clear</button>' : '')
@@ -281,7 +285,7 @@
           + '<button type="button" class="mg-btn" id="mgDonePicked"' + (S.deleting ? ' disabled' : '') + ' onclick="mknManage.markPicked(\'done\')">✅ Done (' + nPicked + ')</button>'
           + '<button type="button" class="mg-btn mg-danger" id="mgDelPicked"' + (S.deleting ? ' disabled' : '') + ' onclick="mknManage.delPicked()">🗑 Delete selected (' + nPicked + ')</button>' : '') : '')
       + '</div>';
-    if (!list.length) return filt + '<div class="mg-empty">' + (S.notes.length ? 'Every note is done. 🎉' : 'No notes yet.') + '</div>';
+    if (!list.length) return filt + '<div class="mg-empty">' + (fbNotes().length ? 'Every note is done. 🎉' : 'No notes yet.') + '</div>';
     var tag = { new: '🆕 new', seen: '👀 seen', done: '✅ done' };
     return filt + list.map(function (n) {
       var subj = encodeURIComponent('Your note about My Kitchen Notes');
@@ -320,8 +324,72 @@
   }
   // v38.00 — a note from the inbox, with its writer known, can be answered in their app.
   function canReplyInApp(n) { return n.src === 'server' && !!n.uid && !!n.project; }
-  // v39.11 — a request for an invitation (Worker v97 invite-ask: no account, the address, a fixed opening)
-  function isInviteAsk(n) { return n.src === 'server' && !n.uid && !!n.email && /^\u2709\uFE0F Asks for an invitation/.test(String(n.text || '')); }
+  // v39.11 — a request for an invitation (Worker v97 invite-ask: no account, the address, a fixed opening); v39.61 — and a
+  // tester's for someone else (Worker v103 invite-for: the opening "… for someone else — asked by …", the asker's uid).
+  function isInviteAsk(n) { return n.src === 'server' && !!n.email && /^\u2709\uFE0F Asks for an invitation/.test(String(n.text || '')); }
+  // v39.61 — 📊 Households → ✉️ Beta invitation requests (Tony, 10 Nov 2026: "This email will reach me (perhaps as a new
+  // tab in the Households page, called Beta invitation requests) and I will decide whether I would like to send them an
+  // invite (each such line will have an "Invite" button next to it, sending the invitation to the new address)"; his
+  // answers: Invite opens the invitation filled in; the sent-recipe link's requests here too). Every copy's where the
+  // inbox is read (the family's and the community copy), this copy's own elsewhere (the test copy: to try it there).
+  function inboxHere() { return typeof feedbackInboxHere !== 'function' || feedbackInboxHere(); }
+  function invAsks() { return (S.notes || []).filter(function (n) { return isInviteAsk(n) && (inboxHere() || n.project === thisProject()); }); }
+  function invNew() { return invAsks().filter(function (n) { return n.status === 'new'; }).length; }
+  function invLang(n) { return /^he/i.test(String(n.lang || '')) ? 'he' : 'en'; }
+  function invWho(n) {
+    var t = String(n.text || ''), m = /^\u2709\uFE0F Asks for an invitation for someone else \u2014 asked by ([^\n]*?)\.(?:\n|$)/.exec(t);
+    if (m) return { tester: true, by: m[1], note: t.split('\n').slice(1).join('\n').replace(/^\u201c/, '').replace(/\u201d$/, '').trim() };
+    var g = /they opened a recipe sent by (.*?)\.$/.exec(t);
+    return { tester: false, from: g ? g[1] : '', note: '' };
+  }
+  // Who of them was invited before (this copy's testerInvites: the address's fingerprint, never the address).
+  async function loadInvited() {
+    var db = (typeof hhDb === 'function' && hhDb()) || window._fbDb, mine = invAsks().filter(function (n) { return n.project === thisProject(); });
+    if (!db || !mine.length || typeof inviteFingerprint !== 'function') return false;
+    var ids = {};
+    try { (await db.collection('testerInvites').get()).forEach(function (d) { ids[d.id] = 1; }); } catch (e) { return false; }
+    for (var i = 0; i < mine.length; i++) { try { if (ids[await inviteFingerprint(mine[i].email)]) S.invited[mine[i].email] = true; } catch (e) {} }
+    return true;
+  }
+  function invitesHtml() {
+    if (S.notesError) return '<div class="mg-note">The requests could not be read: ' + esc(S.notesError) + '</div>';
+    if (!S.notes) return '<div class="mg-empty">⏳ Reading the requests…</div>';
+    var all = invAsks(), list = all.filter(function (n) { return S.invFilter === 'all' || n.status !== 'done'; });
+    var filt = '<div class="mg-tools" style="margin-bottom:10px;">'
+      + '<button type="button" class="mg-btn' + (S.invFilter === 'open' ? ' mg-primary' : '') + '" onclick="mknManage.invFilter(\'open\')">Waiting</button>'
+      + '<button type="button" class="mg-btn' + (S.invFilter === 'all' ? ' mg-primary' : '') + '" onclick="mknManage.invFilter(\'all\')">All (' + all.length + ')</button></div>';
+    var intro = '<div class="mg-muted" style="margin:0 0 10px;line-height:1.5;">Testers ask here for an invitation for someone else (the share button, while the beta is by invitation only), and people who opened a sent recipe ask for themselves. '
+      + '✉️ Invite opens the invitation with the address and the language filled in: you see it and press Send, and the request is marked done.</div>';
+    if (!list.length) return filt + intro + '<div class="mg-empty">' + (all.length ? 'No request is waiting. 🎉' : 'No requests yet.') + '</div>';
+    var tag = { new: '🆕 new', seen: '👀 seen', done: '✅ done' };
+    return filt + intro + list.map(function (n) {
+      var w = invWho(n), k = escA(n.key), kj = jsA(n.key), lang = invLang(n);
+      var asked = w.tester ? 'Asked by ' + esc(w.by) : 'Asked for themselves' + (w.from ? ', after opening a recipe sent by ' + esc(w.from) : '');
+      return '<div class="mg-card mg-inv' + (n.status === 'new' ? ' mg-new' : '') + '" id="mgInv-' + k + '">'
+        + '<div class="mg-ptop"><div><b class="mg-email" dir="ltr">' + esc(n.email) + '</b>' + (n.name ? ' <span dir="auto">' + esc(n.name) + '</span>' : '')
+        + (n.copy ? ' <span class="mg-copy">' + esc(n.copy) + '</span>' : '')
+        + '<div class="mg-muted">' + new Date(n.at || 0).toLocaleString() + ' · ' + (lang === 'he' ? 'the invitation in Hebrew' : 'the invitation in English') + '</div></div>'
+        + '<span class="mg-muted">' + (S.invited[n.email] ? '✅ invited' : (tag[n.status] || esc(n.status))) + '</span></div>'
+        + '<div class="mg-text" dir="auto">' + asked + '</div>'
+        + (w.note ? '<div class="mg-text" dir="auto">\u201c' + esc(w.note) + '\u201d</div>' : '')
+        + (S.invited[n.email] ? '<div class="mg-muted" style="margin-top:4px;">This address was invited before (from this copy).</div>' : '')
+        + '<div class="mg-tools" style="margin-top:8px;">'
+        + '<button type="button" class="mg-btn mg-primary" onclick="mknManage.inviteFor(' + kj + ')" title="Opens ✉️ Invite testers with this address and language filled in — in the copy the request came from">✉️ Invite</button>'
+        + (n.status !== 'done' ? '<button type="button" class="mg-btn" onclick="mknManage.mark(' + kj + ',\'done\')" title="No invitation for now: the request moves to All">🙅 Not now</button>'
+          : '<button type="button" class="mg-btn" onclick="mknManage.mark(' + kj + ',\'new\')">↩︎ Back to waiting</button>')
+        + '<button type="button" class="mg-btn mg-danger" onclick="mknManage.delNote(' + kj + ')" aria-label="Remove this request">🗑</button></div></div>';
+    }).join('');
+  }
+  // The invitation window says which addresses it sent to (testerInvitesAdd): their requests are done.
+  window.inviteAsksSent = function (addrs) {
+    var set = {}; (addrs || []).forEach(function (a) { set[String(a || '').toLowerCase()] = 1; });
+    invAsks().forEach(function (n) {
+      if (!set[n.email] || n.project !== thisProject()) return;
+      S.invited[n.email] = true;
+      if (n.status !== 'done') api.mark(n.key, 'done');
+    });
+    if (document.getElementById('manageOverlay')) render();
+  };
   function repliesHtml(n) {
     var list = n.src === 'server' ? (S.replies[n.id] || []) : [];
     return list.map(function (x) {
@@ -468,7 +536,7 @@
     // v39.17 — shown as their keys until now
     'access.usual-colours': 'Usual colours', 'access.red-green': 'Red–green colours',
     'sound.glass': 'Spoon on a wine glass', 'sound.bell': 'The service bell', 'sound.pot': 'Wooden spoon on a pot', 'sound.muted': 'Muted',
-    'invite-testers': 'Invited testers (the owner)', 'rank.look': 'Looked at the recipe badge'
+    'invite-testers': 'Invited testers (the owner)', 'invite-for-other': 'Asked for an invitation for someone else', 'rank.look': 'Looked at the recipe badge'
   };
   var LANG_NAMES = { en: 'English', he: 'Hebrew', ar: 'Arabic', ru: 'Russian', fr: 'French', es: 'Spanish', de: 'German', it: 'Italian', pt: 'Portuguese', zh: 'Chinese', ja: 'Japanese', hu: 'Hungarian' };
   function useWord(k) {
@@ -820,15 +888,21 @@
     var nc = newCount();
     // v37.73 — the notes are read in the family app only (Tony: never in the beta's).
     var inbox = typeof feedbackInboxHere !== 'function' || feedbackInboxHere();
-    if (!inbox) S.tab = 'households';
-    var tabs = !inbox ? '' : '<div class="mg-tabs" role="tablist">'
+    if (!inbox && S.tab !== 'invites') S.tab = 'households';   // v39.61 — the invitation requests' tab in every copy
+    var invN = invNew();
+    var invTab = '<button type="button" role="tab" aria-selected="' + (S.tab === 'invites') + '" class="mg-tab' + (S.tab === 'invites' ? ' mg-on' : '') + '" onclick="mknManage.tabTo(\'invites\')">✉️ Beta invitation requests' + (invN ? ' <span class="mg-badge">' + invN + '</span>' : '') + '</button>';
+    var tabs = !inbox ? '<div class="mg-tabs" role="tablist">'
+      + '<button type="button" role="tab" aria-selected="' + (S.tab === 'households') + '" class="mg-tab' + (S.tab === 'households' ? ' mg-on' : '') + '" onclick="mknManage.tabTo(\'households\')">🏠 Households</button>'
+      + invTab + '</div>' : '<div class="mg-tabs" role="tablist">'
       + '<button type="button" role="tab" aria-selected="' + (S.tab === 'households') + '" class="mg-tab' + (S.tab === 'households' ? ' mg-on' : '') + '" onclick="mknManage.tabTo(\'households\')">🏠 Households</button>'
       + '<button type="button" role="tab" aria-selected="' + (S.tab === 'feedback') + '" class="mg-tab' + (S.tab === 'feedback' ? ' mg-on' : '') + '" onclick="mknManage.tabTo(\'feedback\')">💬 Feedback' + (nc ? ' <span class="mg-badge">' + nc + '</span>' : '') + '</button>'
+      + invTab
       // v38.15 — what the testers' apps report by themselves (Worker v69).
       + '<button type="button" role="tab" aria-selected="' + (S.tab === 'errors') + '" class="mg-tab' + (S.tab === 'errors' ? ' mg-on' : '') + '" onclick="mknManage.tabTo(\'errors\')">⚠️ Errors' + (errNew() ? ' <span class="mg-badge">' + errNew() + '</span>' : '') + '</button>'
       + '<button type="button" role="tab" aria-selected="' + (S.tab === 'use') + '" class="mg-tab' + (S.tab === 'use' ? ' mg-on' : '') + '" onclick="mknManage.tabTo(\'use\')">📈 Use</button>'
       + '<button type="button" role="tab" aria-selected="' + (S.tab === 'survey') + '" class="mg-tab' + (S.tab === 'survey' ? ' mg-on' : '') + '" onclick="mknManage.tabTo(\'survey\')">📝 Beta question</button></div>';
     if (S.tab === 'feedback') { body.innerHTML = tabs + notesHtml(); return; }
+    if (S.tab === 'invites') { body.innerHTML = tabs + invitesHtml(); return; }   // v39.61
     if (S.tab === 'errors') { body.innerHTML = tabs + errorsHtml(); return; }
     if (S.tab === 'use') { body.innerHTML = tabs + (S.loading ? '<div class="mg-empty">⏳ Reading every household…</div>' : useHtml()); return; }
     if (S.tab === 'survey') { body.innerHTML = tabs + surveyHtml(); return; }
@@ -1116,11 +1190,13 @@
       }
       // v38.10 — a read overtaken by a newer one changes nothing at all: not the page, not the dot
       // (CI: a late one re-counted the ⚙️ dot from notes since marked done, and hid it).
-      if (typeof feedbackInboxHere !== 'function' || feedbackInboxHere()) loadNotes().then(function (fresh) { if (fresh === false) return; render(); syncDot(); });
+      // v39.61 — and elsewhere too, for the ✉️ Beta invitation requests' count (this copy's own)
+      loadNotes().then(function (fresh) { if (fresh === false) return; render(); syncDot(); });
       if (typeof feedbackInboxHere !== 'function' || feedbackInboxHere()) loadErrors().then(function (fresh) { if (fresh !== false) render(); });   // v38.15 — the ⚠️ count
       return api.reload();
     },
     tabTo: function (t) { S.tab = t; render(); if (t === 'feedback' && !S.notes) loadNotes().then(function (fresh) { if (fresh !== false) render(); });
+      if (t === 'invites') (S.notes ? Promise.resolve(true) : loadNotes()).then(function (fresh) { if (fresh === false) return; render(); return loadInvited().then(function (ok) { if (ok) render(); }); });   // v39.61
       if (t === 'errors' && !S.errors) loadErrors().then(function (fresh) { if (fresh !== false) render(); });
       if (t === 'survey') loadSurvey().then(render);
       if (t === 'use' && !S.trends && !S.trendsLoading) { S.trendsLoading = true; render(); loadTrends().then(function () { S.trendsLoading = false; render(); }); } },   // v38.30
@@ -1218,6 +1294,7 @@
     useCopy: function (c) { S.useCopy = c; render(); },
     _errors: loadErrors,
     noteFilter: function (f) { S.noteFilter = f; render(); },
+    invFilter: function (f) { S.invFilter = f === 'all' ? 'all' : 'open'; render(); },   // v39.61
     // v38.16 — tick notes, then 📋 Copy reports: everything about each, as one text.
     pick: function (key, on) { if (on) S.picked[key] = true; else delete S.picked[key]; render(); return pickedNotes().length; },
     pickAll: function (on) { S.picked = {}; if (on) shownNotes().forEach(function (n) { S.picked[n.key] = true; }); render(); return pickedNotes().length; },
@@ -1265,10 +1342,11 @@
     },
     inviteFor: function (key) {
       var n = noteBy(key); if (!n || !n.email) return false;
-      if (!n.project || n.project === thisProject()) return typeof openInviteTesters === 'function' ? openInviteTesters({ to: n.email }) : false;
+      var lang = isInviteAsk(n) ? invLang(n) : '';   // v39.61 — in the language the request asked for
+      if (!n.project || n.project === thisProject()) return typeof openInviteTesters === 'function' ? openInviteTesters({ to: n.email, lang: lang }) : false;
       var u = copyUrl(n.project).replace(/\?manage$/, '');
       if (!u) { toast('Open ✉️ Invite testers in the ' + copyOf(n.project) + ' copy — the request came from there.'); return false; }
-      window.open(u + '#invite=' + encodeURIComponent(n.email), '_blank', 'noopener');
+      window.open(u + '#invite=' + encodeURIComponent(n.email) + (lang ? '&lang=' + lang : ''), '_blank', 'noopener');
       return 'other';
     },
     copyLog: function (key) { var n = noteBy(key); if (n && typeof fbProbeCopy === 'function') fbProbeCopy(n.log, 'The log'); },

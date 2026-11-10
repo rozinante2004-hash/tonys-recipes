@@ -1138,6 +1138,11 @@ console.log('\nAI per household (v60):');
     expect('the owner reads every copy\'s notes, from any copy, newest first', f.status === 200 && f.d.notes.length === 2 && f.d.notes.map(n => n.project).sort().join() === 'recipes-f379d,tonys-recipes-test', JSON.stringify(f.d).slice(0, 200));
     f = await fb({ action: 'meter-admin', op: 'notes-new', idToken: tOwner });
     expect('…counts the new ones', f.d && f.d.new === 2, JSON.stringify(f.d));
+    // v103 — the invitation requests counted apart (the whole stays as it was, for apps before v39.61)
+    db.raw.prepare("INSERT INTO feedback (project, uid, email, name, hid, household, text, shot, log, version, env, device, lang, at, status) VALUES ('tonys-recipes-test','','new@person.example','','','','\u2709\uFE0F Asks for an invitation.','','','v39.61','test','x','en',?,'new')").run(Date.now());
+    f = await fb({ action: 'meter-admin', op: 'notes-new', idToken: tOwner });
+    expect('v103: …the notes and the new invitation requests apart, and the whole as before', f.d && f.d.new === 3 && f.d.notes === 2 && f.d.invites === 1, JSON.stringify(f.d));
+    db.raw.prepare("DELETE FROM feedback WHERE email = 'new@person.example'").run();
     expect('v78: …and carries the server\'s notices (an array, empty when all is well)', f.d && Array.isArray(f.d.server), JSON.stringify(f.d));
     {
       const before = db.raw.prepare('SELECT last_at FROM owner_devices').all().map(r => r.last_at).join();
@@ -2150,6 +2155,15 @@ console.log('\nReports to the private repository (v90):');
   await hourly(env);
   const l3 = db.raw.prepare("SELECT issue FROM report_links WHERE kind = 'note' AND ref = '3'").get();
   expect('v90: …and goes on the next run', l3 && l3.issue > 0, JSON.stringify(l3));
+  // v103 — invitation requests (a sent recipe's link, or a tester for someone else) are not reports: never sent on
+  {
+    const n0 = calls.length;
+    note.run('my-kitchen-notes-beta', '', 'new@person.example', '', '', '', '\u2709\uFE0F Asks for an invitation \u2014 they opened a recipe sent by Dana\u2019s Kitchen.', '', '', 'v39.60', 'beta', 'x', 'he', Date.now(), 'new');
+    note.run('my-kitchen-notes-beta', 'uSecret1', 'friend@person.example', 'Ruth Friend', 'hDana', 'Dana\'s Kitchen', '\u2709\uFE0F Asks for an invitation for someone else \u2014 asked by Dana Tester (Dana\'s Kitchen).\n\u201cMy sister\u201d', '', '', 'v39.61', 'beta', 'x', 'en', Date.now(), 'new');
+    await hourly(env);
+    const sentNow = JSON.stringify(calls.slice(n0).map(c => c.b));
+    expect('v103: invitation requests are never sent on to the reports repository', calls.length === n0 && !/Asks for an invitation|Ruth|person\.example/.test(sentNow), sentNow.slice(0, 300));
+  }
   // without the token: nothing at all
   const db2 = d1(); const e2 = { METER_DB: db2, __fetch: async () => { throw new Error('no token, no call'); } };
   await hourly(e2);
@@ -2250,6 +2264,74 @@ console.log('\nAsking for an invitation (v97):');
   await ask({ email: 'b@example.com' }, '192.0.2.12'); await ask({ email: 'c@example.com' }, '192.0.2.12'); await ask({ email: 'd@example.com' }, '192.0.2.12');
   a = await ask({ email: 'e@example.com' }, '192.0.2.12');
   expect('v97: three a day from one network address, then refused', a.status === 429 && a.d.rateLimited === true, JSON.stringify(a));
+}
+
+console.log('\nA tester asks for an invitation for someone else (v103):');
+{
+  const { DatabaseSync } = await import('node:sqlite');
+  const raw = new DatabaseSync(':memory:');
+  const stmt = (sql, args) => ({ bind: (...a) => stmt(sql, a), first: async () => raw.prepare(sql).get(...(args || [])) || null,
+    all: async () => ({ results: raw.prepare(sql).all(...(args || [])) }),
+    run: async () => { const x = raw.prepare(sql).run(...(args || [])); return { success: true, meta: { last_row_id: Number(x.lastInsertRowid), changes: Number(x.changes) } }; },
+    _run() { raw.prepare(sql).run(...(args || [])); } });
+  const db = { raw, prepare: (sql) => stmt(sql, []), batch: async (l) => { l.forEach(x => x._run()); return []; } };
+  raw.exec('CREATE TABLE IF NOT EXISTS feedback (id INTEGER PRIMARY KEY AUTOINCREMENT, project TEXT, uid TEXT, email TEXT, name TEXT, hid TEXT, household TEXT, text TEXT, shot TEXT, log TEXT, version TEXT, env TEXT, device TEXT, lang TEXT, at INTEGER, status TEXT)');   // made once per isolate, by an earlier section
+  // (the server makes it once per run; this test's own database needs it made here, as the v97 test does)
+  const kp = await crypto.subtle.generateKey({ name: 'RSASSA-PKCS1-v1_5', modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' }, true, ['sign', 'verify']);
+  const pub = await crypto.subtle.exportKey('jwk', kp.publicKey);
+  const b64u = (x) => Buffer.from(typeof x === 'string' ? x : JSON.stringify(x)).toString('base64url');
+  const tok = async (claims) => { const now = Math.floor(Date.now() / 1000);
+    const c = Object.assign({ iss: 'https://securetoken.google.com/my-kitchen-notes-beta', aud: 'my-kitchen-notes-beta', sub: 'uT', email: 'tester@example.com', email_verified: true, name: 'Dana Tester', iat: now - 10, exp: now + 3600 }, claims);
+    const head = b64u({ alg: 'RS256', kid: 'i1' }), bd = b64u(c);
+    const sig = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', kp.privateKey, new TextEncoder().encode(head + '.' + bd));
+    return head + '.' + bd + '.' + Buffer.from(sig).toString('base64url'); };
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (url, init) => {
+    url = String(url);
+    if (url.startsWith('https://fs.inv/')) {
+      const m = /households\/([^/]+)(?:\/members\/([^/?]+))?$/.exec(url);
+      const ok = m && m[1] === 'hT' && (!m[2] || m[2] === 'uT');
+      if (m && m[2]) return new Response(ok ? '{"fields":{"role":{"stringValue":"viewer"}}}' : '{}', { status: ok ? 200 : 403 });
+      return new Response(JSON.stringify({ fields: { name: { stringValue: 'Dana’s Kitchen' } } }), { status: 200 });
+    }
+    return realFetch(url, init);
+  };
+  class FakeEmail { constructor(from, to, rawMail) { this.raw = rawMail; } }
+  const mails = [];
+  const env = { METER_DB: db, __testKeys: { i1: Object.assign({ kid: 'i1' }, pub) }, __firestoreBase: 'https://fs.inv',
+    ALERTS: { send: async m => { mails.push(m); } }, ALERT_TO: 'owner@example.com', __EmailMessage: FakeEmail };
+  const ask = async (body) => { const r = await worker.fetch(post(Object.assign({ action: 'invite-for', hid: 'hT', email: 'Ruth@Friend.Example', name: 'Ruth', note: 'My sister — loves baking', lang: 'he', env: 'beta', version: 'v39.61' }, body), 'https://mykitchennotes.community'), env);
+    let d = null; try { d = await r.json(); } catch (e) {} return { status: r.status, d }; };
+  try {
+    const t = await tok({});
+    let a = await ask({ idToken: t });
+    if (a.status !== 200) console.log('  (the first ask answered ' + JSON.stringify(a) + ')');
+    const row = a.status === 200 ? raw.prepare("SELECT * FROM feedback WHERE email = 'ruth@friend.example'").get() : null;
+    expect('v103: a member asks for an invitation for someone else: kept in the inbox, the person\'s address and name, the invitation\'s language',
+      a.status === 200 && a.d.ok === true && row && row.project === 'my-kitchen-notes-beta' && row.name === 'Ruth' && row.lang === 'he' && row.status === 'new', JSON.stringify([a, row]));
+    expect('v103: …who asked from the sign-in and the kitchen from the database (not from the request)',
+      row && row.uid === 'uT' && row.hid === 'hT' && row.household === 'Dana’s Kitchen' && /^✉️ Asks for an invitation for someone else — asked by Dana Tester \(Dana’s Kitchen\)\.\n“My sister — loves baking”$/.test(row.text), row && row.text);
+    expect('v103: …no address in the words themselves', row && !/@/.test(row.text), row && row.text);
+    expect('v103: …and the owner hears of it, with the address and where to find it',
+      mails.length === 1 && /for someone else/i.test(mails[0].raw) && /ruth@friend\.example/.test(mails[0].raw) && /Beta invitation requests/.test(mails[0].raw), JSON.stringify(mails.map(m => m.raw.slice(0, 300))));
+    a = await ask({ idToken: t, email: 'ruth@friend.example' });
+    expect('v103: the same address again (30 days) is kept once', a.status === 200 && a.d.already === true && raw.prepare('SELECT COUNT(*) AS n FROM feedback').get().n === 1, JSON.stringify(a));
+    a = await ask({ idToken: t, email: 'Tester@Example.com' });
+    expect('v103: one\'s own address is refused', a.status === 400 && a.d.own === true, JSON.stringify(a));
+    a = await ask({ idToken: t, email: 'not-an-address' });
+    expect('v103: something that is not an address is refused', a.status === 400, JSON.stringify(a));
+    a = await ask({});
+    expect('v103: without signing in, refused', a.status === 401, JSON.stringify(a));
+    a = await ask({ idToken: await tok({ email_verified: false }) });
+    expect('v103: an unconfirmed address may not ask', a.status === 403, JSON.stringify(a));
+    a = await ask({ idToken: await tok({ sub: 'uStranger' }), email: 'x1@friend.example' });
+    expect('v103: someone not in the kitchen may not ask', a.status === 403 && raw.prepare('SELECT COUNT(*) AS n FROM feedback').get().n === 1, JSON.stringify(a));
+    a = await ask({ idToken: await tok({ aud: 'someone-elses-app', iss: 'https://securetoken.google.com/someone-elses-app' }), email: 'x2@friend.example' });
+    expect('v103: a copy this server does not serve is refused', a.status === 400 || a.status === 401, JSON.stringify(a));
+    for (let i = 0; i < 9; i++) await ask({ idToken: t, email: 'p' + i + '@friend.example' });
+    a = await ask({ idToken: t, email: 'p10@friend.example' });
+    expect('v103: ten a day from one tester, then refused', a.status === 429 && a.d.rateLimited === true && raw.prepare('SELECT COUNT(*) AS n FROM feedback').get().n === 10, JSON.stringify(a));
+  } finally { globalThis.fetch = realFetch; }
 }
 
 console.log('\nA recipe e-mailed by the server (v98), the owner warned when it runs short or fails, a sent recipe e-mailed (v99):');
@@ -2355,7 +2437,7 @@ console.log('\nA recipe e-mailed by the server (v98), the owner warned when it r
     a = await mail({ idToken: t }, Object.assign({}, env, { RESEND_API_KEY: '' }));
     expect('v98: no key on the server: "not set up yet"', a.status === 503 && a.d.needsConfig === true, JSON.stringify(a));
     const h = await (await worker.fetch(post({ action: 'health' }), env)).json();
-    expect('v98: health says e-mail can be sent', h.mail === true && h.version === 'v102', JSON.stringify([h.mail, h.version]));
+    expect('v98: health says e-mail can be sent', h.mail === true && h.version === (/const WORKER_VERSION = '(v\d+)'/.exec((await import('node:fs')).readFileSync(new URL('../cloudflare-worker.js', import.meta.url), 'utf8')) || [])[1], JSON.stringify([h.mail, h.version]));
 
     // v99 — the owner hears of it (Tony: "make sure I get a warning if quota is exceeded or if any issues arise")
     let nt = notice('mail-down');

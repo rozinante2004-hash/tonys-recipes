@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.60 -->
+<!-- Tony's Recipes Collection v39.61 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -5219,14 +5219,15 @@ var _openManageOnSignIn = false;
 })();
 // v39.11 — …#invite=<address> (💬 Feedback → ✉️ Send invitation, for a request that came from this copy): ✉️ Invite
 // testers opens with it in To, once the owner is signed in. After # it never reaches a server; taken out at once.
-var _inviteOnSignIn = '';
+var _inviteOnSignIn = '', _inviteLangOnSignIn = '';   // v39.61 — and &lang=he|en, the language the request asked for
 (function captureInvite() {
   try {
     var m = /(?:^#|&)invite=([^&]+)/.exec(location.hash);
     if (!m) return;
     var em = ''; try { em = decodeURIComponent(m[1]).trim().toLowerCase(); } catch(e2) {}
     if (/^[^\s@<>"']+@[^\s@<>"']+\.[^\s@<>"']{2,}$/.test(em)) _inviteOnSignIn = em;
-    history.replaceState(null, '', location.pathname + location.search + location.hash.replace(/(^#|&)invite=[^&]*/, '$1').replace(/^#&/, '#').replace(/^#$/, ''));
+    var lm = /(?:^#|&)lang=(he|en)(?:&|$)/.exec(location.hash); if (lm) _inviteLangOnSignIn = lm[1];
+    history.replaceState(null, '', location.pathname + location.search + location.hash.replace(/(^#|&)invite=[^&]*/, '$1').replace(/(^#|&)lang=(he|en)(?=&|$)/, '$1').replace(/&&+/g, '&').replace(/^#&/, '#').replace(/&$/, '').replace(/^#$/, ''));
   } catch(e) {}
 })();
 // v39.22 — …#resetpw=<address> (📊 Households → 🔑 Reset password, for a household of this copy opened from another
@@ -8286,8 +8287,8 @@ async function householdUse(hid, role) {
   if (!_selfTestRunning && typeof surveyMaybe === 'function') setTimeout(function(){ surveyMaybe().catch(function(){}); }, 9000);   // v38.18 — only once Tony opens it
   if (_openManageOnSignIn && typeof isAppOwner === 'function' && isAppOwner()) { _openManageOnSignIn = false; setTimeout(function(){ openManagement(); }, 800); }
   if (_inviteOnSignIn && typeof isAppOwner === 'function' && isAppOwner()) {   // v39.11
-    var inviteTo = _inviteOnSignIn; _inviteOnSignIn = '';
-    setTimeout(async function(){ for (var w = 0; w < 100 && document.getElementById('askOverlay'); w++) await wait(300); openInviteTesters({ to: inviteTo }); }, 900);
+    var inviteTo = _inviteOnSignIn, inviteLang = _inviteLangOnSignIn; _inviteOnSignIn = ''; _inviteLangOnSignIn = '';
+    setTimeout(async function(){ for (var w = 0; w < 100 && document.getElementById('askOverlay'); w++) await wait(300); openInviteTesters({ to: inviteTo, lang: inviteLang }); }, 900);
   }
   if (_resetPwOnSignIn && typeof isAppOwner === 'function' && isAppOwner()) {   // v39.22
     var resetTo = _resetPwOnSignIn; _resetPwOnSignIn = '';
@@ -10060,8 +10061,10 @@ async function feedbackTellOwner() {
   try { await feedbackMoveToInbox(); } catch(e) {}
   if (!feedbackInboxHere()) { feedbackDot(null); return 0; }
   feedbackKnown(null);                       // v37.94 — the last count straight away, while the inbox is asked
-  var n = await feedbackCountNew();
-  if (n) toast('\u{1F4AC} ' + n + ' new note' + (n === 1 ? '' : 's') + ' from testers — ⚙️ → 👑 App owner → \u{1F4CA} Households → \u{1F4AC} Feedback', 10000, goFeedback);
+  var n = await feedbackCountNew(), iv = n ? Math.min(_inviteAsksNew || 0, n) : 0, notes = (n || 0) - iv;
+  if (notes) toast('\u{1F4AC} ' + notes + ' new note' + (notes === 1 ? '' : 's') + ' from testers — ⚙️ → 👑 App owner → \u{1F4CA} Households → \u{1F4AC} Feedback', 10000, goFeedback);
+  // v39.61 — the invitation requests said apart, with their own way there (after the notes' toast, if there is one)
+  if (iv) setTimeout(function(){ toast('\u2709\uFE0F ' + iv + ' new invitation request(s) — ⚙️ → 👑 App owner → \u{1F4CA} Households → \u2709\uFE0F Beta invitation requests', 10000, goInviteAsks); }, notes ? 10500 : 0);
   feedbackKnown(n);
   return n || 0;
 }
@@ -10092,6 +10095,7 @@ async function feedbackMoveToInbox() {
 // be asked (just after an update the Worker or the sign-in may not answer yet)
 // is now "not known" (null), never "nothing new"; the last count is kept on the
 // device and shown until a real answer replaces it.
+var _inviteAsksNew = 0;
 async function feedbackCountNew() {
   var n = 0;
   try { n += (await hhDb().collection('feedback').where('status', '==', 'new').limit(100).get()).size; } catch(e) {}
@@ -10104,6 +10108,7 @@ async function feedbackCountNew() {
       var d = await r.json();
       if (!r.ok || !d) return null;
       n += d.new || 0;
+      _inviteAsksNew = typeof d.invites === 'number' ? d.invites : 0;   // v39.61 — Worker v103: the invitation requests apart
       if (d.server && typeof serverNoticeFrom === 'function') serverNoticeFrom(d.server);   // v38.54 — Worker v78
     }
   } catch(e) { return null; }
@@ -11025,7 +11030,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.60';
+var APP_VERSION = 'v39.61';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -14533,7 +14538,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.60</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.61</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14621,7 +14626,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.60</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.61</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -15432,13 +15437,7 @@ body.banner-shown .header {
       <div id="shareAppSub" style="font-size:12px;color:var(--muted);margin-top:4px;">Send this link to anyone — they can open it in their browser and install it on their phone or desktop.</div>
     </div>
     <div class="modal-body">
-      <!-- v38.69 — Tony: testers may add family members to their household, but not share the app with non-testers -->
-      <div id="shareAppClosed" hidden>
-        <div style="font-size:13px;color:var(--ink);line-height:1.6;margin-bottom:12px;">My Kitchen Notes takes new members by invitation only for now. To cook together, invite the people you cook with to your kitchen: they join it with 👁 Read only, and you can let them add recipes once they are in.</div>
-        <div class="share-app-actions"><button class="share-app-btn" id="shareAppInviteBtn" onclick="closeM('shareAppOverlay');householdInvite()">🔗 Invite someone to my kitchen</button></div>
-        <div id="shareAppAskOwner" hidden style="font-size:13px;color:var(--ink);line-height:1.6;">Only your kitchen’s owner or its managers can invite people. Ask them to invite the person.</div>
-        <div style="font-size:12px;color:var(--muted);margin-top:12px;line-height:1.6;">On your own other devices: open <b id="shareAppSite" dir="ltr"></b> there and sign in with the same account.</div>
-      </div>
+      <!-- v39.61 — while the copy is by invitation only, everyone but the owner gets openInviteForOther() instead of this window -->
       <div id="shareAppOpen">
       <div style="font-size:13px;font-weight:500;color:var(--ink);margin-bottom:6px;">App link:</div>
       <div class="share-app-url" id="shareAppUrl">Loading…</div>
@@ -15861,6 +15860,7 @@ body.banner-shown .header {
       <!-- v39.58 — the newest features, where people look first -->
       <span class="help-suggestion" onclick="askHelpQ('How do I link one recipe to another?')">Link recipes?</span>
       <span class="help-suggestion" onclick="askHelpQ('How do I make a collection of recipes?')">Make a collection?</span>
+      <span class="help-suggestion" onclick="askHelpQ('How do I ask for an invitation for a friend?')">Invite a friend?</span>
     </div>
     <div id="helpAnswer" style="display:none;" class="help-answer"></div>
     <div id="helpLoading" style="display:none;text-align:center;padding:20px;color:var(--muted);font-size:13px;">🤔 Thinking...</div>
@@ -18230,6 +18230,15 @@ window.i18nTemplatesOf = i18nTemplatesOf; window.i18nTemplateCovers = i18nTempla
 // translating a string nobody sees. A `{1}` makes it a shape, matched the same
 // way a built toast is.
 var I18N_EXTRA = [
+  // v39.61 — ✉️ Ask for an invitation for someone else (drawn by code)
+  '\u2709\uFE0F Ask for an invitation for someone else',
+  'Know someone who would enjoy My Kitchen Notes? The beta is by invitation only: ask the app\u2019s owner to invite them. The owner decides, and sends the invitation.',
+  'Their name', 'A word about them', '(if you like)', 'My sister \u2014 she loves baking', 'The invitation in', '\uD83D\uDCE8 Send the request',
+  'Their address, and what you write, goes only to the app\u2019s owner, to decide on the invitation.',
+  'To bring someone into your own kitchen instead: \u2699\uFE0F Settings \u2192 \uD83C\uDFE0 My household \u2192 \uD83D\uDC65 Family Access.',
+  'That is your own address \u2014 type the address of the person you would like to invite.',
+  'That is enough requests for today \u2014 try again tomorrow.', 'The app\u2019s owner could not be asked from this account: {1}',
+  'It could not be sent just now \u2014 try again in a moment.',
   // v39.55 — asking an admin to delete, and the admins' answers (drawn by code)
   '\uD83D\uDDD1\uFE0F Ask an admin to delete', 'Ask an admin to delete \u201C{1}\u201D?', 'Send the request',
   'Deleting a recipe is for your kitchen\u2019s owner and admins. This sends them your request \u2014 one tap there deletes it.',
@@ -18303,8 +18312,8 @@ var I18N_EXTRA = [
   '🎨 Blue for all right, orange for a problem — on this device', '🎨 The usual colours again',
   // v38.71 — Send to Bring!: where to get it
   'Get it from the App Store', 'Get it on Google Play', 'Get Bring! for your phone, or use it on the web',
-  // v38.70 — the share labels while the copy is by invitation only
-  'Share this app with family', 'Share This App with Family',
+  // v38.70 — the share labels while the copy is by invitation only; v39.61 — the share button asks for an invitation instead
+  'Ask for an invitation for someone else', 'Share this app', 'Share This App',
   // the long-job panel
   'almost done', 'a few more seconds', 'about {1} seconds left',
   'about a minute left', 'about {1} minutes left', 'finishing…',
@@ -26744,6 +26753,12 @@ async function goFeedback() {
   if (window.mknManage && typeof mknManage.tabTo === 'function') mknManage.tabTo('feedback');
   return true;
 }
+async function goInviteAsks() {   // v39.61
+  if (await openManagement() === false) return false;
+  if (window.mknManage && typeof mknManage.tabTo === 'function') mknManage.tabTo('invites');
+  return true;
+}
+window.goInviteAsks = goInviteAsks;
 window.toastHide = toastHide; window.toastLand = toastLand; window.goRecipe = goRecipe; window.goSettings = goSettings;
 window.goKitchen = goKitchen; window.goFamilyAccess = goFamilyAccess; window.goFeedback = goFeedback;
 // An import's toast leads to the recipe — not while a WhatsApp batch opens the next one
@@ -33484,6 +33499,7 @@ function appFeatureSections(all) {
       'Keep your own copy of a recipe from a linked household.',
       'A linked household’s recipe opens just like yours — as wide, and on a computer you can drag its corner to make it bigger.',   // v39.58
       'Someone who may not delete recipes asks an admin with one tap — 🗑️ Ask an admin to delete.',   // v39.55
+      'Know someone who would enjoy it? While the app takes new members by invitation only, the share button asks its owner to invite them.',   // v39.61
       'Ask to join a household, or to link with one, by e-mail or by its identifier (MKN-…) — and accept, decline or block the requests you get.',
       'Share a recipe on WhatsApp, by e-mail, or as a web page that opens anywhere.' ] },
     { icon: '\u{1F4E5}', title: 'Save recipes from anywhere', items: [
@@ -33749,40 +33765,127 @@ function appShareUrl() {
 window.appShareUrl = appShareUrl;
 async function openShareAppModal() {
   if (typeof insightCount === 'function') insightCount('share-app');
+  // v38.69 — Tony, 20 Oct: "I would like them to be able to add family members to their household, but not share it
+  // with non-testers." v39.61 — Tony, 10 Nov: "I would rather they still use the long path (⚙️ Settings → 🏠 My household
+  // → 👥 Family Access), and change the share button to open a new modal saying "ask for an invitation for someone
+  // else"." While the copy takes newcomers by invitation only, everyone but the owner asks the owner instead.
+  if (await shareAppClosed()) return openInviteForOther();
   const url = appShareUrl();
   document.getElementById('shareAppUrl').textContent = url;
-  // v38.69 — Tony, 20 Oct: "I would like them to be able to add family members to their household, but not share it
-  // with non-testers." While the copy takes newcomers by invitation only, anyone but the owner invites to their
-  // kitchen instead of sending the app's link.
-  var closed = await shareAppClosed(), sub = document.getElementById('shareAppSub');
-  document.getElementById('shareAppClosed').hidden = !closed;
-  document.getElementById('shareAppOpen').hidden = closed;
-  if (sub) sub.textContent = closed ? 'Invite the people you cook with to your kitchen.'
-    : 'Send this link to anyone — they can open it in their browser and install it on their phone or desktop.';
-  if (closed) {
-    var may = typeof householdCanManage === 'function' && householdCanManage();
-    document.getElementById('shareAppInviteBtn').hidden = !may;
-    document.getElementById('shareAppAskOwner').hidden = may;
-    document.getElementById('shareAppSite').textContent = String(appConfigValue('siteUrl') || location.origin).replace(/^https?:\/\//, '').replace(/\/$/, '');
-  }
+  var sub = document.getElementById('shareAppSub');
+  if (sub) sub.textContent = 'Send this link to anyone — they can open it in their browser and install it on their phone or desktop.';
   document.getElementById('shareAppOverlay').classList.add('open');
+  return 'share';
 }
+// v39.61 — Tony, 10 Nov 2026: "change the share button to open a new modal saying "ask for an invitation for someone
+// else". allowing the user to put in someone else's email. This email will reach me (perhaps as a new tab in the
+// Households page, called Beta invitation requests) and I will decide whether I would like to send them an invite (each
+// such line will have an "Invite" button next to it, sending the invitation to the new address)." His answers: the
+// address, their name and a word about them (both optional) and the invitation's language; every tester may ask. It goes
+// to the server (Worker v103 `invite-for`: signed in, a member of the kitchen), which keeps it in the owner's inbox and
+// tells the owner; 📊 Households → ✉️ Beta invitation requests lists it with ✉️ Invite (manage.js).
+var INVITE_ADDR_RE = /^[^\s@<>"']+@[^\s@<>"']+\.[^\s@<>"']{2,}$/;
+function openInviteForOther() {
+  var prev = document.getElementById('inviteOtherOverlay'); if (prev) prev.remove();
+  var ov = document.createElement('div');
+  ov.id = 'inviteOtherOverlay'; ov.className = 'modal-overlay open';
+  var he = typeof _i18nLang === 'string' && _i18nLang === 'he';
+  var site = String(appConfigValue('siteUrl') || location.origin).replace(/^https?:\/\//, '').replace(/\/$/, '');
+  var lab = 'display:block;font-size:13px;font-weight:600;color:var(--ink);margin:12px 0 4px;';
+  var inp = 'width:100%;box-sizing:border-box;padding:9px 11px;border:1px solid var(--border);border-radius:8px;font:inherit;font-size:16px;background:var(--card-bg);color:var(--ink);';
+  var opt = '<span style="font-weight:400;color:var(--muted);">(if you like)</span>';
+  var small = 'font-size:12px;color:var(--muted);line-height:1.6;margin:10px 0 0;';
+  ov.innerHTML = '<div class="ask-card" role="dialog" aria-modal="true" aria-labelledby="ioTitle" style="max-width:480px;text-align:start;max-height:88vh;overflow-y:auto;">'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><div class="ask-title" id="ioTitle">✉️ Ask for an invitation for someone else</div>'
+    + '<button type="button" class="modal-close" style="position:relative;top:auto;right:auto;" aria-label="Close" id="ioX">✕</button></div>'
+    + '<p style="font-size:13px;line-height:1.6;color:var(--ink);margin:6px 0 0;">Know someone who would enjoy My Kitchen Notes? The beta is by invitation only: ask the app’s owner to invite them. The owner decides, and sends the invitation.</p>'
+    + '<label for="ioEmail" style="' + lab + '">Their e-mail address</label>'
+    + '<input id="ioEmail" type="email" autocomplete="off" inputmode="email" dir="ltr" placeholder="name@example.com" maxlength="200" style="' + inp + '">'
+    + '<label for="ioName" style="' + lab + '">Their name ' + opt + '</label>'
+    + '<input id="ioName" type="text" autocomplete="off" maxlength="120" style="' + inp + '">'
+    + '<label for="ioNote" style="' + lab + '">A word about them ' + opt + '</label>'
+    + '<textarea id="ioNote" rows="2" maxlength="500" placeholder="My sister — she loves baking" style="' + inp + 'resize:vertical;"></textarea>'
+    + '<fieldset style="border:0;padding:0;margin:12px 0 0;"><legend style="font-size:13px;font-weight:600;color:var(--ink);padding:0;margin-bottom:4px;">The invitation in</legend>'
+    +   '<label style="margin-inline-end:18px;font-size:14px;cursor:pointer;"><input type="radio" name="ioLang" value="en"' + (he ? '' : ' checked') + '> <span data-no-i18n>English</span></label>'
+    +   '<label style="font-size:14px;cursor:pointer;"><input type="radio" name="ioLang" value="he"' + (he ? ' checked' : '') + '> <span data-no-i18n lang="he">עברית</span></label></fieldset>'
+    + '<div id="ioStatus" aria-live="polite" style="margin-top:10px;font-size:13px;line-height:1.5;color:var(--ink);min-height:1px;"></div>'
+    + '<div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;"><button type="button" class="ask-btn" id="ioSend">📨 Send the request</button>'
+    +   '<button type="button" class="ask-btn ghost" id="ioCancel">Cancel</button></div>'
+    + '<p style="' + small + '">Their address, and what you write, goes only to the app’s owner, to decide on the invitation.</p>'
+    + '<p style="' + small + '">To bring someone into your own kitchen instead: ⚙️ Settings → 🏠 My household → 👥 Family Access.</p>'
+    + '<p style="' + small + '">On your own other devices: open <b dir="ltr">' + escH(site) + '</b> there and sign in with the same account.</p>'
+    + '</div>';
+  function close() { ov.remove(); }
+  ov.onclick = function (e) { if (e.target === ov) close(); };
+  document.body.appendChild(ov);
+  document.getElementById('ioX').onclick = close;
+  document.getElementById('ioCancel').onclick = close;
+  document.getElementById('ioSend').onclick = function () { inviteForOtherSend(); };
+  document.getElementById('ioEmail').onkeydown = function (e) { if (e.key === 'Enter') { e.preventDefault(); inviteForOtherSend(); } };
+  setTimeout(function () {   // the keyboard comes up by itself only where there is no touch screen
+    var e = document.getElementById('ioEmail'), coarse = false; try { coarse = window.matchMedia && matchMedia('(pointer: coarse)').matches; } catch (x) {}
+    if (e && !coarse) e.focus(); }, 60);
+  return 'ask';
+}
+window.openInviteForOther = openInviteForOther;
+async function inviteForOtherSend() {
+  var el = function (id) { return document.getElementById(id); };
+  var say = function (t) { var x = el('ioStatus'); if (x) x.textContent = t; };
+  var em = String((el('ioEmail') || {}).value || '').trim().toLowerCase();
+  var name = String((el('ioName') || {}).value || '').trim().slice(0, 120), note = String((el('ioNote') || {}).value || '').trim().slice(0, 500);
+  var pick = document.querySelector('#inviteOtherOverlay input[name="ioLang"]:checked'), lang = pick && pick.value === 'he' ? 'he' : 'en';
+  if (!INVITE_ADDR_RE.test(em)) { say('That does not look like an e-mail address.'); if (el('ioEmail')) el('ioEmail').focus(); return null; }
+  if (window._fbUser && _fbUser.email && em === String(_fbUser.email).toLowerCase()) { say('That is your own address — type the address of the person you would like to invite.'); return null; }
+  if (!window._fbUser || typeof _fbUser.getIdToken !== 'function' || !_household || !_household.hid) { say('Sign in first.'); return null; }
+  var btn = el('ioSend'); if (btn) btn.disabled = true;
+  say('⏳ Sending…');
+  var d = {};
+  try {
+    var r = await fetch(WORKER_ENDPOINT, { method: 'POST', headers: workerHeaders(), signal: AbortSignal.timeout(20000),
+      body: workerBody({ action: 'invite-for', idToken: await _fbUser.getIdToken(), hid: _household.hid, email: em, name: name, note: note, lang: lang,
+        byName: String(_fbUser.displayName || '').slice(0, 80), env: APP_CONFIG.environment || '', version: APP_VERSION, device: navigator.userAgent.slice(0, 300) }) });
+    try { d = await r.json(); } catch (e) {}
+    if (!r.ok) {
+      var why = d.rateLimited ? 'That is enough requests for today — try again tomorrow.'
+        : d.own ? 'That is your own address — type the address of the person you would like to invite.'
+        : r.status === 403 ? 'The app’s owner could not be asked from this account: ' + String(d.error || r.status).replace(/^INVITE: /, '')
+        : 'It could not be sent just now — try again in a moment.';
+      say(why); if (btn) btn.disabled = false;
+      syncLog('error', 'An invitation request for someone else was not sent', { status: r.status, reason: String(d.error || '').replace(/[^\s]+@[^\s]+/g, '…').slice(0, 160) });
+      return null;
+    }
+  } catch (e) {
+    say('It could not be sent just now — try again in a moment.'); if (btn) btn.disabled = false;
+    syncLog('error', 'An invitation request for someone else was not sent', { reason: String((e && e.message) || e).slice(0, 160) });
+    return null;
+  }
+  var ov = el('inviteOtherOverlay'); if (ov) ov.remove();
+  syncLog('save', 'Asked for an invitation for someone else', { language: lang, already: !!d.already });   // never the address
+  if (d.already) toast('You (or someone) already asked for ' + em + ' — the request waits for the app’s owner.', 7000);
+  else toast('📨 Sent — the app’s owner decides, and if yes, the invitation goes to ' + em + '.', 7000);
+  if (typeof insightCount === 'function') insightCount('invite-for-other');
+  return d.already ? 'already' : 'sent';
+}
+window.inviteForOtherSend = inviteForOtherSend;
 // v38.70 — Tony, 20 Oct: "modify the text from 'Share this App' to 'Share this App with family'. It will convey the
 // right meaning and serve as a reminder. We will change it back once we launch officially." While the copy takes
 // newcomers by invitation only (📊 Households), every label says "with family"; opening the copy at the launch brings
 // the old words back by itself.
 async function shareAppLabels() {
-  var fam = false;
-  try { fam = typeof hhDb === 'function' && !!hhDb() && !!window._fbUser && (await hhFoundingOpen()) === false; } catch (e) {}
+  // v38.70 — "Share this App with family" while the copy took newcomers by invitation only; v39.61 — the family comes in
+  // through 👥 Family Access, and the button asks the owner for an invitation for someone else (everyone but the owner).
+  var closed = false;
+  try { closed = await shareAppClosed(); } catch (e) {}
   var menu = document.getElementById('shareAppMenuText'), ttl = document.getElementById('shareAppTitleText'), btn = document.getElementById('shareAppBtn');
-  var label = fam ? 'Share this app with family' : 'Share this app';
+  var label = closed ? 'Ask for an invitation for someone else' : 'Share this app';
   if (menu && menu.textContent !== label) menu.textContent = label;
-  if (ttl) { var t = fam ? 'Share This App with Family' : 'Share This App'; if (ttl.textContent !== t) ttl.textContent = t; }
+  if (ttl && ttl.textContent !== 'Share This App') ttl.textContent = 'Share This App';
   if (btn && btn.getAttribute('title') !== label) {
     btn.setAttribute('title', label); btn.setAttribute('aria-label', label);
     if (typeof i18nApply === 'function' && typeof _i18nLang === 'string' && _i18nLang !== 'en') { try { i18nApply(btn); } catch (e) {} }
   }
-  return fam;
+  if (menu && typeof i18nApply === 'function' && typeof _i18nLang === 'string' && _i18nLang !== 'en') { try { i18nApply(menu); } catch (e) {} }
+  return closed;
 }
 window.shareAppLabels = shareAppLabels;
 async function shareAppClosed() {
@@ -33868,6 +33971,8 @@ async function inviteFingerprint(addr) {
   return Array.prototype.map.call(new Uint8Array(b), function (x) { return ('0' + x.toString(16)).slice(-2); }).join('');
 }
 async function testerInvitesAdd(addrs) {
+  // v39.61 — a request for an invitation to these addresses is done (📊 Households → ✉️ Beta invitation requests)
+  if (typeof window.inviteAsksSent === 'function') { try { window.inviteAsksSent(addrs); } catch (e) {} }
   if (!(typeof isAppOwner === 'function' && isAppOwner()) || typeof hhDb !== 'function' || !hhDb() || !addrs || !addrs.length) return 0;
   var done = inviteJson(INVITE_REG_KEY), n = 0, by = String((window._fbUser && _fbUser.uid) || 'owner');
   for (var i = 0; i < addrs.length; i++) {
@@ -34031,8 +34136,9 @@ function openInviteTesters(pre) {
     try { navigator.clipboard.writeText(t).then(function () { inviteSay('\u{1F4CB} Copied — paste it wherever you like.'); }, function () { inviteSay('Could not copy here: select the message and copy it.'); }); }
     catch (e) { inviteSay('Could not copy here: select the message and copy it.'); }
   };
+  if (pre && (pre.lang === 'he' || pre.lang === 'en')) _inviteLang = pre.lang;   // v39.61 — the language the request asked for
   inviteShowLang(_inviteLang);
-  if (pre && pre.to) { inviteEl('invTo').value = String(pre.to); inviteCountShow(); }   // v39.11 — 💬 Feedback → ✉️ Send invitation
+  if (pre && pre.to) { inviteEl('invTo').value = String(pre.to); inviteCountShow(); }   // v39.11 — 💬 Feedback → ✉️ Send invitation; v39.61 — ✉️ Beta invitation requests
   inviteSentShow();
   inviteOnlyShow();   // v38.69
   // Google's sending window must open straight from the tap: what 📧 Send with Gmail needs is fetched now.
@@ -35513,7 +35619,8 @@ var HELP_SYSTEM_PROMPT = [
   "- 👁 READ ONLY: you read your household's recipes and cook from them. A change you make (a ❤️, a 🍳, an edit) stays on your device only and is not sent — the app says so once and offers ✋ Ask the owner (also in 👥 Family Access). Once the owner gives you Read + Write, your changes go to everyone.",
   "- A new person is asked whether to start their own collection or join one they were invited to (paste the link).",
   "- DURING THE BETA, MY KITCHEN NOTES IS BY INVITATION ONLY: a new kitchen can be started only by someone the app's owner invited, signed in with the very address the invitation was sent to (forwarding the invitation lets nobody else in). Invited at another address? Sign out and sign in with that one.",
-  "- To cook together with family or friends, invite them to YOUR kitchen: the 📲 share icon next to the language picker (or ⚙️ → 🏠 My household → 🔗 Invitation link…) makes a link that works for 14 days and lets them in with 👁 Read only; give them more once they have joined. Only the kitchen's owner and its managers can invite. Someone can also be added by e-mail in 👥 Family Access, or ask to join with your kitchen's identifier.",
+  "- To cook together with family or friends, invite them to YOUR kitchen: ⚙️ → 🏠 My household → 👥 Family Access — add them by e-mail, or 🔗 Invitation link… makes a link that works for 14 days and lets them in with 👁 Read only; give them more once they have joined. Only the kitchen's owner and its managers can invite. They can also ask to join with your kitchen's identifier.",
+  "- ✉️ ASK FOR AN INVITATION FOR SOMEONE ELSE (while the app takes new members by invitation only; v39.61): the 📲 share icon next to the language picker (or ··· More → 🏡 Kitchens and people → Ask for an invitation for someone else) opens a window: their e-mail address, their name and a word about them (both if you like), and the invitation's language (English or עברית). 📨 Send the request: it goes only to the app's owner, who decides and sends the invitation. The same address asked for again within 30 days is kept once; up to 10 requests a day. Bringing someone into YOUR kitchen is 👥 Family Access, not this. (The app's owner, and a copy open to everyone, still share the app's link from it.)",
   "- LINK WITH ANOTHER HOUSEHOLD: ··· More → 🏡 Kitchens and people → 🤝 Connect with another household (the owner, or someone with full access). Type that household's identifier (MKN-…; yours is at the top of the main screen — 🪪 MKN-…, a click copies it — and in ⚙️ → 🏠 My household → 🪪 Display my personal identifier) or the e-mail address of anyone in it. Its owner or an admin is asked at once if the app is open (otherwise the next time they open it): Accept, Reject or Remind me later — with the note that came with it. By e-mail address the request also goes through the app — it pops up for that person if they use My Kitchen Notes, or waits until they join with that address (the app never says whether an address has an account); you may also tell them yourself: Via Email (your default mail app, Gmail or Outlook — if no mail app opens, choose your e-mail on the web), Via WhatsApp, or Copy message to Clipboard. The message has a link that opens the request in their app, to accept it. Every step has ‹ Back, with what you typed kept. A refusal is never shown to the sender.",
   "- A REQUEST SENT TO YOUR E-MAIL ADDRESS shows in 📬 Link requests only once that address is CONFIRMED (an account made with e-mail and a password must confirm it from the e-mail sent to it). Not confirmed yet? The Link requests page says so (\"is NOT confirmed yet\"), sends the confirmation e-mail again, and notices by itself, when opened, that it has been confirmed.",
   "- Once linked, each household sees the other's recipes, read-only — and live: a change in their kitchen shows in yours within seconds, the changed card glowing for a moment: after its own in the main list, under that household's name, on a faint blue (hover one: 'A recipe from …'). 🏠 Kitchens ▾ in the filter bar chooses whose recipes show — tick one, several or all. 📥 Save a copy to my recipes makes one your own. Links do not chain: a third household linked to theirs is not seen. Links are listed, and removed, in ⚙️ → 🏠 My household → 👥 Family Access. ⚙️ → 🏠 My household → 🤝 Link requests through the app: blocked stops requests by identifier; requests by e-mail always arrive.",
@@ -35567,7 +35674,7 @@ var HELP_SYSTEM_PROMPT = [
   "=== FOR THE APP'S OWNER ===",
   "- ⚙️ → 👑 App owner is shown only to the app's owner: 📊 Households, 🩺 Server allowances, 📲 Phone alerts (which alerts also ring on the phone in the Pushover app, each on or off, and a test — among them the recipe e-mails: Resend refusing or not answering, a quota at 70% or used up), ✉️ Invite testers, 💳 Payments, 🚀 Deployments (a link to every console the app runs on: My Kitchen Notes itself — its site, builds, Firebase project, database, accounts, domain and the mail to contact@ —; the test copy; GitHub's jobs, secrets and the testers' reports; the server and its database; Resend, which sends the recipe e-mails and the invitations; Pushover, the phone alerts; Anthropic; the photo sources; Google Cloud — YouTube and the Gmail API —; and the browser extension's stores), 🔑 Check the app's key, 🔐 Two-step sign-in for the owner, 🧑‍🍳 Preview the first-visit setup (every page of it, nothing recorded), 📧 Gmail Setup, 🛒 Bring!",
   "- 📊 Households (the owner's): every household — in the family app and My Kitchen Notes, every copy's — with its owner, members, 📚 Recipes (how many it keeps, counted by its own app once a day; rest the mouse on the number for when), AI this month against its AI cap, AI in the two months before (e.g. 'AI in Sep · Oct' in November), links, who shared the app, last active. Click a heading (on a phone: Sort by) to sort — by Recipes for the biggest collections first; ⬇ CSV has the recipe counts too. 📈 Use adds every household up, month by month, in sections side by side (one under the other on a phone; one column when there are many months), with how big the collections are. Click a row for its details: the AI allowance, the members, the Extras, and What they use — two narrow tables side by side (one under the other on a phone), a column for each month, in sections (how often, signing in, recipes added and from where, the farm, devices and settings, then every feature and how many times). In The farm, 'Taps on a visitor (each one)' counts every tap and 'Visits with a farm visitor tapped' counts a visit once, however many taps. Extras: 📧 E-mail recipes from their own Gmail makes that household's ✉️ Email send from each member's own Gmail (Google asks each once) instead of the app's 📨 Send — best left off. If the page says this device's sign-in was made without the code from your authenticator app (or with a password): sign out (at the top, beside the sync status) and sign in again with Google — the app asks for the 6-digit code; the owner's tools need both. 🔑 Reset password, beside the owner and beside each member (in the details), e-mails that person a link to choose a new password — for someone who wrote to you that they can't sign in; you never see their password, and the app doesn't say whether the address has an account. For a household of another copy, the button opens that copy, which sends it after you sign in there.",
-  "- 📊 Households → 💬 Feedback (the owner's): a request for an invitation has ✉️ Send invitation — ✉️ Invite testers opens with that address in To (a request from another copy opens that copy's app, where its invitations belong).",
+  "- 📊 Households → ✉️ Beta invitation requests (the owner's; v39.61): every request for an invitation, apart from 💬 Feedback — a tester's for someone else (who asked, the person's name, a word about them, the invitation's language) and someone's own, from a sent recipe's link. ✉️ Invite opens ✉️ Invite testers with the address and the language filled in — you see it and press Send (a request from another copy opens that copy's app, where its invitations belong); once sent, the request is done. 🙅 Not now sets it aside (under All; ↩︎ Back to waiting); 🗑 removes it. An address invited before says so. The tab counts the waiting ones, and the owner hears of each by e-mail (and a phone alert: 'Someone asks for an invitation'). In the test copy the tab shows that copy's own requests.",
   "- 📊 Households → 💬 Feedback and ⚠️ Errors (the owner's): tick several (or Select all shown), then 👀 Seen (n), ✅ Done (n) or 🗑 Delete selected (n) for all of them at once. 👀 Seen = read, off the ⚙️ red dot, still under 'Not done yet'; ✅ Done = also off that list (still under All). Deleting several asks once and sends one alert",
   "- ✉️ Invite testers: the tester invitation in English or עברית, with this copy's link; the wording can be changed (this device keeps it; 'The original words' brings it back). Paste the addresses; 📨 Send sends each person their own e-mail from the app's address (contact@…), by the app's own e-mail service — no Google window — and their replies come to that address; up to 40 a day; the owner's sign-in as his other tools need it (with Google, and the authenticator's code once that is on). a small 📧 Backup: send with Gmail below the buttons sends them from the owner's Gmail instead (Google asks for permission the first time, and may say it has not verified the app: Advanced, then continue). Also ✉️ Mail app, 💬 WhatsApp and 📋 Copy",
   "- The beta is by invitation only when 📊 Households says so: every address in To (however the invitation goes) may then start a kitchen, signed in with that address; the window says how many are invited. Only a fingerprint of each address is kept, never the address. The invitation asks testers to sign in with that address, not to forward it, and to invite family from inside the app",
@@ -38524,6 +38631,9 @@ function privacyEntries() {
       sends: 'The address you import, the words you search photos for, your AI request on its way, and the notes and reports you choose to send.'
         // v38.15 — the beta and the test copy report by themselves (Worker v69).
         + (insightsOn() ? ' In this test copy it also sends, by itself, the app\u2019s own error messages and how the app is used \u2014 which features and how often, when, on what kind of device, how you signed in and how you first found the app: names and numbers, never your recipes.' : '') },
+    // v39.61 — a request for an invitation for someone else (Privacy Statement 1.15)
+    { who: 'The app\u2019s owner (through the app\u2019s own server)', when: 'only when you ask for an invitation for someone else', on: true,
+      sends: 'Their e-mail address, the name and the words you add about them, the invitation\u2019s language, and who asked \u2014 for the app\u2019s owner, to decide on the invitation. Kept like a note to us.' },
     // v39.46 — a search in every language the recipes are in (Privacy Statement 1.14)
     { who: 'The kitchen dictionary (the app\u2019s own server)', when: 'only when you search and your recipes are in more than one language', on: true,
       sends: 'The word you searched for and the languages your recipes are in, to find how they write it. Each word and its translations are kept for everyone, without who searched; a word new to the dictionary goes to the AI (Anthropic) once.' },

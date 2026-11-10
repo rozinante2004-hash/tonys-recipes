@@ -1,4 +1,14 @@
-// Tony's Recipes — Cloudflare Worker v102
+// Tony's Recipes — Cloudflare Worker v103
+// v103: A TESTER ASKS FOR AN INVITATION FOR SOMEONE ELSE (Tony, 10 Nov 2026: "change the share button to open a new modal
+//   saying "ask for an invitation for someone else". allowing the user to put in someone else's email. This email will
+//   reach me (perhaps as a new tab in the Households page, called Beta invitation requests) and I will decide whether I
+//   would like to send them an invite"). `invite-for` { idToken, hid, email, name, note, lang }: signed in, the address
+//   confirmed, a member of that kitchen (meterMembership); kept in the inbox (`feedback`) as a note opening "✉️ Asks for an
+//   invitation for someone else" — email/name the person's, uid/hid/household the asker's, lang the invitation's
+//   (en | he) — and an owner alert (kind invite-ask). 10 a day per tester, 60 in all; the same address asked for in the
+//   last 30 days is kept once. Invitation requests (these and v97's) are never sent on to the reports repository (they
+//   are not reports, and they carry names); meter-admin `notes-new` also says `notes` (the notes without them) and
+//   `invites` (the new requests), `new` as before.
 // v102: THE KITCHEN DICTIONARY — A SEARCH FINDS RECIPES IN EVERY LANGUAGE THEY ARE WRITTEN IN (Tony, 6 Nov 2026: "When
 //   searching for an item in the main search box, it should search for translations of the same meaning in all the
 //   languages there are recipes in… if I search for "Mushrooms" … the search should search for "פטריות" as well" —
@@ -472,7 +482,7 @@
 //   AI_MAX_TOKENS   – the longest answer one call may ask for (32000; the
 //                     app's largest, reading several recipes at once, asks 8000).
 
-const WORKER_VERSION = 'v102';
+const WORKER_VERSION = 'v103';
 const VIDEO_MAX_MB_DEFAULT = 50;
 const GEMINI_API = 'https://generativelanguage.googleapis.com';
 const GEMINI_MODEL_DEFAULT = 'gemini-2.5-flash';
@@ -1778,6 +1788,7 @@ async function handleRequest(request, env, ctx) {
       if (ir.status === 200) reportsLater(env, ctx);
       return ir;
     }
+    if (body.action === 'invite-for') return await inviteFor(request, env, body);   // v103 — a tester, for someone else
     if (body.action === 'mail-recipe') return await mailRecipe(request, env, body);   // v98 — 📤 Share → ✉️ Email, sent here
     if (body.action === 'search-words') return await searchWords(request, env, body);   // v102 — the kitchen dictionary
     if (body.action === 'household-report') return await householdReport(request, env, body);   // v62
@@ -2068,7 +2079,7 @@ const ALERT_KINDS = [
   ['household-ai', 'A household reached its AI allowance'],
   ['server-errors', 'The server answering with errors'],
   ['usage-check', 'The hourly usage check cannot read the figures'],
-  ['invite-ask', 'Someone asks for an invitation (from a sent recipe\u2019s link)'],   // v97
+  ['invite-ask', 'Someone asks for an invitation (from a sent recipe\u2019s link, or a tester for someone else)'],   // v97; v103
   ['mail-service', 'Recipe e-mails: the e-mail service (Resend) refused or failed, or a quota is near or at its limit']   // v99
 ];
 function alertKindOf(n) {
@@ -2657,7 +2668,54 @@ async function inviteAsk(request, env, body) {
   try {
     await ownerAlert(env, 'My Kitchen Notes: someone asks for an invitation', [text, 'Address: ' + email, 'Copy: ' + project,
       'When: ' + ilTime(Date.now()) + ' (Israel time)', '',
-      'In the app: \u2699\uFE0F \u2192 \u{1F451} App owner \u2192 \u{1F4CA} Households \u2192 \u{1F4AC} Feedback. Invite them with \u2709\uFE0F Invite testers.'].join('\n'), { kind: 'invite-ask' });
+      INVITE_ASKS_WHERE].join('\n'), { kind: 'invite-ask' });
+  } catch (e) {}
+  return jsonResp({ ok: true });
+}
+// v103 — where the owner finds them (the app's 📊 Households tab, from v39.61)
+const INVITE_ASKS_WHERE = 'In the app: ⚙️ → \u{1F451} App owner → \u{1F4CA} Households → ✉️ Beta invitation requests — '
+  + 'its ✉️ Invite opens the invitation with the address filled in.';
+// v103 — an invitation request (either kind) in the inbox: never a report, counted apart.
+const INVITE_ASK_SQL = "text LIKE '✉️ Asks for an invitation%'";
+// v103 — "Ask for an invitation for someone else": see the heading.
+async function inviteFor(request, env, body) {
+  if (!env.METER_DB) return jsonResp({ error: 'INVITE: not set up on this Worker (METER_DB).', needsConfig: true }, 503);
+  const str = (v, max) => String(v == null ? '' : v).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '').trim().slice(0, max);
+  let claims;
+  try { claims = await verifyIdToken(body.idToken, env); }
+  catch (e) { return jsonResp({ error: 'INVITE: sign in first.' }, 401); }
+  if (!claims.email_verified || !claims.email) return jsonResp({ error: 'INVITE: confirm your e-mail address first (look for our e-mail, in spam too).' }, 403);
+  const project = String(claims.aud || '');
+  if (!csvList(env.METER_PROJECTS, METER_PROJECTS_DEFAULT).includes(project)) return jsonResp({ error: 'INVITE: not a copy this server serves.' }, 400);
+  const hid = str(body.hid, 64);
+  if (!/^[A-Za-z0-9]{1,64}$/.test(hid)) return jsonResp({ error: 'INVITE: which kitchen?' }, 400);
+  const email = str(body.email, 200).toLowerCase();
+  if (!/^[^\s@<>"']+@[^\s@<>"']+\.[^\s@<>"']{2,}$/.test(email)) return jsonResp({ error: 'INVITE: that is not an e-mail address.' }, 400);
+  if (email === String(claims.email).toLowerCase()) return jsonResp({ error: 'INVITE: that is your own address.', own: true }, 400);
+  let hh;
+  try { hh = await meterMembership(claims, hid, body.idToken, env); } catch (e) { return jsonResp({ error: 'INVITE: ' + e.message }, 502); }
+  if (!hh.member) return jsonResp({ error: 'INVITE: only a member of a kitchen here may ask.' }, 403);
+  const day = new Date().toISOString().slice(0, 10);
+  const mine = await ceilingCount(env, 'invite-for:' + day + ':' + claims.sub, 86400, 1);
+  const all = await ceilingCount(env, 'invite-for:' + day, 86400, 1);
+  if (mine.used >= 10 || all.used >= 60) return jsonResp({ error: 'INVITE: that is enough requests for today — try again tomorrow.', rateLimited: true }, 429);
+  const db = await meterDb(env);
+  await feedbackTable(db);
+  const dup = await db.prepare('SELECT id FROM feedback WHERE email = ?1 AND project = ?2 AND ' + INVITE_ASK_SQL + ' AND at > ?3')
+    .bind(email, project, Date.now() - 30 * 864e5).first();
+  if (dup) return jsonResp({ ok: true, already: true });
+  const name = str(body.name, 120), note = str(body.note, 500), lang = body.lang === 'he' ? 'he' : 'en';
+  const by = str(body.byName, 80) || str(claims.name, 80) || 'A tester';
+  const text = '✉️ Asks for an invitation for someone else — asked by ' + by + (hh.name ? ' (' + hh.name + ')' : '') + '.'
+    + (note ? '\n“' + note + '”' : '');
+  await db.prepare("INSERT INTO feedback (project, uid, email, name, hid, household, text, shot, log, version, env, device, lang, at, status) "
+    + "VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, '', '', ?8, ?9, ?10, ?11, ?12, 'new')")
+    .bind(project, claims.sub, email, name, hid, hh.name || '', text, str(body.version, 20), str(body.env, 20), str(body.device, 300), lang, Date.now()).run();
+  await mine.credit(); await all.credit();
+  try {
+    await ownerAlert(env, 'My Kitchen Notes: a tester asks for an invitation for someone else', [text,
+      'For: ' + (name ? name + ' <' + email + '>' : email), 'The invitation in: ' + (lang === 'he' ? 'Hebrew' : 'English'), 'Copy: ' + project,
+      'When: ' + ilTime(Date.now()) + ' (Israel time)', '', INVITE_ASKS_WHERE].join('\n'), { kind: 'invite-ask' });
   } catch (e) {}
   return jsonResp({ ok: true });
 }
@@ -3112,7 +3170,9 @@ async function feedbackAdmin(env, db, body, claims) {
   }
   if (body.op === 'notes-new') {
     const r = await db.prepare("SELECT COUNT(*) AS n FROM feedback WHERE status = 'new'").first();
-    return jsonResp({ new: (r && r.n) || 0, server: await serverNotices(env, { owner: true }) });   // v78/v79 — every allowance notice
+    const iv = await db.prepare("SELECT COUNT(*) AS n FROM feedback WHERE status = 'new' AND " + INVITE_ASK_SQL).first();   // v103
+    const all = (r && r.n) || 0, invites = (iv && iv.n) || 0;
+    return jsonResp({ new: all, notes: all - invites, invites, server: await serverNotices(env, { owner: true }) });   // v78/v79 — every allowance notice
   }
   const id = parseInt(body.id, 10);
   if (!(id > 0)) return jsonResp({ error: 'FEEDBACK: which note?' }, 400);
@@ -3987,7 +4047,7 @@ async function reportsForward(env, opts) {
   // Notes not yet sent and not done, newest first.
   const notes = (await db.prepare('SELECT f.id, f.project, f.uid, f.hid, f.text, f.shot, f.log, f.version, f.env, f.device, f.lang, f.at '
     + 'FROM feedback f LEFT JOIN report_links l ON l.kind = \'note\' AND l.ref = CAST(f.id AS TEXT) '
-    + 'WHERE l.ref IS NULL AND f.status != \'done\' ORDER BY f.at DESC LIMIT ?1').bind(max).all()).results || [];
+    + 'WHERE l.ref IS NULL AND f.status != \'done\' AND NOT f.' + INVITE_ASK_SQL + ' ORDER BY f.at DESC LIMIT ?1').bind(max).all()).results || [];   // v103 — not the invitation requests
   notes.forEach(n => todo.push({ kind: 'note', ref: String(n.id), row: n }));
   // Error reports by kind: one issue for each wording, place and version — however many people it happened to.
   if (todo.length < max) {
@@ -4223,4 +4283,4 @@ export default {
   }
 };
 
-// ── END OF WORKER v102 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
+// ── END OF WORKER v103 ── If this is the last line in the Cloudflare editor, the whole file was pasted.

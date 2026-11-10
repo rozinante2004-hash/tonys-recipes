@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v39.60` — app. **Worker: v102**, deployed separately and versioned separately
+**Current version:** `v39.61` — app. **Worker: v103**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -283,7 +283,20 @@ hidden / refuses / silent / privacy text.
     copy "📦 Bring the family app's allowances and AI history here" (Worker `copy-from`).
   - **💬 Feedback** — every copy's notes (Worker D1): filter, screenshot zoom, the log, 👀 Seen,
     ✅ Done, 🗑, ✉️ Reply in Gmail / 📨 E-mail app / **📲 Reply in app** (arrives in the sender's app
-    like a link request, with red dots; "✓ read" shown), ☑ select + 📋 Copy reports.
+    like a link request, with red dots; "✓ read" shown), ☑ select + 📋 Copy reports. (v39.61: the invitation
+    requests are not here — they have their own tab.)
+  - **✉️ Beta invitation requests** (v39.61) — every invitation request in the inbox (`isInviteAsk`: a note opening
+    "✉️ Asks for an invitation"): a tester's for someone else (Worker v103 `invite-for`: the person's address and
+    name, the asker in uid/hid/household and in the words "… for someone else — asked by <name> (<kitchen>).", their
+    word about the person on the next line, the invitation's language in `lang`) and someone's own from a sent
+    recipe's link (v97 `invite-ask`). Each card: address, name, copy, date, "the invitation in English/Hebrew", who
+    asked, the word, "invited before" (this copy's `testerInvites` fingerprints). **✉️ Invite** → `openInviteTesters({
+    to, lang })` here, or the copy it came from with `#invite=<address>&lang=he|en`; **🙅 Not now** (status done;
+    under All, ↩︎ Back to waiting); 🗑. Sent from the invitation window (`testerInvitesAdd` calls
+    `window.inviteAsksSent(addrs)`): the request is done. The tab's badge counts the waiting ones; the ⚙️ dot counts
+    them with the notes. In the copies where the inbox is not read (the test copy) the tab is there too, with that
+    copy's own requests only, so it can be tried there. The owner's start-up notice says them apart: "✉️ {n} new
+    invitation request(s) — … → ✉️ Beta invitation requests" (Worker `notes-new` → `invites`, `notes`).
   - **⚠️ Errors** (testers' copies report their own errors) and **📈 Use** (v38.30: the trends — every
     count per copy, month by month, in sections, with shares and collection sizes), each with 📋 Copy.
   - **📝 Beta question** — the end-of-beta survey (`end-of-beta-1`): Preview, Send to testers, Stop,
@@ -777,9 +790,15 @@ invitation-only (unless adding to the tester's household)."
 - App: `householdMayFound()` = owner, or open, or `testerInvited(user)`. The welcome tells someone invited at
   another address to sign in with that one. Joining a tester's kitchen still works (its 14-day invitation link,
   being added by e-mail, a join request).
-- **Share This App** (`openShareAppModal`, `shareAppClosed()`): while the copy is closed, anyone but the owner sees
-  "🔗 Invite someone to my kitchen" (`householdInvite`, Read only) — or, without the right to invite, "ask your
-  kitchen's owner" — instead of the app's link; the owner shares the app as before.
+- **Share This App** (`openShareAppModal`, `shareAppClosed()`): while the copy is closed, everyone but the owner (any
+  role) gets **✉️ Ask for an invitation for someone else** (v39.61, `openInviteForOther` → `inviteForOtherSend`):
+  their e-mail address (checked; never one's own), their name and a word about them (both "if you like"), the
+  invitation's language (English / עברית, starting as the app's), 📨 Send the request → Worker v103 `invite-for`
+  { idToken, hid, email, name, note, lang, byName }. Said: "📨 Sent — the app's owner decides…", "already asked",
+  the day's limit, a failure; the log has counts only. The window says the family comes in through ⚙️ Settings →
+  🏠 My household → 👥 Family Access, and how to open the app on one's other devices. The share button's title and
+  ··· More's line say "Ask for an invitation for someone else" meanwhile (`shareAppLabels`); the owner, and an open
+  copy, share the app's link as before.
 - The invitation's words (`INVITE_TEXTS`, English and Hebrew, `INVITE_TEXTS_REV` 3 — v39.60, Tony's own choice):
   congratulatory, not asking a favour. Subject "Your seat at the table: the My Kitchen Notes beta 🎉" (Hebrew
   "שמרנו לכם מקום ליד השולחן: הבטא של My Kitchen Notes 🎉"); it opens "Good news: your invitation to the My Kitchen
@@ -1082,9 +1101,17 @@ and `site` — the Worker reads the sent recipe and its photo from Firestore wit
 theirs, a link and not expired, builds the link on one of its own app addresses, and e-mails the photo, the name, the
 note and an "Open the recipe" button); their address is needed; only if the server cannot send it are the sender's own
 mail app, Gmail or Outlook offered, with the link. The link holds the recipient's address
-after # (`#for=`), which fills in their invitation request; 💬 Feedback's invitation requests have ✉️ Send invitation
-(Invite testers with the address in To, in the copy the request came from). Signed out during the closed beta: the recipe, read-only, and "✉️ Ask for
+after # (`#for=`), which fills in their invitation request; it is listed in 📊 Households → ✉️ Beta invitation requests
+(v39.61; before, in 💬 Feedback) with ✉️ Invite (Invite testers with the address and language, in the copy the request
+came from). Signed out during the closed beta: the recipe, read-only, and "✉️ Ask for
 an invitation" (Worker `invite-ask`: a note to the owner + an alert, rate-limited). Privacy Statement 1.11.
+**Worker v103 `invite-for`** (a tester asks for someone else): signed in, the address confirmed, a member of the kitchen
+(`meterMembership`); a note in `feedback` (email/name the person's, uid/hid/household the asker's, lang the
+invitation's); an owner alert (kind `invite-ask`); 10 a day per tester, 60 in all; the same address for the same copy
+within 30 days kept once (`already`); one's own address refused. Invitation requests (`INVITE_ASK_SQL`, both kinds) are
+never forwarded to the reports repository; `notes-new` also returns `notes` and `invites`. Privacy Statement 1.15 (11
+languages): the row "Invitation requests for someone else"; What leaves this device: "The app's owner (through the
+app's own server) — only when you ask for an invitation for someone else".
 
 **The recipe e-mails and their warnings (Resend; Worker v98–v99).** Resend sends for the Worker (`POST
 https://api.resend.com/emails`, key RESEND_API_KEY — a GitHub secret passed on by deploy-worker.yml; MAIL_FROM optional,

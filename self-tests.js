@@ -3009,46 +3009,87 @@ window.SELF_TESTS = [
     } },
 
   // v39.11 — Tony: "When getting an invitation request, in the Feedback tab, please add a button next to each … Clicking
-  // it will open the "Invite testers" page, with the relevant email already filled in."
-  { id:'feedback_send_invitation', group:'Sharing', name:'💬 Feedback: a request for an invitation has ✉️ Send invitation — Invite testers with the address in To, in the copy it came from (v39.11)',
+  // it will open the "Invite testers" page, with the relevant email already filled in." v39.61 — the requests have their
+  // own tab, ✉️ Beta invitation requests (Tony: "each such line will have an "Invite" button next to it").
+  { id:'invite_requests_tab', group:'Sharing', name:'✉️ Households → Beta invitation requests: a tester’s request for someone else and a sent recipe’s own, not in 💬 Feedback; ✉️ Invite opens Invite testers with the address and the language, in the copy it came from; 🙅 Not now; done once invited; counted on the tab; this copy’s only where the inbox is not read (v39.11, v39.61)',
     test: async()=>{
-      if(!feedbackInboxHere()) return;          // the notes are read in the family app only
       var here=APP_CONFIG.firebase.projectId, there=here==='tonys-recipes-test' ? 'my-kitchen-notes-beta' : 'tonys-recipes-test';
       var real={ db:window._fbDb, user:window._fbUser, toast:window.toast, err:window.showServiceError, owner:window.isAppOwner, fetch:window.fetch, h:_workerHealth,
-                 last:_fbLastNew, inv:window.openInviteTesters, open:window.open };
+                 last:_fbLastNew, inv:window.openInviteTesters, open:window.open, inbox:window.feedbackInboxHere, fp:window.inviteFingerprint };
       var keptNew=null; try{ keptNew=localStorage.getItem(FB_NEW_KEY); }catch(e){}
-      var invited=[], opened=[];
+      var invited=[], opened=[], marks=[], invitedFp={};
       try{
         window.toast=function(){}; window.showServiceError=function(){};
         window.isAppOwner=function(){ return true; }; _workerHealth=null;
         window._fbUser={ uid:'uOwner', email:'owner@example.com', getIdToken:async function(){ return 'tok'; } };
+        invitedFp[await inviteFingerprint('before@example.com')]=1;
         window._fbDb={ collection:function(c){
             if(c==='feedback') return { orderBy:function(){ return { limit:function(){ return { get:async function(){ return { forEach:function(){} }; } }; } }; } };
+            if(c==='testerInvites') return { get:async function(){ return { size:1, forEach:function(f){ Object.keys(invitedFp).forEach(function(id){ f({ id:id, data:function(){ return {}; } }); }); } }; } };
             return { get:async function(){ return { size:0, forEach:function(){} }; } }; },
           collectionGroup:function(){ return { get:async function(){ return { size:0, forEach:function(){} }; } }; } };
-        var at=Date.now()-3600e3, ask='✉️ Asks for an invitation — they opened a recipe sent by K (“Soup”).';
+        var at=Date.now()-3600e3;
+        var self='✉️ Asks for an invitation — they opened a recipe sent by K (“Soup”).';
+        var other='✉️ Asks for an invitation for someone else — asked by Dana (Dana’s kitchen).\n“My sister”';
         window.fetch=async function(u, init){
           var b={}; try{ b=JSON.parse(init.body); }catch(e){}
           if(b.op==='notes') return new Response(JSON.stringify({ notes:[
-              { id:71, project:here, uid:'', email:'here@example.com', text:ask, at:at, status:'new' },
-              { id:72, project:there, uid:'', email:'there@example.com', text:ask, at:at-1, status:'new' },
-              { id:73, project:here, uid:'uX', email:'tester@example.com', text:'The import is slow', at:at-2, status:'new' } ], replies:[] }), { status:200 });
+              { id:71, project:here, uid:'', email:'here@example.com', text:self, lang:'he-IL', at:at, status:'new' },
+              { id:72, project:there, uid:'', email:'there@example.com', text:self, lang:'he', at:at-1, status:'new' },
+              { id:73, project:here, uid:'uX', email:'tester@example.com', text:'The import is slow', at:at-2, status:'new' },
+              { id:74, project:here, uid:'uD', email:'ruth@example.com', name:'Ruth', text:other, lang:'en', at:at-3, status:'new' },
+              { id:75, project:here, uid:'uD', email:'before@example.com', name:'', text:other, lang:'he', at:at-4, status:'new' } ], replies:[] }), { status:200 });
+          if(b.op==='note-status'){ marks.push(b.id+':'+b.status); return new Response('{"ok":true}', { status:200 }); }
           return new Response('{"error":"METER: not set up"}', { status:503 });
         };
-        window.openInviteTesters=function(pre){ invited.push(pre && pre.to); return true; };
+        window.openInviteTesters=function(pre){ invited.push(JSON.stringify(pre)); return true; };
         window.open=function(u){ opened.push(String(u)); return null; };
-        await openManagement(); await mknManage._notes(); mknManage.tabTo('feedback');
-        function btnIn(id){ var c=document.getElementById('mgNote-'+id); return c && Array.prototype.filter.call(c.querySelectorAll('button'), function(x){ return /Send invitation/.test(x.textContent); })[0]; }
-        if(!btnIn('s71') || !btnIn('s72')) throw new Error('a request for an invitation has no ✉️ Send invitation');
-        if(btnIn('s73')) throw new Error('offered on an ordinary note');
-        btnIn('s71').click();
-        if(invited.length!==1 || invited[0]!=='here@example.com') throw new Error('Invite testers did not open with the address: '+JSON.stringify(invited));
-        btnIn('s72').click();
-        if(opened.length!==1 || opened[0].indexOf('#invite=there%40example.com')<0 || /\?manage/.test(opened[0])) throw new Error('a request from the other copy should open that copy with the address after #: '+JSON.stringify(opened));
-        return 'this copy: Invite testers filled in; the other copy: opened there';
+        for(var mode of ['inbox','own']){
+          window.feedbackInboxHere=function(){ return mode==='inbox'; };
+          invited=[]; opened=[]; marks=[];
+          await openManagement(); await mknManage._notes();
+          var tab=Array.prototype.filter.call(document.querySelectorAll('#manageOverlay .mg-tab'), function(x){ return /Beta invitation requests/.test(x.textContent); })[0];
+          if(!tab) throw new Error(mode+': no ✉️ Beta invitation requests tab');
+          var badge=tab.querySelector('.mg-badge');
+          if(!badge || badge.textContent!==(mode==='inbox' ? '4' : '3')) throw new Error(mode+': the tab’s count: '+(badge && badge.textContent));
+          if(mode==='inbox'){
+            mknManage.tabTo('feedback');
+            if(document.getElementById('mgNote-s71') || document.getElementById('mgNote-s74') || !document.getElementById('mgNote-s73')) throw new Error('💬 Feedback still lists the invitation requests (or lost the note)');
+          }
+          mknManage.tabTo('invites'); await new Promise(function(r){ setTimeout(r, 80); });
+          var card=function(id){ return document.getElementById('mgInv-'+id); };
+          var btn=function(id, re){ var c=card(id); return c && Array.prototype.filter.call(c.querySelectorAll('button'), function(x){ return re.test(x.textContent); })[0]; };
+          if(!card('s71') || !card('s74') || !card('s75') || card('s73')) throw new Error(mode+': the requests listed: '+Array.prototype.map.call(document.querySelectorAll('#manageOverlay .mg-inv'), function(x){ return x.id; }).join());
+          if(mode==='inbox' ? !card('s72') : card('s72')) throw new Error(mode+': another copy’s request '+(mode==='inbox' ? 'is missing' : 'is shown where the inbox is not read'));
+          if(!/Asked by Dana/.test(card('s74').textContent) || !/“My sister”/.test(card('s74').textContent) || !/Ruth/.test(card('s74').textContent) || !/in English/.test(card('s74').textContent))
+            throw new Error('the tester’s request does not say who asked, about whom, the word and the language: '+card('s74').textContent);
+          if(!/Asked for themselves, after opening a recipe sent by K/.test(card('s71').textContent) || !/in Hebrew/.test(card('s71').textContent)) throw new Error('the sent recipe’s request: '+card('s71').textContent);
+          if(!/invited before/.test(card('s75').textContent) || (mode==='inbox' && /invited before/.test(card('s74').textContent))) throw new Error('who was invited before is not said: '+card('s75').textContent);
+          btn('s74', /Invite/).click();
+          if(invited.length!==1 || JSON.parse(invited[0]).to!=='ruth@example.com' || JSON.parse(invited[0]).lang!=='en') throw new Error(mode+': Invite testers did not open with the address and language: '+invited.join());
+          btn('s71', /Invite/).click();
+          if(JSON.parse(invited[1]).lang!=='he') throw new Error('the device’s language (he-IL) is not the invitation’s: '+invited[1]);
+          if(mode==='inbox'){
+            btn('s72', /Invite/).click();
+            if(opened.length!==1 || opened[0].indexOf('#invite=there%40example.com&lang=he')<0 || /\?manage/.test(opened[0])) throw new Error('a request from the other copy should open that copy with the address and language after #: '+JSON.stringify(opened));
+          }
+          btn('s71', /Not now/).click(); await new Promise(function(r){ setTimeout(r, 30); });
+          if(marks.indexOf('71:done')<0 || card('s71')) throw new Error(mode+': 🙅 Not now did not set it aside: '+marks.join());
+          mknManage.invFilter('all');
+          if(!card('s71') || !btn('s71', /Back to waiting/)) throw new Error(mode+': a set-aside request is not under All, or cannot come back');
+          mknManage.invFilter('open');
+          // the invitation sent to that address: its request is done
+          var realHh=window.hhDb;
+          window.hhDb=function(){ return { collection:function(){ return { doc:function(){ return { set:async function(){} }; } }; } }; };
+          try { await testerInvitesAdd(['ruth@example.com']); } finally { window.hhDb=realHh; }   // what the invitation window calls once sent
+          await new Promise(function(r){ setTimeout(r, 30); });
+          if(marks.indexOf('74:done')<0 || card('s74')) throw new Error(mode+': a request whose invitation was sent is not done: '+marks.join());
+          mknManage.close();
+        }
+        return 'its own tab, every copy’s where the inbox is read and this copy’s elsewhere; Invite with the language; Not now; done once invited';
       } finally {
         window._fbDb=real.db; window._fbUser=real.user; window.toast=real.toast; window.showServiceError=real.err; window.isAppOwner=real.owner; window.fetch=real.fetch; _workerHealth=real.h;
-        window.openInviteTesters=real.inv; window.open=real.open;
+        window.openInviteTesters=real.inv; window.open=real.open; window.feedbackInboxHere=real.inbox;
         if(window.mknManage) mknManage.close();
         _fbLastNew=real.last; try{ if(keptNew===null) localStorage.removeItem(FB_NEW_KEY); else localStorage.setItem(FB_NEW_KEY, keptNew); }catch(e){}
         feedbackKnown(null);
@@ -11535,7 +11576,7 @@ window.SELF_TESTS = [
       }
     } },
 
-  { id:'beta_by_invitation_only', group:'Sharing', name:'🔑 The beta by invitation only: the owner’s invitation lets that address (and nobody it is forwarded to) start a kitchen, kept as a fingerprint and never the address; testers share by inviting to their own kitchen, not the app’s link (“Share this app with family” meanwhile, v38.70); the invitation says so in English and Hebrew (v38.69)',
+  { id:'beta_by_invitation_only', group:'Sharing', name:'🔑 The beta by invitation only: the owner’s invitation lets that address (and nobody it is forwarded to) start a kitchen, kept as a fingerprint and never the address; testers’ share button asks the owner for an invitation for someone else, not the app’s link (v39.61; the family comes in through 👥 Family Access); the invitation says so in English and Hebrew (v38.69)',
     test: async()=>{
       var real={ owner:window.isAppOwner, db:window.hhDb, user:window._fbUser, hh:_household, open:window.hhFoundingOpen, ins:window.insightCount, drafts:localStorage.getItem(INVITE_DRAFTS_KEY), reg:localStorage.getItem(INVITE_REG_KEY) };
       var docs={}, writes=[];
@@ -11564,33 +11605,32 @@ window.SELF_TESTS = [
         if(await householdMayFound()!==false) throw new Error('an unconfirmed address may start a kitchen');
         // v38.90 — the welcome's paragraphs live in HH_WELCOME (so the translations can list them)
         if(HH_WELCOME.tester.indexOf('Invited to test the app? Sign in with the address the invitation came to')===-1 || String(householdWelcome).indexOf('HH_WELCOME.tester')===-1) throw new Error('the welcome does not tell a tester at another address what to do');
-        // Share This App: a tester invites to their kitchen; the app's link is not offered
+        // v39.61 — Share This App: everyone but the owner asks the owner for an invitation for someone else (the family
+        // comes in through 👥 Family Access); the app's link is not offered while the copy is by invitation only
         window._fbUser={ uid:'t1', email:'ann@x.example', emailVerified:true };
-        _household={ hid:'hT', name:'Ann\u2019s kitchen', role:'owner' };
-        await openShareAppModal();
-        var C=document.getElementById('shareAppClosed'), O=document.getElementById('shareAppOpen'), B=document.getElementById('shareAppInviteBtn'), A=document.getElementById('shareAppAskOwner');
-        if(C.hidden || !O.hidden || B.hidden || !A.hidden) throw new Error('a tester is offered the app\u2019s link, or not the invitation to their kitchen');
-        if(!/householdInvite\(\)/.test(B.getAttribute('onclick')||'')) throw new Error('the button does not invite to the kitchen');
-        closeM('shareAppOverlay');
-        _household={ hid:'hT', name:'Ann\u2019s kitchen', role:'viewer' };
-        await openShareAppModal();
-        if(!B.hidden || A.hidden) throw new Error('someone who may not invite is offered to');
-        closeM('shareAppOverlay');
-        // v38.70 — Tony: "Share this App with family" while the copy is by invitation only, back by itself at the launch
+        var S1=document.getElementById('shareAppOverlay'), O=document.getElementById('shareAppOpen');
+        var asked=function(){ return !!document.getElementById('inviteOtherOverlay'); }, clear=function(){ var x=document.getElementById('inviteOtherOverlay'); if(x) x.remove(); S1.classList.remove('open'); };
+        if(document.getElementById('shareAppClosed') || document.getElementById('shareAppInviteBtn')) throw new Error('the old "invite to my kitchen" part is still in the share window');
+        for(var role of ['owner','viewer']){
+          _household={ hid:'hT', name:'Ann’s kitchen', role:role };
+          var r1=await openShareAppModal();
+          if(r1!=='ask' || !asked() || S1.classList.contains('open')) throw new Error('a tester ('+role+' of their kitchen) is not asked for whom to ask an invitation, or is offered the app’s link: '+r1);
+          clear();
+        }
         await shareAppLabels();
         var mt=document.getElementById('shareAppMenuText'), tt=document.getElementById('shareAppTitleText'), hb=document.getElementById('shareAppBtn');
-        if(mt.textContent!=='Share this app with family' || tt.textContent!=='Share This App with Family' || hb.getAttribute('title')!=='Share this app with family' || hb.getAttribute('aria-label')!=='Share this app with family')
-          throw new Error('the labels while invitation only: '+[mt.textContent, tt.textContent, hb.getAttribute('title')].join(' | '));
+        if(mt.textContent!=='Ask for an invitation for someone else' || hb.getAttribute('title')!=='Ask for an invitation for someone else' || hb.getAttribute('aria-label')!=='Ask for an invitation for someone else')
+          throw new Error('the labels while invitation only: '+[mt.textContent, hb.getAttribute('title')].join(' | '));
         window.hhFoundingOpen=async function(){ return true; };
         await shareAppLabels();
         if(mt.textContent!=='Share this app' || tt.textContent!=='Share This App' || hb.getAttribute('title')!=='Share this app') throw new Error('the labels did not come back: '+mt.textContent);
-        await openShareAppModal();
-        if(!C.hidden || O.hidden) throw new Error('an open copy hides the app\u2019s link');
-        closeM('shareAppOverlay');
+        if(await openShareAppModal()!=='share' || asked() || !S1.classList.contains('open') || O.hidden) throw new Error('an open copy does not share the app’s link');
+        clear();
         window.hhFoundingOpen=async function(){ return false; }; window.isAppOwner=function(){ return true; };
-        await openShareAppModal();
-        if(!C.hidden || O.hidden) throw new Error('the owner cannot share the app');
-        closeM('shareAppOverlay');
+        if(await openShareAppModal()!=='share' || asked() || !S1.classList.contains('open')) throw new Error('the owner cannot share the app');
+        await shareAppLabels();
+        if(mt.textContent!=='Share this app') throw new Error('the owner’s label: '+mt.textContent);
+        clear();
         // the invitation's words, in both languages
         var en=INVITE_TEXTS.en.body, he=INVITE_TEXTS.he.body;
         if(!/by invitation only/.test(en) || !/the one this invitation came to/.test(en) || !/forwarded, it won’t let anyone else in/.test(en) || !/\n5\. /.test(en)) throw new Error('English: '+en);
@@ -11613,6 +11653,56 @@ window.SELF_TESTS = [
         if(real.drafts===null) localStorage.removeItem(INVITE_DRAFTS_KEY); else localStorage.setItem(INVITE_DRAFTS_KEY, real.drafts);
         if(real.reg===null) localStorage.removeItem(INVITE_REG_KEY); else localStorage.setItem(INVITE_REG_KEY, real.reg);
         var ov=document.getElementById('shareAppOverlay'); if(ov) ov.classList.remove('open');
+        var io=document.getElementById('inviteOtherOverlay'); if(io) io.remove();
+      }
+    } },
+
+  // v39.61 — Tony, 10 Nov 2026: "change the share button to open a new modal saying "ask for an invitation for someone else".
+  // allowing the user to put in someone else's email. This email will reach me … and I will decide".
+  { id:'invite_for_someone_else', group:'Sharing', name:'✉️ Ask for an invitation for someone else: their address (checked, never one’s own), their name and a word about them, the invitation’s language; sent to the server for the owner with the sign-in and the kitchen; “already asked” and a refusal said; no address in the log (v39.61)',
+    test: async()=>{
+      var real={ user:window._fbUser, hh:_household, fetch:window.fetch, toast:window.toast, lang:_i18nLang, ins:window.insightCount, log:window.syncLog };
+      var sent=[], toasts=[], logs=[], answer=null;
+      try{
+        window.insightCount=function(){}; window.toast=function(m){ toasts.push(String(m)); };
+        window.syncLog=function(k, m, d){ logs.push(k+' '+m+' '+JSON.stringify(d||{})); };
+        window._fbUser={ uid:'uT', email:'Dana@Tester.Example', displayName:'Dana', emailVerified:true, getIdToken:async function(){ return 'tok-1'; } };
+        _household={ hid:'hDana', name:'Dana’s kitchen', role:'viewer' };
+        window.fetch=async function(u, init){ var b={}; try{ b=JSON.parse(init.body); }catch(e){} sent.push(b); var a=answer||{ status:200, body:{ ok:true } }; return new Response(JSON.stringify(a.body), { status:a.status }); };
+        _i18nLang='he';
+        if(openInviteForOther()!=='ask') throw new Error('it does not open');
+        var el=function(id){ return document.getElementById(id); };
+        if(!el('ioEmail') || !el('ioName') || !el('ioNote') || !el('ioSend')) throw new Error('a field is missing');
+        if(!document.querySelector('#inviteOtherOverlay input[name="ioLang"][value="he"]').checked) throw new Error('the invitation’s language does not start as the app’s (Hebrew)');
+        var txt=el('inviteOtherOverlay').textContent;
+        if(!/Settings → 🏠 My household → 👥 Family Access/.test(txt) || !/goes only to the app’s owner/.test(txt)) throw new Error('it does not say where the family comes in, or who sees the address: '+txt.slice(0,300));
+        el('ioEmail').value='not an address';
+        if(await inviteForOtherSend()!==null || sent.length || !/does not look like an e-mail address/.test(el('ioStatus').textContent)) throw new Error('a wrong address is sent, or not said');
+        el('ioEmail').value='dana@tester.example';
+        if(await inviteForOtherSend()!==null || sent.length || !/your own address/.test(el('ioStatus').textContent)) throw new Error('one’s own address is sent');
+        el('ioEmail').value='  Ruth@Friend.Example '; el('ioName').value='Ruth'; el('ioNote').value='My sister — loves baking';
+        document.querySelector('#inviteOtherOverlay input[name="ioLang"][value="en"]').checked=true;
+        if(await inviteForOtherSend()!=='sent') throw new Error('not sent: '+el('ioStatus').textContent);
+        var b=sent[0]||{};
+        if(b.action!=='invite-for' || b.idToken!=='tok-1' || b.hid!=='hDana' || b.email!=='ruth@friend.example' || b.name!=='Ruth' || b.note!=='My sister — loves baking' || b.lang!=='en')
+          throw new Error('what the server is sent: '+JSON.stringify(b));
+        if(el('inviteOtherOverlay') || !/📨 Sent — the app’s owner decides/.test(toasts.join('|'))) throw new Error('the window stays, or it is not said: '+toasts.join('|'));
+        if(logs.join('\n').indexOf('@')!==-1 || !/Asked for an invitation for someone else/.test(logs.join('\n'))) throw new Error('the log: '+logs.join('\n'));
+        // asked before: said so
+        openInviteForOther(); answer={ status:200, body:{ ok:true, already:true } };
+        el('ioEmail').value='ruth@friend.example';
+        if(await inviteForOtherSend()!=='already' || !/already asked for ruth@friend\.example/.test(toasts.join('|'))) throw new Error('"already asked" is not said: '+toasts.join('|'));
+        // the server refuses: said in the window, which stays
+        openInviteForOther(); answer={ status:429, body:{ error:'INVITE: that is enough requests for today — try again tomorrow.', rateLimited:true } };
+        el('ioEmail').value='sam@friend.example';
+        if(await inviteForOtherSend()!==null || !el('inviteOtherOverlay') || !/enough requests for today/.test(el('ioStatus').textContent) || el('ioSend').disabled) throw new Error('a refusal is not said: '+el('ioStatus').textContent);
+        answer={ status:500, body:{ error:'boom' } };
+        if(await inviteForOtherSend()!==null || !/could not be sent just now/.test(el('ioStatus').textContent)) throw new Error('a failure is not said: '+el('ioStatus').textContent);
+        if(logs.join('\n').indexOf('sam@')!==-1) throw new Error('an address in the log: '+logs.join('\n'));
+        return 'sent with the sign-in and the kitchen; already asked, a refusal and a failure said';
+      } finally {
+        window._fbUser=real.user; _household=real.hh; window.fetch=real.fetch; window.toast=real.toast; _i18nLang=real.lang; window.insightCount=real.ins; window.syncLog=real.log;
+        var io=document.getElementById('inviteOtherOverlay'); if(io) io.remove();
       }
     } },
 

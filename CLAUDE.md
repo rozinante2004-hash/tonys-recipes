@@ -1640,6 +1640,16 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
     `movedOn`/`recipeGone`; §5 `links`, `gathered`/`movedInto`; deleting, the index and moves; §8 the contents list,
     links, the linked window, the editor's 🔗) and the version. 7 new phrases translated into all 11 languages (gaps 0).
     Self Tests 459 passed, 0 failed, 7 skipped.
+  - **Released: v39.52–v39.59 to the family's copy and the beta (10 Nov 2026, 15:23 Israel time, on 99558ae; Tony:
+    "Once done, please load it to the family and Beta as well.").** Green first on test: 7ab7e20 (v39.58: Cloudflare
+    Pages for test 14:47, Publish the database rules for test 14:47, Self Tests 15:05) and 99558ae (v39.59: Cloudflare
+    Pages for test 15:04, Self Tests 15:23). main and beta fast-forwarded (821ab7d / 71a7894 → 99558ae). Every job
+    success: Cloudflare Pages for the beta (15:24); on main: Deploy to GitHub Pages and pages build (15:24), **Publish the
+    database rules (15:24 — rules checks on the emulator, then published to the family's and the beta's projects: the
+    v39.55 `deleteAsks` and the v39.58 `movedOn`/`recipeGone` rules are live there)**, Translate new phrases (15:34),
+    Publish languages (15:34 — 2cca6b1 on main, test fast-forwarded; its Deploy to GitHub Pages, pages build and
+    Cloudflare Pages for test 15:35), Self Tests on main (15:41). No Worker change. To tell Tony (as before): devices may
+    still hold recipes deleted before v39.57; Undo of an import is still a real deletion.
   - **v39.60 — the testers' invitation congratulates instead of asking a favour.** Tony, 10 Nov 2026: "I would like to
     modify the text in the testers' invitation to be less pleading and more congratulatory .. I would like them to feel
     proud/fortunate about the fact that they are given the opportunity to join the app in its Beta stage, before
@@ -1655,6 +1665,41 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
     new phrases. Self Test `beta_by_invitation_only` checks the opening, the subjects, "before everyone else", no
     "please"/"help me" (Hebrew: no "בבקשה"/"תעזרו לי"), step 4's Family Access path, the revision; 4 knock-outs (old
     subject, the share button in step 4, a pleading Hebrew opening, revision 2) fail it.
+    Then Tony: "Yes, make it the standard wording, with "recipe app"" — done ("a feature-rich recipe app").
+  - **v39.61 + Worker v103 — the share button asks the owner for an invitation for someone else; 📊 Households → ✉️ Beta
+    invitation requests.** Tony, 10 Nov 2026: "Re the "share button", you are correct. I was looking in Test, where it
+    still has the invitation for the general public. However, I would rather they still use the long path (⚙️ Settings
+    → 🏠 My household → 👥 Family Access), and change the share button to open a new modal saying "ask for an invitation
+    for someone else". allowing the user to put in someone else's email. This email will reach me (perhaps as a new tab
+    in the Households page, called Beta invitation requests) and I will decide whether I would like to send them an
+    invite (each such line will have an "Invite" button next to it, sending the invitation to the new address)." His
+    answers to four questions: Invite opens ✉️ Invite testers filled in (he presses Send); e-mail + name + a word about
+    them (both optional) + the invitation's language; every tester (any role); the sent-recipe link's requests in the
+    same tab. **App:** while the copy is invitation-only, everyone but the owner gets `openInviteForOther()` from the
+    share button and ··· More's line (titled "Ask for an invitation for someone else"); the old "🔗 Invite someone to my
+    kitchen" part of the share window is gone. `inviteForOtherSend()` → Worker `invite-for`; said: sent / already asked
+    / the day's limit / a failure; counts only in the log. `openInviteTesters({ to, lang })`, `#invite=…&lang=`;
+    `testerInvitesAdd` calls `window.inviteAsksSent(addrs)`, which marks those requests done. The owner's start-up
+    notice: notes and invitation requests apart ("✉️ {n} new invitation request(s) — … → ✉️ Beta invitation requests",
+    `goInviteAsks`). **manage.js:** the tab (badge; Waiting / All; each card: address, name, copy, date, language, who
+    asked, the word, "invited before" from this copy's `testerInvites`; ✉️ Invite / 🙅 Not now / ↩︎ Back to waiting / 🗑);
+    💬 Feedback no longer lists them (`fbNotes`); the ⚙️ dot counts both. In copies where the inbox is not read (the
+    test copy) the tab is there with that copy's own requests, so it can be tried on Test (switch Test's Households to
+    "invitation only" first — otherwise its share button shares the app's link, as an open copy should). **Worker
+    v103** (deploys from the test push, live for every copy at once — additive): `invite-for` (signed in, confirmed, a
+    member of the kitchen; 10 a day per tester, 60 in all; the same address for the same copy within 30 days kept once;
+    one's own address refused; an owner alert, kind invite-ask); `notes-new` adds `notes` and `invites` (`new` as
+    before, for older apps); **invitation requests of both kinds are no longer forwarded to the reports repository**
+    (they are not reports, and they carry names). **Privacy Statement 1.15** (10 Nov 2026, all 11 languages, re-keyed
+    with tools/legal-keys.py): the row "Invitation requests for someone else"; What leaves this device: "The app's owner
+    (through the app's own server)". Help: the help assistant (Family Access is the way into one's kitchen; the new
+    window; the owner's tab), What can this app do, a Help suggestion "Invite a friend?". 23 new phrases in all 11
+    languages (tr61; gaps 0). Checked: Worker tests (14 new: who may ask, limits, the same address, the alert, the
+    count apart, not to the reports repository) — all pass; Self Tests `invite_for_someone_else`, `invite_requests_tab`
+    (both inbox modes), `beta_by_invitation_only` (rewritten share part), `invite_testers`; knock-outs (no window, the
+    share button not closed, no kitchen sent, one's own address allowed, the old isInviteAsk, no language, Feedback
+    keeping them, the send hook not called, not marked done) all fail them. Screens: 390 px in English and Hebrew,
+    1280 px.
   - **Planned for Tuesday 10 Nov 2026, after 11:00 Israel time — NOT before** (Tony, 7 Nov 2026, ~00:45: "as I am
     already at 75% of my weekly quota, I would like you to only log the request and plan it for Tuesday, after 11:00,
     when it resets"; a reminder into this session is scheduled for 11:05, trig_019vabk7G3ZPSwUAMaDctuxi). Two features:
