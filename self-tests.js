@@ -11842,7 +11842,7 @@ window.SELF_TESTS = [
       var heads=Array.prototype.map.call(m.querySelectorAll('.more-sec > .set-head'), function(h){ return h.textContent.replace(/^[^A-Za-z]+/, '').trim(); });
       if(heads.join('|')!=='Ideas|Tools|Kitchens and people|WhatsApp|Tidy up') throw new Error('the headings are '+heads.join(' | '));
       var where={ openExploreModal:'ideas', openSuggestModal:'ideas', openWhatCanIMake:'ideas', openCalcModal:'tools', openConnectHousehold:'people',
-        openFamilyChat:'people', openKitchenChats:'people', openGiftsIn:'people', openGiftsOut:'people', openShareAppModal:'people',
+        openFamilyChat:'people', openKitchenChats:'people', openGiftsIn:'people', openGiftsOut:'people', openDeleteAsks:'people', openShareAppModal:'people',
         openWaAsk:'whatsapp', openWaLinks:'whatsapp', aiTagAllDiets:'tidy', autoFetchMissingPhotos:'tidy' };
       Object.keys(where).forEach(function(f){
         var it=m.querySelectorAll('[onclick*="'+f+'("]');
@@ -11850,7 +11850,8 @@ window.SELF_TESTS = [
         var sec=it[0].closest('.more-sec');
         if(!sec || sec.getAttribute('data-sec')!==where[f] || !it[0].closest('.set-body')) throw new Error(f+' is under "'+(sec&&sec.getAttribute('data-sec'))+'", not in "'+where[f]+'"\'s body');
       });
-      if(m.querySelectorAll('.set-body .drop-item').length!==14) throw new Error('··· More has '+m.querySelectorAll('.set-body .drop-item').length+' items, not 14');
+      // v39.55 — 15 with 🗑️ Requests to delete (shown to the owner and admins while there are requests)
+      if(m.querySelectorAll('.set-body .drop-item').length!==15) throw new Error('··· More has '+m.querySelectorAll('.set-body .drop-item').length+' items, not 15');
       // v39.30 — Tony: "the titles … to become the only menu items under More. Clicking any of them will open a sub menu
       // with whatever is under the same title right now … in the same menu, expanding downwards, pushing the next title down."
       var seen=function(el){ return !!el && el.getClientRects().length>0 && getComputedStyle(el).visibility!=='hidden'; };
@@ -11884,7 +11885,7 @@ window.SELF_TESTS = [
         if(!m.querySelector('.more-sec[data-sec="whatsapp"]').hidden) throw new Error('the WhatsApp heading stayed with nothing under it');
         if(m.querySelector('.more-sec[data-sec="ideas"]').hidden) throw new Error('a heading with items was hidden');
       } finally { wa.forEach(function(b, i){ b.style.display=was[i]; }); moreSectionsRefresh(); }
-      return 'Files & backup: 5 items, none repeated; More: 5 headings alone, each opening its items in place and pushing the next down, one at a time; 14 items each in its place; an empty heading hidden';
+      return 'Files & backup: 5 items, none repeated; More: 5 headings alone, each opening its items in place and pushing the next down, one at a time; 15 items each in its place; an empty heading hidden';
     } },
 
   { id:'selftest_execute_in_view', group:'UI', name:'🧪 The Self Test window keeps ▶ Execute in view on a short screen — the list gives way — and ends above the home bar (v39.29)',
@@ -15013,6 +15014,116 @@ window.SELF_TESTS = [
         if(ov && ov.classList.contains('open')) closeM('viewOverlay');
         recipes.length=0; real.recipes.forEach(function(r){ recipes.push(r); });
         _pendingUndo=null; _cloudRestoreForTest(real.cloud);
+      }
+    } },
+  { id:'delete_ask_admin', group:'Sharing', name:'🗑️ Whoever may not delete asks an admin instead — a recipe, a collection, one recipe in a collection, several selected; the owner and admins delete in one tap (Undo) or keep it (v39.55)',
+    test: async()=>{
+      // v39.55 — Tony, 8 Nov 2026: "hide the delete button from non-admins, or any other member who does not have Delete
+      // privileges, or offer \"ask Admin to delete\". It will prevent frustration and ungainly error messages." — "for both
+      // recipes and collections". The database lets only the owner and admins delete a recipe (firestore.rules).
+      ['hhMayDelete','askAdminDelete','askAdminDeleteSelected','delAsksLoad','openDeleteAsks','delAskAct','deleteRecipeNow','removePartNow'].forEach(function(f){ if(typeof window[f]!=='function') throw new Error(f+' is not defined'); });
+      // A stand-in for the kitchen's documents: households/stDA/deleteAsks/<id>.
+      var store={}, ref=function(path){ return { id:path.split('/').pop(),
+          set:async function(d){ store[path]=JSON.parse(JSON.stringify(d)); }, delete:async function(){ delete store[path]; },
+          get:async function(){ return { exists: path in store, data:function(){ return store[path]; } }; },
+          collection:function(n){ return col(path+'/'+n); } }; };
+      var col=function(path){ var f=[]; var api={ doc:function(id){ return ref(path+'/'+id); }, where:function(k,op,v){ f.push([k,v]); return api; },
+          get:async function(){ var ks=Object.keys(store).filter(function(k){ return k.indexOf(path+'/')===0 && k.slice(path.length+1).indexOf('/')===-1 && f.every(function(x){ return store[k][x[0]]===x[1]; }); });
+            return { size:ks.length, forEach:function(fn){ ks.forEach(function(k){ fn({ id:k.split('/').pop(), data:function(){ return store[k]; }, ref:ref(k) }); }); } }; } }; return api; };
+      var asks=function(){ return Object.keys(store).filter(function(k){ return k.indexOf('households/stDA/deleteAsks/')===0; }).map(function(k){ return store[k]; }); };
+      var soup=normalizeRecipe({ id:9300701, uid:'st-da-soup', name:'ST Leek soup', ingredients:[{a:'1',n:'leek'}], steps:['cook'] });
+      var coll=normalizeRecipe({ id:9300702, uid:'st-da-coll', name:'ST Breads', parts:[{ uid:'st-da-p1', name:'ST Pita', ingredients:[{a:'1',n:'flour'}], steps:['bake'] },
+        { uid:'st-da-p2', name:'ST Lafa', ingredients:[{a:'1',n:'flour'}], steps:['bake'] }, { uid:'st-da-p3', name:'ST Challah', ingredients:[{a:'1',n:'flour'}], steps:['bake'] }] });
+      var third=normalizeRecipe({ id:9300703, uid:'st-da-third', name:'ST Salad', ingredients:[{a:'1',n:'lettuce'}], steps:['toss'] });
+      var real={ recipes:recipes.slice(), hh:window._household, user:window._fbUser, hhRef:window.hhRef, ask:window.askConfirm, toast:window.toast, toastA:window.toastAction,
+                 save:window.saveData, grid:window.renderGrid, filt:window.renderFilters, cloud:_cloudSnapshotForTest(), delAsks:JSON.stringify(_delAsks), sel:selectMode };
+      var toasts=[], asked=0;
+      recipes.push(soup, coll, third);
+      window.hhRef=function(){ return ref('households/stDA'); };
+      window._fbUser={ uid:'stDAme', displayName:'ST Member', email:'' };
+      window._household=Object.assign({}, real.hh||{}, { hid:'stDA', role:'editor', links:(real.hh&&real.hh.links)||[] });
+      window.askConfirm=async function(){ asked++; return true; };
+      window.toast=function(m){ toasts.push(String(m)); }; window.toastAction=function(m){ toasts.push(String(m)); };
+      window.saveData=function(){}; window.renderGrid=function(){}; window.renderFilters=function(){};
+      _delAsks.mine={}; _delAsks.list=[];
+      var ov=document.getElementById('viewOverlay');
+      try{
+        if(_cloudLayout!=='households') throw new Error('(this copy is not in the household layout)');
+        // ── an editor ──
+        if(hhMayDelete()) throw new Error('an editor counts as someone who may delete recipes');
+        openView(soup.id); await wait(120);
+        if(ov.querySelector('[onclick^="deleteRecipe("]')) throw new Error('an editor is offered 🗑️ Delete on a recipe');
+        var b=ov.querySelector('[onclick^="askAdminDelete("]');
+        if(!b || !/Ask an admin to delete/.test(b.textContent)) throw new Error('an editor is not offered 🗑️ Ask an admin to delete');
+        b.click(); await wait(80);
+        var a=asks();
+        if(a.length!==1 || a[0].what!=='recipe' || a[0].rid!==String(soup.id) || a[0].by!=='stDAme' || a[0].title!=='ST Leek soup' || a[0].name!=='ST Member') throw new Error('the request sent is not this recipe, in the asker\'s name: '+JSON.stringify(a));
+        if(!recipes.some(function(r){ return r.id===soup.id; })) throw new Error('asking deleted the recipe on the editor\'s device');
+        if(!toasts.some(function(m){ return /Sent/.test(m); })) throw new Error('the editor is not told the request was sent');
+        toasts.length=0; await deleteRecipe(soup.id); await wait(40);
+        if(!recipes.some(function(r){ return r.id===soup.id; })) throw new Error('deleteRecipe still deletes for an editor');
+        if(asks().length!==1 || !toasts.some(function(m){ return /already asked/.test(m); })) throw new Error('asking twice sends a second request, or does not say it was asked');
+        closeM('viewOverlay');
+        // a collection, and one recipe inside it
+        openView(coll.id); await wait(120);
+        if(ov.querySelector('[onclick^="removePartFromCollection("]')) throw new Error('an editor is offered 🗑 Remove on a recipe in a collection');
+        var pb=ov.querySelector('.part-actions [onclick^="askAdminDelete("]');
+        if(!pb) throw new Error('a recipe in a collection has no 🗑️ Ask an admin to delete');
+        pb.click(); await wait(80);
+        if(!asks().some(function(x){ return x.what==='part' && x.rid===String(coll.id) && x.puid==='st-da-p1' && x.title==='ST Pita'; })) throw new Error('the request for one recipe in a collection does not name it: '+JSON.stringify(asks()));
+        var cb=Array.prototype.find.call(ov.querySelectorAll('.recipe-actions [onclick^="askAdminDelete("]'), function(x){ return !x.closest('.part-actions'); });
+        if(!cb) throw new Error('a collection has no 🗑️ Ask an admin to delete');
+        cb.click(); await wait(80);
+        if(!asks().some(function(x){ return x.what==='collection' && x.rid===String(coll.id) && !x.puid; })) throw new Error('the request for a collection is not a collection\'s');
+        if(recipeParts(coll).length!==3) throw new Error('asking took a recipe out of the collection');
+        closeM('viewOverlay');
+        // Select → Delete
+        toggleSelectMode(); selectedIds.add(third.id);
+        var bar=document.getElementById('delBarDelete');
+        if(!bar || !/Ask an admin to delete/.test(bar.textContent)) throw new Error('Select → Delete does not say it asks an admin');
+        await deleteSelected(); await wait(60);
+        if(!recipes.some(function(r){ return r.id===third.id; })) throw new Error('Select → Delete deleted for an editor');
+        if(!asks().some(function(x){ return x.rid===String(third.id); })) throw new Error('Select → Delete sent no request');
+        if(selectMode) toggleSelectMode();
+        if(asks().length!==4) throw new Error(asks().length+' requests, not 4');
+        // ── the admin ──
+        window._household.role='admin';
+        if(!hhMayDelete()) throw new Error('an admin counts as someone who may not delete');
+        openView(soup.id); await wait(120);
+        if(!ov.querySelector('[onclick^="deleteRecipe("]') || ov.querySelector('[onclick^="askAdminDelete("]')) throw new Error('an admin is not offered 🗑️ Delete itself');
+        closeM('viewOverlay');
+        var w=await openDeleteAsks(); await wait(40);
+        var rows=document.querySelectorAll('#delAsksOverlay .da-row');
+        if(rows.length!==4) throw new Error('the admin sees '+rows.length+' requests, not 4');
+        var idx=function(fn){ for(var i=0;i<_delAsks.list.length;i++) if(fn(_delAsks.list[i].d)) return i; return -1; };
+        toasts.length=0;
+        await delAskAct(idx(function(d){ return d.rid===String(soup.id) && d.what==='recipe'; }), 'delete'); await wait(40);
+        if(recipes.some(function(r){ return r.id===soup.id; })) throw new Error('one tap on 🗑️ Delete it did not delete the recipe');
+        if(asks().some(function(x){ return x.rid===String(soup.id); })) throw new Error('the answered request is still there');
+        if(!toasts.some(function(m){ return /Deleted/.test(m); })) throw new Error('the deletion offers no Undo');
+        undoDelete(); await wait(20);
+        if(!recipes.some(function(r){ return r.id===soup.id; })) throw new Error('Undo does not bring the recipe back');
+        await delAskAct(idx(function(d){ return d.what==='part'; }), 'delete'); await wait(40);
+        if(recipeParts(coll).some(function(p){ return p.uid==='st-da-p1'; })) throw new Error('one tap did not take the recipe out of the collection');
+        await delAskAct(idx(function(d){ return d.rid===String(third.id); }), 'keep'); await wait(40);
+        if(!recipes.some(function(r){ return r.id===third.id; })) throw new Error('Keep it deleted the recipe');
+        if(asks().some(function(x){ return x.rid===String(third.id); })) throw new Error('Keep it did not clear the request');
+        // a request for what is gone already: says so, and clears
+        var ci=recipes.indexOf(coll); recipes.splice(ci,1); delAsksRender();
+        if(!/Already gone/.test((document.getElementById('daBody')||{}).textContent||'')) throw new Error('a request for a recipe that is gone does not say so');
+        await delAskAct(idx(function(d){ return d.what==='collection'; }), 'keep'); await wait(30);
+        if(asks().length) throw new Error('requests left after every one was answered: '+JSON.stringify(asks()));
+        if(asked<5) throw new Error('a request was sent without asking first ('+asked+' questions)');
+      } finally {
+        var dov=document.getElementById('delAsksOverlay'); if(dov) dov.remove();
+        if(ov && ov.classList.contains('open')) closeM('viewOverlay');
+        if(selectMode && !real.sel) toggleSelectMode();
+        window.hhRef=real.hhRef; window._fbUser=real.user; window._household=real.hh; window.askConfirm=real.ask; window.toast=real.toast; window.toastAction=real.toastA;
+        window.saveData=real.save; window.renderGrid=real.grid; window.renderFilters=real.filt;
+        recipes.length=0; real.recipes.forEach(function(r){ recipes.push(r); });
+        var was=JSON.parse(real.delAsks); _delAsks.mine=was.mine; _delAsks.list=was.list; _delAsks.told=was.told;
+        _pendingUndo=null; _cloudRestoreForTest(real.cloud);
+        var d=document.getElementById('delBarDelete'); if(d) d.textContent='🗑️ Delete';
       }
     } },
   { id:'export_docx_build', group:'Import/Export', name:'Word (.docx) builds a valid ZIP',

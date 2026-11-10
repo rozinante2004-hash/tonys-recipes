@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v39.54` — app. **Worker: v102**, deployed separately and versioned separately
+**Current version:** `v39.55` — app. **Worker: v102**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -408,6 +408,13 @@ under its plain path only (a `?url=` request goes network-first).
   **Pace and pitch (v39.36, Tony's choice "E" from five heard on his phone):** FARM_VOICE_TUNE child speed 0.8, pitch
   1.8 (the top; above it speech cracks); female 0.74 / 1.4; male 0.7 / 0.7 (only slower: he stays deep, v38.01); each
   animal adds ±0.3 × (its pitch − 1), kept within 0.55–1.8.
+- **🗑️ Ask an admin to delete (v39.55):** `hhMayDelete()` (owner/admin in the household layout, or not signed in). Others
+  see "🗑️ Ask an admin to delete" wherever a delete is offered, and the delete functions ask instead (`askAdminDelete`,
+  `askAdminDeleteSelected` → `delAskSend` → `households/<hid>/deleteAsks/<uid>_<rid>[_<puid>]` = { by, name, what, rid,
+  puid, title, at }). Owner/admins: `delAsksLoad` at household entry (toast once, the ··· More item `delAsksItem` with a
+  count), `openDeleteAsks` → rows with Delete it (`deleteRecipeNow` / `removePartNow`) and Keep it (`delAskAct`), each
+  deleting the request. Rules: create by a member as themselves, fixed keys; read by the asker and admins; no update.
+  Self Test `delete_ask_admin`; emulator checks in tests/firestore-households-rules.test.mjs.
 - **Small fixes (v39.54):** `i18nTemplateCovers(k, dict)` — a translated {n} key of the dictionary matching a line whole;
   such a line is not noted (`i18nNoteMissing`), dropped from the kept missing list (`i18nLoadMissing`), left out of the
   gaps unless the app asks for that line itself (`i18nGapList`), and taken out of the shared store by the release job

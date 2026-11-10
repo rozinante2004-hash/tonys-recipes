@@ -110,6 +110,31 @@ await check('an editor cannot list them',                getDocs(collection(bob,
 await check('nobody changes a request',                  updateDoc(doc(dave, 'households/h1/requests/dave'), { at: 2 }), false);
 await check('an admin answers it (removes it)',          deleteDoc(doc(erin, 'households/h1/requests/dave')), true);
 
+console.log('Asking an admin to delete (v39.55)');
+// bob edits, dave reads, erin is an admin, carol is a stranger.
+const delAsk = (db, id, extra) => setDoc(doc(db, 'households/h1/deleteAsks/' + id),
+  Object.assign({ by: 'bob', name: 'Bob', what: 'recipe', rid: '12', puid: '', title: 'Leek soup', at: 1 }, extra || {}));
+await check('an editor asks the admins to delete a recipe',      delAsk(bob, 'bob_12'), true);
+await check('…only in his own name',                            delAsk(bob, 'bob_13', { by: 'dave' }), false);
+await check('…carrying nothing else',                           delAsk(bob, 'bob_14', { role: 'admin' }), false);
+await check('…a recipe, a collection or one recipe in it only', delAsk(bob, 'bob_15', { what: 'everything' }), false);
+await check('…with a recipe to point at',                       delAsk(bob, 'bob_16', { rid: '' }), false);
+await check('one recipe inside a collection',                   delAsk(bob, 'bob_20_p1', { what: 'part', rid: '20', puid: 'p1', title: 'Pita' }), true);
+await check('someone who only reads may ask too',               delAsk(dave, 'dave_12', { by: 'dave', name: 'Dave' }), true);
+await check('a stranger cannot',                                delAsk(carol, 'carol_12', { by: 'carol', name: 'Carol' }), false);
+await check('the asker reads his own',                          getDoc(doc(bob, 'households/h1/deleteAsks/bob_12')), true);
+await check('…and lists his own',                               getDocs(query(collection(bob, 'households/h1/deleteAsks'), where('by', '==', 'bob'))), true);
+await check('another member cannot read it',                    getDoc(doc(dave, 'households/h1/deleteAsks/bob_12')), false);
+await check('an admin lists them',                              getDocs(collection(erin, 'households/h1/deleteAsks')), true);
+await check('an editor cannot list them all',                   getDocs(collection(bob, 'households/h1/deleteAsks')), false);
+await check('a stranger cannot read one',                       getDoc(doc(carol, 'households/h1/deleteAsks/bob_12')), false);
+await check('nobody changes one',                               updateDoc(doc(bob, 'households/h1/deleteAsks/bob_12'), { title: 'Something else' }), false);
+await check('another member cannot remove it',                  deleteDoc(doc(dave, 'households/h1/deleteAsks/bob_12')), false);
+await check('the asker withdraws his own',                      deleteDoc(doc(dave, 'households/h1/deleteAsks/dave_12')), true);
+await check('an admin answers one (removes it)',                deleteDoc(doc(erin, 'households/h1/deleteAsks/bob_12')), true);
+await check('…and the other',                                   deleteDoc(doc(erin, 'households/h1/deleteAsks/bob_20_p1')), true);
+await check('the editor still cannot delete a recipe himself',  deleteDoc(doc(bob, 'households/h1/recipes/5')), false);
+
 console.log('Managing members');
 await check('an admin makes a viewer an editor',  updateDoc(doc(erin, 'households/h1/members/dave'), { role: 'editor' }), true);
 await check('an admin cannot make anyone admin',  updateDoc(doc(erin, 'households/h1/members/dave'), { role: 'admin' }), false);

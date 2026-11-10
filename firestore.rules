@@ -379,6 +379,25 @@ service cloud.firestore {
         allow create, update: if atLeast(hid, 'editor');
         allow delete: if atLeast(hid, 'admin') || beingDeleted(hid);
       }
+      // v39.55 — Tony, 8 Nov 2026: "hide the delete button from non-admins … or offer \"ask Admin to delete\". It will
+      // prevent frustration and ungainly error messages." Deleting stays the owner's and admins' (above); a member who may
+      // not delete asks them: `deleteAsks/<id>` = { by, name, what: recipe | collection | part, rid, puid, title, at },
+      // written by the member in their own name and never changed. The owner and admins read them and answer (they delete
+      // the recipe, then the request, or just the request); the member sees and withdraws their own.
+      match /deleteAsks/{id} {
+        allow read: if (signedIn() && resource.data.by == request.auth.uid) || atLeast(hid, 'admin') || beingDeleted(hid);
+        allow create: if isMember(hid)
+          && request.resource.data.keys().hasOnly(['by', 'name', 'what', 'rid', 'puid', 'title', 'at'])
+          && request.resource.data.by == request.auth.uid
+          && request.resource.data.what in ['recipe', 'collection', 'part']
+          && request.resource.data.name is string && request.resource.data.name.size() <= 80
+          && request.resource.data.rid is string && request.resource.data.rid.size() > 0 && request.resource.data.rid.size() <= 40
+          && request.resource.data.puid is string && request.resource.data.puid.size() <= 80
+          && request.resource.data.title is string && request.resource.data.title.size() <= 200
+          && request.resource.data.at is int;
+        allow update: if false;
+        allow delete: if (signedIn() && resource.data.by == request.auth.uid) || atLeast(hid, 'admin') || beingDeleted(hid);
+      }
       // v37.13 — a reader asking to add and change recipes: `requests/<uid>` =
       // { uid, at }. Only for themselves, only while a viewer; the household's
       // admins see them and answer (by changing the role, and removing it).

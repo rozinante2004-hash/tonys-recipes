@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.54 -->
+<!-- Tony's Recipes Collection v39.55 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1629,6 +1629,9 @@ function toggleSelectMode() {
   renderGrid();
   var bar = document.getElementById('selectBar');
   if (bar) bar.style.display = selectMode ? 'flex' : 'none';
+  var del = document.getElementById('delBarDelete');   // v39.55 — for whoever may not delete, the request
+  var delLabel = hhMayDelete() ? '\uD83D\uDDD1\uFE0F Delete' : '\uD83D\uDDD1\uFE0F Ask an admin to delete';
+  if (del) del.textContent = delLabel;
   syncSelectBtnState();
 }
 
@@ -1662,6 +1665,7 @@ var _pendingUndo = null;
 
 async function deleteSelected() {
   if (!selectedIds.size) { toast('No recipes selected'); return; }
+  if (!hhMayDelete()) return askAdminDeleteSelected();   // v39.55
   var count = selectedIds.size;
   if (!await askConfirm({ icon:'🗑️', title:'Delete ' + count + ' recipe' + (count!==1?'s':'') + '?',
       message:'You can undo this straight afterwards.', okLabel:'Delete', danger:true })) return;
@@ -1709,20 +1713,31 @@ window.duplicateRecipe = duplicateRecipe;
 
 // 2.4 — delete straight from the recipe (undo-able, same as bulk delete)
 async function deleteRecipe(id) {
+  if (!hhMayDelete()) return askAdminDelete(id);   // v39.55 — not theirs to delete: they ask
   var idx = recipes.findIndex(function(x){ return x.id===id; });
   if (idx < 0) return;
   var r = recipes[idx];
   if (!await askConfirm({ icon:'🗑️', title:'Delete this recipe?', message:r.name + '\n\nYou can undo this straight afterwards.',
       okLabel:'Delete', danger:true })) return;
+  deleteRecipeNow(id);
+}
+// The deletion itself, undo-able (v39.55: also an admin's one tap on a member's request).
+function deleteRecipeNow(id) {
+  var idx = recipes.findIndex(function(x){ return x.id===id; });
+  if (idx < 0) return false;
+  var r = recipes[idx];
   _pendingUndo = { items: [{ idx: idx, recipe: r }], at: Date.now() };
   queueCloudDelete(r.id);   // 5.4 — remove its own document too, not just the entry
   recipes.splice(idx, 1);
   saveData();
   renderFilters();
   renderGrid();
-  closeM('viewOverlay');
+  var vo = document.getElementById('viewOverlay');
+  if (vo && vo.classList.contains('open') && viewId === id) closeM('viewOverlay');
   toastAction('🗑️ Deleted “' + r.name + '”', '↩︎ Undo', undoDelete);
+  return true;
 }
+window.deleteRecipeNow = deleteRecipeNow;
 window.deleteRecipe = deleteRecipe;
 
 function undoDelete() {
@@ -1745,6 +1760,160 @@ function undoDelete() {
   toast('↩︎ Restored ' + n + ' recipe' + (n!==1?'s':''));
 }
 window.undoDelete = undoDelete;
+
+// ─── v39.55 — "🗑️ ASK AN ADMIN TO DELETE" ─────────────────────────────────────
+// Tony, 8 Nov 2026: "hide the delete button from non-admins, or any other member who does not have Delete privileges, or
+// offer \"ask Admin to delete\". It will prevent frustration and ungainly error messages." His choice: ask — for recipes
+// and for collections. Deleting is the owner's and admins' (firestore.rules: a recipe's document is deleted only by
+// atLeast admin); for anyone else every 🗑️ — a recipe's, a collection's, one recipe inside a collection's, Select → Delete
+// — becomes "🗑️ Ask an admin to delete", and asking writes `households/<hid>/deleteAsks/<asker>_<recipe>[_<part>]` =
+// { by, name, what, rid, puid, title, at }. The owner and admins are told as the kitchen opens, and answer in ··· More →
+// 🏡 Kitchens and people → 🗑️ Requests to delete: one tap deletes it (a recipe with Undo; a recipe in a collection kept in
+// the collection's 🕘 Version history), or keeps it; either clears the request.
+var _delAsks = { mine: {}, list: [], told: {} };
+function hhMayDelete() {
+  if (_cloudLayout !== 'households' || !_household || !window._fbUser) return true;   // this device's own recipes
+  return _household.role === 'owner' || _household.role === 'admin';
+}
+function delAskId(rid, puid) { return (window._fbUser ? _fbUser.uid : 'me') + '_' + rid + (puid ? '_' + puid : ''); }
+async function delAskMineLoad() {
+  try {
+    var s = await hhRef().collection('deleteAsks').where('by', '==', _fbUser.uid).get(), m = {};
+    s.forEach(function(d){ m[d.id] = true; });
+    _delAsks.mine = m;
+  } catch (e) {}
+}
+// Sends the requests: { sent, again } (one asked before is not asked again), or null when there is no kitchen to ask.
+async function delAskSend(items) {
+  if (!_household || !window._fbUser) { toast('Sign in first.', 5000); return null; }
+  await delAskMineLoad();
+  var sent = 0, again = 0, who = String(_fbUser.displayName || _fbUser.email || '').slice(0, 80);
+  for (var i = 0; i < items.length; i++) {
+    var it = items[i], id = delAskId(it.rid, it.puid);
+    if (_delAsks.mine[id]) { again++; continue; }
+    try {
+      await hhRef().collection('deleteAsks').doc(id).set({ by: _fbUser.uid, name: who, what: it.what, rid: String(it.rid),
+        puid: it.puid || '', title: String(it.title || '').slice(0, 200), at: Date.now() });
+      _delAsks.mine[id] = true; sent++;
+    } catch (e) { syncLog('error', 'A request to delete could not be sent', String((e && e.message) || e).slice(0, 160)); }
+  }
+  return { sent: sent, again: again };
+}
+async function askAdminDelete(rid, puid) {
+  var r = recipes.find(function(x){ return x.id === rid; });
+  if (!r) { toast('That recipe is no longer here', 4000); return false; }
+  var part = puid ? recipeParts(r).find(function(p){ return p.uid === puid; }) : null;
+  if (puid && !part) { toast('That recipe is no longer in this collection', 4000); return false; }
+  var what = part ? 'part' : (isCollection(r) ? 'collection' : 'recipe'), title = part ? part.name : r.name;
+  // (each sentence whole, in a variable: a choice written into the message is read as one phrase by the harvest)
+  var why = what === 'collection'
+    ? 'Deleting a collection is for your kitchen’s owner and admins. This sends them your request — one tap there deletes it.'
+    : 'Deleting a recipe is for your kitchen’s owner and admins. This sends them your request — one tap there deletes it.';
+  if (!await askConfirm({ icon: '🗑️', title: 'Ask an admin to delete “' + title + '”?',
+      message: why, okLabel: 'Send the request' })) return false;
+  var res = await delAskSend([{ rid: rid, puid: puid || '', what: what, title: title }]);
+  if (!res) return false;
+  if (res.sent) {
+    toast('📨 Sent — your kitchen’s owner and admins can delete “' + title + '” in one tap.', 6000);
+    syncLog('save', 'Asked an admin to delete a recipe', { id: rid, what: what });
+  } else if (res.again) toast('You have already asked about “' + title + '” — it waits for an admin.', 5000);
+  else toast('The request could not be sent — try again in a moment.', 5000);
+  return !!res.sent;
+}
+async function askAdminDeleteSelected() {
+  var list = recipes.filter(function(r){ return selectedIds.has(r.id); });
+  if (!list.length) { toast('No recipes selected'); return false; }
+  if (!await askConfirm({ icon: '🗑️', title: 'Ask an admin to delete ' + list.length + ' recipe(s)?',
+      message: 'Deleting recipes is for your kitchen’s owner and admins. This sends them your request — one tap there deletes each.',
+      okLabel: 'Send the request' })) return false;
+  var res = await delAskSend(list.map(function(r){ return { rid: r.id, puid: '', what: isCollection(r) ? 'collection' : 'recipe', title: r.name }; }));
+  if (!res) return false;
+  cancelSelectMode();
+  var said = res.again ? '📨 Sent — ' + res.sent + ' request(s) to delete (' + res.again + ' asked before).'
+                       : '📨 Sent — ' + res.sent + ' request(s) to delete.';
+  toast(said, 6000);
+  if (res.sent) syncLog('save', 'Asked an admin to delete recipes', { count: res.sent });
+  return res.sent > 0;
+}
+// The owner's and admins' side.
+async function delAsksLoad() {
+  if (!_household || !householdCanManage()) { _delAsks.list = []; delAsksBadge(); return []; }
+  try {
+    var s = await hhRef().collection('deleteAsks').get(), l = [];
+    s.forEach(function(d){ l.push({ id: d.id, d: d.data() || {} }); });
+    l.sort(function(a, b){ return (b.d.at || 0) - (a.d.at || 0); });
+    _delAsks.list = l;
+  } catch (e) { return _delAsks.list; }
+  delAsksBadge();
+  if (_delAsks.list.length && !_delAsks.told[_cloudHid] && !_selfTestRunning) {
+    _delAsks.told[_cloudHid] = true;
+    toast('🗑️ ' + _delAsks.list.length + ' request(s) to delete recipes — tap to see them.', 9000, openDeleteAsks);
+  }
+  return _delAsks.list;
+}
+function delAsksBadge() {
+  var n = _delAsks.list.length, item = document.getElementById('delAsksItem'), c = document.getElementById('delAsksCount');
+  if (item) item.style.display = (n && householdCanManage()) ? '' : 'none';
+  if (c) c.textContent = n ? ' (' + n + ')' : '';
+}
+async function openDeleteAsks() {
+  if (!_household || !householdCanManage()) { toast('Only your kitchen’s owner and admins delete recipes.', 5000); return null; }
+  var prev = document.getElementById('delAsksOverlay'); if (prev) prev.remove();
+  var ov = document.createElement('div');
+  ov.id = 'delAsksOverlay'; ov.className = 'modal-overlay open';
+  ov.innerHTML = '<div class="ask-card" role="dialog" aria-modal="true" aria-labelledby="daTitle" style="max-width:560px;text-align:start;max-height:88vh;overflow-y:auto;">'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><div class="ask-title" id="daTitle">🗑️ Requests to delete</div>'
+    + '<button type="button" class="modal-close" style="position:relative;top:auto;right:auto;" aria-label="Close" onclick="document.getElementById(\'delAsksOverlay\').remove()">✕</button></div>'
+    + '<div id="daBody"><div style="color:var(--muted);font-size:13px;padding:14px 0;">⏳ Reading…</div></div></div>';
+  ov.onclick = function(e){ if (e.target === ov) ov.remove(); };
+  document.body.appendChild(ov);
+  await delAsksLoad();
+  delAsksRender();
+  return ov;
+}
+function delAskTarget(d) {
+  var r = recipes.find(function(x){ return String(x.id) === String(d.rid); });
+  if (!r) return null;
+  if (d.what !== 'part') return { r: r, p: null, name: r.name };
+  var p = recipeParts(r).find(function(x){ return x.uid === d.puid; });
+  return p ? { r: r, p: p, name: p.name } : null;
+}
+function delAsksRender() {
+  var body = document.getElementById('daBody');
+  if (!body) return;
+  var btn = 'padding:6px 11px;border-radius:8px;font-size:12.5px;font-weight:600;cursor:pointer;min-height:32px;font-family:inherit;background:var(--card-bg);';
+  var h = '<div style="font-size:12.5px;color:var(--muted);line-height:1.5;margin:4px 0 12px;">Members of your kitchen who may not delete recipes ask you here. Delete it, or keep it — either way the request is cleared.</div>';
+  h += _delAsks.list.length ? _delAsks.list.map(function(a, i) {
+    var d = a.d, at = delAskTarget(d);
+    var kind = d.what === 'collection' ? 'A collection' : d.what === 'part' ? 'A recipe in a collection' : 'A recipe';
+    return '<div class="da-row" style="border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px;">'
+      + '<b dir="auto" data-no-i18n>' + escH(at ? at.name : (d.title || '')) + '</b>'
+      + (at && at.p ? ' <span style="font-size:12px;color:var(--muted);">· 📚 <span dir="auto" data-no-i18n>' + escH(at.r.name) + '</span></span>' : '')
+      + '<div style="font-size:12px;color:var(--muted);margin-top:2px;"><span>' + kind + '</span> · <span>asked by</span> <span dir="auto" data-no-i18n>' + escH(d.name || '') + '</span></div>'
+      + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;align-items:center;">'
+      + (at ? '<button type="button" class="da-del" style="' + btn + 'color:var(--danger);border:1px solid #E8B0B0;" onclick="delAskAct(' + i + ',\'delete\')">🗑️ Delete it</button>'
+            + '<button type="button" class="da-keep" style="' + btn + 'color:var(--heading);border:1px solid var(--border);" onclick="delAskAct(' + i + ',\'keep\')">Keep it</button>'
+            : '<span style="font-size:12.5px;color:var(--muted);">Already gone</span>'
+            + '<button type="button" class="da-keep" style="' + btn + 'color:var(--heading);border:1px solid var(--border);" onclick="delAskAct(' + i + ',\'keep\')">Clear</button>')
+      + '</div></div>';
+  }).join('') : '<div style="color:var(--muted);font-size:13px;padding:10px 0;">No requests waiting.</div>';
+  body.innerHTML = h;
+}
+async function delAskAct(i, how) {
+  var a = _delAsks.list[i];
+  if (!a || !householdCanManage()) return false;
+  var d = a.d, at = delAskTarget(d);
+  if (how === 'delete' && at) { if (at.p) removePartNow(at.r.id, at.p.uid); else deleteRecipeNow(at.r.id); }
+  try { await hhRef().collection('deleteAsks').doc(a.id).delete(); }
+  catch (e) { syncLog('error', 'A request to delete could not be cleared', String((e && e.message) || e).slice(0, 160)); }
+  _delAsks.list = _delAsks.list.filter(function(x){ return x.id !== a.id; });
+  delAsksBadge(); delAsksRender();
+  if (how !== 'delete' && at) toast('Kept “' + at.name + '” — the request is cleared.', 4000);
+  syncLog('save', how === 'delete' && at ? 'Deleted at a member’s request' : 'A request to delete was cleared', { id: d.rid, what: d.what });
+  return true;
+}
+window.hhMayDelete = hhMayDelete; window.askAdminDelete = askAdminDelete; window.askAdminDeleteSelected = askAdminDeleteSelected;
+window.delAsksLoad = delAsksLoad; window.openDeleteAsks = openDeleteAsks; window.delAskAct = delAskAct; window.delAsksRender = delAsksRender;
 
 // ─── UNDO FOR THE BULK, STRUCTURAL OPERATIONS (v36.22, audit F4) ─────────────
 // Deleting has had Undo since 1.4. Splitting a collection, merging recipes into
@@ -8159,6 +8328,7 @@ async function householdLoadMembers() {
   }
   list.forEach(function(m){ if (m.uid && asks[m.uid] && m.hhRole === 'viewer') m.asks = true; });
   householdToldOfAsks(list);
+  if (_household.role === 'owner' || _household.role === 'admin') delAsksLoad().catch(function(){});   // v39.55
   if (_household.role === 'owner' || _household.role === 'admin') {
     try {
       var ps = await hhDb().collection('pending').where('hid', '==', _cloudHid).get();
@@ -8603,6 +8773,11 @@ async function householdWipe(hid, onStep) {
   var rq = await hhRef(hid).collection('requests').get(), rrefs = [];
   rq.forEach(function(d){ rrefs.push(d.ref); });
   await inBatches(rrefs);
+  try {   // v39.55 — members' requests to delete
+    var da = await hhRef(hid).collection('deleteAsks').get(), drefs = [];
+    da.forEach(function(d){ drefs.push(d.ref); });
+    await inBatches(drefs);
+  } catch(e) {}
   try {   // v37.80 — what became of its link requests, and whom it blocked
     var lg = await hhRef(hid).collection('requestLog').get(), lgrefs = [];
     lg.forEach(function(d){ lgrefs.push(d.ref); });
@@ -10842,7 +11017,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.54';
+var APP_VERSION = 'v39.55';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -14350,7 +14525,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.54</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.55</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14438,7 +14613,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.54</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.55</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -14623,6 +14798,8 @@ body.banner-shown .header {
             <!-- v39.10 — Tony: "a menu item for it under "More ...", called something like "Recipes sent to me"", and "📤 Recipes I sent" -->
             <button class="drop-item" id="giftsInItem" data-layout-only="households" title="Recipes other kitchens sent yours, waiting to be saved — each for 4 weeks." onclick="closeDrop('moreDrop');openGiftsIn()"><span>📨 Recipes sent to me</span><span id="giftsInCount" data-no-i18n></span></button>
             <button class="drop-item" id="giftsOutItem" data-layout-only="households" title="What your kitchen sent, and whether they saved it." onclick="closeDrop('moreDrop');openGiftsOut()">📤 Recipes I sent</button>
+            <!-- v39.55 — Tony: "ask Admin to delete" — what members asked the owner and admins to delete (shown while there are some) -->
+            <button class="drop-item" id="delAsksItem" data-layout-only="households" style="display:none;" title="What members of your kitchen asked you to delete." onclick="closeDrop('moreDrop');openDeleteAsks()"><span>🗑️ Requests to delete</span><span id="delAsksCount" data-no-i18n></span></button>
             <button class="drop-item" onclick="closeDrop('moreDrop');openShareAppModal()"><span aria-hidden="true" data-no-i18n style="display:inline-flex;"><svg class="share-ico" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="11.5" fill="#C1440E"/><path d="M7.2 12 14.8 7.6M7.2 12 14.8 16.4" stroke="#FFFFFF" stroke-width="1.9" stroke-linecap="round"/><circle cx="15" cy="7.4" r="2.6" fill="#FFFFFF"/><circle cx="7" cy="12" r="2.6" fill="#FFFFFF"/><circle cx="15" cy="16.6" r="2.6" fill="#FFFFFF"/></svg></span> <span id="shareAppMenuText">Share this app</span></button>
             </div>
           </div>
@@ -14816,7 +14993,7 @@ body.banner-shown .header {
     <button class="del-bar-btn del-bar-action" onclick="printSelected()">🖨️ Print</button>
     <button class="del-bar-btn del-bar-action" onclick="collectSelectedInto(null)">📚 New collection</button>
     <button class="del-bar-btn del-bar-action" onclick="addSelectedToCollection()">📚 Add to collection</button>
-    <button class="del-bar-btn del-bar-delete" onclick="deleteSelected()">🗑️ Delete</button>
+    <button class="del-bar-btn del-bar-delete" id="delBarDelete" onclick="deleteSelected()">🗑️ Delete</button>
   </div>
 </div>
 
@@ -18042,6 +18219,19 @@ window.i18nTemplatesOf = i18nTemplatesOf; window.i18nTemplateCovers = i18nTempla
 // translating a string nobody sees. A `{1}` makes it a shape, matched the same
 // way a built toast is.
 var I18N_EXTRA = [
+  // v39.55 — asking an admin to delete, and the admins' answers (drawn by code)
+  '\uD83D\uDDD1\uFE0F Ask an admin to delete', 'Ask an admin to delete \u201C{1}\u201D?', 'Send the request',
+  'Deleting a recipe is for your kitchen\u2019s owner and admins. This sends them your request \u2014 one tap there deletes it.',
+  'Deleting a collection is for your kitchen\u2019s owner and admins. This sends them your request \u2014 one tap there deletes it.',
+  'Deleting recipes is for your kitchen\u2019s owner and admins. This sends them your request \u2014 one tap there deletes each.',
+  'Ask an admin to delete {1} recipe(s)?', '\uD83D\uDCE8 Sent \u2014 your kitchen\u2019s owner and admins can delete \u201C{1}\u201D in one tap.',
+  'You have already asked about \u201C{1}\u201D \u2014 it waits for an admin.', 'The request could not be sent \u2014 try again in a moment.',
+  '\uD83D\uDCE8 Sent \u2014 {1} request(s) to delete.', '\uD83D\uDCE8 Sent \u2014 {1} request(s) to delete ({2} asked before).',
+  '\uD83D\uDDD1\uFE0F {1} request(s) to delete recipes \u2014 tap to see them.', '\uD83D\uDDD1\uFE0F Requests to delete',
+  'Members of your kitchen who may not delete recipes ask you here. Delete it, or keep it \u2014 either way the request is cleared.',
+  'A collection', 'A recipe in a collection', 'A recipe', 'asked by', '\uD83D\uDDD1\uFE0F Delete it', 'Keep it', 'Already gone', 'Clear',
+  'No requests waiting.', 'Kept \u201C{1}\u201D \u2014 the request is cleared.', 'Only your kitchen\u2019s owner and admins delete recipes.',
+  'Only your kitchen\u2019s owner and admins delete recipes \u2014 this asks them to',
   // v39.53 — links between recipes: the picker, the editor's list, ← Back and what they say (drawn by code)
   '\uD83D\uDD17 Link to a recipe', 'The words:', 'Search your recipes', 'No recipe by that name', 'not among your recipes now',
   'Remove this link', '\u2190 Back', 'Back to the recipe you came from', 'Link to a recipe', 'That recipe is no longer here',
@@ -22769,8 +22959,11 @@ function partActionsHtml(coll, p) {
     + 'onclick="openBringModal(' + q + ')">🛒 Bring!</button>'
     + '<button class="action-btn" onclick="promotePartToRecipe(' + coll.id + ',' + jsA(p.uid) + ')" '
     + 'title="Make this a recipe of its own">⤴ Make its own</button>'
-    + '<button class="action-btn" style="color:var(--danger);border-color:#E8B0B0;" '
-    + 'onclick="removePartFromCollection(' + coll.id + ',' + jsA(p.uid) + ')">🗑 Remove</button>'
+    + (hhMayDelete()
+      ? '<button class="action-btn" style="color:var(--danger);border-color:#E8B0B0;" '
+        + 'onclick="removePartFromCollection(' + coll.id + ',' + jsA(p.uid) + ')">🗑 Remove</button>'
+      : '<button class="action-btn" style="color:var(--danger);border-color:#E8B0B0;" '   // v39.55
+        + 'onclick="askAdminDelete(' + coll.id + ',' + jsA(p.uid) + ')" title="Only your kitchen’s owner and admins delete recipes — this asks them to">🗑️ Ask an admin to delete</button>')
     + cooked
     + '</div></div>';
 }
@@ -23249,6 +23442,7 @@ window.collapseCollectionIfThin = collapseCollectionIfThin;
 // cook — and tidying those away should not mean creating three cards first and
 // deleting them afterwards.
 async function removePartFromCollection(collId, partUid) {
+  if (!hhMayDelete()) return askAdminDelete(collId, partUid);   // v39.55 — not theirs to delete: they ask
   var coll = recipes.find(function(x){ return x.id === collId; });
   if (!coll) { toast('That collection is no longer here'); return; }
   var part = recipeParts(coll).find(function(p){ return p.uid === partUid; });
@@ -23264,6 +23458,15 @@ async function removePartFromCollection(collId, partUid) {
             : left + ' recipes would be left in the collection.')
         + '\n\nThe collection’s previous state is kept in 🕘 Version history, so this can be undone.',
       okLabel:'Remove it', danger:true })) return;
+  removePartNow(collId, partUid);
+}
+// The removal itself (v39.55: also an admin's one tap on a member's request); the collection's previous state is in its
+// 🕘 Version history.
+function removePartNow(collId, partUid) {
+  var coll = recipes.find(function(x){ return x.id === collId; });
+  var part = coll && recipeParts(coll).find(function(p){ return p.uid === partUid; });
+  if (!part) return false;
+  var left = recipeParts(coll).length - 1;
 
   // The whole collection goes into history BEFORE the part is taken out, so
   // "↩ Restore" brings the removed recipe back with it.
@@ -23280,7 +23483,9 @@ async function removePartFromCollection(collId, partUid) {
       ? '🗑 Removed — “' + coll.name + '” is empty now'
       : '🗑 Removed “' + part.name + '” — ' + left + ' left in the collection',
     how === 'still-a-collection' ? 4000 : 6000);
+  return true;
 }
+window.removePartNow = removePartNow;
 window.removePartFromCollection = removePartFromCollection;
 
 async function splitCollection(collId) {
@@ -23454,7 +23659,8 @@ function drawView(){
         <button class="action-btn" onclick="printRecipe(${r.id})">🖨️ Print</button>
         <button class="action-btn" onclick="toggleShare(${r.id})">📤 Share</button>
         <button class="action-btn" onclick="duplicateRecipe(${r.id})" title="Create an editable copy">⧉ Duplicate</button>
-        <button class="action-btn" style="color:var(--danger);border-color:#E8B0B0;" onclick="deleteRecipe(${r.id})">🗑️ Delete</button>
+        ${hhMayDelete() ? `<button class="action-btn" style="color:var(--danger);border-color:#E8B0B0;" onclick="deleteRecipe(${r.id})">🗑️ Delete</button>`
+          : `<button class="action-btn" style="color:var(--danger);border-color:#E8B0B0;" onclick="askAdminDelete(${r.id})" title="Only your kitchen’s owner and admins delete recipes — this asks them to">🗑️ Ask an admin to delete</button>`}
         <button class="action-btn action-btn-bring" data-feature="bring" onclick="openBringModal(${r.id})">🛒 Send to Bring!</button>
         ${r.originalPhoto ? `<button class="action-btn" id="origPhotoBtn-${r.id}" onclick="toggleOriginalPhoto(${r.id})">📸 Show Original</button>` : ''}
         ${r.originalPhoto ? `<button class="action-btn" style="color:var(--danger);" onclick="removeOriginalPhoto(${r.id})">🗑️ Remove Original</button>` : ''}
@@ -35303,6 +35509,7 @@ var HELP_SYSTEM_PROMPT = [
   "- Diet tags on recipes help the diet filters work correctly — use Auto-tag to set them",
   "- The Self Test (⚙️ → 🔧 Troubleshooting → 🧪 Self Test) is useful for diagnosing if something stops working",
   "- The interface language: tap 🌐 next to ? — the app's words change; recipes stay as written. The app speaks English, Hebrew, Arabic, Russian, French, Spanish, German, Italian, Portuguese, Chinese, Japanese and Hungarian, and any language someone adds (🌐 → ➕ Add a language… — translated once, then everyone has it). On a new device whose own language the app speaks, it asks once, before the setup: that language or English (a Hungarian phone is asked Magyar or English) — so the setup, the kitchen rules and the welcome come in that language too",
+  "- 🗑️ ASK AN ADMIN TO DELETE (v39.55): in a shared kitchen only its owner and admins delete recipes and collections. For everyone else every 🗑️ Delete — on a recipe, on a collection, on one recipe inside a collection, and Select → Delete — reads 🗑️ Ask an admin to delete: it asks first, then sends the kitchen's owner and admins your request (asking again about the same recipe sends nothing new), and says it was sent; nothing is deleted on your device. The owner and admins are told when the app opens (a tap opens the list), and find the requests in ··· More → 🏡 Kitchens and people → 🗑️ Requests to delete (shown while there are some): each says what it is and who asked, with 🗑️ Delete it (one tap; a recipe can be brought back with ↩︎ Undo, a recipe taken out of a collection from the collection's 🕘 Version history) and Keep it; either clears the request. A request for a recipe that is already gone says so, with Clear",
   "- 🔗 LINKS BETWEEN RECIPES (v39.53): words in a recipe can lead to another recipe — say 'tahini sauce' in the falafel's ingredients to your Tahini sauce recipe. In ✏️ Edit, mark the words (in an ingredient, the Method or the Notes), then tap 🔗 (beside B above the Steps box, beside + Add ingredient, or beside Notes) or press Ctrl+K (⌘K on a Mac). A list of all your recipes opens — the recipes inside your collections, and the linked kitchens' recipes too — with a search box at the top; tap one and the words are a link. The links are listed under the Notes (🔗 Links to other recipes), each with ✕ to remove it. In the recipe the words look like a web link, wherever they appear in it; tap one and that recipe opens (a recipe inside a collection: the collection, at that recipe), with ← Back at the top to return to where you were. If the recipe it leads to is deleted, or a linked kitchen stops sharing it, the words show as plain words; they work again if it comes back (↩︎ Undo). The recipe's text itself does not change, so search, printing, Word, sharing and Bring! see the words as before",
   "- 📑 A COLLECTION'S CONTENTS (v39.52): every collection opens with its contents — the list of its recipes, in order; tap a line to jump to that recipe, and each recipe has ↑ Contents at its top right to jump back. It always shows the collection as it is now (a recipe added, removed, made its own or split off changes it at once), in your own collections and in a linked kitchen's. Printing a collection, 📄 Word and 📤 Share → web page start with the same contents and give each recipe its own heading; in Word and on the web page each line is a working link to its recipe and each recipe links back to the contents",
   "- A PAGE THAT LINKS TO ITS RECIPES (v39.48): some recipe round-ups (a list of 20 or 30 dishes, each a name, a line and a 'to the recipe' link) do not hold the recipes themselves. 🔗 From URL (or sharing the page to the app) then opens each recipe's own page and brings them all in as one 📚 collection — up to 30 at a time; if the page links to more, the preview says how many more, and those can be added one at a time from their own pages. It takes a minute or two for a long list ('Opening recipe 7 of 29…'). If it ever finds nothing, the log says why — copy it and send it. (v39.49) While several recipes are read, the screen stays on by itself — keep the app open until it finishes: a phone stops the app while its screen is off or another app is in front, and the import goes on from where it stopped when you come back; a recipe page cut off by that is read again. (v39.50) Some phones will not keep the screen on — Low Power Mode is the usual reason: the progress then says so, and touching the screen now and then keeps it awake; the log says whether the screen was kept on (v39.54) An import that starts by itself from a shared link has had no tap yet, and a phone gives the screen lock only after one: the progress then says to tap the screen once, and that tap keeps it on until the import finishes.",

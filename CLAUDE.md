@@ -1546,6 +1546,27 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
     it was set for (frozen in sleep with no "hidden" first) is taken the same way. The log line says "…timed out after
     90s on screen". Self Test `sync_watchdog_on_screen` (hidden → nothing; back → a fresh window; ten minutes late →
     not a stall; a finished promise passes); knock-outs (the v39.53 plain timer, a late timer counted) each fail it.
+  - **v39.55 — 🗑️ Ask an admin to delete** (Tuesday 10 Nov 2026, item 5 of the plan below). `hhMayDelete()`: in the
+    household layout, signed in, only the owner and admins (firestore.rules deletes a recipe's document for atLeast
+    admin). For anyone else, every delete offered — a recipe's 🗑️ Delete, a collection's, one recipe inside a
+    collection's 🗑 Remove, Select → Delete (its label too) — reads "🗑️ Ask an admin to delete", and `deleteRecipe`,
+    `removePartFromCollection` and `deleteSelected` themselves ask instead of deleting (so no DELETE_NOT_PERMITTED
+    later). Asking confirms first, then writes `households/<hid>/deleteAsks/<uid>_<recipe id>[_<part uid>]` = { by,
+    name, what: recipe|collection|part, rid, puid, title, at }; a second ask about the same thing sends nothing and says
+    so. **The owner and admins:** told once as the kitchen opens (a toast that opens the list; not during a Self Test),
+    and ··· More → 🏡 Kitchens and people → 🗑️ Requests to delete (shown while there are some, with the count): each
+    row names it and who asked, with 🗑️ Delete it (one tap: `deleteRecipeNow` with Undo, or `removePartNow` — the
+    collection's previous state in its 🕘 Version history) and Keep it; either deletes the request. A request for what is
+    already gone says "Already gone", with Clear. Deleting a household removes its requests too. **Rules:**
+    `deleteAsks/{id}` — create by a member in their own name with exactly those keys (what one of the three, rid 1–40,
+    title ≤ 200, name ≤ 80); read by the asker and the owner/admins; never updated; deleted by the asker or the
+    owner/admins. 20 emulator checks in tests/firestore-households-rules.test.mjs (all 423 household checks pass
+    locally). Self Test `delete_ask_admin` (editor: the buttons, a request each for a recipe, a part, a collection and
+    Select; deleteRecipe guarded; asked twice → nothing new; admin: Delete itself, the list, one tap deletes + Undo,
+    a part taken out, Keep it, already gone → Clear); 7 knock-outs each fail it. 27 phrases by hand in 11 languages
+    (tr/tr55.py); a choice written into a message was harvested as one junk phrase — each sentence is now in a variable.
+    Not changed: gathering recipes into a collection or merging still removes the originals for an editor (the server
+    refuses those deletions as before) — to raise with Tony.
   - **Planned for Tuesday 10 Nov 2026, after 11:00 Israel time — NOT before** (Tony, 7 Nov 2026, ~00:45: "as I am
     already at 75% of my weekly quota, I would like you to only log the request and plan it for Tuesday, after 11:00,
     when it resets"; a reminder into this session is scheduled for 11:05, trig_019vabk7G3ZPSwUAMaDctuxi). Two features:
