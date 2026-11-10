@@ -10076,7 +10076,10 @@ async function feedbackTellOwner() {
   if (n !== null) inviteAsksKnown(iv);       // v39.62 — its own red dot; the reports' dot counts the reports
   if (notes) toast('\u{1F4AC} ' + notes + ' new note' + (notes === 1 ? '' : 's') + ' from testers — ⚙️ → 👑 App owner → \u{1F4CA} Households → \u{1F4AC} Feedback', 10000, goFeedback);
   // v39.61 — the invitation requests said apart, with their own way there (after the notes' toast, if there is one)
-  if (iv) setTimeout(function(){ toast('\u2709\uFE0F ' + iv + ' new invitation request(s) — ⚙️ → 👑 App owner → \u{1F4CA} Households → \u2709\uFE0F Beta invitation requests', 10000, goInviteAsks); }, notes ? 10500 : 0);
+  // (one timer, cleared before the next; silent if the Self Test has started meanwhile — a notice fired into a later test)
+  clearTimeout(_invToastTimer);
+  if (iv) _invToastTimer = setTimeout(function(){ if (_selfTestRunning) return;
+    toast('\u2709\uFE0F ' + iv + ' new invitation request(s) — ⚙️ → 👑 App owner → \u{1F4CA} Households → \u2709\uFE0F Beta invitation requests', 10000, goInviteAsks); }, notes ? 10500 : 0);
   feedbackKnown(n === null ? null : notes);
   return n || 0;
 }
@@ -10112,7 +10115,7 @@ var _inviteAsksNew = 0, _inviteAsksHere = null;
 // invitation requests waiting, on the same red path as the reports (⚙️ → 👑 App owner → 📊 Households) and the tab's
 // count there — in every copy: where the inbox is read (the family's, the community copy), every copy's requests;
 // elsewhere (the test copy) its own. The owner's only. Kept on the device like the reports' count.
-var INV_NEW_KEY = 'mkn_inv_new', _invLastNew = null;
+var INV_NEW_KEY = 'mkn_inv_new', _invLastNew = null, _invToastTimer = 0;
 function inviteAsksKnown(n) {     // a real count — or null: show the last one known
   if (typeof n === 'number') { _invLastNew = n; try { localStorage.setItem(INV_NEW_KEY, String(n)); } catch(e) {} }
   else if (_invLastNew === null) { try { var c = parseInt(localStorage.getItem(INV_NEW_KEY), 10); if (c >= 0) _invLastNew = c; } catch(e) {} }

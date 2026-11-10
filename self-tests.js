@@ -3148,6 +3148,7 @@ window.SELF_TESTS = [
       } finally {
         window.isAppOwner=real.owner; window.fetch=real.fetch; _workerHealth=real.h; window.feedbackInboxHere=real.inbox; window.toast=real.toast; window.hhDb=real.db;
         _fbNewTold=real.told; window.feedbackMoveToInbox=real.move; window._fbUser=real.user; _selfTestRunning=real.running;
+        clearTimeout(_invToastTimer);   // the deferred notice must not fire into a later test
         try{ if(keptInv===null) localStorage.removeItem(INV_NEW_KEY); else localStorage.setItem(INV_NEW_KEY, keptInv);
              if(keptFb===null) localStorage.removeItem(FB_NEW_KEY); else localStorage.setItem(FB_NEW_KEY, keptFb); }catch(e){}
         _invLastNew=real.invLast; _fbLastNew=real.fbLast;
