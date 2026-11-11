@@ -425,7 +425,7 @@
  },
  "Your household’s recipes are there for you to read and cook from; adding and changing them is for its owner and the people with Read + Write. What you changed is kept on this device only, not in the household’s recipes.{1}": {
   "from": "מתכוני משק הבית כאן כדי שתוכלו לקרוא ולבשל מהם; הוספה ושינוי שלהם שמורים לבעל/ת הבית ולאנשים עם הרשאת קריאה וכתיבה. מה ששינית נשמר רק במכשיר הזה, לא במתכוני משק הבית.{1}",
-  "to": "מתכוני משק הבית כאן כדי שתוכלו לקרוא ולבשל מהם; הוספה ושינוי שלהם שמורים לבעל/ת הבית ולאנשים עם הרשאת קריאה וכתיבה. מה ששיניתם נשמר רק במכשיר הזה, לא במתכוני משק הבית.{1}"
+  "to": "מתכוני משק הבית כאן כדי שתוכלו לקרוא ולבשל מהם; הוספה ושינוי שלהם שמורים למנהל/ת משק הבית ולאנשים עם הרשאת קריאה וכתיבה. מה ששיניתם נשמר רק במכשיר הזה, לא במתכוני משק הבית.{1}"
  },
  "To Bring!: the ingredients you chose to send. To Gmail: a recipe you chose to e-mail, to the address you typed.": {
   "from": "ל-Bring!: המצרכים שבחרת לשלוח. ל-Gmail: מתכון שבחרת לשלוח במייל, לכתובת שהקלדת.",
@@ -494,5 +494,13 @@
  "Copied — paste it wherever you are asking for help": {
   "from": "הועתק — הדביקו אותו במקום שבו אתם מבקש/ת עזרה",
   "to": "הועתק — הדביקו אותו במקום שבו אתם מבקשים עזרה"
+ },
+ "Use this when the owner of {1} is already a member of My Kitchen Notes: it pops up in their app. If they are not a member yet, it waits until they join with this address — tell them below as well.": {
+  "from": "להשתמש בזה כשבעל/ת {1} כבר חבר/ה ב-My Kitchen Notes: זה קופץ לו/לה באפליקציה. אם עדיין לא חבר/ה, זה מחכה עד שיצטרפו עם הכתובת הזו — כדאי לספר להם גם למטה.",
+  "to": "להשתמש בזה כשמנהל/ת {1} כבר חבר/ה ב-My Kitchen Notes: זה קופץ לו/לה באפליקציה. אם עדיין לא חבר/ה, זה מחכה עד שיצטרפו עם הכתובת הזו — כדאי לספר להם גם למטה."
+ },
+ "Your change was not accepted by the household’s recipes — your account may not add or change them. It is kept on this device. The household’s owner can see your role in 👥 Family Access: Read + Write or Full access can change recipes.": {
+  "from": "השינוי שלכם לא התקבל במתכוני משק הבית — ייתכן שהחשבון שלכם לא יכול להוסיף או לשנות אותם. השינוי נשמר במכשיר הזה בלבד. בעל/ת משק הבית יכולים לראות את התפקיד שלכם ב-👥 ניהול משק בית: הרשאת קריאה וכתיבה או גישה מלאה מאפשרות לשנות מתכונים.",
+  "to": "השינוי שלכם לא התקבל במתכוני משק הבית — ייתכן שהחשבון שלכם לא יכול להוסיף או לשנות אותם. השינוי נשמר במכשיר הזה בלבד. מנהל/ת משק הבית יכול/ה לראות את התפקיד שלכם ב-👥 ניהול משק בית: הרשאת קריאה וכתיבה או גישה מלאה מאפשרות לשנות מתכונים."
  }
 }
