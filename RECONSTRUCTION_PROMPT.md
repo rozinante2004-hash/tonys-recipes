@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v39.68` — app. **Worker: v106**, deployed separately and versioned separately
+**Current version:** `v39.69` — app. **Worker: v106**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -3112,7 +3112,7 @@ SVG favicon (the fork/flame mark); the fonts' stylesheet `fonts/fonts.css` (woff
 licence in `fonts/LICENSE.txt`; the legal pages use `fonts/legal-fonts.css`); and the app's own copies
 of **Firebase compat (app/auth/firestore)** from `vendor/`. **xlsx, mammoth, jszip and Google GSI are
 NOT in `<head>`** — they load on first use via `loadScriptOnce()` (5.11); the three libraries from
-`vendor/libs/`, GSI from Google. The service worker keeps `vendor/` and the woff2 files cache-first
+`vendor/libs/` (SheetJS **0.20.3**, `xlsx-0.20.3.full.min.js`, from cdn.sheetjs.com since v39.69 — npm stops at 0.18.5, which has CVE-2023-30533; mammoth 1.6.0, jszip 3.10.1), GSI from Google. The service worker keeps `vendor/` and the woff2 files cache-first
 (their names carry the version) and `fonts/*.css` network-first. qrcodejs and the Excel export were
 removed in v28.5.
 

@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.68 -->
+<!-- Tony's Recipes Collection v39.69 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -11111,7 +11111,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.68';
+var APP_VERSION = 'v39.69';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -14643,7 +14643,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.68</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.69</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14731,7 +14731,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.68</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.69</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -25733,7 +25733,7 @@ function loadScriptOnce(url, globalName) {
 }
 window.loadScriptOnce = loadScriptOnce;
 // v38.29 — served from the app's own site (vendor/libs/, the same versions cdnjs had), not cdnjs.
-var CDN_XLSX    = 'vendor/libs/xlsx-0.18.5.full.min.js';
+var CDN_XLSX    = 'vendor/libs/xlsx-0.20.3.full.min.js';  // v39.69 (audit H5): SheetJS 0.20.3 from cdn.sheetjs.com (0.18.5, the last on npm, had CVE-2023-30533)
 var CDN_MAMMOTH = 'vendor/libs/mammoth-1.6.0.browser.min.js';
 var CDN_JSZIP   = 'vendor/libs/jszip-3.10.1.min.js';
 var GSI_CLIENT_URL = 'https://accounts.google.com/gsi/client';   // v38.29 — Google's own; it cannot be served from here   // v37.50 — unzipping the extension into a folder
