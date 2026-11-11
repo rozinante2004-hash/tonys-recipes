@@ -63,8 +63,12 @@ to `test`; releases only on his yes.
     451, 503 in the Worker's "Page returned …"; anything else never goes to a relay).
 11. **S5 + H5 — Dependabot for the workflows, actions pinned to commit SHAs; SheetJS 0.20** (Tony, after the
     explanation: "11. Yes"). **S5 done, v39.64:** every `uses:` is a full commit with its version as a comment;
-    `.github/dependabot.yml` opens one grouped pull request a month against `test`. **H5 waits:** cdn.sheetjs.com
-    (the only source of SheetJS 0.20; npm stops at 0.18.5) is refused by this environment's network rules.
+    `.github/dependabot.yml` opens one grouped pull request a month against `test`. **H5 waits for a session in the
+    "My Kitchen Notes" environment** (created 11 Nov with Tony's approval: today's access plus cdn.sheetjs.com, the
+    only source of SheetJS 0.20 — npm and the GitHub repository stop at 0.18.5; a running session cannot move onto
+    it). There: download `https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js` (and its LICENSE) into
+    `vendor/libs/xlsx-0.20.3.*`, point `CDN_XLSX` at it, update the size and lazy-load Self Tests that name the file
+    and the service worker's list if it names it, delete the 0.18.5 files, and run `file_drop_and_from_file_work`.
 12. **H3 — the empty-catch review: done, v39.68.** `tools/empty-catches.mjs` (622 dropped errors; 28 around a write,
     three of them real lost writes, now logged); CI fails when more than 25 sit around a write.
 - **Not doing** (Tony: no): U7 collapsing the help suggestions; F3 dropping `.doc`.
@@ -92,7 +96,8 @@ to `test`; releases only on his yes.
   window, v39.63). A translation script must write the repo's JSON shape (indent 1, sorted keys, final newline) or
   the diff is the whole file.
 
-**Setting up a new session**
+**Setting up a new session** — start it in the **"My Kitchen Notes"** environment (personal; the three repositories;
+today's network plus cdn.sheetjs.com). The "Default" one works too, without that host.
 1. A cloud session opens in `rozinante2004-hash.github.io` (the site-root repository — nothing to do there). Attach
    `rozinante2004-hash/tonys-recipes` with push access (`add_repo`, access "push"), clone it to
    `/home/user/tonys-recipes`, then `git checkout test`. All work happens on `test`.
