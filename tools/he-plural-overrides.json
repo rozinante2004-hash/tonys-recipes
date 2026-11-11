@@ -502,5 +502,41 @@
  "Your change was not accepted by the household’s recipes — your account may not add or change them. It is kept on this device. The household’s owner can see your role in 👥 Family Access: Read + Write or Full access can change recipes.": {
   "from": "השינוי שלכם לא התקבל במתכוני משק הבית — ייתכן שהחשבון שלכם לא יכול להוסיף או לשנות אותם. השינוי נשמר במכשיר הזה בלבד. בעל/ת משק הבית יכולים לראות את התפקיד שלכם ב-👥 ניהול משק בית: הרשאת קריאה וכתיבה או גישה מלאה מאפשרות לשנות מתכונים.",
   "to": "השינוי שלכם לא התקבל במתכוני משק הבית — ייתכן שהחשבון שלכם לא יכול להוסיף או לשנות אותם. השינוי נשמר במכשיר הזה בלבד. מנהל/ת משק הבית יכול/ה לראות את התפקיד שלכם ב-👥 ניהול משק בית: הרשאת קריאה וכתיבה או גישה מלאה מאפשרות לשנות מתכונים."
+ },
+ "How much of the free daily allowances (Cloudflare) is used, and anything paused right now (the app's owner only).": {
+  "from": "כמה מהמכסות היומיות החינמיות (Cloudflare) נוצל, ומה מושהה כרגע (רק לבעל/ת האפליקציה).",
+  "to": "כמה מהמכסות היומיות החינמיות (Cloudflare) נוצל, ומה מושהה כרגע (רק למנהל האפליקציה)."
+ },
+ "Sends you a test alert by e-mail and WhatsApp, to check they reach you (the app's owner only).": {
+  "from": "שולח אליכם התראת בדיקה במייל ובוואטסאפ, כדי לוודא שהיא מגיעה (רק לבעל/ת האפליקציה).",
+  "to": "שולח אליכם התראת בדיקה במייל ובוואטסאפ, כדי לוודא שהיא מגיעה (רק למנהל האפליקציה)."
+ },
+ "This is for the app’s owner.": {
+  "from": "זה מיועד לבעל/ת האפליקציה.",
+  "to": "זה מיועד למנהל האפליקציה."
+ },
+ "Walk through the setup a new person sees on a first visit — every page, nothing created or sent (the app's owner only).": {
+  "from": "סיור בתהליך ההרשמה שמשתמש חדש רואה בביקור הראשון — כל מסך, בלי ליצור או לשלוח כלום (לבעל/ת האפליקציה בלבד).",
+  "to": "סיור בתהליך ההרשמה שמשתמש חדש רואה בביקור הראשון — כל מסך, בלי ליצור או לשלוח כלום (למנהל האפליקציה בלבד)."
+ },
+ "Where each copy of the app runs, with links (the app's owner only).": {
+  "from": "איפה כל עותק של האפליקציה פועל, עם קישורים (לבעל/ת האפליקציה בלבד).",
+  "to": "איפה כל עותק של האפליקציה פועל, עם קישורים (למנהל האפליקציה בלבד)."
+ },
+ "Which alerts also come to you on WhatsApp — each on or off — and a test alert (the app's owner only).": {
+  "from": "אילו התראות יגיעו אליכם גם ב-WhatsApp — כל אחת בנפרד — והתראת בדיקה (רק לבעל/ת האפליקציה).",
+  "to": "אילו התראות יגיעו אליכם גם ב-WhatsApp — כל אחת בנפרד — והתראת בדיקה (רק למנהל האפליקציה)."
+ },
+ "Which alerts also ring on your phone (the Pushover app) — each on or off — and a test alert (the app's owner only).": {
+  "from": "אילו התראות גם מצלצלות בטלפון (אפליקציית Pushover) — כל אחת בנפרד — והתראת בדיקה (לבעל/ת האפליקציה בלבד).",
+  "to": "אילו התראות גם מצלצלות בטלפון (אפליקציית Pushover) — כל אחת בנפרד — והתראת בדיקה (למנהל האפליקציה בלבד)."
+ },
+ "Which alerts also ring on your phone (the ntfy app) — each on or off — and a test alert (the app's owner only).": {
+  "from": "אילו התראות גם מצלצלות בטלפון (אפליקציית ntfy) — כל אחת פעילה או כבויה — והתראת בדיקה (רק לבעל/ת האפליקציה).",
+  "to": "אילו התראות גם מצלצלות בטלפון (אפליקציית ntfy) — כל אחת פעילה או כבויה — והתראת בדיקה (רק למנהל האפליקציה)."
+ },
+ "{1}The farm visitors are chosen in the family app — every copy uses those.{2}Only the app’s owner chooses the farm visitors.": {
+  "from": "{1}מבקרי החווה נבחרים באפליקציית המשפחה — כל עותק משתמש בהם.{2}רק בעל/ת האפליקציה בוחר/ת את מבקרי החווה.",
+  "to": "{1}מבקרי החווה נבחרים באפליקציית המשפחה — כל עותק משתמש בהם.{2}רק מנהל האפליקציה בוחר את מבקרי החווה."
  }
 }
