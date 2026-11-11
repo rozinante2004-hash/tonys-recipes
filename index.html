@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.63 -->
+<!-- Tony's Recipes Collection v39.64 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -2097,9 +2097,12 @@ async function calcNutrition(id) {
   if (!r) return;
   toast('⏳ Calculating nutrition...');
   var ings = allIngredients(r).map(function(i) { return noBold((i.a?i.a+' ':'')+i.n); }).join(', ');
-  var prompt = 'Estimate nutrition per serving for a recipe with these ingredients: ' + ings
+  // v39.64 (audit) — per 100 g of the finished dish: that is what the panel says ("Nutrition per 100g") and what Tony
+  // chose (ideas 3.8, per-serving declined); the prompt had asked per SERVING, so the numbers under the label were
+  // not what the label said.
+  var prompt = 'Estimate the nutrition per 100 g of the finished dish for a recipe with these ingredients: ' + ings
     + '. Servings: ' + (r.servings||'4') + '. '
-    + 'Return ONLY JSON: {"calories":0,"protein":0,"carbs":0,"fat":0} (numbers only, per serving).';
+    + 'Return ONLY JSON: {"calories":0,"protein":0,"carbs":0,"fat":0} (numbers only, per 100 g: calories in kcal, the rest in grams).';
   try {
     var raw = await aiCall(prompt, 200, null, AI_MODEL_SMALL);   // v36.15 — a number, not judgement
     var data = extractJSON(raw);
@@ -2108,12 +2111,30 @@ async function calcNutrition(id) {
       r.updatedAt = Date.now();
       saveData();
       drawView(id);
+      toggleNutrition(id, true);   // v39.64 — on a phone, the values just calculated are shown, not folded
       toast('✅ Nutrition calculated');
     }
   } catch(e) { toast('❌ ' + e.message); }
 }
 
 window.calcNutrition = calcNutrition;
+
+// v39.64 (audit U1(a), Tony: "A") — on a phone the nutrition box with values is ONE line ("Nutrition per 100g ·
+// 245 kcal ▸") until tapped. The fold itself is CSS (data-folded on the panel, inside the 600 px media block);
+// this flips the attribute and the button's aria-expanded, and does nothing on a computer, where the four
+// values are always open. The box that only offers ✨ Calculate was one line already.
+function nutritionFoldsHere() {
+  try { return !!(window.matchMedia && window.matchMedia('(max-width: 600px)').matches); } catch(e) { return false; }
+}
+function toggleNutrition(id, open) {
+  var p = document.getElementById('nutrition-' + id);
+  if (!p || !nutritionFoldsHere()) return;
+  var fold = (open === undefined) ? p.getAttribute('data-folded') === '0' : !open;
+  p.setAttribute('data-folded', fold ? '1' : '0');
+  var head = p.querySelector('.nutrition-head');
+  if (head) head.setAttribute('aria-expanded', fold ? 'false' : 'true');
+}
+window.toggleNutrition = toggleNutrition;
 
 // ─── PHOTO TOGGLE ─────────────────────────────────────────────────────────────
 // Show/hide the original full-res scan beneath the recipe. (It lives in
@@ -11066,7 +11087,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.63';
+var APP_VERSION = 'v39.64';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -12058,8 +12079,10 @@ window.addEventListener('unhandledrejection', function(e) {
    colour used on top of it — inheriting half a palette is what breaks here. */
 :root[data-theme="dark"] .nutrition-panel { background: #241D18; border-color: #3A2F26; }
 :root[data-theme="dark"] .nutrition-title,
+:root[data-theme="dark"] .nutrition-caret,
 :root[data-theme="dark"] .nutrition-unit  { color: #B9AFA3; }
-:root[data-theme="dark"] .nutrition-label { color: #EFE7DC; }
+:root[data-theme="dark"] .nutrition-label,
+:root[data-theme="dark"] .nutrition-summary { color: #EFE7DC; }
 :root[data-theme="dark"] .nutrition-value { color: #F5C77E; }
 :root[data-theme="dark"] .filter-btn:hover { background: #33291F; color: var(--ink); border-color: #55372A; }
 
@@ -13830,6 +13853,21 @@ li.line-sub-indent { padding-inline-start: 22px; }
 }
 .nutrition-btn:hover { color: var(--terracotta); border-color: var(--terracotta); }
 .nutrition-btn:active { transform: translateY(1px); box-shadow: 0 1px 0 #c8c0b5; }
+/* v39.64 (audit U1(a), Tony: "A") — on a phone the box with values is ONE line, "Nutrition per 100g · 245 kcal ▸",
+   until tapped (data-folded on the panel; toggleNutrition); a computer always shows the four values. */
+.nutrition-head { display: flex; align-items: center; gap: 8px; width: 100%; margin: 0; padding: 0; border: 0;
+  background: none; font: inherit; color: inherit; text-align: start; cursor: default; -webkit-appearance: none; }
+.nutrition-head .nutrition-title { margin: 0; flex: 1; }
+.nutrition-summary, .nutrition-caret { display: none; }
+.nutrition-body { margin-top: 10px; }
+@media (max-width: 600px) {
+  .nutrition-head { cursor: pointer; min-height: 36px; }
+  .nutrition-panel[data-folded="1"] .nutrition-summary { display: inline; font-size: 12px; font-weight: 600; color: var(--ink); white-space: nowrap; }
+  .nutrition-caret { display: inline-block; color: var(--muted); font-size: 14px; transition: transform 0.15s; }
+  .nutrition-panel[data-folded="1"] .nutrition-body { display: none; }
+  .nutrition-panel[data-folded="0"] .nutrition-caret { transform: rotate(90deg); }
+  .rtl-recipe .nutrition-panel[data-folded="1"] .nutrition-caret { transform: scaleX(-1); }
+}
 
 
 /* ── MEASUREMENT CALCULATOR ── */
@@ -14581,7 +14619,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.63</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.64</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14669,7 +14707,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.63</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.64</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -23618,14 +23656,20 @@ function drawView(){
         <span class="difficulty ${escA(String(r.difficulty||'').toLowerCase())}">${escH(r.difficulty)}</span>`}
       </div>
       <div class="source-link" style="margin-bottom:8px;font-size:12px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;"><bdi style="color:var(--muted);font-weight:500;flex-shrink:0;">Source:</bdi><span id="srcDisplay-${r.id}">${r.source ? `<span dir="auto" data-no-i18n style="word-break:break-word;">${sourceHtml(r.source)}</span>` : `<span style="color:var(--muted);font-style:italic;">Not specified</span>`}</span><button onclick="editSource(${r.id})" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--muted);padding:2px 6px;border-radius:4px;border:1px solid var(--border);font-family:'DM Sans','Heebo',sans-serif;flex-shrink:0;" title="Edit source">✏️</button></div><div id="srcEdit-${r.id}" style="display:none;margin-bottom:8px;"><div style="display:flex;gap:6px;align-items:center;"><input id="srcInput-${r.id}" type="text" value="${escA(r.source||'')}" placeholder="URL or 'AI generated' or leave blank" onkeydown="if(event.key==='Enter')saveSource(${r.id});if(event.key==='Escape')cancelSource(${r.id});" style="flex:1;padding:6px 10px;border-radius:7px;border:1.5px solid var(--terracotta);font-size:12px;font-family:'DM Sans','Heebo',sans-serif;color:var(--ink);"><button onclick="saveSource(${r.id})" style="padding:6px 12px;border-radius:7px;border:none;background:var(--terracotta-fill);color:white;font-size:12px;cursor:pointer;font-family:'DM Sans','Heebo',sans-serif;font-weight:500;flex-shrink:0;">Save</button><button onclick="cancelSource(${r.id})" style="padding:6px 10px;border-radius:7px;border:1px solid var(--border);background:var(--card-bg);color:var(--muted);font-size:12px;cursor:pointer;font-family:'DM Sans','Heebo',sans-serif;flex-shrink:0;">✕</button></div></div>
-      <div id="nutrition-${r.id}" class="nutrition-panel"${isCollection(r) ? ' style="display:none;"' : ''}>
+      <div id="nutrition-${r.id}" class="nutrition-panel" data-folded="1"${isCollection(r) ? ' style="display:none;"' : ''}>
         ${r.nutrition
-          ? `<div class="nutrition-title">Nutrition per 100g</div>
+          ? `<button type="button" class="nutrition-head" aria-expanded="${nutritionFoldsHere() ? 'false' : 'true'}" aria-controls="nutritionBody-${r.id}" onclick="toggleNutrition(${r.id})">
+               <span class="nutrition-title">Nutrition per 100g</span>
+               <span class="nutrition-summary"><bdi data-no-i18n>${escH(r.nutrition.calories)}</bdi> <span>kcal</span></span>
+               <span class="nutrition-caret" aria-hidden="true">▸</span>
+             </button>
+             <div class="nutrition-body" id="nutritionBody-${r.id}">
              <div class="nutrition-grid">
-               <div class="nutrition-item"><span class="nutrition-value">${r.nutrition.calories}</span><span class="nutrition-unit">kcal</span><span class="nutrition-label">Calories</span></div>
-               <div class="nutrition-item"><span class="nutrition-value">${r.nutrition.carbs}g</span><span class="nutrition-unit">per 100g</span><span class="nutrition-label">Carbs</span></div>
-               <div class="nutrition-item"><span class="nutrition-value">${r.nutrition.fat}g</span><span class="nutrition-unit">per 100g</span><span class="nutrition-label">Fat</span></div>
-               <div class="nutrition-item"><span class="nutrition-value">${r.nutrition.protein}g</span><span class="nutrition-unit">per 100g</span><span class="nutrition-label">Protein</span></div>
+               <div class="nutrition-item"><span class="nutrition-value">${escH(r.nutrition.calories)}</span><span class="nutrition-unit">kcal</span><span class="nutrition-label">Calories</span></div>
+               <div class="nutrition-item"><span class="nutrition-value">${escH(r.nutrition.carbs)}g</span><span class="nutrition-unit">per 100g</span><span class="nutrition-label">Carbs</span></div>
+               <div class="nutrition-item"><span class="nutrition-value">${escH(r.nutrition.fat)}g</span><span class="nutrition-unit">per 100g</span><span class="nutrition-label">Fat</span></div>
+               <div class="nutrition-item"><span class="nutrition-value">${escH(r.nutrition.protein)}g</span><span class="nutrition-unit">per 100g</span><span class="nutrition-label">Protein</span></div>
+             </div>
              </div>`
           : `<div style="display:flex;align-items:center;justify-content:space-between;">
                <span class="nutrition-title" style="margin:0;">Nutrition per 100g</span>
@@ -25466,13 +25510,13 @@ async function runExplore() {
     + " Return ONLY a valid JSON array like this: " + jsonShape
     + (selDiets.length ? " All must comply with: " + selDiets.join(", ") + "." : "");
   try {
-    const raw = await aiCall(prompt, 3000);
+    const raw = await aiCall(prompt, 3000, null, AI_MODEL_SMALL);   // v39.64 (audit C3, Tony: yes) — five ideas are a small job
     renderSuggestions(extractJSON(raw), "exploreResult");
   } catch(err) {
     if (err.message && err.message.includes("Rate limit")) {
       res.innerHTML = "<div class=\"explore-result\" style=\"color:var(--warn-text);\"><strong>\u23F0 Rate limit.</strong> Retrying in 15s\u2026<div class=\"ai-spinner\" style=\"margin:8px auto;display:block;width:20px;height:20px;\"></div></div>";
       setTimeout(async () => {
-        try { renderSuggestions(extractJSON(await aiCall(prompt, 3000)), "exploreResult"); }
+        try { renderSuggestions(extractJSON(await aiCall(prompt, 3000, null, AI_MODEL_SMALL)), "exploreResult"); }
         catch(e2) { res.innerHTML = aiFailPane(e2, 'runExplore'); }
       }, 15000);
     } else {
@@ -25582,13 +25626,13 @@ async function runSuggest() {
     +(filters.length ? " All must match the filters." : " Be diverse and exciting.")
     +" Return ONLY a valid JSON array like this: "+jsonShape;
   try {
-    var raw = await aiCall(prompt, 3000);
+    var raw = await aiCall(prompt, 3000, null, AI_MODEL_SMALL);   // v39.64 (audit C3) — as runExplore
     renderSuggestions(extractJSON(raw), "suggestResult");
   } catch(err) {
     if (err.message && err.message.includes("Rate limit")) {
       res.innerHTML = "<div class=\"explore-result\" style=\"color:var(--warn-text);\"><strong>\u23F0 Rate limit.</strong> Retrying in 15s\u2026</div>";
       setTimeout(async function(){
-        try { renderSuggestions(extractJSON(await aiCall(prompt,3000)),"suggestResult"); }
+        try { renderSuggestions(extractJSON(await aiCall(prompt,3000,null,AI_MODEL_SMALL)),"suggestResult"); }
         catch(e2){res.innerHTML=aiFailPane(e2,'runSuggest');}
       },15000);
     } else {
@@ -35563,7 +35607,7 @@ var HELP_SYSTEM_PROMPT = [
   "- 🥫 MY PANTRY: ⚙️ → 🏠 My household → 🥫 My Pantry — the things you always have in, one per line (or separated by commas); matching is loose, so 'olive oil' also covers 'good olive oil'. 🥫 What can I make with what I have? counts them as in the house. Kept on this device only; Save pantry (v39.43).",
   "- 🌐 Translate (in an open recipe): into any of about twenty languages — English, Hebrew, Russian, Arabic, Chinese, Dutch, French, German, Greek, Italian, Japanese, Korean, Polish, Portuguese, Romanian, Spanish, Swedish, Turkish, Ukrainian, Yiddish; the language it is written in is found by itself (🔍 Auto-detect) or chosen under From. 🌐 Translate Now shows the translation; 💾 Save as new recipe in collection keeps it as a new recipe — the original stays as it was (v39.43)",
   "- 🏷️ Auto-tag diet types (··· More → 🧹 Tidy up): AI analyses all untagged recipes and assigns diet tags",
-  "- ✨ Calculate nutrition: AI estimates per-serving nutrition from ingredients",
+  "- ✨ Calculate nutrition (in an open recipe, under Source): AI estimates the nutrition per 100 g of the finished dish from the ingredients — calories, carbs, fat and protein. On a phone the box with values is one line (the calories); tap it to see all four",
   "- All AI features require internet connection",
   "",
   "=== VIEWING A RECIPE ===",
@@ -39765,23 +39809,39 @@ async function aiTagAllDiets() {
   if (!await askConfirm({ icon:'🏷️', title:'Auto-tag ' + untagged.length + ' recipe' + (untagged.length!==1?'s':'') + '?',
       message:'Each recipe is analysed and diet tags suggested. You can edit any of them afterwards.', okLabel:'Tag them' })) return;
   toast('Tagging ' + untagged.length + ' recipes...');
-  var tagged = 0;
-  for (var i = 0; i < untagged.length; i++) {
-    var r = untagged[i];
+  // v39.64 (audit C4, Tony: yes) — twenty recipes per call, the answer a JSON object keyed by each recipe's number
+  // in the list, instead of one call per recipe (a 143-recipe kitchen asked 143 times). The small model, as before
+  // (v36.15). A batch whose answer cannot be read leaves its recipes untagged and the run goes on.
+  var tagged = 0, failed = 0;
+  for (var start = 0; start < untagged.length; start += DIET_TAG_BATCH) {
+    var batch = untagged.slice(start, start + DIET_TAG_BATCH);
     try {
-      var prompt = 'Which diet tags apply to this recipe? Choose ALL that apply from: Keto, Carnivore, Vegetarian, Vegan, Omnivore.\n'
-        + 'Rules: Omnivore=no restrictions. Vegetarian=no meat/fish. Vegan=no animal products. Carnivore=meat-focused,minimal carbs. Keto=low carb,high fat.\n'
-        + 'Recipe: ' + r.name + '\nIngredients: ' + r.ingredients.map(function(i){ return (i.a?i.a+' ':'')+i.n; }).join(', ') + '\n'
-        + 'Respond ONLY with a JSON array e.g. ["Vegetarian","Keto"]';
-      var result = await aiCall(prompt, 80, null, AI_MODEL_SMALL);   // v36.15 — a tag list
-      var clean = result.replace(/```json|```/g,'').trim();
-      var diets = JSON.parse(clean);
-      if (Array.isArray(diets)) { r.diets = diets; tagged++; toast('Tagged ' + tagged + '/' + untagged.length + ': ' + r.name.slice(0,20)); }
-    } catch(e) { console.warn('Failed to tag:', r.name, e); }
-    await new Promise(function(res){ setTimeout(res, 300); });
+      var answer = extractJSON(await aiCall(dietTagPrompt(batch), 60 + batch.length * 30, null, AI_MODEL_SMALL)) || {};
+      batch.forEach(function(r, i) {
+        var tags = answer[String(i + 1)];
+        if (!Array.isArray(tags)) return;
+        tags = tags.filter(function(t) { return DIETS.indexOf(t) > -1; });
+        if (!tags.length) return;
+        r.diets = tags; r.updatedAt = Date.now(); tagged++;
+      });
+      toast('Tagged ' + tagged + '/' + untagged.length);
+    } catch(e) { failed += batch.length; console.warn('Failed to tag a batch of', batch.length, e); }
+    if (start + DIET_TAG_BATCH < untagged.length) await new Promise(function(res){ setTimeout(res, 300); });
   }
   saveData(); renderGrid();
-  toast('\u2705 Tagged ' + tagged + ' recipes!');
+  // Two whole sentences, not one with a tail: a tail put together by code is a {2} to the translations, and would
+  // stay in English.
+  if (failed) toast('\u2705 Tagged ' + tagged + ' recipes! ' + failed + ' could not be tagged. Try again later.', 7000);
+  else toast('\u2705 Tagged ' + tagged + ' recipes!');
+}
+var DIET_TAG_BATCH = 20;
+function dietTagPrompt(batch) {
+  return 'Which diet tags apply to each recipe below? For each one choose ALL that apply from: Keto, Carnivore, Vegetarian, Vegan, Omnivore.\n'
+    + 'Rules: Omnivore=no restrictions. Vegetarian=no meat/fish. Vegan=no animal products. Carnivore=meat-focused,minimal carbs. Keto=low carb,high fat.\n'
+    + batch.map(function(r, i) {
+        return (i + 1) + '. ' + noBold(r.name) + ': ' + allIngredients(r).map(function(x){ return noBold((x.a?x.a+' ':'')+x.n); }).join(', ').slice(0, 400);
+      }).join('\n') + '\n'
+    + 'Respond ONLY with a JSON object keyed by the recipe number, e.g. {"1":["Vegetarian","Keto"],"2":["Omnivore"]}';
 }
 
 window.renderDietButtons = renderDietButtons;

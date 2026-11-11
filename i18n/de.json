@@ -1,7 +1,7 @@
 {
  "lang": "de",
  "updatedAt": 1794349607507,
- "count": 2851,
+ "count": 2853,
  "strings": {
   "\"Add to Home Screen\"": "Zum Home-Bildschirm hinzufügen",
   "\"Open Bring!\"": "Bring! öffnen",
@@ -1247,6 +1247,7 @@
   "T": "T",
   "Tabitha the turkey": "Tabitha, der Truthahn",
   "Tag them": "Markieren",
+  "Tagged {1}/{2}": "{1}/{2} getaggt",
   "Tagged {1}/{2}: {3}": "{1}/{2} markiert: {3}",
   "Tagging {1} recipes...": "{1} Rezepte werden markiert...",
   "Take a photo of a recipe or choose an existing image — AI will extract it automatically.": "Mach ein Foto von einem Rezept oder wähle ein vorhandenes Bild — die KI liest es automatisch aus.",
@@ -2207,6 +2208,7 @@
   "✅ Sent!": "✅ Gesendet!",
   "✅ Source saved": "✅ Quelle gespeichert",
   "✅ Tagged {1} recipes!": "✅ {1} Rezepte getaggt!",
+  "✅ Tagged {1} recipes! {2} could not be tagged. Try again later.": "✅ {1} Rezepte getaggt! {2} konnten nicht getaggt werden. Versuchen Sie es später noch einmal.",
   "✅ The app is the newest ({1}) — sign in to sync your recipes": "✅ Die App ist auf dem neuesten Stand ({1}) — melde dich an, um deine Rezepte zu synchronisieren",
   "✅ The cloud already matches every photo on this device.": "✅ Die Cloud stimmt bereits mit jedem Foto auf diesem Gerät überein.",
   "✅ This is the latest version.": "✅ Dies ist die neueste Version.",

@@ -1,7 +1,7 @@
 {
  "lang": "zh",
  "updatedAt": 1794349607507,
- "count": 2856,
+ "count": 2858,
  "strings": {
   "\"Add to Home Screen\"": "添加到主屏幕",
   "\"Open Bring!\"": "打开 Bring!",
@@ -1247,6 +1247,7 @@
   "T": "T",
   "Tabitha the turkey": "火鸡塔比莎",
   "Tag them": "给它们打标签",
+  "Tagged {1}/{2}": "已标记 {1}/{2}",
   "Tagged {1}/{2}: {3}": "已标记 {1}/{2}：{3}",
   "Tagging {1} recipes...": "正在为 {1} 道菜谱打标签…",
   "Take a photo of a recipe or choose an existing image — AI will extract it automatically.": "拍摄食谱照片或选择现有图片，AI 会自动提取内容。",
@@ -2208,6 +2209,7 @@
   "✅ Sent!": "✅ 已发送！",
   "✅ Source saved": "✅ 来源已保存",
   "✅ Tagged {1} recipes!": "✅ 已标记 {1} 个食谱！",
+  "✅ Tagged {1} recipes! {2} could not be tagged. Try again later.": "✅ 已标记 {1} 个食谱！{2} 个未能标记，请稍后再试。",
   "✅ The app is the newest ({1}) — sign in to sync your recipes": "✅ 应用已是最新版本（{1}）——登录以同步你的菜谱",
   "✅ The cloud already matches every photo on this device.": "✅ 云端已包含本设备的全部照片。",
   "✅ This is the latest version.": "✅ 这已是最新版本。",

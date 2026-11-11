@@ -1,7 +1,7 @@
 {
  "lang": "ru",
  "updatedAt": 1794349607507,
- "count": 3152,
+ "count": 3154,
  "strings": {
   "\"Add to Home Screen\"": "Добавить на главный экран",
   "\"One item away\" filter ({1}f.{2})": "Фильтр «Не хватает одного» ({1}ф.{2})",
@@ -1467,6 +1467,7 @@
   "T": "T",
   "Tabitha the turkey": "Индюшка Табита",
   "Tag them": "Отметить их",
+  "Tagged {1}/{2}": "Помечено: {1}/{2}",
   "Tagged {1}/{2}: {3}": "Помечено {1}/{2}: {3}",
   "Tagging {1} recipes...": "Помечаем {1} рецептов...",
   "Take a photo of a recipe or choose an existing image — AI will extract it automatically.": "Сфотографируйте рецепт или выберите готовое изображение — AI распознает его автоматически.",
@@ -2507,6 +2508,7 @@
   "✅ Sent!": "✅ Отправлено!",
   "✅ Source saved": "✅ Источник сохранён",
   "✅ Tagged {1} recipes!": "✅ Помечено рецептов: {1}!",
+  "✅ Tagged {1} recipes! {2} could not be tagged. Try again later.": "✅ Помечено рецептов: {1}! Не удалось пометить: {2}. Повторите попытку позже.",
   "✅ The app is the newest ({1}) — sign in to sync your recipes": "✅ Установлена последняя версия приложения ({1}) — войдите, чтобы синхронизировать рецепты",
   "✅ The cloud already matches every photo on this device.": "✅ В облаке уже есть все фото с этого устройства.",
   "✅ This is the latest version.": "✅ Это последняя версия.",

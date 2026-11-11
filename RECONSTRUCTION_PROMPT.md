@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v39.63` — app. **Worker: v104**, deployed separately and versioned separately
+**Current version:** `v39.64` — app. **Worker: v104**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -800,6 +800,10 @@ invitation-only (unless adding to the tester's household)."
   `X-Frame-Options: DENY`, `Content-Security-Policy: frame-ancestors 'none'`, `nosniff`, a referrer policy (v39.63).
 - The help window's answers (`askHelp`): 🔍 Details beside numbered/bulleted steps only; an answer with no steps keeps
   one per line (v39.63). `tests/screen-walk.js` walks every screen in four variants with screenshots and measurements.
+- CI (v39.64): `self-tests.yml` skips the suite for a commit that already passed on another branch (job
+  `already-green`; a release therefore does not run it twice) and does not run on a push that changes only
+  `i18n/**`. Every action in every workflow is pinned to a full commit, its version in a comment;
+  `.github/dependabot.yml` proposes the updates once a month as one pull request against `test`.
 - **Share This App** (`openShareAppModal`, `shareAppClosed()`): while the copy is closed, everyone but the owner (any
   role) gets **✉️ Ask for an invitation for someone else** (v39.61, `openInviteForOther` → `inviteForOtherSend`):
   their e-mail address (checked; never one's own), their name and a word about them (both "if you like"), the
@@ -2335,7 +2339,10 @@ export (Excel/Word), share, or print selected recipes.
 
 **View modal (`openView`/`drawView`)**: hero (photo or emoji on `bg`), category, RTL‑aware title,
 meta (prep/servings/difficulty), an editable **Source** row (inline edit/save), a **Nutrition
-per 100g** panel (shows values or a "✨ Calculate" button → `calcNutrition` via AI), **Scale**
+per 100g** panel (shows values or a "✨ Calculate" button → `calcNutrition` via AI — the prompt asks per 100 g
+of the finished dish, v39.64; on a phone, `max-width: 600px`, the panel with values is one line — the title,
+the calories and a ▸ — `data-folded` on the panel, `toggleNutrition(id, open)` flips it and the head button's
+`aria-expanded`; a computer always shows the four values), **Scale**
 buttons ×1–×6 (persisted per recipe in `scale_<id>`), **Metric/Imperial** unit toggle
 (`cvtIng`/`M2I`/`I2M` conversion + `scaleAmt`/`parseFraction`), diet tags, cook‑count line, a
 NOTES callout, **Ingredients** list, **Method** (per‑step RTL detection for Hebrew), and an
@@ -2381,9 +2388,13 @@ lines accept `amount — name` / `amount - name` separators. Editing preserves `
 - **Translate** (`openTranslate`/`runTranslate`/`applyTranslation`): translate name/ingredients/
   steps/notes to a chosen language and optionally apply back to the recipe.
 - **Explore** (`runExplore`) and **Suggest** (`runSuggest`): brainstorm meal ideas / generate new
-  recipes from chosen diet/meal/cuisine chips and counts, with one‑tap add.
-- **Nutrition** (`calcNutrition`): estimate per‑serving macros, store as `nutrition`.
-- **Diet auto‑tag** (`aiTagAllDiets`): batch‑tag untagged recipes with diet labels.
+  recipes from chosen diet/meal/cuisine chips and counts, with one‑tap add. Both ask `AI_MODEL_SMALL`
+  since v39.64 (audit C3: a list of ideas is a small job).
+- **Nutrition** (`calcNutrition`): estimate the macros per 100 g of the finished dish (the panel's own label;
+  the prompt asked per serving until v39.64), store as `nutrition`.
+- **Diet auto‑tag** (`aiTagAllDiets`): tags untagged recipes with diet labels — since v39.64 twenty recipes per call
+  (`DIET_TAG_BATCH`, `dietTagPrompt`: a numbered list, the answer a JSON object keyed by the number; tags outside
+  `DIETS` dropped; a batch that fails leaves its recipes untagged, the run goes on; the small model).
 - **Auto‑fetch photos** (`autoFetchMissingPhotos`): for photoless recipes, translate Hebrew names
   to English if needed, Pixabay‑search, download + compress the top hit into `photo`.
 - **Help assistant** (`openHelp`/`askHelp`): in‑app Q&A bot with a big `HELP_SYSTEM_PROMPT`

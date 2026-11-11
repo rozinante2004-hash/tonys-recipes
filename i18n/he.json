@@ -1,7 +1,7 @@
 {
  "lang": "he",
  "updatedAt": 1794349607507,
- "count": 3281,
+ "count": 3283,
  "strings": {
   "\"Add to Home Screen\"": "הוספה למסך הבית",
   "\"One item away\" filter ({1}f.{2})": "פילטר \"פריט אחד חסר\" ({1}f.{2})",
@@ -1522,6 +1522,7 @@
   "TRUNCATED: the answer hit the {1}-token ceiling before it finished.": "נקטע: התשובה הגיעה לתקרת {1} טוקנים לפני שהסתיימה.",
   "Tabitha the turkey": "טביתה, תרנגול ההודו",
   "Tag them": "לתייג אותם",
+  "Tagged {1}/{2}": "תויגו {1}/{2}",
   "Tagged {1}/{2}: {3}": "תויגו {1}/{2}: {3}",
   "Tagging {1} recipes...": "מתייג {1} מתכונים...",
   "Take a photo of a recipe or choose an existing image — AI will extract it automatically.": "צלמו מתכון או בחרו תמונה קיימת — הבינה המלאכותית תחלץ אותו אוטומטית.",
@@ -2631,6 +2632,7 @@
   "✅ Sent!": "✅ נשלח!",
   "✅ Source saved": "✅ המקור נשמר",
   "✅ Tagged {1} recipes!": "✅ תויגו {1} מתכונים!",
+  "✅ Tagged {1} recipes! {2} could not be tagged. Try again later.": "✅ תויגו {1} מתכונים! {2} לא תויגו. נסו שוב מאוחר יותר.",
   "✅ The app is the newest ({1}) — sign in to sync your recipes": "✅ האפליקציה מעודכנת ({1}) — התחברו כדי לסנכרן את המתכונים שלכם",
   "✅ The cloud already matches every photo on this device.": "✅ הענן כבר תואם לכל תמונה במכשיר הזה.",
   "✅ This is the latest version.": "✅ זו הגרסה העדכנית ביותר.",

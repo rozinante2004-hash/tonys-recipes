@@ -1,0 +1,21 @@
+# v39.64 (audit S5, Tony: "11. Yes") — every action in the workflows is pinned to a full commit (the version is the
+# comment after it), so a moved tag can never change what runs here. Dependabot reads those comments and, once a
+# month, opens ONE pull request against `test` that moves every action to its newest release, commit and comment
+# together. Nothing merges by itself: the pull request runs the Self Tests like any other change, and is merged to
+# `test` (then released as usual) or closed. Only the workflows are watched — the app has no npm dependencies; the
+# libraries in vendor/ are upgraded by hand (see CLAUDE.md → What this is).
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    target-branch: "test"
+    schedule:
+      interval: "monthly"
+      time: "08:17"
+      timezone: "Asia/Jerusalem"
+    open-pull-requests-limit: 2
+    groups:
+      actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: "Workflows"

@@ -14,23 +14,58 @@ on:
     # `test` (v36.74): new work lands there first, and Cloudflare Pages builds
     # the test copy from it; `main` is the family's copy.
     branches: ["main", "test"]
+    # v39.64 (audit C9, Tony: yes) — a push that changes ONLY the languages (the bot's "Languages: published from the
+    # app" commits, on main and merged into test) does not run the suite: nothing it tests changed. A push with any
+    # other file in it still runs everything.
+    paths-ignore: ["i18n/**"]
   pull_request:
   workflow_dispatch:
 
 permissions:
   contents: read
+  actions: read     # v39.64 — the first job reads this workflow's earlier runs
 
 jobs:
+  # v39.64 (audit C9, Tony: "9. Yes") — a release pushes to main the very commit that already passed here on `test`,
+  # and the suite then ran a second time on it (20 minutes, the release waiting). This job looks for a successful
+  # "Self Tests" run on the same commit on another branch; when there is one, the suite is skipped with a notice.
+  # Anything not already green on test (a hand push to main, a re-run, a pull request) runs in full.
+  already-green:
+    runs-on: ubuntu-24.04
+    outputs:
+      skip: ${{ steps.look.outputs.skip }}
+    steps:
+      - id: look
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          skip=false
+          if [ "${{ github.event_name }}" = "push" ]; then
+            n=$(gh api "repos/${{ github.repository }}/actions/workflows/self-tests.yml/runs?head_sha=${{ github.sha }}&status=success&per_page=30" \
+                  --jq '[.workflow_runs[] | select(.head_branch != "${{ github.ref_name }}")] | length' 2>/dev/null || echo 0)
+            [ "${n:-0}" -gt 0 ] && skip=true
+          fi
+          echo "skip=$skip" >> "$GITHUB_OUTPUT"
+          if [ "$skip" = true ]; then
+            echo "::notice::Self Tests already passed on ${{ github.sha }} on another branch — not run again"
+          else
+            echo "No earlier green run on this commit — the suite runs."
+          fi
+
   self-tests:
+    needs: already-green
+    # !cancelled(): if the look-up job itself failed, its answer is empty and the suite RUNS — a broken look-up must
+    # never skip the tests.
+    if: ${{ !cancelled() && needs.already-green.outputs.skip != 'true' }}
     # 20 Oct 2026 — ubuntu-latest became Ubuntu 26.04 overnight and Playwright 1.56 cannot install a browser
     # there ("Playwright does not support chromium on ubuntu26.04-x64"): every self-test run failed before a test ran.
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
       - name: Set up Node
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version: '22'
 
@@ -194,7 +229,7 @@ jobs:
       # fallback copy kept an `allow write` that silently granted deletion.
       # `demo-` projects never touch a real Firebase project.
       - name: Set up Java (for the Firestore emulator)
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
         with:
           distribution: temurin
           java-version: '21'

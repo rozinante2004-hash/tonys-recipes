@@ -16868,8 +16868,12 @@ window.SELF_TESTS = [
       // translation editor that keeps edits and 🔁 Replace, the help assistant's knowledge of every menu item and of
       // WhatsApp, 🚀 Deployments rewritten, invitations sent by the server, the farm voices, the date and log-noise
       // guards, and 🌐 the search in every language the recipes are in) and the page reached 1902 KB.
+      // Raised to 2300 in v39.64 (the audit of 10 Nov, item H1; Tony: "Raise budget"): v39.47–v39.63 added ~90 KB
+      // (without comments) of real features (a collection's contents, links between recipes, Ask an admin to delete,
+      // the sent-recipe and invitation flows, the testers' invitation window, the audit's own fixes) and the page
+      // reached 1,994 KB. 2300 leaves room for the audit's remaining items (JSON-LD imports, the signed fetches).
       kb = Math.round(lean.length/1024);
-      if(kb > 2000) throw new Error('index.html is '+kb+' KB without its comments (what a device downloads). The suite itself is NOT inlined — that is '
+      if(kb > 2300) throw new Error('index.html is '+kb+' KB without its comments (what a device downloads). The suite itself is NOT inlined — that is '
         + 'checked above — so this is the app growing. Either something large went in that should not '
         + 'have, or the budget needs raising on purpose rather than by accident.');
 
@@ -16949,6 +16953,79 @@ window.SELF_TESTS = [
       // The cache is big enough to be worth having.
       if(AI_CACHE_MAX < 200) throw new Error('the AI cache holds only '+AI_CACHE_MAX+' entries');
       if(AI_CACHE_TTL < 14*24*60*60*1000) throw new Error('the AI cache expires after under a fortnight');
+    } },
+
+  { id:'idea_lists_on_small_model', group:'Network', name:'Explore and Suggest ask the small model (v39.64, audit C3)',
+    test: async()=>{
+      // Tony: "7. Yes" — a list of five meal ideas is a small job; the main model was asked for it only because
+      // nothing had routed it. Both functions are driven for real with the request body read, as ai_model_routing
+      // does; the stub answers an empty list so nothing is rendered or stored.
+      var realFetch=window.fetch, realInsight=window.insightCount, sent=[], prevCache=_aiCacheParkForTest();
+      var kTags=ingTags.slice(), kDiets=selDiets.slice(), kKw=document.getElementById('sug-keywords').value;
+      var ex=document.getElementById('exploreResult'), su=document.getElementById('suggestResult');
+      var kEx=ex.innerHTML, kSu=su.innerHTML;
+      try{
+        window.insightCount=function(){};
+        window.fetch=function(u, opts){
+          var b={}; try{ b=JSON.parse((opts&&opts.body)||'{}'); }catch(e){}
+          if(!b.model) return realFetch.apply(window, arguments);
+          sent.push(b.model);
+          return Promise.resolve({ ok:true, status:200, json:function(){ return Promise.resolve({ content:[{ text:'[]' }] }); } });
+        };
+        ingTags=['st-probe-'+Date.now()]; selDiets=[];
+        await runExplore();
+        document.getElementById('sug-keywords').value='st-probe-'+Date.now();
+        await runSuggest();
+        if(sent.length!==2) throw new Error('expected one call from Explore and one from Suggest, saw '+sent.length);
+        if(sent[0]!==AI_MODEL_SMALL) throw new Error('Explore asked for "'+sent[0]+'", not the small model '+AI_MODEL_SMALL);
+        if(sent[1]!==AI_MODEL_SMALL) throw new Error('Suggest asked for "'+sent[1]+'", not the small model '+AI_MODEL_SMALL);
+      } finally {
+        window.fetch=realFetch; window.insightCount=realInsight; _aiCacheRestoreForTest(prevCache);
+        ingTags=kTags; selDiets=kDiets; document.getElementById('sug-keywords').value=kKw;
+        ex.innerHTML=kEx; su.innerHTML=kSu;
+      }
+    } },
+
+  { id:'diet_tagging_in_batches', group:'Features', name:'Auto-tag diet types asks once per twenty recipes, not once per recipe (v39.64, audit C4)',
+    test: async()=>{
+      // Tony: "8. Yes". 45 untagged fixtures → three calls (20, 20, 5) to the small model, each answered with a
+      // JSON object keyed by the recipe's number; a batch whose answer is not JSON leaves ITS recipes untagged and
+      // the others tagged. The real recipes are set aside for the run, and nothing is saved or drawn.
+      var realRecipes=recipes, realAi=window.aiCall, realAsk=window.askConfirm, realSave=window.saveData, realGrid=window.renderGrid;
+      var calls=[];
+      var fx=[]; for(var i=0;i<45;i++) fx.push(normalizeRecipe({ id:980100+i, uid:'dt-'+i, name:'Batch dish '+(i+1), category:'Dinner',
+        ingredients:[{a:'1',n:'ingredient '+(i+1)}], steps:['cook'] }));
+      try{
+        recipes=fx;
+        window.askConfirm=function(){ return Promise.resolve(true); };
+        window.saveData=function(){}; window.renderGrid=function(){};
+        window.aiCall=function(prompt, max, tools, model){
+          calls.push({ prompt:prompt, model:model, max:max });
+          if(calls.length===2) return Promise.resolve('Sorry, I cannot help with that.');
+          var n=(prompt.match(/^\d+\. /gm)||[]).length, o={};
+          for(var k=1;k<=n;k++) o[String(k)]=[ k%2 ? 'Vegetarian' : 'Omnivore', 'Keto' ].concat(k===3 ? ['NotADiet'] : []);
+          return Promise.resolve('```json\n'+JSON.stringify(o)+'\n```');
+        };
+        await aiTagAllDiets();
+        if(calls.length!==3) throw new Error('expected 3 calls for 45 recipes (20+20+5), saw '+calls.length);
+        calls.forEach(function(c, i){
+          if(c.model!==AI_MODEL_SMALL) throw new Error('call '+(i+1)+' asked for "'+c.model+'", not the small model');
+          var listed=(c.prompt.match(/^\d+\. /gm)||[]).length, want=[20,20,5][i];
+          if(listed!==want) throw new Error('call '+(i+1)+' lists '+listed+' recipes, expected '+want);
+        });
+        if(calls[0].prompt.indexOf('Batch dish 20')===-1 || calls[0].prompt.indexOf('Batch dish 21')!==-1)
+          throw new Error('the first call does not list exactly the first twenty');
+        if(calls[0].prompt.indexOf('ingredient 7')===-1) throw new Error('the ingredients are not in the prompt');
+        var tagged=fx.filter(function(r){ return r.diets && r.diets.length; });
+        if(tagged.length!==25) throw new Error('expected 25 tagged (the second batch failed), got '+tagged.length);
+        if(fx[20].diets.length || fx[39].diets.length) throw new Error('a recipe of the failed batch was tagged');
+        if(fx[0].diets.join()!=='Vegetarian,Keto' || fx[1].diets.join()!=='Omnivore,Keto') throw new Error('the tags were not applied by recipe number: '+fx[0].diets.join()+' / '+fx[1].diets.join());
+        if(fx[2].diets.indexOf('NotADiet')>-1) throw new Error('a tag that is not one of the five was kept');
+        if(fx[44].diets.join()!=='Vegetarian,Keto') throw new Error('the last, short batch was not applied');
+        if(!fx[0].updatedAt) throw new Error('a tagged recipe was not stamped, so it would not sync');
+      } finally {
+        recipes=realRecipes; window.aiCall=realAi; window.askConfirm=realAsk; window.saveData=realSave; window.renderGrid=realGrid;
+      }
     } },
 
   { id:'sec_photo_bytes_via_worker', group:'Network', name:'A photo\u2019s bytes come through the Worker, and only the Worker (v36.30)',
@@ -20353,6 +20430,79 @@ window.SELF_TESTS = [
       }
     } },
 
+  { id:'nutrition_folds_on_phones', group:'UI', name:'On a phone the nutrition box is one line until tapped; a computer shows the four values (v39.64)',
+    test: async()=>{
+      // Audit U1(a), Tony: "A". The fold is CSS inside the 600 px media block (data-folded on the panel);
+      // toggleNutrition flips the attribute and the button's aria-expanded, and does nothing on a computer.
+      // The suite runs on Tony's phone too, so what the CSS actually does is judged by the REAL viewport,
+      // while the app's own "is this a phone" answer is stubbed both ways.
+      var _viewWasOpen=document.getElementById('viewOverlay').classList.contains('open');
+      var testId=970203, kView=viewId, realMM=window.matchMedia;
+      var realPhone=!!(realMM && realMM.call(window,'(max-width: 600px)').matches);
+      function stub(phone){ window.matchMedia=function(q){ return { matches: phone && /max-width:\s*600px/.test(q), media:q,
+        addEventListener:function(){}, removeEventListener:function(){}, addListener:function(){}, removeListener:function(){} }; }; }
+      recipes.unshift(normalizeRecipe({id:testId,uid:'nut-fold',bg:'#fff',name:'Nutrition fold',
+        ingredients:[{a:'1',n:'egg'}],steps:['cook'],nutrition:{calories:245,protein:12,carbs:30,fat:9}}));
+      try{
+        // The fold rule itself, read from the CSSOM: it must live in the phone block, not apply everywhere.
+        var foldRule=null;
+        for(var i=0;i<document.styleSheets.length;i++){
+          var rules; try{ rules=document.styleSheets[i].cssRules; }catch(e){ continue; }
+          for(var j=0;j<rules.length;j++){
+            if(rules[j].type===4 && /max-width:\s*600px/.test(rules[j].conditionText||rules[j].media.mediaText)){
+              for(var k=0;k<rules[j].cssRules.length;k++){
+                var sel=rules[j].cssRules[k].selectorText||'';
+                if(sel.indexOf('.nutrition-panel[data-folded="1"] .nutrition-body')>-1 && rules[j].cssRules[k].style.display==='none') foldRule=rules[j].cssRules[k];
+              }
+            }
+          }
+        }
+        if(!foldRule) throw new Error('no phone-width rule hides the folded nutrition values');
+
+        // 1. As a phone: drawn folded, one line; a tap opens; a tap closes; open on request.
+        stub(true);
+        viewId=testId; drawView();
+        var p=document.getElementById('nutrition-'+testId);
+        if(!p) throw new Error('no nutrition panel');
+        var head=p.querySelector('.nutrition-head'), body=document.getElementById('nutritionBody-'+testId);
+        if(!head||!body) throw new Error('the panel is not split into a head and a body');
+        if(head.tagName!=='BUTTON') throw new Error('the head is not a button, so it cannot be tapped or reached by keyboard');
+        if(head.getAttribute('aria-controls')!=='nutritionBody-'+testId) throw new Error('the head does not say what it opens');
+        if(body.querySelectorAll('.nutrition-item').length!==4) throw new Error('expected the four values, got '+body.querySelectorAll('.nutrition-item').length);
+        if(!/245/.test((p.querySelector('.nutrition-summary')||{}).textContent||'')) throw new Error('the folded line does not show the calories');
+        if(p.getAttribute('data-folded')!=='1' || head.getAttribute('aria-expanded')!=='false')
+          throw new Error('on a phone the box is not drawn folded: data-folded='+p.getAttribute('data-folded')+', aria-expanded='+head.getAttribute('aria-expanded'));
+        if(realPhone && getComputedStyle(body).display!=='none') throw new Error('folded, yet the values are on the screen (this device is a phone)');
+        toggleNutrition(testId);
+        if(p.getAttribute('data-folded')!=='0' || head.getAttribute('aria-expanded')!=='true') throw new Error('a tap did not open the values');
+        if(getComputedStyle(body).display==='none') throw new Error('open, yet the values are hidden');
+        toggleNutrition(testId);
+        if(p.getAttribute('data-folded')!=='1' || head.getAttribute('aria-expanded')!=='false') throw new Error('a second tap did not fold the values again');
+        toggleNutrition(testId, true);
+        if(p.getAttribute('data-folded')!=='0') throw new Error('toggleNutrition(id, true) did not open the values (calcNutrition relies on it)');
+
+        // 2. As a computer: drawn open, and a click changes nothing.
+        stub(false);
+        drawView();
+        p=document.getElementById('nutrition-'+testId); head=p.querySelector('.nutrition-head'); body=document.getElementById('nutritionBody-'+testId);
+        if(head.getAttribute('aria-expanded')!=='true') throw new Error('on a computer the head says the values are hidden');
+        toggleNutrition(testId);
+        if(head.getAttribute('aria-expanded')!=='true') throw new Error('on a computer a click folded the values');
+        if(!realPhone && getComputedStyle(body).display==='none') throw new Error('on a computer the values are hidden');
+
+        // 3. No values yet: the one-line box with ✨ Calculate, as before — nothing to fold.
+        var r=recipes.find(function(x){ return x.id===testId; }); r.nutrition=null;
+        drawView();
+        p=document.getElementById('nutrition-'+testId);
+        if(!p.querySelector('.nutrition-btn')) throw new Error('without values there is no ✨ Calculate');
+        if(p.querySelector('.nutrition-head')) throw new Error('without values there is nothing to fold, yet a fold head is drawn');
+      } finally {
+        window.matchMedia=realMM;
+        recipes = recipes.filter(function(x){ return x.id!==testId; });
+        viewId=kView; if(viewId!=null) drawView();
+        if(!_viewWasOpen && document.getElementById('viewOverlay').classList.contains('open')) closeM('viewOverlay');
+      }
+    } },
   { id:'coll_split_and_promote', group:'Features', name:'A collection can be split, and one recipe lifted out (v36.0)',
     test: async()=>{
       ['splitCollection','promotePartToRecipe','recipeFromPart']

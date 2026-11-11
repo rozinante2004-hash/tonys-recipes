@@ -1,7 +1,7 @@
 {
  "lang": "fr",
  "updatedAt": 1794349607507,
- "count": 2852,
+ "count": 2854,
  "strings": {
   "\"Add to Home Screen\"": "Ajouter à l'écran d'accueil",
   "\"Open Bring!\"": "Ouvrir Bring!",
@@ -1247,6 +1247,7 @@
   "T": "T",
   "Tabitha the turkey": "Tabitha la dinde",
   "Tag them": "Étiquetez-les",
+  "Tagged {1}/{2}": "{1}/{2} taguées",
   "Tagged {1}/{2}: {3}": "Étiquetées {1}/{2} : {3}",
   "Tagging {1} recipes...": "Étiquetage de {1} recettes...",
   "Take a photo of a recipe or choose an existing image — AI will extract it automatically.": "Prenez une recette en photo ou choisissez une image existante — l'IA l'extrait automatiquement.",
@@ -2207,6 +2208,7 @@
   "✅ Sent!": "✅ Envoyé !",
   "✅ Source saved": "✅ Source enregistrée",
   "✅ Tagged {1} recipes!": "✅ {1} recettes taguées !",
+  "✅ Tagged {1} recipes! {2} could not be tagged. Try again later.": "✅ {1} recettes taguées ! {2} n’ont pas pu être taguées. Réessayez plus tard.",
   "✅ The app is the newest ({1}) — sign in to sync your recipes": "✅ L'app est à jour ({1}) — connecte-toi pour synchroniser tes recettes",
   "✅ The cloud already matches every photo on this device.": "✅ Le cloud correspond déjà à toutes les photos de cet appareil.",
   "✅ This is the latest version.": "✅ Vous avez la dernière version.",

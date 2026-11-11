@@ -30,28 +30,32 @@ where.
   `docs/history/2026-11.md`, and update "Live now" here.
 - The rules were last published on 10 Nov 2026 (deploy-rules on 99558ae, success). A push to `test` that changes
   them publishes to the test project only; a release publishes to the family's and the beta's.
-- The Self Tests: **463 pass, 0 fail, 7 skipped** (the network ones) on v39.63, locally and in CI.
+- The Self Tests: **466 pass, 0 fail, 7 skipped** (the network ones) on v39.64, locally; 463 on v39.63 in CI too.
 
 **The audit of 10 Nov 2026 (`AUDIT-2026-11-10.md`) — Tony's answers of 11 Nov, and where each item is.** In the
 order of work; update this list as items land. Each change: Self Tests + knock-outs, the local checks, Help and
 `RECONSTRUCTION_PROMPT.md`, every new phrase in all 11 languages (gaps 0), a note in `docs/history/2026-11.md`, push
 to `test`; releases only on his yes.
 1. **H6 — split CLAUDE.md: done** (this file; `docs/history/`).
-2. **U1(a) — the nutrition box folded on phones** (Tony: "A"): one tappable line, the ids kept so `calcNutrition`
-   works; a screenshot for Tony.
+2. **U1(a) — the nutrition box folded on phones: done, v39.64 on Test** (one line, "Nutrition per 100g · 245 kcal ▸",
+   a tap opens the four values; a computer always shows them; screenshots sent to Tony).
 3. **S1 — a verified sign-in** (idToken) for fetch-url, facebook-fetch, instagram-fetch, fb-probe, video-from-url,
    video-recipe/video-file, photo-fetch, photo-search (Worker v105; `health` stays open).
 4. **C2 — the recipe built from the page's own schema.org JSON-LD without the AI** (Tony: "Yes. YouTube" — YouTube
    goes through the Data API, title + description → AI; JSON-LD does not apply there).
-5. **H1 — raise the page size budget** (Tony: "Raise budget"; 1,994 KB of 2,000 KB).
+5. **H1 — the page size budget: done, v39.64** (2,000 → 2,300 KB; the built page is 1,997 KB).
 6. **U6 — Hebrew address form → plural** (Tony: "Plural"), through `tools/he-address-form.mjs` that prints every
    change; Tony approves before it is applied.
-7. **C3 — Explore / Suggest / What can I make on `AI_MODEL_SMALL`**; Tony tries them on the test copy.
-8. **C4 — diet tagging in batches of 20.**
-9. **C9 — no second Self Test run** for a commit already green on `test`; languages-only commits skipped.
+7. **C3 — Explore and Suggest on `AI_MODEL_SMALL`: done, v39.64** — Tony tries them on the test copy. ("What can I
+   make" uses no AI: it matches the pantry on the device.)
+8. **C4 — diet tagging in batches of 20: done, v39.64** (`DIET_TAG_BATCH`, `dietTagPrompt`).
+9. **C9 — no second Self Test run: done, v39.64** (the `already-green` job; `paths-ignore: ["i18n/**"]`, so a push
+   that changes ONLY translation files runs no Self Tests — check a hand translation locally with gaps.js).
 10. **S3 — relays only for a page the server was refused** (403/429), never as the first fallback.
 11. **S5 + H5 — Dependabot for the workflows, actions pinned to commit SHAs; SheetJS 0.20** (Tony, after the
-    explanation: "11. Yes").
+    explanation: "11. Yes"). **S5 done, v39.64:** every `uses:` is a full commit with its version as a comment;
+    `.github/dependabot.yml` opens one grouped pull request a month against `test`. **H5 waits:** cdn.sheetjs.com
+    (the only source of SheetJS 0.20; npm stops at 0.18.5) is refused by this environment's network rules.
 12. **H3 — the empty-catch review** (`tools/empty-catches.mjs`; `syncLog('error', …)` where silence hides a lost
     write).
 - **Not doing** (Tony: no): U7 collapsing the help suggestions; F3 dropping `.doc`.

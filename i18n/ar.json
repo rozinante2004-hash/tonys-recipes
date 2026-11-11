@@ -1,7 +1,7 @@
 {
  "lang": "ar",
  "updatedAt": 1794349607507,
- "count": 2854,
+ "count": 2856,
  "strings": {
   "\"Add to Home Screen\"": "إضافة إلى الشاشة الرئيسية",
   "\"Open Bring!\"": "فتح Bring!",
@@ -1247,6 +1247,7 @@
   "T": "T",
   "Tabitha the turkey": "تابيثا الديكة الرومية",
   "Tag them": "أضف لها وسومًا",
+  "Tagged {1}/{2}": "تم وسم {1}/{2}",
   "Tagged {1}/{2}: {3}": "تم وسم {1}/{2}: {3}",
   "Tagging {1} recipes...": "جارٍ وسم {1} وصفة...",
   "Take a photo of a recipe or choose an existing image — AI will extract it automatically.": "التقط صورة لوصفة أو اختر صورة موجودة — سيستخرجها الذكاء الاصطناعي تلقائيًا.",
@@ -2208,6 +2209,7 @@
   "✅ Sent!": "✅ تم الإرسال!",
   "✅ Source saved": "✅ تم حفظ المصدر",
   "✅ Tagged {1} recipes!": "✅ تم وسم {1} وصفة!",
+  "✅ Tagged {1} recipes! {2} could not be tagged. Try again later.": "✅ تم وسم {1} وصفة! تعذّر وسم {2}. حاول مرة أخرى لاحقًا.",
   "✅ The app is the newest ({1}) — sign in to sync your recipes": "✅ التطبيق هو الأحدث ({1}) — سجّل الدخول لمزامنة وصفاتك",
   "✅ The cloud already matches every photo on this device.": "✅ السحابة مطابقة بالفعل لكل صورة على هذا الجهاز.",
   "✅ This is the latest version.": "✅ هذا هو أحدث إصدار.",

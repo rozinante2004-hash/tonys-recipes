@@ -1,7 +1,7 @@
 {
  "lang": "ja",
  "updatedAt": 1794349607507,
- "count": 3157,
+ "count": 3159,
  "strings": {
   "\"Add to Home Screen\"": "ホーム画面に追加",
   "\"One item away\" filter ({1}f.{2})": "「あと1品」フィルター（{1}f.{2}）",
@@ -1469,6 +1469,7 @@
   "T": "T",
   "Tabitha the turkey": "七面鳥のタビサ",
   "Tag them": "タグ付けする",
+  "Tagged {1}/{2}": "{1}/{2}件タグ付け済み",
   "Tagged {1}/{2}: {3}": "タグ付け {1}/{2}：{3}",
   "Tagging {1} recipes...": "{1}件のレシピにタグ付け中...",
   "Take a photo of a recipe or choose an existing image — AI will extract it automatically.": "レシピの写真を撮るか、既存の画像を選んでください — AIが自動で読み取ります。",
@@ -2512,6 +2513,7 @@
   "✅ Sent!": "✅ 送信しました！",
   "✅ Source saved": "✅ 出典を保存しました",
   "✅ Tagged {1} recipes!": "✅ {1}件のレシピにタグを付けました！",
+  "✅ Tagged {1} recipes! {2} could not be tagged. Try again later.": "✅ {1}件のレシピにタグを付けました！{2}件はタグを付けられませんでした。後でもう一度お試しください。",
   "✅ The app is the newest ({1}) — sign in to sync your recipes": "✅ アプリは最新です（{1}）— サインインしてレシピを同期しましょう",
   "✅ The cloud already matches every photo on this device.": "✅ クラウドはこのデバイスのすべての写真とすでに一致しています。",
   "✅ This is the latest version.": "✅ 最新バージョンです。",

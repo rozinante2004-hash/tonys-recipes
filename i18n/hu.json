@@ -1,7 +1,7 @@
 {
  "lang": "hu",
  "updatedAt": 1794349607507,
- "count": 2628,
+ "count": 2630,
  "strings": {
   "\"Add to Home Screen\"": "Hozzáadás a kezdőképernyőhöz",
   "\"Open Bring!\"": "Bring! megnyitása",
@@ -1144,6 +1144,7 @@
   "Syncing to your other devices…": "Szinkronizálás a többi eszközödre…",
   "Tabitha the turkey": "Tabitha, a pulyka",
   "Tag them": "Jelöld meg őket",
+  "Tagged {1}/{2}": "{1}/{2} megcímkézve",
   "Tagged {1}/{2}: {3}": "Megjelölve: {1}/{2}: {3}",
   "Tagging {1} recipes...": "{1} recept címkézése...",
   "Take a photo of a recipe or choose an existing image — AI will extract it automatically.": "Fotózz le egy receptet, vagy válassz egy meglévő képet — az AI automatikusan kinyeri belőle a receptet.",
@@ -2014,6 +2015,7 @@
   "✅ Sent!": "✅ Elküldve!",
   "✅ Source saved": "✅ Forrás mentve",
   "✅ Tagged {1} recipes!": "✅ {1} recept megcímkézve!",
+  "✅ Tagged {1} recipes! {2} could not be tagged. Try again later.": "✅ {1} recept megcímkézve! {2} receptet nem sikerült megcímkézni. Próbálja újra később.",
   "✅ The app is the newest ({1}) — sign in to sync your recipes": "✅ Az app a legújabb ({1}) — jelentkezz be a receptjeid szinkronizálásához",
   "✅ The cloud already matches every photo on this device.": "✅ A felhő már megegyezik az eszközön lévő minden fotóval.",
   "✅ This is the latest version.": "✅ Ez a legújabb verzió.",
