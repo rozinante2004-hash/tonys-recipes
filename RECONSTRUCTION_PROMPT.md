@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v39.66` — app. **Worker: v105**, deployed separately and versioned separately
+**Current version:** `v39.67` — app. **Worker: v105**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -2394,7 +2394,9 @@ lines accept `amount — name` / `amount - name` separators. Editing preserves `
 
 - **Import from URL** (`runUrlImport`): YouTube → Worker YouTube API; Instagram → Worker
   `instagram-fetch`; else Worker `fetch-url`, then **fallback CORS proxies**
-  (`allorigins.win`, `corsproxy.io`, `codetabs.com`) if the Worker returns too little. Then ask
+  (`allorigins.win`, `corsproxy.io`, `codetabs.com`) ONLY when the site refused the Worker (its answer
+  "Page returned 401/403/429/451/503", `RELAY_WHEN_REFUSED`; v39.67, audit S3 — a page with no readable text, a
+  missing page or an unreachable Worker never goes to a relay), after `proxyConsent`. Then ask
   Claude to return strict recipe JSON *in the original language* (`{name,category,difficulty,
   prep,servings,ingredients:[{a,n}],steps:[]}` or `{error:"no recipe found"}`). No recipe →
   offer **Save as video/link bookmark** (`showSaveAsVideoBookmark`).

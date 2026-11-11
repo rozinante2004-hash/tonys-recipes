@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.66 -->
+<!-- Tony's Recipes Collection v39.67 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -11110,7 +11110,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.66';
+var APP_VERSION = 'v39.67';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -14642,7 +14642,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.66</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.67</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14730,7 +14730,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.66</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.67</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -27508,6 +27508,8 @@ var PROXY_CONSENT_KEY = 'tonys_proxy_consent';
 // v37.27 — THE CASCADE (Tony): relays are tried WITHOUT asking, unless the
 // person chose to be asked (the privacy panel). The preview still names the
 // relay a recipe came through. Unset = 'always'; 'ask' is stored when chosen.
+// v39.67 (audit S3) — the site's answers to the server that mean "not to servers" (a relay asks from elsewhere).
+var RELAY_WHEN_REFUSED = [401, 403, 429, 451, 503];
 function proxyConsentState() {
   try { return localStorage.getItem(PROXY_CONSENT_KEY) || 'always'; } catch(e) { return 'always'; }
 }
@@ -27692,6 +27694,9 @@ async function runUrlImportSteps() {
   // v37.29 — never the general fetch for Facebook: it gets only the login
   // page, whose words the AI then rightly calls "no recipe" — and the real
   // reason from the Facebook reader above was lost with it.
+  // v39.67 (audit S3, Tony: "keep them only for pages the server was refused") — the site's own refusal of the app's
+  // server (the Worker answers "Page returned 403"), the one case a relay can help: it asks from somewhere else.
+  var refusedStatus = 0;
   if (!pageText && !isFacebookUrl(url)) try {
     const fetchResp = await fetch(WORKER_ENDPOINT, {
       method: 'POST',
@@ -27708,7 +27713,10 @@ async function runUrlImportSteps() {
       // v36.2 — a round-up can be nothing but links to the recipes. Kept aside
       // in case the text alone turns out to hold no recipe at all.
       _pageLinks = Array.isArray(fetchData.links) ? fetchData.links : [];
-      if (!pageText) attempts.push('the server fetched the page but found no readable text in it');
+      var refused = /Page returned (\d{3})/.exec(String(fetchData.error || ''));
+      if (refused && RELAY_WHEN_REFUSED.indexOf(Number(refused[1])) > -1) refusedStatus = Number(refused[1]);
+      if (!pageText) attempts.push(refused ? 'the site answered the server with ' + refused[1] + (refusedStatus ? ' (it refuses servers)' : '')
+        : 'the server fetched the page but found no readable text in it');
     } else {
       var wd = null; try { wd = await fetchResp.json(); } catch(e2) {}
       attempts.push('server: ' + workerErrorText(fetchResp.status, wd));
@@ -27720,8 +27728,14 @@ async function runUrlImportSteps() {
   // v37.14 — a Facebook post or a YouTube video: a relay gets only Facebook's
   // sign-in page, or YouTube's player — never the recipe. Not sent there.
   var videoPost = isFacebookUrl(url) ? 'facebook' : (isYouTubeUrl(url) ? 'youtube' : '');
-  // ── Step 2: Fall back to browser CORS proxies if Worker fetch failed ───────
-  if ((!pageText || pageText.length < 100) && !videoPost) {
+  // ── Step 2: a relay, ONLY for a site that refused the app's own server ───────
+  // v39.67 (audit S3) — a relay sees the address and chooses the text that comes back, so it is used only where it can
+  // help: the site refused the server. A page with no readable text, a missing page or a server that could not be
+  // reached would give a relay the same nothing (or worse, its own text).
+  if ((!pageText || pageText.length < 100) && !videoPost && !refusedStatus) {
+    attempts.push('relays: not used — they are only for a site that refuses the app\u2019s own server');
+  }
+  if ((!pageText || pageText.length < 100) && !videoPost && refusedStatus) {
     // Ask BEFORE any URL leaves for a relay, not after.
     if (!await proxyConsent(url)) {
       attempts.push('relays: declined — the page was not sent to a third-party proxy');

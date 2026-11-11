@@ -724,6 +724,36 @@ window.SELF_TESTS = [
       }
       return 'both routes: .xlsx (reader loaded on first use), .docx, .html (lines apart), .txt — each to the AI and the preview';
     } },
+  { id:'relays_only_for_a_refused_site', group:'Import/Export', name:'A relay is offered only when the site refused the app\u2019s own server (v39.67, audit S3)',
+    test: async()=>{
+      // Tony: "keep them only for pages the server was refused". The Worker answers a refusal as 200 { error:'Page
+      // returned 403', text:'' }; a page with nothing readable as 200 { text:'' }; a missing page as 'Page returned 404'.
+      var real={ fetch:window.fetch, consent:window.proxyConsent, extract:window.extractRecipesFromText, log:window.syncLog };
+      var inp=document.getElementById('urlImportInput'), was=inp.value, asked=0, relayHosts=[], answer=null;
+      try{
+        window.syncLog=function(){};
+        window.proxyConsent=async function(){ asked++; return false; };
+        window.extractRecipesFromText=async function(){ return { error:'no recipe found' }; };
+        window.fetch=async function(u, init){
+          if(String(u).indexOf(WORKER_ENDPOINT)!==0){ relayHosts.push(String(u)); return { ok:false, status:500, json:async function(){ return {}; } }; }
+          return { ok:true, status:200, json:async function(){ return answer; } };
+        };
+        inp.value='https://www.example.com/st-relay-recipe';
+        answer={ error:'Page returned 403', text:'' }; await runUrlImport();
+        if(asked!==1) throw new Error('a site that refused the server (403) was not offered a relay (asked '+asked+')');
+        answer={ error:'Page returned 429', text:'' }; await runUrlImport();
+        if(asked!==2) throw new Error('a site that rate-limited the server (429) was not offered a relay');
+        answer={ text:'' }; await runUrlImport();
+        if(asked!==2) throw new Error('a page with no readable text was sent towards a relay');
+        answer={ error:'Page returned 404', text:'' }; await runUrlImport();
+        if(asked!==2) throw new Error('a missing page (404) was sent towards a relay');
+        if(relayHosts.length) throw new Error('a relay was asked without consent: '+relayHosts.join(', '));
+      } finally {
+        window.fetch=real.fetch; window.proxyConsent=real.consent; window.extractRecipesFromText=real.extract; window.syncLog=real.log;
+        inp.value=was;
+        var ie=document.getElementById('importErrorModal'); if(ie) ie.remove();
+      }
+    } },
   { id:'import_facebook_and_video_say_what_works', group:'Import/Export', name:'A Facebook post or a recipe-less video says why, and what works; a video can be watched (v37.14, v37.15)',
     test: async()=>{
       var real={ fetch:window.fetch, consent:window.proxyConsent, extract:window.extractRecipesFromText, log:window.syncLog };
@@ -16726,7 +16756,7 @@ window.SELF_TESTS = [
       // The importer must actually call the gate before any relay fetch.
       var src = await (await fetch(new URL('index.html?t='+Date.now(), location.href), {cache:'no-store'})).text();
       // v38.72 — found by its code, not its comment: the built copies carry no comments
-      var i = src.indexOf("if ((!pageText || pageText.length < 100) && !videoPost) {");
+      var i = src.indexOf("if ((!pageText || pageText.length < 100) && !videoPost && refusedStatus) {");   // v39.67 — only for a refused site
       var block = i < 0 ? '' : src.slice(i, src.indexOf("if (!pageText || pageText.length < (videoPost === 'facebook' ? 40 : 100))", i));
       if(!block) throw new Error('could not find the relay fallback to check');
       if(block.indexOf('proxyConsent(')===-1)
@@ -16765,7 +16795,7 @@ window.SELF_TESTS = [
 
         // ...and the importer must not have gone back to innerHTML.
         var src = await (await fetch(new URL('index.html?t='+Date.now(), location.href), {cache:'no-store'})).text();
-        var pi = src.indexOf("if ((!pageText || pageText.length < 100) && !videoPost) {");   // v38.72 — by its code
+        var pi = src.indexOf("if ((!pageText || pageText.length < 100) && !videoPost && refusedStatus) {");   // v38.72 — by its code; v39.66 — only for a refused site
         var proxyBlock = pi < 0 ? '' : src.slice(pi, src.indexOf("if (!pageText || pageText.length < (videoPost === 'facebook' ? 40 : 100))", pi));
         if(!proxyBlock) throw new Error('could not find the CORS-proxy fallback to check');
         // Only the FETCHED html matters here; `res.innerHTML = spinner(...)` in

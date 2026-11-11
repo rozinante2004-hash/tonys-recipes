@@ -58,7 +58,8 @@ to `test`; releases only on his yes.
 8. **C4 — diet tagging in batches of 20: done, v39.64** (`DIET_TAG_BATCH`, `dietTagPrompt`).
 9. **C9 — no second Self Test run: done, v39.64** (the `already-green` job; `paths-ignore: ["i18n/**"]`, so a push
    that changes ONLY translation files runs no Self Tests — check a hand translation locally with gaps.js).
-10. **S3 — relays only for a page the server was refused** (403/429), never as the first fallback.
+10. **S3 — relays only for a site that refused the server: done, v39.67** (`RELAY_WHEN_REFUSED` = 401, 403, 429,
+    451, 503 in the Worker's "Page returned …"; anything else never goes to a relay).
 11. **S5 + H5 — Dependabot for the workflows, actions pinned to commit SHAs; SheetJS 0.20** (Tony, after the
     explanation: "11. Yes"). **S5 done, v39.64:** every `uses:` is a full commit with its version as a comment;
     `.github/dependabot.yml` opens one grouped pull request a month against `test`. **H5 waits:** cdn.sheetjs.com
