@@ -49,11 +49,15 @@ to `test`; releases only on his yes.
    goes through the Data API, title + description → AI; page data does not apply there). Follow-up, not done: the
    page's own photo (`image`, returned by the Worker) as the recipe's photo.
 5. **H1 — the page size budget: done, v39.64** (2,000 → 2,300 KB; the built page is 1,997 KB).
-6. **U6 — Hebrew in the plural: the proposal is with Tony (v39.66 on Test).** `tools/he-address-form.mjs --central
-   --out <file>` lists every change, read from the CENTRAL Hebrew (517 of 3,281 phrases on 11 Nov). Once Tony
-   approves: run the workflow "Hebrew in the plural" (he-plural.yml, by hand, `confirm` = `make it plural`); it writes
-   the central Hebrew and starts Publish languages. The translation prompt now asks the AI for Hebrew in the plural
-   (`i18nPrompt` rule 7a), so new phrases stay plural.
+6. **U6 — Hebrew in the plural: APPROVED by Tony (11 Nov, after his review; 577 phrases, 124 fixed by hand).** On
+   Test now as the file `i18n/he.json` (written from the tool, on `test`). **Right after the next release** (when
+   he-plural.yml reaches `main` — GitHub starts a workflow by hand only once it is on the default branch), and after
+   that release's "Translate new phrases" and "Publish languages" have finished: run it —
+   `gh workflow run he-plural.yml --ref main -f confirm='make it plural'` — to write the CENTRAL Hebrew (the source of
+   every copy's file; until then a publish would put the singular back on `main`/`test`), then check its run and the
+   publish after it. If the central Hebrew changes before the release (someone edits a translation), the publish's
+   merge into `test` conflicts on `i18n/he.json`: take `test`'s side and rerun. The prompt (rule 7a) keeps new
+   phrases plural.
 7. **C3 — Explore and Suggest on `AI_MODEL_SMALL`: done, v39.64** — Tony tries them on the test copy. ("What can I
    make" uses no AI: it matches the pantry on the device.)
 8. **C4 — diet tagging in batches of 20: done, v39.64** (`DIET_TAG_BATCH`, `dietTagPrompt`).
