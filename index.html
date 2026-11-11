@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.65 -->
+<!-- Tony's Recipes Collection v39.66 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -11110,7 +11110,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.65';
+var APP_VERSION = 'v39.66';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -14642,7 +14642,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.65</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.66</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14730,7 +14730,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.65</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.66</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -19371,6 +19371,12 @@ function i18nPrompt(lang, batch) {
     + 'without ceremony; match that rather than making it formal.\n'
     + '7. If a string is already a proper noun or has no meaningful translation, return it '
     + 'unchanged rather than inventing one.\n\n'
+    // v39.66 (audit U6, Tony: "Plural") — the Hebrew speaks to its reader in the plural, as the central Hebrew now does;
+    // the AI had answered in the masculine singular ("📨 שלח את הבקשה"), so every release added singular phrases.
+    + (lang === 'he' ? '7a. HEBREW: address the reader in the PLURAL, never the masculine singular and never a '
+      + '"him/her" slash form. Commands and buttons that tell the reader to act use the plural imperative '
+      + '(לחצו, הקישו, בחרו, שמרו, שלחו, נסו); "your" is שלכם, "you" is אתם / לכם / אתכם. A label that names a thing '
+      + 'or a state stays a noun or an adjective (שמירה, נשמר).\n\n' : '')
     + '8. The answer is keyed by POSITION, not by the English. Return '
     + '{"0":"…","1":"…"} with one entry for every line below, using its number. '
     + 'Do not repeat the English anywhere in your answer.\n\n'

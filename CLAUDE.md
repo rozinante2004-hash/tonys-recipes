@@ -48,8 +48,11 @@ to `test`; releases only on his yes.
 4. **C2 — the recipe built from the page's own schema.org JSON-LD without the AI** (Tony: "Yes. YouTube" — YouTube
    goes through the Data API, title + description → AI; JSON-LD does not apply there).
 5. **H1 — the page size budget: done, v39.64** (2,000 → 2,300 KB; the built page is 1,997 KB).
-6. **U6 — Hebrew address form → plural** (Tony: "Plural"), through `tools/he-address-form.mjs` that prints every
-   change; Tony approves before it is applied.
+6. **U6 — Hebrew in the plural: the proposal is with Tony (v39.66 on Test).** `tools/he-address-form.mjs --central
+   --out <file>` lists every change, read from the CENTRAL Hebrew (517 of 3,281 phrases on 11 Nov). Once Tony
+   approves: run the workflow "Hebrew in the plural" (he-plural.yml, by hand, `confirm` = `make it plural`); it writes
+   the central Hebrew and starts Publish languages. The translation prompt now asks the AI for Hebrew in the plural
+   (`i18nPrompt` rule 7a), so new phrases stay plural.
 7. **C3 — Explore and Suggest on `AI_MODEL_SMALL`: done, v39.64** — Tony tries them on the test copy. ("What can I
    make" uses no AI: it matches the pantry on the device.)
 8. **C4 — diet tagging in batches of 20: done, v39.64** (`DIET_TAG_BATCH`, `dietTagPrompt`).

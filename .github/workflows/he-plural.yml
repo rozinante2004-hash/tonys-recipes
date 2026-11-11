@@ -1,0 +1,53 @@
+name: Hebrew in the plural
+
+# v39.66 (the audit of 10 Nov 2026, item U6; Tony, 11 Nov: "Plural"). Rewrites the CENTRAL Hebrew translations (the
+# database document the publish job writes i18n/he.json from) so the app speaks to its reader in the plural: the
+# reviewed commands (לחץ → לחצו), the "him/her" slash forms (בחר/י → בחרו) and "your" (שלך → שלכם) — see
+# tools/he-address-form.mjs for exactly what changes and where. ONLY by hand, and only with the words below typed:
+# the list it changes was approved by Tony first. A run without them prints the list and writes nothing.
+# Shares the translation job's lane, so the two never write the Hebrew at the same time.
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type exactly: make it plural   (anything else: show the list, write nothing)'
+        required: true
+        default: 'show the list'
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: translate-languages
+  cancel-in-progress: false
+
+jobs:
+  plural:
+    runs-on: ubuntu-24.04
+    env:
+      FIREBASE_RULES_KEY: ${{ secrets.FIREBASE_RULES_KEY }}
+      CONFIRM: ${{ inputs.confirm }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: "22"
+
+      - name: What would change (read from the central Hebrew, nothing written)
+        run: node tools/he-address-form.mjs --central --out "$RUNNER_TEMP/proposal.md" && head -c 3000 "$RUNNER_TEMP/proposal.md"
+
+      - name: Write it into the central Hebrew
+        if: inputs.confirm == 'make it plural'
+        run: |
+          npm init -y >/dev/null 2>&1 || true
+          npm install --no-audit --no-fund google-auth-library@9 >/dev/null
+          node tools/he-address-form.mjs --central --apply --confirm "$CONFIRM"
+
+      # The job's own token cannot start other workflows by pushing, so it asks directly.
+      - name: Publish it
+        if: inputs.confirm == 'make it plural'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run publish-languages.yml --ref main -f force=false
