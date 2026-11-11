@@ -1750,6 +1750,9 @@ and in the release notes below, newest last. `RECONSTRUCTION_PROMPT.md` §1b has
     sign-in); website imports ignore the page's own JSON-LD recipe (send it instead of 60 KB of text, or no AI at all);
     the built page is 1,994 KB of its 2,000 KB budget; the Hebrew interface addresses the person four ways. The
     scratchpad walk screenshots are not in the repository (tests/screen-walk.js remakes them).
+  - **On Test, green (11 Nov 2026):** v39.63 on 3d6a568 (Cloudflare Pages for test 00:37, Self Tests 00:54). The
+    release's last job, Self Tests on main for 7adfd86: success 00:41 — every job of the v39.60–v39.62 release green.
+    Not yet on the family's copy or the beta: v39.63 (the audit's safe fixes) waits for Tony's answers and his yes.
   - **On Test, green (10 Nov 2026):** v39.60 on 3fe4519 (Cloudflare Pages for test 15:41, Self Tests 16:00); v39.61 +
     Worker v103 on cd96e4d (Deploy the Worker 16:07 — "live: v103, published: v103", live for every copy from then;
     Cloudflare Pages for test 16:07; Self Tests 16:25). Not yet on the family's copy or the beta: needs Tony's yes.
