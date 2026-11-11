@@ -1,0 +1,498 @@
+{
+ "only when you send something there": {
+  "from": "רק כשאתה שולח משהו לשם",
+  "to": "רק כשאתם שולחים משהו לשם"
+ },
+ "The {1} event(s) recorded all came from the Self Test suite, which fails on purpose to prove the app notices. None of them say anything about how the app is behaving for you.": {
+  "from": "כל {1} האירועים שנרשמו הגיעו מחבילת בדיקת העצמי, שנכשלת בכוונה כדי להוכיח שהאפליקציה שמה לב. אף אחד מהם לא אומר משהו על איך האפליקציה מתנהגת אצלך.",
+  "to": "כל {1} האירועים שנרשמו הגיעו מחבילת בדיקת העצמי, שנכשלת בכוונה כדי להוכיח שהאפליקציה שמה לב. אף אחד מהם לא אומר משהו על איך האפליקציה מתנהגת אצלכם."
+ },
+ "{1}You sign in with Google, so your password is Google’s: change it in your Google account (myaccount.google.com → Security → Password).{2}Your account signs in with an e-mailed link, without a password. To have one: sign out, type {3} on the sign-in screen and press “Forgot password?” — the e-mail lets you choose it.": {
+  "from": "{1}אתם מתחבר/ת עם Google, כך שהסיסמה שלכם היא של Google: שנה/י אותה בחשבון ה-Google שלכם (myaccount.google.com ← אבטחה ← סיסמה).{2}החשבון שלכם מתחבר עם קישור שנשלח במייל, בלי סיסמה. כדי שתהיה לכם אחת: התנתקו, הקלידו {3} במסך ההתחברות ולחצו על \"שכחת סיסמה?\" — המייל יאפשר לכם לבחור אחת.",
+  "to": "{1}אתם מתחברים עם Google, כך שהסיסמה שלכם היא של Google: שנו אותה בחשבון ה-Google שלכם (myaccount.google.com ← אבטחה ← סיסמה).{2}החשבון שלכם מתחבר עם קישור שנשלח במייל, בלי סיסמה. כדי שתהיה לכם אחת: התנתקו, הקלידו {3} במסך ההתחברות ולחצו על \"שכחתם סיסמה?\" — המייל יאפשר לכם לבחור אחת."
+ },
+ "✏️ Your changes are kept on this device until they are shared — open ✏️ Edit translations and press 💾 Save.": {
+  "from": "✏️ השינויים שלכם נשמרים במכשיר הזה עד שישותפו — פתחו ✏️ עריכת תרגומים ולחצ/י 💾 שמירה.",
+  "to": "✏️ השינויים שלכם נשמרים במכשיר הזה עד שישותפו — פתחו ✏️ עריכת תרגומים ולחצו 💾 שמירה."
+ },
+ "Someone added {1} to their recipe collection. It opens for you once this address is confirmed — from the e-mail we send you (look in spam too). Then come back and reload the app.": {
+  "from": "מישהו הוסיף את {1} לאוסף המתכונים שלו/שלה. זה ייפתח אצלך ברגע שהכתובת הזו תאושר — מהמייל ששלחנו אליכם (תבדקו גם בספאם). אחר כך תחזור/י לטעון את האפליקציה מחדש.",
+  "to": "מישהו הוסיף את {1} לאוסף המתכונים שלהם. זה ייפתח אצלכם ברגע שהכתובת הזו תאושר — מהמייל ששלחנו אליכם (תבדקו גם בספאם). אחר כך תחזרו לטעון את האפליקציה מחדש."
+ },
+ "You are running v{1}.": {
+  "from": "אתה משתמש בגרסה {1}.",
+  "to": "אתם משתמשים בגרסה {1}."
+ },
+ "✅ {1} can now join — the moment they sign in with that address.": {
+  "from": "✅ {1} יכולים להצטרף עכשיו — ברגע שייכנס/תיכנס עם הכתובת הזו.",
+  "to": "✅ {1} יכולים להצטרף עכשיו — ברגע שייכנסו עם הכתובת הזו."
+ },
+ "You confirmed it is you. Delete {1} and the collections you own alone? This cannot be undone.": {
+  "from": "אישרת שזו/ה אתם. למחוק את {1} ואת האוספים שרק אתם הבעלים שלהם? אי אפשר לבטל פעולה זו.",
+  "to": "אישרתם שזה אתם. למחוק את {1} ואת האוספים שרק אתם הבעלים שלהם? אי אפשר לבטל פעולה זו."
+ },
+ "Pantry ranks recipes by what you would need to buy": {
+  "from": "המזווה מדרג מתכונים לפי מה שתצטרך לקנות",
+  "to": "המזווה מדרג מתכונים לפי מה שתצטרכו לקנות"
+ },
+ "🔄 Synced chats — start here": {
+  "from": "🔄 צ'אטים מסונכרנים — התחל/י כאן",
+  "to": "🔄 צ'אטים מסונכרנים — התחילו כאן"
+ },
+ "When a page cannot be fetched by your own server, the import can go through a public relay. Those relays see the address you are importing and choose what text comes back. You are asked each time.": {
+  "from": "כשהשרת שלכם לא מצליח לטעון דף, הייבוא יכול לעבור דרך ממסר ציבורי. הממסרים האלה רואים את הכתובת שאתה מייבא ובוחרים אילו טקסט חוזר. תישאל בכל פעם.",
+  "to": "כשהשרת שלכם לא מצליח לטעון דף, הייבוא יכול לעבור דרך ממסר ציבורי. הממסרים האלה רואים את הכתובת שאתם מייבאים ובוחרים אילו טקסט חוזר. תישאלו בכל פעם."
+ },
+ "Copies a message with a link to the recipe, to paste wherever you like": {
+  "from": "מעתיק הודעה עם קישור למתכון, להדבקה בכל מקום שתרצה",
+  "to": "מעתיק הודעה עם קישור למתכון, להדבקה בכל מקום שתרצו"
+ },
+ "When your Bring! token expires, go to {1} (while logged in) and click the bookmark. Done!": {
+  "from": "כשהאסימון של Bring! שלכם פג תוקף, גש אל {1} (בזמן שאתה מחובר) ולחץ על הסימנייה. זהו!",
+  "to": "כשהאסימון של Bring! שלכם פג תוקף, גשו אל {1} (בזמן שאתם מחוברים) ולחצו על הסימנייה. זהו!"
+ },
+ "A file you hold, independent of the cloud": {
+  "from": "קובץ שנמצא אצלך, בלי תלות בענן",
+  "to": "קובץ שנמצא אצלכם, בלי תלות בענן"
+ },
+ "You have unsaved changes to {1}. What would you like to do?": {
+  "from": "יש לכם שינויים שלא נשמרו ב{1}. מה תרצה לעשות?",
+  "to": "יש לכם שינויים שלא נשמרו ב{1}. מה תרצו לעשות?"
+ },
+ "— this is the whole route, and it needs no GitHub access at all:{2} {3}. WhatsApp → open the group → tap the {4} at the top → scroll down → {5} → {6}.{7} {8}. WhatsApp prepares the file (a few seconds on a big group), then the {9} opens.{10} {11}. Scroll the lower list of actions and tap {12}. Pick somewhere you will find again — {13} is fine — then {14}.{15} {16}. Come back here: {17} above.{18} {19}. The iPhone's file picker opens. The export is usually the top entry under {20}; otherwise tap {21} and go to where you saved it. Tap it.": {
+  "from": "— זה כל התהליך, והוא לא דורש גישה ל-GitHub בכלל:{2} {3}. WhatsApp → פתחו את הקבוצה → הקישו על ה-{4} למעלה → גללו למטה → {5} → {6}.{7} {8}. WhatsApp מכין את הקובץ (כמה שניות בקבוצה גדולה), ואז נפתח ה-{9}.{10} {11}. גללו ברשימת הפעולות התחתונה והקישו על {12}. בחרו מיקום שתמצא שוב — {13} מתאים — ואז {14}.{15} {16}. חזרו לכאן: {17} למעלה.{18} {19}. בורר הקבצים של האייפון נפתח. הייצוא נמצא בדרך כלל בפריט העליון תחת {20}; אחרת הקש על {21} ועבור למקום שבו שמרת. הקישו עליו.",
+  "to": "— זה כל התהליך, והוא לא דורש גישה ל-GitHub בכלל:{2} {3}. WhatsApp → פתחו את הקבוצה → הקישו על ה-{4} למעלה → גללו למטה → {5} → {6}.{7} {8}. WhatsApp מכין את הקובץ (כמה שניות בקבוצה גדולה), ואז נפתח ה-{9}.{10} {11}. גללו ברשימת הפעולות התחתונה והקישו על {12}. בחרו מיקום שתמצאו שוב — {13} מתאים — ואז {14}.{15} {16}. חזרו לכאן: {17} למעלה.{18} {19}. בורר הקבצים של האייפון נפתח. הייצוא נמצא בדרך כלל בפריט העליון תחת {20}; אחרת הקישו על {21} ועברו למקום שבו שמרתם. הקישו עליו."
+ },
+ "The address of a page you are importing, when this app’s own server cannot fetch it. These relays are not ours, and they choose what text comes back — which is why you are asked first. You can change that in ⚙️ → Logging & debugging.": {
+  "from": "הכתובת של דף שאתה מייבא, כשהשרת של האפליקציה עצמו לא מצליח להביא אותו. הרלייז האלה אינם שלנו, והם קובעים איזה טקסט חוזר — ולכן שואלים אתכם קודם. אפשר לשנות זאת ב-⚙️ ← רישום ואיתור תקלות.",
+  "to": "הכתובת של דף שאתם מייבאים, כשהשרת של האפליקציה עצמו לא מצליח להביא אותו. הרלייז האלה אינם שלנו, והם קובעים איזה טקסט חוזר — ולכן שואלים אתכם קודם. אפשר לשנות זאת ב-⚙️ ← רישום ואיתור תקלות."
+ },
+ "only if you have connected them, and only when you send something": {
+  "from": "רק אם חיברת אותם, ורק כשאתה שולח משהו",
+  "to": "רק אם חיברתם אותם, ורק כשאתם שולחים משהו"
+ },
+ "You own {1}, and other people are in {2}. Why this is needed: a collection always has an owner — the one person who can add and remove people, rename it, and decide what happens to it. If your account went while you are its owner, the others would be left with recipes nobody can manage, and no way to invite anyone new. So, either: • Hand {3} over to someone in it (⚙️ → 🏠 My household → 👥 Family Access → 👑 Hand over…). Everything stays, for everyone; they become the owner. • Or delete {4} (same place, 🗑 Delete this household…) — its recipes go, for everyone. Then come back here to delete your account.": {
+  "from": "{1} בבעלותך, ואנשים נוספים נמצאים ב{2}. למה זה נחוץ: לאוסף תמיד יש בעלים — האדם היחיד שיכול להוסיף ולהסיר אנשים, לשנות את השם שלו, ולהחליט מה קורה איתו. אם החשבון שלכם היה נעלם בזמן שאתה הבעלים, האחרים היו נשארים עם מתכונים שאף אחד לא יכול לנהל, ובלי שום דרך להזמין מישהו חדש. אז, אפשר: • להעביר את {3} למישהו שכבר נמצא בו (⚙️ ← 🏠 משק הבית שלי ← 👥 גישה משפחתית ← 👑 העברת בעלות…). הכול נשאר, לכולם; הם הופכים לבעלים. • או למחוק את {4} (באותו מקום, 🗑 מחיקת משק הבית הזה…) — המתכונים שבו נמחקים, לכולם. ואז לחזור לכאן למחוק את החשבון שלכם.",
+  "to": "{1} בבעלותכם, ואנשים נוספים נמצאים ב{2}. למה זה נחוץ: לאוסף תמיד יש בעלים — האדם היחיד שיכול להוסיף ולהסיר אנשים, לשנות את השם שלו, ולהחליט מה קורה איתו. אם החשבון שלכם היה נעלם בזמן שאתם הבעלים, האחרים היו נשארים עם מתכונים שאף אחד לא יכול לנהל, ובלי שום דרך להזמין מישהו חדש. אז, אפשר: • להעביר את {3} למישהו שכבר נמצא בו (⚙️ ← 🏠 משק הבית שלי ← 👥 גישה משפחתית ← 👑 העברת בעלות…). הכול נשאר, לכולם; הם הופכים לבעלים. • או למחוק את {4} (באותו מקום, 🗑 מחיקת משק הבית הזה…) — המתכונים שבו נמחקים, לכולם. ואז לחזור לכאן למחוק את החשבון שלכם."
+ },
+ "Households that asked to link kitchens with yours, the ones yours asked, and what became of each.": {
+  "from": "משקי בית שביקשו לחבר מטבחים עם שלכם, אלה ששלך ביקש מהם, ומה עלה בגורל כל אחד מהם.",
+  "to": "משקי בית שביקשו לחבר מטבחים עם שלכם, אלה ששלכם ביקש מהם, ומה עלה בגורל כל אחד מהם."
+ },
+ "This page could not be fetched by your own server, so the import would go through a public relay service instead. Those relays are not ours. They would see that you are importing from {1}, and they choose what text comes back — so a bad one could return a recipe that is subtly wrong. They cannot run code in the app or reach your saved recipes.": {
+  "from": "השרת שלכם לא הצליח לטעון את העמוד הזה, כך שהייבוא יעבור דרך שירות ממסר ציבורי במקום. הממסרים האלה אינם שלנו. הם יראו שאתה מייבא מ-{1}, והם בוחרים איזה טקסט חוזר — כך שממסר לא תקין עלול להחזיר מתכון שגוי בעדינות. הם לא יכולים להריץ קוד באפליקציה או להגיע למתכונים השמורים שלכם.",
+  "to": "השרת שלכם לא הצליח לטעון את העמוד הזה, כך שהייבוא יעבור דרך שירות ממסר ציבורי במקום. הממסרים האלה אינם שלנו. הם יראו שאתם מייבאים מ-{1}, והם בוחרים איזה טקסט חוזר — כך שממסר לא תקין עלול להחזיר מתכון שגוי בעדינות. הם לא יכולים להריץ קוד באפליקציה או להגיע למתכונים השמורים שלכם."
+ },
+ "only when you search for a photo": {
+  "from": "רק כשאתה מחפש תמונה",
+  "to": "רק כשאתם מחפשים תמונה"
+ },
+ "Every household in this copy: members, AI spending and allowances, links, shares, last use. Only you can open it.": {
+  "from": "כל משק בית בעותק הזה: חברים, הוצאות ומכסות AI, קישורים, שיתופים, שימוש אחרון. רק אתה יכול לפתוח את זה.",
+  "to": "כל משק בית בעותק הזה: חברים, הוצאות ומכסות AI, קישורים, שיתופים, שימוש אחרון. רק אתם יכולים לפתוח את זה."
+ },
+ "Pull down to refresh, or tap {1} below.": {
+  "from": "משוך/י למטה לרענון, או הקישו על {1} למטה.",
+  "to": "משכו למטה לרענון, או הקישו על {1} למטה."
+ },
+ "Search recipes, ingredients…": {
+  "from": "חפש/י מתכונים, מרכיבים…",
+  "to": "חפשו מתכונים, מרכיבים…"
+ },
+ "only when you use an AI feature": {
+  "from": "רק כשאתה משתמש בתכונת AI",
+  "to": "רק כשאתם משתמשים בתכונת AI"
+ },
+ "when you import, search for a photo, use the AI, or send a note": {
+  "from": "כשאתה מייבא, מחפש תמונה, משתמש בבינה המלאכותית, או שולח הערה",
+  "to": "כשאתם מייבאים, מחפשים תמונה, משתמשים בבינה המלאכותית, או שולחים הערה"
+ },
+ "Nobody else is in your household yet. Invite your family — ⚙️ → 🏠 My household → 👥 Family Access → 🔗 Invitation link — and you can write to them here: to everyone at once, or to one person.": {
+  "from": "עדיין אין אף אחד נוסף במשק הבית שלכם. הזמן את המשפחה שלכם — ⚙️ → 🏠 משק הבית שלי → 👥 גישה למשפחה → 🔗 קישור הזמנה — ותוכל לכתוב להם כאן: לכולם יחד, או לאדם אחד.",
+  "to": "עדיין אין אף אחד נוסף במשק הבית שלכם. הזמינו את המשפחה שלכם — ⚙️ → 🏠 משק הבית שלי → 👥 גישה למשפחה → 🔗 קישור הזמנה — ותוכלו לכתוב להם כאן: לכולם יחד, או לאדם אחד."
+ },
+ "You read this kitchen’s recipes": {
+  "from": "אתם קורא/ת את המתכונים של המטבח הזה",
+  "to": "אתם קוראים את המתכונים של המטבח הזה"
+ },
+ "The address you are importing, the words you search photos for, and the AI request above. It holds the API keys so your browser never has to, and stores nothing except a request count used to cap the bill.": {
+  "from": "הכתובת שאתה מייבא, המילים שאתה מחפש לפיהן תמונות, ובקשת ה-AI שלמעלה. הוא שומר את מפתחות ה-API כדי שהדפדפן שלכם לא יצטרך, ולא שומר כלום מלבד מונה בקשות שמשמש להגבלת העלות.",
+  "to": "הכתובת שאתם מייבאים, המילים שאתם מחפשים לפיהן תמונות, ובקשת ה-AI שלמעלה. הוא שומר את מפתחות ה-API כדי שהדפדפן שלכם לא יצטרך, ולא שומר כלום מלבד מונה בקשות שמשמש להגבלת העלות."
+ },
+ "📜 Privacy statement · Invitations to try the App: the address an invitation from the App’s owner goes to, and the invitation itself, passed through our e-mail service to deliver it (we keep only how many were sent each day); and that address as a fingerprint that cannot be turned back into it, so that it may start a kitchen.": {
+  "from": "הזמנות לנסות את האפליקציה: הכתובת שאליה נשלחת הזמנה ממנהל האפליקציה, וההזמנה עצמה, העוברות דרך שירות הדוא״ל שלנו כדי למסור אותה (אנו שומרים רק כמה נשלחו בכל יום); וכן הכתובת הזו כטביעת אצבע שאי אפשר לשחזר ממנה את הכתובת, כדי שתוכל לפתוח מטבח.",
+  "to": "הזמנות לנסות את האפליקציה: הכתובת שאליה נשלחת הזמנה ממנהל האפליקציה, וההזמנה עצמה, העוברות דרך שירות הדוא״ל שלנו כדי למסור אותה (אנו שומרים רק כמה נשלחו בכל יום); וכן הכתובת הזו כטביעת אצבע שאי אפשר לשחזר ממנה את הכתובת, כדי שיוכלו לפתוח מטבח."
+ },
+ "📲 You are running {1}. {2} is ready — tap {3}.": {
+  "from": "📲 אתה משתמש ב-{1}. {2} מוכן — הקישו על {3}.",
+  "to": "📲 אתם משתמשים ב-{1}. {2} מוכן — הקישו על {3}."
+ },
+ "The app is installed, so it is already in your phone’s Share menu. Then, on any recipe post or website, tap Share and pick this app, and the recipe lands here — no copying or pasting.": {
+  "from": "האפליקציה כבר מותקנת, אז היא נמצאת בתפריט השיתוף של הטלפון. אחר כך, בכל פוסט מתכון או אתר, פשוט תלחץ על שיתוף ותבחר באפליקציה הזו, והמתכון ינחת כאן — בלי העתקה והדבקה.",
+  "to": "האפליקציה כבר מותקנת, אז היא נמצאת בתפריט השיתוף של הטלפון. אחר כך, בכל פוסט מתכון או אתר, פשוט לחצו על שיתוף ובחרו באפליקציה הזו, והמתכון ינחת כאן — בלי העתקה והדבקה."
+ },
+ "Bold — the selected words of the ingredient you are in, or its word under the cursor (Ctrl+B)": {
+  "from": "מודגש — המילים המסומנות של הרכיב שבו אתה נמצא, או המילה שבה נמצא הסמן (Ctrl+B)",
+  "to": "מודגש — המילים המסומנות של הרכיב שבו אתם נמצאים, או המילה שבה נמצא הסמן (Ctrl+B)"
+ },
+ "Households that asked to link kitchens with yours, the ones yours asked, and what became of each. The owner or an admin answers them.": {
+  "from": "משקי בית שביקשו לחבר מטבחים עם שלכם, אלה ששלך ביקש מהם, ומה עלה בגורל כל אחד מהם. הבעלים או מנהל עונים להם.",
+  "to": "משקי בית שביקשו לחבר מטבחים עם שלכם, אלה ששלכם ביקש מהם, ומה עלה בגורל כל אחד מהם. הבעלים או מנהל עונים להם."
+ },
+ "Chats stored alongside your recipes, in the same cloud and behind the same sign-in. This is the option that works on {1} device, including a work phone that blocks GitHub, because nothing here touches the repo. Import below and it appears everywhere you are signed in.": {
+  "from": "השיחות נשמרות לצד המתכונים שלכם, באותו ענן ומאחורי אותה התחברות. זו האפשרות שעובדת בכל {1}, כולל טלפון עבודה שחוסם את GitHub, כי שום דבר כאן לא נוגע ב-repo. ייבוא למטה, וזה יופיע בכל מקום שבו אתה מחובר.",
+  "to": "השיחות נשמרות לצד המתכונים שלכם, באותו ענן ומאחורי אותה התחברות. זו האפשרות שעובדת בכל {1}, כולל טלפון עבודה שחוסם את GitHub, כי שום דבר כאן לא נוגע ב-repo. ייבוא למטה, וזה יופיע בכל מקום שבו אתם מחוברים."
+ },
+ "Your recipes stay safe in the cloud and come back when you sign in again.": {
+  "from": "המתכונים שלכם שמורים בענן ויחזרו כשתתחבר/י שוב.",
+  "to": "המתכונים שלכם שמורים בענן ויחזרו כשתתחברו שוב."
+ },
+ "The search words. Not your recipes, and not who you are.": {
+  "from": "מילות החיפוש. לא המתכונים שלכם, ולא מי שאתה.",
+  "to": "מילות החיפוש. לא המתכונים שלכם, ולא מי שאתם."
+ },
+ "Tap a box to tick a line off · tap the line to mark where you are · double-tap to clear": {
+  "from": "הקישו על תיבה כדי לסמן שורה · הקישו על השורה כדי לסמן איפה אתה נמצא · הקשה כפולה כדי לנקות",
+  "to": "הקישו על תיבה כדי לסמן שורה · הקישו על השורה כדי לסמן איפה אתם נמצאים · הקשה כפולה כדי לנקות"
+ },
+ "List the things you always have in — oil, flour, eggs, salt — and this ranks your recipes by how little you'd need to buy.": {
+  "from": "רשום את מה שתמיד יש לכם במטבח — שמן, קמח, ביצים, מלח — והמתכונים שלכם יסודרו לפי כמה מעט תצטרך לקנות.",
+  "to": "רשמו את מה שתמיד יש לכם במטבח — שמן, קמח, ביצים, מלח — והמתכונים שלכם יסודרו לפי כמה מעט תצטרכו לקנות."
+ },
+ "Give it to people you know: with it they can ask to link their kitchen with yours, and see each other’s recipes. It names your household, not you — it shows no e-mail address.": {
+  "from": "תנו אותו לאנשים שאתה מכיר: איתו הם יכולים לבקש לקשר את המטבח שלהם לשלך, ולראות את המתכונים אחד של השני. הוא מציין את שם משק הבית שלכם, לא אתכם - הוא לא מציג כתובת אימייל.",
+  "to": "תנו אותו לאנשים שאתם מכירים: איתו הם יכולים לבקש לקשר את המטבח שלהם לשלכם, ולראות את המתכונים אחד של השני. הוא מציין את שם משק הבית שלכם, לא אתכם - הוא לא מציג כתובת אימייל."
+ },
+ "You will no longer see its recipes. Someone in it can invite you back.": {
+  "from": "לא תראה יותר את המתכונים שלו. מישהו בקבוצה יכול להזמין אתכם חזרה.",
+  "to": "לא תראו יותר את המתכונים שלו. מישהו בקבוצה יכול להזמין אתכם חזרה."
+ },
+ "Sends the e-mails the app sends for its members: 📤 Share → ✉️ Email → 📨 Send, and 📨 Send to another kitchen → ✉️ Via Email. They come from “the kitchen’s name via My Kitchen Notes” at the community domain, and replies go to the member who sent them. The free plan sends {1} a day and {2} a month (e-mails received count too); the app sends at most {3} a day, {4} for each person. You are warned at {5}%, when a quota runs out, and whenever Resend refuses or does not answer (📲 Phone alerts → Recipe e-mails); 🩺 Server allowances shows the counts. The key is the GitHub secret {6} — after changing it, re-run “Deploy the Worker”.": {
+  "from": "שולח את המיילים שהאפליקציה שולחת לחברים שלה: 📤 שיתוף ← ✉️ אימייל ← 📨 שליחה, ו-📨 שליחה למטבח אחר ← ✉️ באימייל. הם מגיעים מ\"שם המטבח דרך My Kitchen Notes\" מהדומיין של הקהילה, ותשובות חוזרות לחבר ששלח אותם. התוכנית החינמית שולחת {1} ביום ו-{2} בחודש (גם מיילים שמתקבלים נספרים); האפליקציה שולחת לכל היותר {3} ביום, {4} לכל אדם. תקבל אזהרה ב-{5}%, כשמכסה נגמרת, ובכל פעם ש-Resend מסרב או לא עונה (📲 התראות טלפון ← מיילי מתכונים); 🩺 מכסות שרת מציג את הספירות. המפתח הוא הסוד ב-GitHub {6} — אחרי שמשנים אותו, יש להריץ מחדש את \"פריסת ה-Worker\".",
+  "to": "שולח את המיילים שהאפליקציה שולחת לחברים שלה: 📤 שיתוף ← ✉️ אימייל ← 📨 שליחה, ו-📨 שליחה למטבח אחר ← ✉️ באימייל. הם מגיעים מ\"שם המטבח דרך My Kitchen Notes\" מהדומיין של הקהילה, ותשובות חוזרות לחבר ששלח אותם. התוכנית החינמית שולחת {1} ביום ו-{2} בחודש (גם מיילים שמתקבלים נספרים); האפליקציה שולחת לכל היותר {3} ביום, {4} לכל אדם. תקבלו אזהרה ב-{5}%, כשמכסה נגמרת, ובכל פעם ש-Resend מסרב או לא עונה (📲 התראות טלפון ← מיילי מתכונים); 🩺 מכסות שרת מציג את הספירות. המפתח הוא הסוד ב-GitHub {6} — אחרי שמשנים אותו, יש להריץ מחדש את \"פריסת ה-Worker\"."
+ },
+ "⚠️ You are offline — the update needs a connection. Try again when you are back online.": {
+  "from": "⚠️ אין חיבור לאינטרנט — העדכון דורש חיבור. נסו שוב כשתחזור להיות מקוון.",
+  "to": "⚠️ אין חיבור לאינטרנט — העדכון דורש חיבור. נסו שוב כשתחזרו להיות מקוונים."
+ },
+ "You": {
+  "from": "אתה",
+  "to": "אתם"
+ },
+ "You can undo this straight afterwards.": {
+  "from": "תוכל לבטל את זה מיד לאחר מכן.",
+  "to": "תוכלו לבטל את זה מיד לאחר מכן."
+ },
+ "Pick the backup file. Nothing changes yet — once it is open you can choose whether to replace everything or only add back the recipes that are missing.": {
+  "from": "בחרו את קובץ הגיבוי. כלום לא משתנה עדיין — אחרי שהוא נפתח תוכל לבחור אם להחליף הכול או רק להוסיף בחזרה את המתכונים החסרים.",
+  "to": "בחרו את קובץ הגיבוי. כלום לא משתנה עדיין — אחרי שהוא נפתח תוכלו לבחור אם להחליף הכול או רק להוסיף בחזרה את המתכונים החסרים."
+ },
+ "Your household's identifier: give it to people you know so they can link their kitchen with yours. It shows no e-mail address.": {
+  "from": "מזהה משק הבית שלכם: תנו אותו לאנשים שאתה מכיר כדי שיוכלו לחבר את המטבח שלהם לשלך. הוא לא מציג כתובת אימייל.",
+  "to": "מזהה משק הבית שלכם: תנו אותו לאנשים שאתם מכירים כדי שיוכלו לחבר את המטבח שלהם לשלכם. הוא לא מציג כתובת אימייל."
+ },
+ "What should the collection be called?": {
+  "from": "איך תרצה לקרוא לאוסף?",
+  "to": "איך תרצו לקרוא לאוסף?"
+ },
+ "only when you ask for an invitation for someone else": {
+  "from": "רק כשאתה מבקש הזמנה עבור מישהו אחר",
+  "to": "רק כשאתם מבקשים הזמנה עבור מישהו אחר"
+ },
+ "You own {1}, and other people are in {2}. Hand {3} over to one of them (Family Access → 👑 Hand over…), or delete {4}, and then delete your account.": {
+  "from": "אתם הבעלים של {1}, ואנשים נוספים נמצאים ב-{2}. העבר/י את הבעלות על {3} לאחד מהם (ניהול משק בית ← 👑 העברת בעלות…), או מחקו את {4}, ולאחר מכן מחקו את החשבון שלכם.",
+  "to": "אתם הבעלים של {1}, ואנשים נוספים נמצאים ב-{2}. העבירו את הבעלות על {3} לאחד מהם (ניהול משק בית ← 👑 העברת בעלות…), או מחקו את {4}, ולאחר מכן מחקו את החשבון שלכם."
+ },
+ "When a page cannot be fetched by your own server, the import can go through a public relay. Those relays see the address you are importing and choose what text comes back. They are used without asking (the app tries everything before bothering you) — untick this to be asked each time.": {
+  "from": "כשאי אפשר לטעון דף דרך השרת שלנו, היבוא יכול לעבור דרך ממסר ציבורי. הממסרים האלה רואים את הכתובת שאתם מייבא/ת ובוחרים איזה טקסט חוזר אליכם. הם בשימוש בלי לשאול (האפליקציה מנסה הכל לפני שהיא פונה אליכם) — בטלו סימון זה כדי להישאל בכל פעם.",
+  "to": "כשאי אפשר לטעון דף דרך השרת שלנו, היבוא יכול לעבור דרך ממסר ציבורי. הממסרים האלה רואים את הכתובת שאתם מייבאים ובוחרים איזה טקסט חוזר אליכם. הם בשימוש בלי לשאול (האפליקציה מנסה הכל לפני שהיא פונה אליכם) — בטלו סימון זה כדי להישאל בכל פעם."
+ },
+ "Your version is kept in 🕘 Version history below, so you can compare and restore it.": {
+  "from": "הגרסה שלכם נשמרת ב-🕘 היסטוריית גרסאות למטה, כדי שתוכל להשוות ולשחזר אותה.",
+  "to": "הגרסה שלכם נשמרת ב-🕘 היסטוריית גרסאות למטה, כדי שתוכלו להשוות ולשחזר אותה."
+ },
+ "{1} You can undo this straight afterwards.": {
+  "from": "{1} תוכל לבטל זאת מיד לאחר מכן.",
+  "to": "{1} תוכלו לבטל זאת מיד לאחר מכן."
+ },
+ "Your e-mail address, so the app knows who you are. Nothing else.": {
+  "from": "כתובת המייל שלכם, כדי שהאפליקציה תדע מי אתה. שום דבר מעבר לזה.",
+  "to": "כתובת המייל שלכם, כדי שהאפליקציה תדע מי אתם. שום דבר מעבר לזה."
+ },
+ "This replaces \"{1}\" on this device with the copy in the cloud. Your current version is kept — it goes into this recipe’s 🕘 Version history, so you can compare the two and restore yours if you prefer.": {
+  "from": "זה מחליף את \"{1}\" במכשיר הזה בעותק מהעננן. הגרסה הנוכחית שלכם נשמרת — היא עוברת ל-🕘 היסטוריית הגרסאות של המתכון, כך שתוכל להשוות בין השתיים ולשחזר את שלכם אם תרצה.",
+  "to": "זה מחליף את \"{1}\" במכשיר הזה בעותק מהעננן. הגרסה הנוכחית שלכם נשמרת — היא עוברת ל-🕘 היסטוריית הגרסאות של המתכון, כך שתוכלו להשוות בין השתיים ולשחזר את שלכם אם תרצו."
+ },
+ "This cannot be taken back by you — only the new owner could hand it back.": {
+  "from": "אתם לא יכולים לבטל את זה — רק הבעלים החדש/ה יכולים להחזיר את זה.",
+  "to": "אתם לא יכולים לבטל את זה — רק הבעלים החדשים יכולים להחזיר את זה."
+ },
+ "YouTube Data API — fetches video descriptions when you import a recipe from a YouTube URL": {
+  "from": "YouTube Data API — שולף תיאורי סרטונים כשאתה מייבא מתכון מכתובת YouTube",
+  "to": "YouTube Data API — שולף תיאורי סרטונים כשאתם מייבאים מתכון מכתובת YouTube"
+ },
+ "The address of the page you are importing — nothing about you.": {
+  "from": "הכתובת של הדף שאתה מייבא — שום דבר עליכם.",
+  "to": "הכתובת של הדף שאתם מייבאים — שום דבר עליכם."
+ },
+ "The report is plain text: the findings above plus every event. Nobody but you can read this log — it never leaves the device on its own — so paste it into the chat if you want it looked at.": {
+  "from": "הדוח הוא טקסט פשוט: הממצאים שלמעלה בתוספת כל אירוע. אף אחד מלבדך לא יכול לקרוא את היומן הזה — הוא לעולם לא יוצא מהמכשיר מעצמו — אז אם תרצה שיבדקו אותו, הדבק אותו בצ'אט.",
+  "to": "הדוח הוא טקסט פשוט: הממצאים שלמעלה בתוספת כל אירוע. אף אחד מלבדכם לא יכול לקרוא את היומן הזה — הוא לעולם לא יוצא מהמכשיר מעצמו — אז אם תרצו שיבדקו אותו, הדביקו אותו בצ'אט."
+ },
+ "🔒 Your recipes are kept in the app’s cloud database, seen only by your household and the households you choose to link with. {1}.{2} By signing in you agree to the {3} and the {4}.": {
+  "from": "🔒 המתכונים שלכם נשמרים בענן של האפליקציה, ונראים רק על ידי משק הבית שלכם ומשקי הבית שבחרת להתחבר אליהם. {1}.{2} בהתחברות אתה מסכים ל-{3} ול-{4}.",
+  "to": "🔒 המתכונים שלכם נשמרים בענן של האפליקציה, ונראים רק על ידי משק הבית שלכם ומשקי הבית שבחרתם להתחבר אליהם. {1}.{2} בהתחברות אתם מסכימים ל-{3} ול-{4}."
+ },
+ "✏️ Your changes that are not shared yet are back — press 💾 Save to share them.": {
+  "from": "✏️ השינויים שלכם שעדיין לא שותפו חזרו — לחצ/י 💾 שמירה כדי לשתף אותם.",
+  "to": "✏️ השינויים שלכם שעדיין לא שותפו חזרו — לחצו 💾 שמירה כדי לשתף אותם."
+ },
+ "Open link in Safari or Chrome → tap Share → \"Add to Home Screen\"{2} {3} Open link in Chrome → tap menu → \"Add to Home Screen\"{4} {5} Open link in Chrome → click ⊕ in address bar": {
+  "from": "פתחו קישור ב-Safari או Chrome ← הקש על שיתוף ← \"הוספה למסך הבית\"{2} {3} פתחו קישור ב-Chrome ← הקש על התפריט ← \"הוספה למסך הבית\"{4} {5} פתחו קישור ב-Chrome ← לחץ על ⊕ בשורת הכתובת",
+  "to": "פתחו קישור ב-Safari או Chrome ← הקישו על שיתוף ← \"הוספה למסך הבית\"{2} {3} פתחו קישור ב-Chrome ← הקישו על התפריט ← \"הוספה למסך הבית\"{4} {5} פתחו קישור ב-Chrome ← לחצו על ⊕ בשורת הכתובת"
+ },
+ "Select tests to run, then click Execute.": {
+  "from": "בחרו בדיקות להרצה, ואז לחצו על הפעל.",
+  "to": "בחרו בדיקות להרצה, ואז לחצו על ▶ הפעילו נבחרים."
+ },
+ "Make this line — or every selected line — a sub-title (no step number)": {
+  "from": "הפוך את השורה הזו — או כל שורה מסומנת — לכותרת משנה (ללא מספר שלב)",
+  "to": "הפכו את השורה הזו — או כל שורה מסומנת — לכותרת משנה (ללא מספר שלב)"
+ },
+ "{1}↻ Release to refresh{2}↓ Pull to refresh": {
+  "from": "{1}↻ שחררו לרענון{2}↓ משוך לרענון",
+  "to": "{1}↻ שחררו לרענון{2}↓ משכו לרענון"
+ },
+ "URL or 'AI generated' or leave blank": {
+  "from": "כתובת URL או 'נוצר בבינה מלאכותית' או השאר ריק",
+  "to": "כתובת URL או 'נוצר בבינה מלאכותית' או השאירו ריק"
+ },
+ "If the regular file picker shows permission errors, drag the file directly from your file manager (Nautilus, Dolphin, etc.) into the box above.": {
+  "from": "אם בוחר הקבצים הרגיל מציג שגיאות הרשאה, גרור את הקובץ ישירות ממנהל הקבצים שלכם (Nautilus, Dolphin וכד') אל התיבה שלמעלה.",
+  "to": "אם בוחר הקבצים הרגיל מציג שגיאות הרשאה, גררו את הקובץ ישירות ממנהל הקבצים שלכם (Nautilus, Dolphin וכד') אל התיבה שלמעלה."
+ },
+ "Two devices added different recipes while offline and both were given the same number. Nothing was lost — the numbers were changed so both survive: {1} If a recipe is showing the wrong photo, open it and set the photo again: photos are stored against the number, so the one that moved may still be holding the other recipe's picture.": {
+  "from": "שני מכשירים הוסיפו מתכונים שונים במצב לא מקוון, ולשניהם הוקצה אותו המספר. שום דבר לא אבד — המספרים שונו כך ששניהם נשמרו: {1} אם מתכון מציג תמונה לא נכונה, פתח אותו והגדר מחדש את התמונה: התמונות נשמרות לפי מספר, כך שייתכן שהמתכון שהוזז עדיין מחזיק את תמונת המתכון האחר.",
+  "to": "שני מכשירים הוסיפו מתכונים שונים במצב לא מקוון, ולשניהם הוקצה אותו המספר. שום דבר לא אבד — המספרים שונו כך ששניהם נשמרו: {1} אם מתכון מציג תמונה לא נכונה, פתחו אותו והגדירו מחדש את התמונה: התמונות נשמרות לפי מספר, כך שייתכן שהמתכון שהוזז עדיין מחזיק את תמונת המתכון האחר."
+ },
+ "Forget the saved list and read the chats from scratch next time": {
+  "from": "שכח את הרשימה השמורה וקרא את הצ'אטים מחדש בפעם הבאה",
+  "to": "שכחו את הרשימה השמורה וקראו את הצ'אטים מחדש בפעם הבאה"
+ },
+ "Run applyAriaLabels() after render/init so icon-only buttons get accessible names, keep aria-label on #searchInput and aria-live on #toast, and keep the Escape handler (closeTopModal).": {
+  "from": "הרץ את applyAriaLabels() אחרי render/init כדי שכפתורים עם אייקון בלבד יקבלו שמות נגישים, שמור על aria-label ב-#searchInput ועל aria-live ב-#toast, ושמור על ה-handler של Escape (closeTopModal).",
+  "to": "הריצו את applyAriaLabels() אחרי render/init כדי שכפתורים עם אייקון בלבד יקבלו שמות נגישים, שמרו על aria-label ב-#searchInput ועל aria-live ב-#toast, ושמרו על ה-handler של Escape (closeTopModal)."
+ },
+ "⚠️ Printing was blocked by your browser. Allow pop-ups for this site, then try again.": {
+  "from": "⚠️ הדפדפן חסם את ההדפסה. אפשר חלונות קופצים לאתר הזה ונסה שוב.",
+  "to": "⚠️ הדפדפן חסם את ההדפסה. אפשרו חלונות קופצים לאתר הזה ונסו שוב."
+ },
+ "Family members sign in with their own Google account at the same URL: {2}{3}{4} All accounts read and write to the {5} — changes sync in real-time across everyone's devices, just like your PC↔iPhone sync today.{6}{7} After adding members below, tap {8}, copy the rules, and paste them into Firebase Console to activate access. {9} — the member list here is only half of it.": {
+  "from": "בני המשפחה נכנסים עם חשבון Google משלהם לאותה כתובת: {2}{3}{4} כל החשבונות קוראים וכותבים אל {5} — השינויים מסתנכרנים בזמן אמת בין כל המכשירים, בדיוק כמו הסנכרון בין המחשב לאייפון שלכם היום.{6}{7} אחרי הוספת חברים למטה, הקש על {8}, העתק את הכללים והדבק אותם ב-Firebase Console כדי להפעיל את הגישה. {9} — רשימת החברים כאן היא רק חצי מהעבודה.",
+  "to": "בני המשפחה נכנסים עם חשבון Google משלהם לאותה כתובת: {2}{3}{4} כל החשבונות קוראים וכותבים אל {5} — השינויים מסתנכרנים בזמן אמת בין כל המכשירים, בדיוק כמו הסנכרון בין המחשב לאייפון שלכם היום.{6}{7} אחרי הוספת חברים למטה, הקישו על {8}, העתיקו את הכללים והדביקו אותם ב-Firebase Console כדי להפעיל את הגישה. {9} — רשימת החברים כאן היא רק חצי מהעבודה."
+ },
+ "❌ The confirmation e-mail could not be sent. Try later from ⚙️ → ✉️ Confirm my e-mail address.": {
+  "from": "❌ לא הצלחנו לשלוח את מייל האישור. נסו שוב מאוחר יותר דרך ⚙️ ← ✉️ אשר את כתובת האימייל שלי.",
+  "to": "❌ לא הצלחנו לשלוח את מייל האישור. נסו שוב מאוחר יותר דרך ⚙️ ← ✉️ אישור כתובת האימייל שלי."
+ },
+ "Make this a recipe of its own": {
+  "from": "הפוך את זה למתכון עצמאי",
+  "to": "הפכו את זה למתכון עצמאי"
+ },
+ "↓ Pull to refresh": {
+  "from": "↓ משוך לרענון",
+  "to": "↓ משכו לרענון"
+ },
+ "Preview of your email — press Send Email to send it from your Gmail": {
+  "from": "תצוגה מקדימה של האימייל שלכם — לחצו על שלח אימייל כדי לשלוח אותו מ-Gmail",
+  "to": "תצוגה מקדימה של האימייל שלכם — לחצו על 📧 שלחו אימייל כדי לשלוח אותו מ-Gmail"
+ },
+ "Make this line a sub-title (no step number)": {
+  "from": "הפוך שורה זו לכותרת משנה (בלי מספר שלב)",
+  "to": "הפכו שורה זו לכותרת משנה (בלי מספר שלב)"
+ },
+ "Working offline — tap Sign in above to sync across devices": {
+  "from": "עובד במצב לא מקוון — הקישו התחבר מעל כדי לסנכרן בין מכשירים",
+  "to": "עובד במצב לא מקוון — הקישו על התחברות למעלה כדי לסנכרן בין מכשירים"
+ },
+ "In Chrome: Bookmarks menu → Add page → paste the code as the URL.{1}Name it \"Refresh Bring! Token\".": {
+  "from": "ב-Chrome: תפריט סימניות ← הוסף דף ← הדבק את הקוד בתור הכתובת.{1}קראו לזה \"Refresh Bring! Token\".",
+  "to": "ב-Chrome: תפריט סימניות ← הוסף דף ← הדביקו את הקוד בתור הכתובת.{1}קראו לזה \"Refresh Bring! Token\"."
+ },
+ "🤖 Parse & Import Recipe": {
+  "from": "🤖 נתח וייבא מתכון",
+  "to": "🤖 נתחו וייבאו מתכון"
+ },
+ "To approve a single suggestion, mouse over it and click on suggestion": {
+  "from": "כדי לאשר הצעה בודדת, העבר את העכבר מעליה ולחץ עליה",
+  "to": "כדי לאשר הצעה בודדת, העבירו את העכבר מעליה ולחצו עליה"
+ },
+ "⚙️ Settings → ☁️ Send my photos to the cloud, which lists the differences and pushes the local ones up.": {
+  "from": "⚙️ הגדרות ← ☁️ שלח את התמונות שלי לענן, שמציג את ההבדלים ומעלה את הקבצים המקומיים",
+  "to": "⚙️ הגדרות ← ☁️ שלחו את התמונות שלי לענן, שמציג את ההבדלים ומעלה את הקבצים המקומיים"
+ },
+ "What you copied last is the Facebook bookmark’s code — it belongs in a bookmark, not here. To import the reel: in Facebook tap “See more” under it, select the text and copy it, then press 📋 Paste what I copied again.": {
+  "from": "מה שהעתקתם לאחרונה הוא הקוד של הסימנייה מפייסבוק — הוא שייך בתוך סימנייה, לא כאן. כדי לייבא את הרילס: בפייסבוק הקישו על “הציגו עוד” מתחתיו, סמנו את הטקסט והעתיקו אותו, ואז הקישו שוב על 📋 הדבק את מה שהעתקתי.",
+  "to": "מה שהעתקתם לאחרונה הוא הקוד של הסימנייה מפייסבוק — הוא שייך בתוך סימנייה, לא כאן. כדי לייבא את הרילס: בפייסבוק הקישו על “הציגו עוד” מתחתיו, סמנו את הטקסט והעתיקו אותו, ואז הקישו שוב על 📋 הדביקו את מה שהעתקתי."
+ },
+ "IndexedDB read/write failed. Storage may be full or blocked. Check DevTools → Application → IndexedDB → tonys_recipes_db, and free device storage.": {
+  "from": "קריאה/כתיבה ל-IndexedDB נכשלה. אולי האחסון מלא או חסום. בדקו ב-DevTools ← Application ← IndexedDB ← tonys_recipes_db, ופנה מקום אחסון במכשיר.",
+  "to": "קריאה/כתיבה ל-IndexedDB נכשלה. אולי האחסון מלא או חסום. בדקו ב-DevTools ← Application ← IndexedDB ← tonys_recipes_db, ופנו מקום אחסון במכשיר."
+ },
+ "{1} recipe{2} will move into {3}, and will no longer appear on their own in the list. Favourites and cooking history come along. {4} Each one can be lifted back out later with “⤴ Make its own”.": {
+  "from": "{1} מתכון{2} יעברו אל {3} ולא יופיעו יותר בנפרד ברשימה. המועדפים והיסטוריית הבישול יעברו איתם. {4} כל אחד מהם אפשר להוציא בחזרה מאוחר יותר באמצעות \"⤴ הפוך למתכון נפרד\".",
+  "to": "{1} מתכון{2} יעברו אל {3} ולא יופיעו יותר בנפרד ברשימה. המועדפים והיסטוריית הבישול יעברו איתם. {4} כל אחד מהם אפשר להוציא בחזרה מאוחר יותר באמצעות \"⤴ הפרדה כעצמאי\"."
+ },
+ "↻ Take the other device’s version": {
+  "from": "↻ קח את הגרסה מהמכשיר האחר",
+  "to": "↻ קחו את הגרסה מהמכשיר האחר"
+ },
+ "{1}steps{2}Tap the words in the Method first, then B{3}Tap the ingredient first, then B": {
+  "from": "{1}שלבים{2}קודם הקש על המילים בהוראות ההכנה, ואז B{3}קודם הקש על הרכיב, ואז B",
+  "to": "{1}שלבים{2}קודם הקישו על המילים בהוראות ההכנה, ואז B{3}קודם הקישו על הרכיב, ואז B"
+ },
+ "This device holds {1} recipe{2} saved here before you signed in — perhaps by someone else who used this browser. Add {3} to “{4}”?": {
+  "from": "במכשיר הזה יש {1} מתכון{2} שנשמרו כאן לפני שהתחברת — אולי על ידי מישהו אחר שהשתמש בדפדפן הזה. להוסיף את {3} אל \"{4}\"?",
+  "to": "במכשיר הזה יש {1} מתכון{2} שנשמרו כאן לפני שהתחברתם — אולי על ידי מישהו אחר שהשתמש בדפדפן הזה. להוסיף את {3} אל \"{4}\"?"
+ },
+ "Preview of your email — click Open Gmail to send": {
+  "from": "תצוגה מקדימה של המייל שלכם — לחצו על פתח Gmail כדי לשלוח",
+  "to": "תצוגה מקדימה של המייל שלכם — לחצו על פתחו Gmail כדי לשלוח"
+ },
+ "WhatsApp hands you a {2} named {3} or similar, not a {4} — that is correct, and this app opens it itself. Do not unzip it on the phone. And leave {5} ticked, or the chat stays on the phone and never reaches your other devices.": {
+  "from": "WhatsApp מעביר לכם {2} בשם {3} או דומה, לא {4} — וזה תקין, האפליקציה פותחת אותו בעצמה. אל תחלץ אותו בטלפון. והשאר את {5} מסומן, אחרת הצ'אט יישאר בטלפון ולא יגיע למכשירים האחרים שלכם.",
+  "to": "WhatsApp מעביר לכם {2} בשם {3} או דומה, לא {4} — וזה תקין, האפליקציה פותחת אותו בעצמה. אל תחלצו אותו בטלפון. והשאירו את {5} מסומן, אחרת הצ'אט יישאר בטלפון ולא יגיע למכשירים האחרים שלכם."
+ },
+ "DOC_TOO_BIG: A cloud item exceeded Firestore's ~1 MB limit. Photos are now stored separately, so this most likely means a single recipe's text (notes/steps) is unusually large. Details: {1} Retrying will NOT fix this — trim the recipe and save again.": {
+  "from": "DOC_TOO_BIG: פריט בענן חרג ממגבלת ה-1MB~ של Firestore. תמונות נשמרות כעת בנפרד, אז כנראה שמדובר בטקסט של מתכון בודד (הערות/שלבים) שגדול באופן חריג. פרטים: {1} ניסיון חוזר לא יפתור את זה — קצר את המתכון ושמור שוב.",
+  "to": "DOC_TOO_BIG: פריט בענן חרג ממגבלת ה-1MB~ של Firestore. תמונות נשמרות כעת בנפרד, אז כנראה שמדובר בטקסט של מתכון בודד (הערות/שלבים) שגדול באופן חריג. פרטים: {1} ניסיון חוזר לא יפתור את זה — קצרו את המתכון ושמרו שוב."
+ },
+ "Turn each into its own recipe": {
+  "from": "הפוך כל אחד למתכון נפרד",
+  "to": "הפכו כל אחד למתכון נפרד"
+ },
+ "Within about ten minutes every copy of the app will serve the current translations as its own files (the check runs every ten minutes; it can take a little longer when GitHub is busy). Last published: {1} On a computer you can publish them at once: on GitHub, press “Run workflow”.": {
+  "from": "תוך כעשר דקות כל עותק של האפליקציה יציג את התרגומים העדכניים כקבצים משלו (הבדיקה רצה כל עשר דקות; זה יכול לקחת קצת יותר זמן כש-GitHub עסוק). פורסם לאחרונה: {1} במחשב אפשר לפרסם אותם מיד: ב-GitHub, לחץ על \"Run workflow\".",
+  "to": "תוך כעשר דקות כל עותק של האפליקציה יציג את התרגומים העדכניים כקבצים משלו (הבדיקה רצה כל עשר דקות; זה יכול לקחת קצת יותר זמן כש-GitHub עסוק). פורסם לאחרונה: {1} במחשב אפשר לפרסם אותם מיד: ב-GitHub, לחצו על \"Run workflow\"."
+ },
+ "🔍 Search web for photo": {
+  "from": "🔍 חפש תמונה באינטרנט",
+  "to": "🔍 חפשו תמונה באינטרנט"
+ },
+ "Open the recipe. The red banner at the top has \"↻ Take the other device’s version\", which fetches that one recipe on its own — your copy is kept in its 🕘 Version history so you can compare and restore it.": {
+  "from": "פתחו את המתכון. בבאנר האדום למעלה יש כפתור \"↻ קח את הגרסה של המכשיר השני\", שמביא את המתכון הזה בלבד — העותק שלכם נשמר ב🕘 היסטוריית הגרסאות שלכם כדי שתוכלו להשוות ולשחזר אותו.",
+  "to": "פתחו את המתכון. בבאנר האדום למעלה יש כפתור \"↻ קחו את הגרסה של המכשיר השני\", שמביא את המתכון הזה בלבד — העותק שלכם נשמר ב🕘 היסטוריית הגרסאות שלכם כדי שתוכלו להשוות ולשחזר אותו."
+ },
+ "{1}Add them{2}Create it": {
+  "from": "{1}הוסיפו אותם{2}צור אותו",
+  "to": "{1}הוסיפו אותם{2}צרו אותו"
+ },
+ "Choose the sound, and hear each one.": {
+  "from": "בחרו צליל, ושמע כל אחד מהם.",
+  "to": "בחרו צליל, ושמעו כל אחד מהם."
+ },
+ "Hand {1} over first": {
+  "from": "העבר קודם את {1}",
+  "to": "העבירו קודם את {1}"
+ },
+ "The backup was restored on this device, but it could NOT be sent to the cloud: {1} Your other devices still hold the old collection. Fix the connection and use ⚙️ → Sync now, or they will overwrite this device on their next sync.": {
+  "from": "הגיבוי שוחזר במכשיר הזה, אבל לא ניתן היה לשלוח אותו לענן: {1} המכשירים האחרים שלכם עדיין מחזיקים את האוסף הישן. תקן את החיבור והשתמש ב-⚙️ ← סנכרן עכשיו, אחרת הם ידרסו את המכשיר הזה בסנכרון הבא שלהם.",
+  "to": "הגיבוי שוחזר במכשיר הזה, אבל לא ניתן היה לשלוח אותו לענן: {1} המכשירים האחרים שלכם עדיין מחזיקים את האוסף הישן. תקנו את החיבור והשתמשו ב-⚙️ ← סנכרן עכשיו, אחרת הם ידרסו את המכשיר הזה בסנכרון הבא שלהם."
+ },
+ "Extra photo source for “Search web for photo” (via the See more button). {1} requests/hour, {2}/month free.": {
+  "from": "מקור תמונות נוסף עבור \"חפש תמונה באינטרנט\" (בכפתור \"עוד\"). {1} בקשות בשעה, {2} בחודש בחינם.",
+  "to": "מקור תמונות נוסף עבור \"חפשו תמונה באינטרנט\" (בכפתור \"עוד\"). {1} בקשות בשעה, {2} בחודש בחינם."
+ },
+ "Deletes your account, and the households you own alone with all their recipes. Cannot be undone. A household shared with others must be handed over first.": {
+  "from": "מוחק את החשבון שלכם, ואת משקי הבית שבבעלותך לבד עם כל המתכונים שלהם. לא ניתן לבטל. משק בית ששותף עם אחרים צריך קודם להימסר הלאה.",
+  "to": "מוחק את החשבון שלכם, ואת משקי הבית שבבעלותכם לבד עם כל המתכונים שלהם. לא ניתן לבטל. משק בית ששותף עם אחרים צריך קודם להימסר הלאה."
+ },
+ "acts on the line your cursor is in, or on every line you select · {1} or Ctrl+B: **bold** here is bold in the recipe": {
+  "from": "פועל על השורה שבה נמצא הסמן, או על כל השורות שסימנת · {1} או Ctrl+B: ‎**מודגש**‎ כאן יהיה מודגש במתכון",
+  "to": "פועל על השורה שבה נמצא הסמן, או על כל השורות שסימנתם · {1} או Ctrl+B: ‎**מודגש**‎ כאן יהיה מודגש במתכון"
+ },
+ "You wrote:": {
+  "from": "כתבת:",
+  "to": "כתבתם:"
+ },
+ "To Bring!: an ingredient list you chose to send (kept on this app’s server for {1} minutes, for Bring! to read). Or straight onto the household’s Bring! list. To Gmail: a recipe you chose to email, to the address you typed.": {
+  "from": "אל Bring!: רשימת מצרכים שבחרת לשלוח (נשמרת בשרת של האפליקציה למשך {1} דקות, כדי ש-Bring! יוכל לקרוא אותה). או ישירות לרשימת ה-Bring! של משק הבית. אל Gmail: מתכון שבחרת לשלוח במייל, לכתובת שהקלדת.",
+  "to": "אל Bring!: רשימת מצרכים שבחרתם לשלוח (נשמרת בשרת של האפליקציה למשך {1} דקות, כדי ש-Bring! יוכל לקרוא אותה). או ישירות לרשימת ה-Bring! של משק הבית. אל Gmail: מתכון שבחרתם לשלוח במייל, לכתובת שהקלדתם."
+ },
+ "You wrote on {1}:": {
+  "from": "כתבת ב-{1}:",
+  "to": "כתבתם ב-{1}:"
+ },
+ "Your household’s recipes are there for you to read and cook from; adding and changing them is for its owner and the people with Read + Write. What you changed is kept on this device only, not in the household’s recipes.{1}": {
+  "from": "מתכוני משק הבית כאן כדי שתוכלו לקרוא ולבשל מהם; הוספה ושינוי שלהם שמורים לבעל/ת הבית ולאנשים עם הרשאת קריאה וכתיבה. מה ששינית נשמר רק במכשיר הזה, לא במתכוני משק הבית.{1}",
+  "to": "מתכוני משק הבית כאן כדי שתוכלו לקרוא ולבשל מהם; הוספה ושינוי שלהם שמורים לבעל/ת הבית ולאנשים עם הרשאת קריאה וכתיבה. מה ששיניתם נשמר רק במכשיר הזה, לא במתכוני משק הבית.{1}"
+ },
+ "To Bring!: the ingredients you chose to send. To Gmail: a recipe you chose to e-mail, to the address you typed.": {
+  "from": "ל-Bring!: המצרכים שבחרת לשלוח. ל-Gmail: מתכון שבחרת לשלוח במייל, לכתובת שהקלדת.",
+  "to": "ל-Bring!: המצרכים שבחרתם לשלוח. ל-Gmail: מתכון שבחרתם לשלוח במייל, לכתובת שהקלדתם."
+ },
+ "To Bring!: an ingredient list you chose to send. To Gmail: a recipe you chose to email, to the address you typed.": {
+  "from": "ל-Bring!: רשימת מצרכים שבחרת לשלוח. ל-Gmail: מתכון שבחרת לשלוח במייל, לכתובת שהקלדת.",
+  "to": "ל-Bring!: רשימת מצרכים שבחרתם לשלוח. ל-Gmail: מתכון שבחרתם לשלוח במייל, לכתובת שהקלדתם."
+ },
+ "The request you sent stays — ⚙️ → 🏠 My household → 📬 Link requests to withdraw it.": {
+  "from": "הבקשה ששלחת נשארת — ⚙️ ← 🏠 משק הבית שלי ← 📬 בקשות קישור כדי למשוך אותה.",
+  "to": "הבקשה ששלחתם נשארת — ⚙️ ← 🏠 משק הבית שלי ← 📬 בקשות קישור כדי למשוך אותה."
+ },
+ "only after you agree, each time": {
+  "from": "רק לאחר שתאשר/י, בכל פעם",
+  "to": "רק לאחר שתאשרו, בכל פעם"
+ },
+ "Your household’s recipes and photos, and who is in it, and the WhatsApp chats you chose to connect, so every device of yours and of your family has them. Only the people in your household can read them.": {
+  "from": "המתכונים והתמונות של משק הבית שלכם, מי נמצא בו, ושיחות הוואטסאפ שבחרת לחבר, כך שבכל המכשירים שלכם ושל המשפחה שלכם הם יהיו זמינים. רק האנשים במשק הבית שלכם יכולים לקרוא אותם.",
+  "to": "המתכונים והתמונות של משק הבית שלכם, מי נמצא בו, ושיחות הוואטסאפ שבחרתם לחבר, כך שבכל המכשירים שלכם ושל המשפחה שלכם הם יהיו זמינים. רק האנשים במשק הבית שלכם יכולים לקרוא אותם."
+ },
+ "This recipe changed while you were editing": {
+  "from": "המתכון הזה השתנה בזמן שערכת אותו",
+  "to": "המתכון הזה השתנה בזמן שערכתם אותו"
+ },
+ "— You wrote on {1}:\n“{2}”\n\nEvery answer is kept in ⚙️ → 💬 Help and feedback → 📨 Answers to my notes.": {
+  "from": "— כתבת ב-{1}:\n“{2}”\n\nכל תשובה נשמרת ב-⚙️ ← 💬 עזרה ומשוב ← 📨 תשובות להערות שלי.",
+  "to": "— כתבתם ב-{1}:\n“{2}”\n\nכל תשובה נשמרת ב-⚙️ ← 💬 עזרה ומשוב ← 📨 תשובות להערות שלי."
+ },
+ "Use the app normally for a while and come back. If you wanted to look at the test run itself, the events are still listed below.": {
+  "from": "השתמשו באפליקציה כרגיל לזמן מה וחזרו אחר כך. אם רצית לבדוק את הרצת הבדיקה עצמה, האירועים עדיין מופיעים למטה.",
+  "to": "השתמשו באפליקציה כרגיל לזמן מה וחזרו אחר כך. אם רציתם לבדוק את הרצת הבדיקה עצמה, האירועים עדיין מופיעים למטה."
+ },
+ "✅ You have joined the household": {
+  "from": "✅ הצטרפת למשק הבית",
+  "to": "✅ הצטרפתם למשק הבית"
+ },
+ "The text of whatever you asked about — a recipe to translate, a page to import, your question to the help assistant, a pantry list. It goes through this app’s Cloudflare Worker, which adds the API key and keeps no copy. Photos are never sent.": {
+  "from": "הטקסט של מה שביקשת — מתכון לתרגום, עמוד לייבוא, השאלה שלכם לעוזר העזרה, רשימת מזווה. הוא עובר דרך ה-Cloudflare Worker של האפליקציה, שמוסיף את מפתח ה-API ולא שומר עותק. תמונות לעולם לא נשלחות.",
+  "to": "הטקסט של מה שביקשתם — מתכון לתרגום, עמוד לייבוא, השאלה שלכם לעוזר העזרה, רשימת מזווה. הוא עובר דרך ה-Cloudflare Worker של האפליקציה, שמוסיף את מפתח ה-API ולא שומר עותק. תמונות לעולם לא נשלחות."
+ },
+ "That is not the password of {1}. Forgot it? Sign out and press “Forgot password?” on the sign-in screen: an e-mail lets you choose a new one.": {
+  "from": "זו לא הסיסמה של {1}. שכחת אותה? התנתקו ולחצו על \"שכחת סיסמה?\" במסך ההתחברות: מייל יאפשר לכם לבחור חדשה.",
+  "to": "זו לא הסיסמה של {1}. שכחתם אותה? התנתקו ולחצו על \"שכחתם סיסמה?\" במסך ההתחברות: מייל יאפשר לכם לבחור חדשה."
+ },
+ "✋ Asked. {1} sees it in 👥 Family Access, and decides.": {
+  "from": "✋ ביקשת. {1} רואה את זה ב-👥 ניהול משק בית, ומחליט/ה.",
+  "to": "✋ ביקשתם. {1} רואה את זה ב-👥 ניהול משק בית, ומחליט/ה."
+ },
+ "🔒 Secret recipes are not switched on for this copy yet — the {1} you marked stay as they were (linked kitchens still see them) until they are.": {
+  "from": "🔒 מתכונים סודיים עדיין לא מופעלים בעותק הזה — {1} שסימנת נשארים כפי שהיו (מטבחים מקושרים עדיין רואים אותם) עד שיופעלו.",
+  "to": "🔒 מתכונים סודיים עדיין לא מופעלים בעותק הזה — {1} שסימנתם נשארים כפי שהיו (מטבחים מקושרים עדיין רואים אותם) עד שיופעלו."
+ },
+ "To Bring!: the ingredients you chose to send, or straight onto your household’s Bring! list. To Gmail: a recipe you chose to e-mail, to the address you typed.": {
+  "from": "אל Bring!: המצרכים שבחרת לשלוח, ישירות לרשימת Bring! של משק הבית. אל Gmail: מתכון שבחרת לשלוח במייל, לכתובת שהקלדת.",
+  "to": "אל Bring!: המצרכים שבחרתם לשלוח, ישירות לרשימת Bring! של משק הבית. אל Gmail: מתכון שבחרתם לשלוח במייל, לכתובת שהקלדתם."
+ },
+ "Forgot password?": {
+  "from": "שכחת סיסמה?",
+  "to": "שכחתם סיסמה?"
+ },
+ "Every recipe, its photos, and the family member list, and any WhatsApp chat exports you chose to sync. This is YOUR Firebase project: the data sits in a Google account you own, and the access rules are yours to publish.": {
+  "from": "כל מתכון, התמונות שלו, ורשימת בני המשפחה, וכל ייצוא שיחת WhatsApp שבחרת לסנכרן. זהו פרויקט ה-Firebase שלכם: הנתונים יושבים בחשבון Google שבבעלותך, וכללי הגישה הם שלכם לפרסם.",
+  "to": "כל מתכון, התמונות שלו, ורשימת בני המשפחה, וכל ייצוא שיחת WhatsApp שבחרתם לסנכרן. זהו פרויקט ה-Firebase שלכם: הנתונים יושבים בחשבון Google שבבעלותכם, וכללי הגישה הם שלכם לפרסם."
+ },
+ "Copied — paste it wherever you are asking for help": {
+  "from": "הועתק — הדביקו אותו במקום שבו אתם מבקש/ת עזרה",
+  "to": "הועתק — הדביקו אותו במקום שבו אתם מבקשים עזרה"
+ }
+}

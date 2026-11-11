@@ -102,6 +102,8 @@ export function heAddressPlural(text, english) {
         if (p && !w.startsWith(p)) continue;
         const core = w.slice(p.length);
         if (SLASH_KEEP.has(core)) return w;
+        // "אני מסכים/ה" is the speaker, not the reader: left as it is (the first pass made it "אני מסכימים")
+        if (/(?:^|[^\u05D0-\u05EA])אני(?:\s+רק)?\s+$/.test(all.slice(Math.max(0, at - 10), at))) return w;
         if (SLASH_OTHER[core]) { changes.push(w + ' → ' + p + SLASH_OTHER[core]); return p + SLASH_OTHER[core]; }
         const m = /^(.+)\/י$/.exec(core);
         if (m && COMMANDS[m[1]]) { saw = true; changes.push(w + ' → ' + p + COMMANDS[m[1]]); return p + COMMANDS[m[1]]; }
@@ -126,6 +128,22 @@ export function heAddressPlural(text, english) {
 const LEFT = /(?:^|[^א-ת])(אתה|תוכל|תרצה|תמצא|תראה|תבחר|תלחץ|תשלח|תשמור|תפתח|אל ת[א-ת]+|[א-ת]+\/[יהת])(?=[^א-ת]|$)/;
 export function leftSingular(text) { const m = LEFT.exec(text); return m ? m[1] : ''; }
 
+// ── the reviewed fixes ──────────────────────────────────────────────────────────────────────────────────────────
+// Tony read the first proposal (11 Nov 2026) and found singular forms the tables do not reach ("גש … בזמן שאתה מחובר",
+// "ושמע", "תרצה", "שאתה מייבא"). Each phrase a person had to look at is in tools/he-plural-overrides.json, keyed by its
+// English: { from: what the rules above make of it, to: the reviewed plural }. A fix is used only while the rules
+// still make exactly `from` — if the phrase changed since, it is reported, never applied blind.
+export function loadOverrides() {
+  try { return JSON.parse(fs.readFileSync(path.join(repo, 'tools', 'he-plural-overrides.json'), 'utf8')); } catch (e) { return {}; }
+}
+export function pluralWithOverrides(text, english, overrides) {
+  const r = heAddressPlural(text, english);
+  const o = overrides && overrides[english];
+  if (!o) return { text: r.text, changes: r.changes, override: '' };
+  if (o.from === r.text) return { text: o.to, changes: r.changes.concat(['(reviewed by hand)']), override: 'used' };
+  return { text: r.text, changes: r.changes, override: 'stale' };
+}
+
 // ── the run ───────────────────────────────────────────────────────────────────────────────────────────────────
 const argv = process.argv.slice(2);
 if (import.meta.url === 'file://' + process.argv[1] || process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
@@ -134,7 +152,7 @@ if (import.meta.url === 'file://' + process.argv[1] || process.argv[1] && fileUR
   const html = fs.readFileSync(path.join(repo, 'index.html'), 'utf8');
   const src = /languageSource:\s*Object\.freeze\(\{([\s\S]*?)\}\)/.exec(html);
   const field = n => (new RegExp(n + ":\\s*'([^']+)'").exec(src ? src[1] : '') || [])[1];
-  const projectId = field('projectId'), prefix = field('prefix');
+  const projectId = field('projectId'), prefix = field('prefix'), indexPath = field('index');
   const DOCS = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/`;
   let strings, updateTime = null;
   if (CENTRAL) {
@@ -147,15 +165,26 @@ if (import.meta.url === 'file://' + process.argv[1] || process.argv[1] && fileUR
   } else {
     strings = JSON.parse(fs.readFileSync(path.join(repo, opt('in') || 'i18n/he.json'), 'utf8')).strings;
   }
-  const changed = [], left = [];
+  const changed = [], left = [], stale = [], overrides = loadOverrides();
+  // Phrases translated by hand in this checkout's i18n/he.json that the central Hebrew lacks (new in this release
+  // cycle): written along with the plural, or the publish that follows would drop them from the file.
+  let repoNew = {};
+  if (CENTRAL) {
+    try {
+      const file = JSON.parse(fs.readFileSync(path.join(repo, 'i18n', 'he.json'), 'utf8')).strings || {};
+      for (const [k, v] of Object.entries(file)) if (!(k in strings) && typeof v === 'string' && v.trim()) repoNew[k] = v;
+    } catch (e) {}
+  }
   for (const [k, v] of Object.entries(strings)) {
     if (typeof v !== 'string') continue;
-    const r = heAddressPlural(v, k);
+    const r = pluralWithOverrides(v, k, overrides);
+    if (r.override === 'stale') stale.push(k);
     if (r.text !== v) changed.push({ k, from: v, to: r.text, why: r.changes });
     const l = leftSingular(r.text);
     if (l) left.push({ k, text: r.text, word: l });
   }
-  console.log(`${Object.keys(strings).length} Hebrew phrases (${CENTRAL ? 'central, ' + projectId : opt('in') || 'i18n/he.json'}): ${changed.length} to change, ${left.length} with a singular form left for a person`);
+  console.log(`${Object.keys(strings).length} Hebrew phrases (${CENTRAL ? 'central, ' + projectId : opt('in') || 'i18n/he.json'}): ${changed.length} to change, ${left.length} with a singular form left for a person`
+    + `; ${Object.keys(overrides).length - stale.length} reviewed fixes used` + (Object.keys(repoNew).length ? `; ${Object.keys(repoNew).length} new phrases from this checkout added` : '') + (stale.length ? `, ${stale.length} NOT used (the phrase changed since it was reviewed): ` + stale.map(k => JSON.stringify(k.slice(0, 50))).join(', ') : ''));
   if (!opt('out') && !APPLY) changed.slice(0, 40).forEach(c => console.log('  ' + c.from + '\n→ ' + c.to + '\n'));
   if (opt('out')) {
     const md = ['# Hebrew in the plural — the proposal', '',
@@ -177,13 +206,20 @@ if (import.meta.url === 'file://' + process.argv[1] || process.argv[1] && fileUR
     if (!credentials || credentials.type !== 'service_account') { console.error('FIREBASE_RULES_KEY is not a service account key'); process.exit(1); }
     const { GoogleAuth } = require('google-auth-library');
     const t = await (await new GoogleAuth({ credentials, scopes: ['https://www.googleapis.com/auth/datastore'] }).getClient()).getAccessToken();
-    const next = Object.assign({}, strings); changed.forEach(c => { next[c.k] = c.to; });
+    const next = Object.assign({}, strings, repoNew); changed.forEach(c => { next[c.k] = c.to; });
     const fields = { strings: { mapValue: { fields: Object.fromEntries(Object.entries(next).map(([k, v]) => [k, { stringValue: String(v) }])) } },
+      count: { integerValue: String(Object.keys(next).length) },
       updatedAt: { integerValue: String(Date.now()) }, by: { stringValue: 'GitHub, Hebrew in the plural (approved by the owner)' } };
     const mask = Object.keys(fields).map(f => 'updateMask.fieldPaths=' + encodeURIComponent(f)).join('&');
     const r = await fetch(DOCS + prefix + 'he?' + mask + '&currentDocument.updateTime=' + encodeURIComponent(updateTime),
       { method: 'PATCH', headers: { Authorization: 'Bearer ' + (t.token || t), 'Content-Type': 'application/json' }, body: JSON.stringify({ fields }) });
     if (!r.ok) { console.error('::error::not written (HTTP ' + r.status + '): ' + (await r.text()).slice(0, 300) + ' — if it changed meanwhile, run again'); process.exit(1); }
+    // The publish job notices a language by the index's { at, count } for it (as tools/translate-new.mjs writes it).
+    const now = Number(fields.updatedAt.integerValue), count = Object.keys(next).length;
+    const ri = await fetch(DOCS + indexPath + '?updateMask.fieldPaths=' + encodeURIComponent('langs.he'),
+      { method: 'PATCH', headers: { Authorization: 'Bearer ' + (t.token || t), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fields: { langs: { mapValue: { fields: { he: { mapValue: { fields: { at: { integerValue: String(now) }, count: { integerValue: String(count) } } } } } } } } }) });
+    if (!ri.ok) { console.error('::error::the Hebrew was written, but the languages index was not (HTTP ' + ri.status + ') — run "Publish languages" with force'); process.exit(1); }
     console.log(`::notice::Hebrew in the plural: ${changed.length} phrases changed in the central translations — publish-languages puts them in i18n/he.json.`);
   }
 }
