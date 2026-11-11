@@ -2563,6 +2563,83 @@ console.log('\nA recipe e-mailed by the server (v98), the owner warned when it r
   } finally { globalThis.fetch = realFetch; }
 }
 
+// v105 (audit S1) — the page, video and photo fetches take a sign-in. Each call below is shaped so the answer says
+// which side of the gate it landed on without any network: a fetch-url with a bad address answers 400 ("Invalid URL")
+// once past the gate and 401 at it; a video file sent as text/plain answers 415 past the gate and 401 at it.
+console.log('\nv105: a sign-in for the page, video and photo fetches');
+{
+  const kp = await crypto.subtle.generateKey({ name: 'RSASSA-PKCS1-v1_5', modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' }, true, ['sign', 'verify']);
+  const pub = await crypto.subtle.exportKey('jwk', kp.publicKey);
+  const b64u = (x) => Buffer.from(typeof x === 'string' ? x : JSON.stringify(x)).toString('base64url');
+  async function tok(claims = {}) {
+    const now = Math.floor(Date.now() / 1000);
+    const c = Object.assign({ iss: 'https://securetoken.google.com/tonys-recipes-test', aud: 'tonys-recipes-test', sub: 'uS',
+      email: 's@example.com', email_verified: true, iat: now - 10, exp: now + 3600, firebase: { sign_in_provider: 'password' } }, claims);
+    const head = b64u({ alg: 'RS256', kid: 'kS' }), body = b64u(c);
+    const sig = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', kp.privateKey, new TextEncoder().encode(head + '.' + body));
+    return head + '.' + body + '.' + Buffer.from(sig).toString('base64url');
+  }
+  const base = { __testKeys: { kS: Object.assign({ kid: 'kS' }, pub) }, GEMINI_API_KEY: 'g-test' };
+  const accept = Object.assign({}, base), require_ = Object.assign({ SIGNED_FETCH: 'require' }, base);
+  const call = async (body, env) => { const r = await worker.fetch(post(body), env); let d = null; try { d = await r.json(); } catch (e) {} return { status: r.status, d }; };
+  const video = async (env, ticket) => {
+    _ipN++;
+    const r = await worker.fetch(new Request('https://worker.test/?action=video-file' + (ticket ? '&ticket=' + encodeURIComponent(ticket) : ''), {
+      method: 'POST', headers: { 'Content-Type': 'text/plain', 'Origin': ORIGIN, 'CF-Connecting-IP': '198.52.0.' + (_ipN & 255) }, body: 'x' }), env);
+    let d = null; try { d = await r.json(); } catch (e) {} return { status: r.status, d };
+  };
+  const good = await tok();
+  let h = await call({ action: 'health' }, accept);
+  expect('v105: health says the fetches take a sign-in, not yet required', h.d && h.d.signedFetch && h.d.signedFetch.version === 1 && h.d.signedFetch.required === false, JSON.stringify(h.d && h.d.signedFetch));
+  h = await call({ action: 'health' }, require_);
+  expect('v105: …and says so when it is required', h.d && h.d.signedFetch && h.d.signedFetch.required === true, JSON.stringify(h.d && h.d.signedFetch));
+
+  let r = await call({ action: 'fetch-url', url: 'not-a-page' }, accept);
+  expect('v105 accept: no sign-in — still served (the released apps do not send one yet)', r.status === 400 && /Invalid URL/.test(r.d.error), JSON.stringify(r));
+  r = await call({ action: 'fetch-url', url: 'not-a-page', idToken: good }, accept);
+  expect('v105 accept: a good sign-in — served', r.status === 400 && /Invalid URL/.test(r.d.error), JSON.stringify(r));
+  r = await call({ action: 'fetch-url', url: 'not-a-page', idToken: good.slice(0, -4) + 'AAAA' }, accept);
+  expect('v105 accept: a forged sign-in is refused, never served as though absent', r.status === 401 && r.d.signIn === true && /could not be checked/.test(r.d.error), JSON.stringify(r));
+  r = await call({ action: 'fetch-url', url: 'not-a-page', idToken: await tok({ aud: 'someone-elses-app', iss: 'https://securetoken.google.com/someone-elses-app' }) }, accept);
+  expect('v105 accept: another app\'s sign-in — refused', r.status === 401 && /does not serve/.test(r.d.error), JSON.stringify(r));
+  r = await call({ action: 'fetch-url', url: 'not-a-page', idToken: await tok({ exp: Math.floor(Date.now() / 1000) - 3600 }) }, accept);
+  expect('v105 accept: an expired sign-in — refused', r.status === 401 && /expired/.test(r.d.error), JSON.stringify(r));
+  r = await call({ action: 'fetch-url', url: 'not-a-page', idToken: await tok({ email_verified: false }) }, accept);
+  expect('v105: an unconfirmed address — refused, told to confirm it', r.status === 403 && r.d.unconfirmed === true && /confirm your e-mail/.test(r.d.error), JSON.stringify(r));
+
+  for (const a of ['fetch-url', 'facebook-fetch', 'instagram-fetch', 'fb-probe', 'video-from-url', 'video-recipe', 'photo-fetch', 'photo-search']) {
+    r = await call({ action: a, url: 'not-a-page' }, require_);
+    expect('v105 require: ' + a + ' without a sign-in — refused, and told to sign in', r.status === 401 && r.d.signIn === true && /sign in first/.test(r.d.error), JSON.stringify(r));
+  }
+  r = await call({ action: 'fetch-url', url: 'not-a-page', idToken: good }, require_);
+  expect('v105 require: with a good sign-in — served', r.status === 400 && /Invalid URL/.test(r.d.error), JSON.stringify(r));
+  r = await call({ action: 'health' }, require_);
+  expect('v105 require: health stays open', r.status === 200 && r.d.ok === true, JSON.stringify(r).slice(0, 200));
+
+  // The video file: its sign-in is a ticket in the address (the body is the video).
+  r = await call({ action: 'video-ticket' }, accept);
+  expect('v105: no ticket without a sign-in', r.status === 401 && r.d.signIn === true, JSON.stringify(r));
+  r = await call({ action: 'video-ticket', idToken: good }, accept);
+  const ticket = r.d && r.d.ticket;
+  expect('v105: a ticket for a sign-in — five minutes, no one\'s id in it', r.status === 200 && /^\d+\.[0-9a-f]{16}\.[0-9a-f]{64}$/.test(ticket || '') && r.d.expiresIn === 300 && ticket.indexOf('uS') === -1, JSON.stringify(r));
+  let v = await video(require_, ticket);
+  expect('v105 require: a video file with its ticket — past the gate', v.status === 415, JSON.stringify(v));
+  v = await video(require_, '');
+  expect('v105 require: a video file without a ticket — refused', v.status === 401 && v.d.signIn === true, JSON.stringify(v));
+  v = await video(accept, '');
+  expect('v105 accept: a video file without a ticket — still served', v.status === 415, JSON.stringify(v));
+  const [exp, nonce, sig] = ticket.split('.');
+  v = await video(accept, (Number(exp) + 3600) + '.' + nonce + '.' + sig);
+  expect('v105: a ticket with its time pushed on — refused (the signature covers it)', v.status === 401, JSON.stringify(v));
+  v = await video(accept, exp + '.' + nonce + '.' + sig.replace(/^./, c => c === 'a' ? 'b' : 'a'));
+  expect('v105: a ticket with a changed signature — refused', v.status === 401, JSON.stringify(v));
+  v = await video(Object.assign({}, accept, { GEMINI_API_KEY: 'another-key' }), ticket);
+  expect('v105: a ticket made with another key — refused', v.status === 401, JSON.stringify(v));
+  const realNow = Date.now; Date.now = () => realNow() + 301000;
+  try { v = await video(accept, ticket); } finally { Date.now = realNow; }
+  expect('v105: a ticket after its five minutes — refused, told to send again', v.status === 401 && /run out/.test(v.d.error), JSON.stringify(v));
+}
+
 if (failures.length) {
   console.log(`\n${failures.length} failure(s):`);
   failures.forEach(f => console.log('  - ' + f));

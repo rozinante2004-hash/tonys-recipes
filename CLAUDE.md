@@ -39,8 +39,12 @@ to `test`; releases only on his yes.
 1. **H6 — split CLAUDE.md: done** (this file; `docs/history/`).
 2. **U1(a) — the nutrition box folded on phones: done, v39.64 on Test** (one line, "Nutrition per 100g · 245 kcal ▸",
    a tap opens the four values; a computer always shows them; screenshots sent to Tony).
-3. **S1 — a verified sign-in** (idToken) for fetch-url, facebook-fetch, instagram-fetch, fb-probe, video-from-url,
-   video-recipe/video-file, photo-fetch, photo-search (Worker v105; `health` stays open).
+3. **S1 — a verified sign-in for the page, video and photo fetches: v39.65 + Worker v105 on Test, STAGED.** The app
+   sends the sign-in (`workerBodySigned`; a video file a ticket, `videoFileTicket`); the Worker checks any token sent
+   (`signedCaller`, the address confirmed) but still serves a call with none (`SIGNED_FETCH_DEFAULT = 'accept'`),
+   because the apps released before v39.65 send none. **Step 2, after Tony releases v39.65 to Family and Beta:**
+   Worker v106 with `SIGNED_FETCH_DEFAULT = 'require'` (its tests already cover the 'require' mode) — it deploys
+   from `test` at once, so push it only once the release is out, and tell Tony.
 4. **C2 — the recipe built from the page's own schema.org JSON-LD without the AI** (Tony: "Yes. YouTube" — YouTube
    goes through the Data API, title + description → AI; JSON-LD does not apply there).
 5. **H1 — the page size budget: done, v39.64** (2,000 → 2,300 KB; the built page is 1,997 KB).
@@ -382,6 +386,10 @@ found only because a test was written first and disagreed with the code.
   starting. The old convention — hand-uploads through the web UI, branch
   `claude/tonys-recipes-app-nv31q1`, PR #1 — is retired; that PR was closed unmerged.
 - Keep `RECONSTRUCTION_PROMPT.md` and `IMPROVEMENT_IDEAS.md` current in the same commit.
+- **Translations by hand (v39.65):** put them in `i18n/<lang>.json` with the code that shows the phrase (the
+  repo's layout: indent 1, strings in JS order, `count`); the release's `translate-new.mjs` copies them into the
+  central translations instead of asking the AI. The CENTRAL document per language is the source: a change to a
+  phrase that is already there (not a new one) must be written there, or the next publish undoes it.
 - **Where notes go (11 Nov 2026, audit H6):** this file holds the rules and the current state only, and is read into
   every session — keep it under ~700 lines. A version's note and a release record go at the TOP of
   `docs/history/<yyyy-mm>.md` (newest first, in full, as before); a new trap at the top of `docs/history/traps.md`;
@@ -434,10 +442,14 @@ every session needs, a line here.
   **AN E-MAIL ADDRESS IS NEVER A PHRASE** — the languages are public files and the harvest collects every visible text.
 - **Nothing secret may live in `index.html`.** The Worker app key is the deliberate exception: it ships, is not a
   secret, and only stops drive-by abuse — **the Worker is not free to call**: allowed Origin + app key + per-IP
-  rate limits in KV; the AI actions also need a verified sign-in (`idToken` + `hid`).
+  rate limits in KV; the AI actions also need a verified sign-in (`idToken` + `hid`), and since Worker v105 the page,
+  video and photo fetches take one too (`workerBodySigned`).
+- **The Worker is ONE server for all three copies, and a push to `test` that changes it deploys it at once.** A change
+  that would refuse what the released apps send must be staged: accept first, release the app, then refuse.
 - **NEVER send a custom request header to the Worker** — the OPTIONS reply lists the allowed headers, so a new
   header blocks every call until the matching Worker is live; the app key travels in the body (`appKey`), and in
-  `X-App-Key` only for the one video upload whose body is not JSON. **CORS is applied CENTRALLY** in the Worker's
+  `X-App-Key` only for the one video upload whose body is not JSON (its sign-in rides as a `?ticket=`, Worker v105).
+  **CORS is applied CENTRALLY** in the Worker's
   `fetch` wrapper; handlers never set it.
 - **A photo's bytes go through the Worker, and ONLY the Worker** — `connect-src` is an allowlist with no bare
   `https:`; the CSP has caused four outages: it must stay in step with the connect hosts, the script hosts and the

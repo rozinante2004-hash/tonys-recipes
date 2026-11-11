@@ -1,4 +1,14 @@
-// Tony's Recipes — Cloudflare Worker v104
+// Tony's Recipes — Cloudflare Worker v105
+// v105: THE PAGE, VIDEO AND PHOTO FETCHES TAKE A SIGN-IN (the audit of 10 Nov 2026, item S1; Tony, 11 Nov: "3. Yes").
+//   fetch-url, facebook-fetch, instagram-fetch, fb-probe, video-from-url, video-recipe, photo-fetch and photo-search
+//   take `idToken`; a token that is there must be a valid Firebase sign-in of a served project with a confirmed address
+//   (`signedCaller`). A video FILE is the request's body, so its sign-in comes as a ticket: `video-ticket` { idToken }
+//   → { ticket } (an HMAC of its expiry, five minutes, no person in it), sent as `?action=video-file&ticket=…` — no new
+//   request header (the v31 lesson). STAGED: until the apps that send the sign-in (v39.65) are released, a call with
+//   NO token is still served (SIGNED_FETCH_DEFAULT 'accept'); the next Worker makes it 'require' (or the variable
+//   SIGNED_FETCH = 'require'), and then a stranger with the public app key gets nothing from these actions. health
+//   says `signedFetch` { version, required }.
+// Tony's Recipes — Cloudflare Worker v104 (below: the notes of each version, newest first)
 // v104: THE RED DOT FOR INVITATION REQUESTS IN EVERY COPY (Tony, 10 Nov 2026: "Please add a red dot indicator when a new
 //   request is awaiting, as for reports"). meter-admin `notes-new` also says `invitesBy` { project: the new invitation
 //   requests for that copy } — a copy whose app does not read the whole inbox (the test copy) counts its own.
@@ -485,7 +495,12 @@
 //   AI_MAX_TOKENS   – the longest answer one call may ask for (32000; the
 //                     app's largest, reading several recipes at once, asks 8000).
 
-const WORKER_VERSION = 'v104';
+const WORKER_VERSION = 'v105';
+// v105 (audit S1) — the actions that take a sign-in, and whether a call without one is still served (see the top).
+const SIGNED_ACTIONS = new Set(['fetch-url', 'facebook-fetch', 'instagram-fetch', 'fb-probe', 'video-from-url',
+  'video-recipe', 'photo-fetch', 'photo-search', 'video-ticket']);
+const SIGNED_FETCH_DEFAULT = 'accept';   // → 'require' once the app that sends the sign-in (v39.65) is released
+const VIDEO_TICKET_SECONDS = 300;
 const VIDEO_MAX_MB_DEFAULT = 50;
 const GEMINI_API = 'https://generativelanguage.googleapis.com';
 const GEMINI_MODEL_DEFAULT = 'gemini-2.5-flash';
@@ -1228,6 +1243,14 @@ async function handleRequest(request, env, ctx) {
       if (!appKeyOk(request, env, null)) return jsonResp({ error: 'FORBIDDEN: missing or wrong app key.' }, 403, corsHeaders);
       const limitedV = await rateLimited(request, env, 'video-recipe');
       if (limitedV) return limitedV;
+      // v105 (audit S1) — the sign-in of a video file: the ticket `video-ticket` gave (the body is the video).
+      const ticket = new URL(request.url).searchParams.get('ticket');
+      if (ticket || signedFetchRequired(env)) {
+        if (!(await videoTicketOk(env, ticket))) {
+          return jsonResp({ error: ticket ? 'SIGN_IN: the video\'s sign-in has run out. Send the video again.'
+            : 'SIGN_IN: sign in first — reading a video needs a signed-in account.', signIn: true }, 401, corsHeaders);
+        }
+      }
       return await videoFileRecipe(request, env);
     }
 
@@ -1248,6 +1271,17 @@ async function handleRequest(request, env, ctx) {
       }
       const limited = await rateLimited(request, env, body.action);
       if (limited) return limited;
+    }
+
+    // v105 (audit S1) — the page, video and photo fetches: a sign-in, checked (see the top of the file).
+    if (SIGNED_ACTIONS.has(body.action)) {
+      const signed = await signedCaller(body, env);
+      if (signed.resp) return signed.resp;
+      if (body.action === 'video-ticket') {
+        if (!signed.claims) return jsonResp({ error: 'SIGN_IN: sign in first — reading a video needs a signed-in account.', signIn: true }, 401, corsHeaders);
+        if (!env.GEMINI_API_KEY) return jsonResp({ error: 'VIDEO_AI: reading recipes from videos is not set up on the server (GEMINI_API_KEY).', needsConfig: true }, 503, corsHeaders);
+        return jsonResp({ ticket: await videoTicket(env), expiresIn: VIDEO_TICKET_SECONDS }, 200, corsHeaders);
+      }
     }
 
     // ── health ───────────────────────────────────────────────────────────────
@@ -1280,6 +1314,8 @@ async function handleRequest(request, env, ctx) {
         // strips them before Anthropic (an older one would forward them, and
         // Anthropic refuses unknown fields — the v37 lesson).
         metering: { version: 1, db: !!env.METER_DB },
+        // v105 — the page, video and photo fetches take the sign-in; `required`: a call without one is refused.
+        signedFetch: { version: 1, required: signedFetchRequired(env) },
         feedback: !!env.METER_DB,     // v61 — notes from every copy, one inbox
         mail: !!(env.RESEND_API_KEY && env.METER_DB),   // v98 — a recipe e-mailed by this server
         reports: !!(env.REPORTS_GITHUB_TOKEN && env.METER_DB),   // v90 — and on to the private reports repository
@@ -1973,6 +2009,52 @@ async function verifyIdToken(token, env) {
   if (!(claims.exp > now - 30)) throw new Error('expired');
   if (!(claims.iat < now + 300) || !claims.sub) throw new Error('not valid yet');
   return claims;
+}
+// v105 (audit S1) — the caller of a page, video or photo fetch. → { claims } signed in; {} no token while calls
+// without one are still served; { resp } refused. A token that is there is always checked: a bad one is never
+// served as though it were absent.
+function signedFetchRequired(env) {
+  return String((env && env.SIGNED_FETCH) || SIGNED_FETCH_DEFAULT).toLowerCase() === 'require';
+}
+async function signedCaller(body, env) {
+  const token = body && body.idToken;
+  if (!token) {
+    if (!signedFetchRequired(env)) return {};
+    return { resp: jsonResp({ error: 'SIGN_IN: sign in first — importing from web pages, reading videos and searching '
+      + 'for photos need a signed-in account. (Signed in already? Reload the app: an older version did not send it.)',
+      signIn: true }, 401) };
+  }
+  let claims;
+  try { claims = await verifyIdToken(token, env); }
+  catch (e) {
+    return { resp: jsonResp({ error: 'SIGN_IN: your sign-in could not be checked (' + (e && e.message)
+      + '). Reload the app and try again.', signIn: true }, 401) };
+  }
+  if (claims.email_verified !== true) {
+    return { resp: jsonResp({ error: 'SIGN_IN: confirm your e-mail address first (the link we sent you), then try again.',
+      signIn: true, unconfirmed: true }, 403) };
+  }
+  return { claims };
+}
+// The video file's sign-in: "<expiry>.<nonce>.<HMAC>", keyed from the Gemini key (a secret only this Worker holds,
+// and the one the upload needs anyway). Nobody's id is in it — it travels in the address.
+async function videoTicketKey(env) {
+  const raw = new TextEncoder().encode('mkn-video-ticket|' + String(env.GEMINI_API_KEY || ''));
+  return crypto.subtle.importKey('raw', await crypto.subtle.digest('SHA-256', raw), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign', 'verify']);
+}
+function hexOf(buf) { return Array.from(new Uint8Array(buf), b => b.toString(16).padStart(2, '0')).join(''); }
+async function videoTicket(env) {
+  const exp = Math.floor(Date.now() / 1000) + VIDEO_TICKET_SECONDS;
+  const nonce = hexOf(crypto.getRandomValues(new Uint8Array(8)));
+  const sig = hexOf(await crypto.subtle.sign('HMAC', await videoTicketKey(env), new TextEncoder().encode(exp + '.' + nonce)));
+  return exp + '.' + nonce + '.' + sig;
+}
+async function videoTicketOk(env, ticket) {
+  const m = /^(\d{9,11})\.([0-9a-f]{16})\.([0-9a-f]{64})$/.exec(String(ticket || ''));
+  if (!m || !env.GEMINI_API_KEY) return false;
+  if (Number(m[1]) < Math.floor(Date.now() / 1000)) return false;
+  const sig = new Uint8Array(m[3].match(/../g).map(h => parseInt(h, 16)));
+  return crypto.subtle.verify('HMAC', await videoTicketKey(env), sig, new TextEncoder().encode(m[1] + '.' + m[2]));
 }
 // Is this person in this household? Asked of Firestore with their own token;
 // remembered for ten minutes in this Worker instance.
@@ -4289,4 +4371,4 @@ export default {
   }
 };
 
-// ── END OF WORKER v104 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
+// ── END OF WORKER v105 ── If this is the last line in the Cloudflare editor, the whole file was pasted.

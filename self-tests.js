@@ -17028,6 +17028,59 @@ window.SELF_TESTS = [
       }
     } },
 
+  { id:'worker_fetches_carry_the_sign_in', group:'Network', name:'The page, video and photo fetches carry the sign-in; a refusal says what to do (v39.65, audit S1)',
+    test: async()=>{
+      // Tony: "3. Yes". Worker v105 takes the person's sign-in on fetch-url, facebook-fetch, instagram-fetch, fb-probe,
+      // video-from-url, video-recipe, photo-fetch, photo-search, and a ticket for a video file. Pinned here: the body
+      // helper, that EVERY call site of those actions uses it (read from the page's own source), the video ticket,
+      // and the words a refusal is turned into.
+      var realUser=window._fbUser, realFetch=window.fetch, realHealth=_workerHealth;
+      try{
+        window._fbUser={ uid:'st-s1', getIdToken:function(){ return Promise.resolve('tok-s1'); } };
+        var b=JSON.parse(await workerBodySigned({ action:'fetch-url', url:'https://example.com/a' }));
+        if(b.idToken!=='tok-s1') throw new Error('a signed-in fetch went without the sign-in: '+JSON.stringify(b));
+        if(b.action!=='fetch-url' || b.url!=='https://example.com/a' || b.appKey!==WORKER_APP_KEY) throw new Error('the body lost its own fields: '+JSON.stringify(b));
+        window._fbUser={ uid:'st-s1', getIdToken:function(){ return Promise.reject(new Error('offline')); } };
+        b=JSON.parse(await workerBodySigned({ action:'photo-search', query:'soup' }));
+        if('idToken' in b) throw new Error('a token that could not be had was sent anyway');
+        window._fbUser=null;
+        if(!(typeof _fbAuth!=='undefined' && _fbAuth && _fbAuth.currentUser)){
+          b=JSON.parse(await workerBodySigned({ action:'photo-fetch', url:'https://example.com/p.jpg' }));
+          if('idToken' in b) throw new Error('signed out, yet a sign-in was sent');
+        }
+
+        // Every call site of the eight actions goes through workerBodySigned — a new one that does not is caught here.
+        var src = await (await fetch(new URL('index.html?t='+Date.now(), location.href), {cache:'no-store'})).text();
+        var re=/(workerBody\w*)\(\s*(?:ask \|\| )?\{\s*action:\s*'(fetch-url|facebook-fetch|instagram-fetch|fb-probe|video-from-url|video-recipe|photo-fetch|photo-search)'/g, m, seen=0, plain=[];
+        while((m=re.exec(src))){ seen++; if(m[1]!=='workerBodySigned') plain.push(m[2]); }
+        if(seen<7) throw new Error('only '+seen+' call sites of the signed actions found — the check is not reading the code');
+        if(plain.length) throw new Error('called without the sign-in: '+plain.join(', '));
+
+        // The video file: a ticket, asked only of a Worker that says it takes one.
+        var asked=[];
+        window.fetch=function(u, opts){ var bb={}; try{ bb=JSON.parse((opts&&opts.body)||'{}'); }catch(e){}
+          asked.push(bb.action); return Promise.resolve({ ok:true, status:200, json:function(){ return Promise.resolve({ ticket:'1790000000.0123456789abcdef.'+'a'.repeat(64) }); } }); };
+        window._fbUser={ uid:'st-s1', getIdToken:function(){ return Promise.resolve('tok-s1'); } };
+        _workerHealth={ ok:true, version:'v104' };
+        if((await videoFileTicket())!=='' || asked.length) throw new Error('a ticket was asked of a Worker that does not give one');
+        _workerHealth={ ok:true, version:'v105', signedFetch:{ version:1, required:false } };
+        var q=await videoFileTicket();
+        if(asked.join()!=='video-ticket' || q.indexOf('&ticket=1790000000.0123456789abcdef.')!==0) throw new Error('the ticket was not asked for and passed on: '+asked.join()+' → '+q);
+        window._fbUser=null; asked.length=0;
+        if(!(typeof _fbAuth!=='undefined' && _fbAuth && _fbAuth.currentUser) && ((await videoFileTicket())!=='' || asked.length))
+          throw new Error('signed out, yet a ticket was asked for');
+
+        // What a refusal says — never "the app key was rejected" or "the origin" for a sign-in.
+        var w1=workerErrorText(401, { error:'SIGN_IN: sign in first …', signIn:true });
+        if(!/^Sign in first/.test(w1)) throw new Error('a refusal for no sign-in reads: '+w1);
+        var w2=workerErrorText(403, { error:'SIGN_IN: confirm your e-mail address first …', signIn:true, unconfirmed:true });
+        if(!/Confirm your e-mail address/.test(w2) || /app key|origin/i.test(w2)) throw new Error('an unconfirmed address reads: '+w2);
+        var w3=workerErrorText(401, { error:'SIGN_IN: your sign-in could not be checked (expired). Reload the app and try again.', signIn:true });
+        if(!/could not be checked/.test(w3)) throw new Error('a bad sign-in reads: '+w3);
+        if(!/app key/.test(workerErrorText(403, { error:'FORBIDDEN: missing or wrong app key.' }))) throw new Error('the app-key refusal lost its own words');
+      } finally { window._fbUser=realUser; window.fetch=realFetch; _workerHealth=realHealth; }
+    } },
+
   { id:'sec_photo_bytes_via_worker', group:'Network', name:'A photo\u2019s bytes come through the Worker, and only the Worker (v36.30)',
     test: async()=>{
       if(typeof fetchPhotoBlob!=='function') throw new Error('fetchPhotoBlob not defined');

@@ -244,8 +244,22 @@ try {
     plan.push({ lang, gaps, fresh: true });
     console.log(`  ${lang}: all ${gaps.length} phrases (a new language)`);
   }
+  // v39.65 — a phrase translated BY HAND in this release is taken as it is, not asked of the AI. A hand translation
+  // lives in the checkout's i18n/<lang>.json (which the publish job otherwise only ever writes FROM the central
+  // translations, so a phrase there that the central ones lack was put there on purpose, with the code that shows
+  // it). Before v39.65 the AI translated such a phrase again and the publish then replaced the reviewed words —
+  // in Hebrew a plural instruction came back singular ("📨 שלח את הבקשה", 10 Nov).
+  for (const p of plan) {
+    let file = {};
+    try { file = JSON.parse(fs.readFileSync(path.join(repo, 'i18n', p.lang + '.json'), 'utf8')).strings || {}; } catch (e) {}
+    p.hand = {};
+    p.gaps = p.gaps.filter(g => { const v = file[g]; if (typeof v === 'string' && v.trim()) { p.hand[g] = v; return false; } return true; });
+    const n = Object.keys(p.hand).length;
+    if (n) console.log(`  ${p.lang}: ${n} translated by hand in the repository — taken as they are`);
+  }
+  const handTotal = plan.reduce((n, p) => n + Object.keys(p.hand || {}).length, 0);
   const total = plan.reduce((n, p) => n + p.gaps.length, 0);
-  if (!total) { console.log('every language is up to date'); process.exit(0); }
+  if (!total && !handTotal) { console.log('every language is up to date'); process.exit(0); }
   if (DRY) {
     plan.filter(p => p.gaps.length).forEach(p => console.log(`  ${p.lang}: ` + p.gaps.slice(0, 8).map(g => JSON.stringify(g.slice(0, 60))).join(', ') + (p.gaps.length > 8 ? ' …' : '')));
     console.log('(dry run — nothing translated, nothing written)');
@@ -257,7 +271,7 @@ try {
   }
 
   // 3. Translated by the app's own code; its AI calls answered from here.
-  if (!wifReady() && !API_KEY) { console.log('::error::no way to reach Anthropic (Workload Identity Federation or ANTHROPIC_API_KEY) — nothing translated'); process.exit(1); }
+  if (total && !wifReady() && !API_KEY) { console.log('::error::no way to reach Anthropic (Workload Identity Federation or ANTHROPIC_API_KEY) — nothing translated'); process.exit(1); }
   console.log('Anthropic by ' + (wifReady() ? 'Workload Identity Federation (no key stored)' : 'API key'));
   let calls = 0, inTok = 0, outTok = 0, aiError = '';
   // The app's own code catches a failed AI call and carries on; the reason is kept
@@ -290,6 +304,13 @@ try {
     results.push({ lang: p.lang, filled: got.filled, missing: got.missing, fresh: !!p.fresh });
   }
   console.log(`AI: ${calls} call${calls === 1 ? '' : 's'}, ${inTok} tokens in, ${outTok} out`);
+  // v39.65 — and the hand translations with them (above).
+  for (const p of plan) {
+    if (!p.hand || !Object.keys(p.hand).length) continue;
+    let r = results.find(x => x.lang === p.lang);
+    if (!r) { r = { lang: p.lang, filled: {}, missing: 0, fresh: !!p.fresh }; results.push(r); }
+    Object.assign(r.filled, p.hand);
+  }
 
   // 4. Added to the central translations — to what is there NOW, never over it.
   const now = Date.now();

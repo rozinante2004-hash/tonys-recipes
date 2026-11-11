@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v39.64` — app. **Worker: v104**, deployed separately and versioned separately
+**Current version:** `v39.65` — app. **Worker: v105**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -800,6 +800,16 @@ invitation-only (unless adding to the tester's household)."
   `X-Frame-Options: DENY`, `Content-Security-Policy: frame-ancestors 'none'`, `nosniff`, a referrer policy (v39.63).
 - The help window's answers (`askHelp`): 🔍 Details beside numbered/bulleted steps only; an answer with no steps keeps
   one per line (v39.63). `tests/screen-walk.js` walks every screen in four variants with screenshots and measurements.
+- **The page, video and photo fetches take the sign-in (v39.65 + Worker v105, audit S1).** The app's
+  `workerBodySigned(payload)` adds `idToken` (from `fbSignedInUser().getIdToken()`; none when signed out or not to be
+  had) to fetch-url, facebook-fetch, instagram-fetch, video-recipe / video-from-url, photo-fetch and photo-search; a
+  video FILE first trades it for a five-minute ticket (`videoFileTicket()` → action `video-ticket` → `?ticket=` on
+  `?action=video-file`; asked only when health says `signedFetch`). The Worker's `signedCaller`: a token that is
+  there must verify (signature, a served project, not expired) with `email_verified`; refusals carry `signIn: true`
+  (and `unconfirmed`), and `workerErrorText` turns them into "Sign in first…", "Confirm your e-mail address first…",
+  "Your sign-in could not be checked…", "The video's sign-in has run out…". STAGED: `SIGNED_FETCH_DEFAULT` is
+  'accept' (a call with no token is still served, for the apps released before v39.65); the next Worker sets
+  'require' (or the variable `SIGNED_FETCH=require`). `health` → `signedFetch: { version, required }`.
 - CI (v39.64): `self-tests.yml` skips the suite for a commit that already passed on another branch (job
   `already-green`; a release therefore does not run it twice) and does not run on a push that changes only
   `i18n/**`. Every action in every workflow is pinned to a full commit, its version in a comment;

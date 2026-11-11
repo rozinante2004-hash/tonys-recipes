@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.64 -->
+<!-- Tony's Recipes Collection v39.65 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -2628,10 +2628,33 @@ function workerBody(payload) {
 function aiMeterOn() {
   return !!(typeof _workerHealth !== 'undefined' && _workerHealth && _workerHealth.metering && _workerHealth.metering.version >= 1);
 }
+// v39.65 (audit S1, Tony: "3. Yes") — the page, video and photo fetches carry the person's sign-in (Worker v105
+// checks it: a valid Firebase sign-in of this copy, the address confirmed). A body field, never a header (the v31
+// lesson), so it is harmless to a Worker that does not read it. Signed out, or the token not to be had: the call
+// goes without one, and the Worker decides — it serves it until the sign-in is required, then says why it refuses.
+async function workerSignIn() {
+  var u = (typeof fbSignedInUser === 'function') ? fbSignedInUser() : window._fbUser;
+  if (!u || typeof u.getIdToken !== 'function') return '';
+  try { return (await u.getIdToken()) || ''; } catch(e) { return ''; }
+}
+async function workerBodySigned(payload) {
+  var o = {};
+  Object.keys(payload || {}).forEach(function(k){ o[k] = payload[k]; });
+  if (!o.idToken) { var t = await workerSignIn(); if (t) o.idToken = t; }
+  return workerBody(o);
+}
+window.workerBodySigned = workerBodySigned;
 window.aiMeterOn = aiMeterOn;
 window.workerBody = workerBody;
 // Turn the Worker's own refusals into something actionable rather than a raw code.
 function workerErrorText(status, data) {
+  // v39.65 — a refused sign-in (Worker v105) says what to do, never "the app key was rejected".
+  if (data && data.signIn) {
+    if (data.unconfirmed) return 'Confirm your e-mail address first (the link we sent you), then try again.';
+    if (/run out/.test(String(data.error || ''))) return 'The video\u2019s sign-in has run out. Send the video again.';
+    if (/could not be checked/.test(String(data.error || ''))) return 'Your sign-in could not be checked. Reload the app and try again.';
+    return 'Sign in first: importing from web pages, reading videos and searching for photos need a signed-in account.';
+  }
   if (status === 403) return (data && data.error && /app key/i.test(data.error))
     ? 'The app key was rejected. Set APP_SHARED_KEY on the Worker to match, or clear it there to disable the check.'
     : 'The Worker refused this origin. Add this site to ALLOWED_ORIGINS on the Worker.';
@@ -2665,7 +2688,7 @@ async function fetchPhotoBlob(url) {
     var r = await fetch(WORKER_ENDPOINT, {
       method: 'POST',
       headers: workerHeaders(),
-      body: workerBody({ action: 'photo-fetch', url: url }),
+      body: await workerBodySigned({ action: 'photo-fetch', url: url }),
       signal: AbortSignal.timeout(20000)
     });
     if (r.ok) {
@@ -4007,7 +4030,7 @@ async function photoSearchOnce(query, source) {
   try {
     var resp = await fetch(WORKER_ENDPOINT, {
       method: 'POST', headers: workerHeaders(),
-      body: workerBody({ action: 'photo-search', query: query, source: source }),
+      body: await workerBodySigned({ action: 'photo-search', query: query, source: source }),
       signal: AbortSignal.timeout(10000)
     });
     var data = await resp.json();
@@ -11087,7 +11110,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.64';
+var APP_VERSION = 'v39.65';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -14619,7 +14642,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.64</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.65</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14707,7 +14730,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.64</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.65</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -18310,6 +18333,11 @@ window.i18nTemplatesOf = i18nTemplatesOf; window.i18nTemplateCovers = i18nTempla
 // translating a string nobody sees. A `{1}` makes it a shape, matched the same
 // way a built toast is.
 var I18N_EXTRA = [
+  // v39.65 — a refused sign-in on the page, video and photo fetches (workerErrorText; Worker v105)
+  'Sign in first: importing from web pages, reading videos and searching for photos need a signed-in account.',
+  'Confirm your e-mail address first (the link we sent you), then try again.',
+  'Your sign-in could not be checked. Reload the app and try again.',
+  'The video\u2019s sign-in has run out. Send the video again.',
   // v39.61 — ✉️ Ask for an invitation for someone else (drawn by code)
   '\u2709\uFE0F Ask for an invitation for someone else',
   'Know someone who would enjoy My Kitchen Notes? The beta is by invitation only: ask the app\u2019s owner to invite them. The owner decides, and sends the invitation.',
@@ -27398,9 +27426,9 @@ async function extractRecipesFromLinks(pageText, links, pageUrl, onProgress, out
   try { got = await mapLimited(picks, MULTI_CONCURRENCY, async function(pick) {
     try {
       // v39.49 — a download the phone's sleep cut off ("Load failed") is asked for again once the app is back on screen.
-      var getPage = function() {
+      var getPage = async function() {
         return fetch(WORKER_ENDPOINT, { method: 'POST', headers: workerHeaders(),
-          body: workerBody({ action: 'fetch-url', url: pick.href }),
+          body: await workerBodySigned({ action: 'fetch-url', url: pick.href }),
           signal: AbortSignal.timeout(25000) });
       };
       var r;
@@ -27590,7 +27618,7 @@ async function runUrlImportSteps() {
     try {
       var igResp = await fetch(WORKER_ENDPOINT, {
         method: 'POST', headers: workerHeaders(),
-        body: workerBody({ action: 'instagram-fetch', shortcode: igId })
+        body: await workerBodySigned({ action: 'instagram-fetch', shortcode: igId })
       });
       var igData = await igResp.json();
       // `partial` means the Worker got the post but not the words. Ten characters
@@ -27638,7 +27666,7 @@ async function runUrlImportSteps() {
   if (isFacebookUrl(url)) {
     res.innerHTML = spinner('\u{1F4D8} Reading the Facebook post\u2026');
     try {
-      var fr = await fetch(WORKER_ENDPOINT, { method: 'POST', headers: workerHeaders(), body: workerBody({ action: 'facebook-fetch', url: url }) });
+      var fr = await fetch(WORKER_ENDPOINT, { method: 'POST', headers: workerHeaders(), body: await workerBodySigned({ action: 'facebook-fetch', url: url }) });
       var fd = null; try { fd = await fr.json(); } catch(e) {}
       _fbVideoUrl = (fd && fd.videoUrl) || '';
       _fbCaption = (fd && (fd.text || fd.caption)) || '';   // v37.30 — said in the box when it holds no recipe
@@ -27662,7 +27690,7 @@ async function runUrlImportSteps() {
     const fetchResp = await fetch(WORKER_ENDPOINT, {
       method: 'POST',
       headers: workerHeaders(),
-      body: workerBody({ action: 'fetch-url', url: url })
+      body: await workerBodySigned({ action: 'fetch-url', url: url })
     });
     if (fetchResp.ok) {
       const fetchData = await fetchResp.json();
@@ -27870,7 +27898,7 @@ async function youtubeRecipeFromVideo(url, res, ask, lead) {
       : '\u25b6\ufe0f Watching the video for the recipe\u2026 (this can take up to a minute)'));
     d = null; st = 0;
     try {
-      var r = await fetch(WORKER_ENDPOINT, { method: 'POST', headers: workerHeaders(), body: workerBody(ask || { action: 'video-recipe', url: url }) });
+      var r = await fetch(WORKER_ENDPOINT, { method: 'POST', headers: workerHeaders(), body: await workerBodySigned(ask || { action: 'video-recipe', url: url }) });
       st = r.status;
       try { d = await r.json(); } catch(e) {}
     } catch(e) { syncLog('error', 'Reading the video: the server could not be reached', String(e && e.message)); return false; }
@@ -35260,10 +35288,8 @@ var _photoCache = {}, _photoGen = 0;
 function photoFetch(source, page) {
   var k = _photoQuery + '|' + source + '|' + page;
   if (!_photoCache[k]) {
-    _photoCache[k] = fetch(WORKER_ENDPOINT, {
-      method: 'POST', headers: workerHeaders(),
-      body: workerBody({ action: 'photo-search', query: _photoQuery, source: source, page: page }),
-      signal: AbortSignal.timeout(20000)
+    _photoCache[k] = workerBodySigned({ action: 'photo-search', query: _photoQuery, source: source, page: page }).then(function (b) {
+      return fetch(WORKER_ENDPOINT, { method: 'POST', headers: workerHeaders(), body: b, signal: AbortSignal.timeout(20000) });
     }).then(function (r) { return r.json(); }).then(function (d) {
       if (d && d.error) delete _photoCache[k];   // a refusal is asked again next time
       return d;
@@ -35592,6 +35618,7 @@ var HELP_SYSTEM_PROMPT = [
   "=== IMPORTING RECIPES ===",
   "Via + Add Recipe ▾ (and 📁 Files & backup ▾ for a file):",
   "- 🔗 Import from URL: paste any recipe website URL — app fetches and extracts the recipe via AI",
+  "- SIGNED IN FOR THE WEB (v39.65): importing from a web page, a Facebook or Instagram post or a video, and searching for photos, go through the app's own server with your sign-in, so a stranger cannot use it. If the app says 'Sign in first', sign in; 'Confirm your e-mail address first' means the confirmation link we e-mailed you has not been opened yet; 'could not be checked' — reload the app and try again",
   "- YouTube: paste a YouTube URL — extracts recipe from video description",
   "- Instagram: paste an Instagram reel/post URL — extracts recipe from caption",
   "- ✍️ Paste free-hand text: paste copied recipe text — AI parses it",
@@ -40053,7 +40080,7 @@ async function importRecipeVideo(event) {
   res.innerHTML = spinner('\u{1F3AC} Sending the video (' + (mb < 1 ? '<1' : Math.round(mb)) + ' MB)\u2026 then watching it for the recipe. This can take a minute or two.');
   var d = null, st = 0;
   try {
-    var r = await fetch(WORKER_ENDPOINT + '?action=video-file', { method: 'POST',
+    var r = await fetch(WORKER_ENDPOINT + '?action=video-file' + (await videoFileTicket()), { method: 'POST',
       headers: { 'Content-Type': file.type || 'video/mp4', 'X-App-Key': WORKER_APP_KEY }, body: file });
     st = r.status;
     try { d = await r.json(); } catch(e) {}
@@ -40063,6 +40090,7 @@ async function importRecipeVideo(event) {
   }
   if (!d || !d.text) {
     syncLog('import', 'Reading a video gave no recipe', { status: st, why: d && (d.error || (d.noRecipe ? 'no recipe' : '')) });
+    if (d && d.signIn) return sayWhy(workerErrorText(st, d));
     if (d && d.noRecipe) return sayWhy('The video was watched, and no recipe was found in it.');
     if (d && d.busy) return sayWhy('Google\u2019s video reader is busy right now. Try the same video again in a minute or two.');
     return sayWhy('The video could not be read: ' + String((d && d.error) || ('the server answered ' + st)).replace(/^[A-Z_]+: /, '').slice(0, 240));
@@ -40082,6 +40110,21 @@ async function importRecipeVideo(event) {
   }
 }
 window.importRecipeVideo = importRecipeVideo;
+// v39.65 (audit S1) — a video file's sign-in: the file is the request's body, so the Worker (v105) first trades the
+// sign-in for a five-minute ticket that goes in the address. Asked only of a Worker that says it takes one; with no
+// sign-in or no answer, the video goes without, and the Worker decides.
+async function videoFileTicket() {
+  if (!(typeof _workerHealth !== 'undefined' && _workerHealth && _workerHealth.signedFetch && _workerHealth.signedFetch.version >= 1)) return '';
+  var t = await workerSignIn();
+  if (!t) return '';
+  try {
+    var r = await fetch(WORKER_ENDPOINT, { method: 'POST', headers: workerHeaders(),
+      body: workerBody({ action: 'video-ticket', idToken: t }), signal: AbortSignal.timeout(15000) });
+    var d = await r.json();
+    return (d && d.ticket) ? '&ticket=' + encodeURIComponent(d.ticket) : '';
+  } catch(e) { syncLog('import', 'A video\u2019s sign-in ticket could not be had', String(e && e.message)); return ''; }
+}
+window.videoFileTicket = videoFileTicket;
 // A bookmark that runs ON the Facebook page, in the person's own signed-in
 // browser: opens "See more", takes the post's text (or whatever is selected),
 // and opens this app with it after '#'. Nothing of Facebook's reaches our
