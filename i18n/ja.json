@@ -1,7 +1,7 @@
 {
  "lang": "ja",
  "updatedAt": 1794349607507,
- "count": 3163,
+ "count": 3164,
  "strings": {
   "\"Add to Home Screen\"": "ホーム画面に追加",
   "\"One item away\" filter ({1}f.{2})": "「あと1品」フィルター（{1}f.{2}）",
@@ -2811,6 +2811,7 @@
   "📄 Exported {1} recipe{2} to Word!": "📄 {1}件のレシピをWordに書き出しました！",
   "📄 Preparing: {1}…": "📄 準備中：{1}…",
   "📄 Step 4: Text extracted ({1} chars), sending to AI…": "📄 手順4：テキスト抽出完了（{1}文字）、AIに送信中…",
+  "📄 Taken as the site itself publishes it — no AI was needed.": "📄 サイト自身が公開している内容をそのまま取り込みました — AIは不要でした。",
   "📄 Word": "📄 Word",
   "📊 Difficulty": "📊 難易度",
   "📊 Households (management)": "📊 世帯（管理）",

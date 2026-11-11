@@ -166,6 +166,12 @@ jobs:
           npm install --no-save --no-audit --no-fund --prefix "$RUNNER_TEMP/acorn" acorn@8 >/dev/null
           ACORN_PATH="$RUNNER_TEMP/acorn/node_modules/acorn" node tools/check-strip.js index.html dist/index.html
 
+      # v39.68 (the audit of 10 Nov 2026, H3) — an error dropped without a word around a database or server write is a
+      # lost write nobody hears of. The 25 left were reviewed (cleanups, best-effort counters, caches); a new one fails
+      # here, so it is logged (syncLog) or the limit is raised on purpose.
+      - name: No new silent catch around a write
+        run: ACORN_PATH="$RUNNER_TEMP/acorn/node_modules/acorn" node tools/empty-catches.mjs index.html --max-writes 25
+
       - name: Run the Self Test suite on the built TEST copy
         run: |
           (cd dist && python3 -m http.server 8139 --bind 127.0.0.1 &)

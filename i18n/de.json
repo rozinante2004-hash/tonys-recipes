@@ -1,7 +1,7 @@
 {
  "lang": "de",
  "updatedAt": 1794349607507,
- "count": 2857,
+ "count": 2858,
  "strings": {
   "\"Add to Home Screen\"": "Zum Home-Bildschirm hinzufügen",
   "\"Open Bring!\"": "Bring! öffnen",
@@ -2506,6 +2506,7 @@
   "📄 Exported {1} recipe{2} to Word!": "📄 {1} Rezept{2} nach Word exportiert!",
   "📄 Preparing: {1}…": "📄 Wird vorbereitet: {1}…",
   "📄 Step 4: Text extracted ({1} chars), sending to AI…": "📄 Schritt 4: Text extrahiert ({1} Zeichen), wird an KI gesendet…",
+  "📄 Taken as the site itself publishes it — no AI was needed.": "📄 So übernommen, wie die Website es selbst veröffentlicht — ohne KI.",
   "📄 Word": "📄 Word",
   "📊 Difficulty": "📊 Schwierigkeit",
   "📊 Households (management)": "📊 Haushalte (Verwaltung)",

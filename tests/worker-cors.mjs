@@ -2640,6 +2640,40 @@ console.log('\nv105: a sign-in for the page, video and photo fetches');
   expect('v105: a ticket after its five minutes — refused, told to send again', v.status === 401 && /run out/.test(v.d.error), JSON.stringify(v));
 }
 
+// v106 (audit C2) — fetch-url returns the recipe the page publishes about itself (schema.org JSON-LD).
+console.log('\nv106: a page\'s own recipe data');
+{
+  const realFetch = globalThis.fetch;
+  const pages = {
+    'https://recipes.example/shakshuka': '<html><head><title>Shakshuka</title><script type="application/ld+json">' + JSON.stringify({
+      '@context': 'https://schema.org', '@graph': [{ '@type': 'WebSite', name: 'Recipes' }, { '@type': 'Recipe', name: 'Shakshuka &amp; feta',
+        recipeIngredient: ['2 tbsp olive oil', '1 onion, chopped', '400 g tomatoes'], recipeYield: ['4', '4 servings'], totalTime: 'PT45M',
+        recipeInstructions: [{ '@type': 'HowToSection', name: 'The sauce', itemListElement: [{ '@type': 'HowToStep', text: 'Heat the oil.' }, { '@type': 'HowToStep', text: 'Fry the onion.' }] },
+          { '@type': 'HowToStep', text: 'Crack in the eggs.' }], recipeCategory: 'Breakfast', image: { url: 'https://recipes.example/s.jpg' } }] })
+      + '</script></head><body><h1>Shakshuka</h1><p>' + 'A story about eggs. '.repeat(20) + '</p></body></html>',
+    'https://recipes.example/he': '<html><head><script type="application/ld+json">{"@type":"Recipe","name":"מרק עדשים","recipeIngredient":["1 כוס עדשים כתומות","1 בצל"],"recipeInstructions":"לטגן את הבצל.\nלהוסיף עדשים ומים."}</script></head><body>' + 'מרק. '.repeat(40) + '</body></html>',
+    'https://recipes.example/plain': '<html><body><h1>Soup</h1><p>' + 'Just words about soup. '.repeat(20) + '</p></body></html>',
+  };
+  globalThis.fetch = async (url, init) => {
+    url = String(url);
+    if (pages[url]) return new Response(pages[url], { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' } });
+    return realFetch(url, init);
+  };
+  try {
+    const get = async (url) => { const r = await worker.fetch(post({ action: 'fetch-url', url }), {}); return { status: r.status, d: await r.json() }; };
+    let r = await get('https://recipes.example/shakshuka');
+    const one = r.d.recipes && r.d.recipes[0];
+    expect('v106: the page\'s recipe comes back with its text', r.status === 200 && r.d.text && r.d.recipes && r.d.recipes.length === 1, JSON.stringify(r.d).slice(0, 300));
+    expect('v106: …its name decoded, its ingredients, its yield and time', one && one.name === 'Shakshuka & feta' && one.ingredients.length === 3 && one.servings === '4' && one.totalTime === '45 min', JSON.stringify(one));
+    expect('v106: …its method, the section a heading', one && one.steps.length === 4 && one.steps[0].sub === 'The sauce' && one.steps[3] === 'Crack in the eggs.', JSON.stringify(one && one.steps));
+    expect('v106: …its category and photo', one && one.category[0] === 'Breakfast' && one.image === 'https://recipes.example/s.jpg', JSON.stringify(one));
+    r = await get('https://recipes.example/he');
+    expect('v106: a Hebrew page, a line break inside its data', r.d.recipes && r.d.recipes[0].name === 'מרק עדשים' && r.d.recipes[0].steps.length === 2, JSON.stringify(r.d.recipes));
+    r = await get('https://recipes.example/plain');
+    expect('v106: a page without recipe data — no recipes field, its text as before', r.status === 200 && r.d.text && r.d.recipes === undefined, JSON.stringify(r.d).slice(0, 200));
+  } finally { globalThis.fetch = realFetch; }
+}
+
 if (failures.length) {
   console.log(`\n${failures.length} failure(s):`);
   failures.forEach(f => console.log('  - ' + f));

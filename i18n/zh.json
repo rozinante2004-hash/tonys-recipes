@@ -1,7 +1,7 @@
 {
  "lang": "zh",
  "updatedAt": 1794349607507,
- "count": 2862,
+ "count": 2863,
  "strings": {
   "\"Add to Home Screen\"": "添加到主屏幕",
   "\"Open Bring!\"": "打开 Bring!",
@@ -2510,6 +2510,7 @@
   "📄 Exported {1} recipe{2} to Word!": "📄 已将 {1} 个食谱导出为 Word{2}！",
   "📄 Preparing: {1}…": "📄 正在准备：{1}…",
   "📄 Step 4: Text extracted ({1} chars), sending to AI…": "📄 第 4 步：文本提取完成（{1} 字），正在发送给 AI…",
+  "📄 Taken as the site itself publishes it — no AI was needed.": "📄 按网站自己发布的内容直接导入——无需 AI。",
   "📄 Word": "📄 Word",
   "📊 Difficulty": "📊 难度",
   "📊 Households (management)": "📊 家庭（管理）",

@@ -45,8 +45,9 @@ to `test`; releases only on his yes.
    because the apps released before v39.65 send none. **Step 2, after Tony releases v39.65 to Family and Beta:**
    Worker v106 with `SIGNED_FETCH_DEFAULT = 'require'` (its tests already cover the 'require' mode) — it deploys
    from `test` at once, so push it only once the release is out, and tell Tony.
-4. **C2 — the recipe built from the page's own schema.org JSON-LD without the AI** (Tony: "Yes. YouTube" — YouTube
-   goes through the Data API, title + description → AI; JSON-LD does not apply there).
+4. **C2 — a page's own recipe data, without the AI: v39.68 + Worker v106 on Test** (Tony: "Yes. YouTube" — YouTube
+   goes through the Data API, title + description → AI; page data does not apply there). Follow-up, not done: the
+   page's own photo (`image`, returned by the Worker) as the recipe's photo.
 5. **H1 — the page size budget: done, v39.64** (2,000 → 2,300 KB; the built page is 1,997 KB).
 6. **U6 — Hebrew in the plural: the proposal is with Tony (v39.66 on Test).** `tools/he-address-form.mjs --central
    --out <file>` lists every change, read from the CENTRAL Hebrew (517 of 3,281 phrases on 11 Nov). Once Tony
@@ -64,8 +65,8 @@ to `test`; releases only on his yes.
     explanation: "11. Yes"). **S5 done, v39.64:** every `uses:` is a full commit with its version as a comment;
     `.github/dependabot.yml` opens one grouped pull request a month against `test`. **H5 waits:** cdn.sheetjs.com
     (the only source of SheetJS 0.20; npm stops at 0.18.5) is refused by this environment's network rules.
-12. **H3 — the empty-catch review** (`tools/empty-catches.mjs`; `syncLog('error', …)` where silence hides a lost
-    write).
+12. **H3 — the empty-catch review: done, v39.68.** `tools/empty-catches.mjs` (622 dropped errors; 28 around a write,
+    three of them real lost writes, now logged); CI fails when more than 25 sit around a write.
 - **Not doing** (Tony: no): U7 collapsing the help suggestions; F3 dropping `.doc`.
 - **Still open from earlier audits, Tony's side:** restrict the community app's browser key in two stages (APIs
   first, then websites; 🔑 Check the app's key after each); the Pushover licence (bought in the app's 30-day trial,

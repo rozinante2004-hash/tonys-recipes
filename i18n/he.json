@@ -1,7 +1,7 @@
 {
  "lang": "he",
  "updatedAt": 1794349607507,
- "count": 3287,
+ "count": 3288,
  "strings": {
   "\"Add to Home Screen\"": "הוספה למסך הבית",
   "\"One item away\" filter ({1}f.{2})": "פילטר \"פריט אחד חסר\" ({1}f.{2})",
@@ -2931,6 +2931,7 @@
   "📄 Exported {1} recipe{2} to Word!": "📄 יוצאו {1} מתכון{2} ל-Word!",
   "📄 Preparing: {1}…": "📄 מכין: {1}…",
   "📄 Step 4: Text extracted ({1} chars), sending to AI…": "📄 שלב 4: הטקסט חולץ ({1} תווים), שולח ל-AI…",
+  "📄 Taken as the site itself publishes it — no AI was needed.": "📄 נלקח כפי שהאתר עצמו מפרסם אותו — בלי צורך בבינה מלאכותית.",
   "📄 Word": "📄 Word",
   "📊 Difficulty": "📊 רמת קושי",
   "📊 Households (management)": "📊 משקי בית (ניהול)",

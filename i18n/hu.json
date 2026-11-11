@@ -1,7 +1,7 @@
 {
  "lang": "hu",
  "updatedAt": 1794349607507,
- "count": 2634,
+ "count": 2635,
  "strings": {
   "\"Add to Home Screen\"": "Hozzáadás a kezdőképernyőhöz",
   "\"Open Bring!\"": "Bring! megnyitása",
@@ -2298,6 +2298,7 @@
   "📄 Exported {1} recipe{2} to Word!": "📄 {1} recept exportálva Wordbe!",
   "📄 Preparing: {1}…": "📄 Előkészítés: {1}…",
   "📄 Step 4: Text extracted ({1} chars), sending to AI…": "📄 4. lépés: szöveg kinyerve ({1} karakter), küldés az AI-nak…",
+  "📄 Taken as the site itself publishes it — no AI was needed.": "📄 Úgy átvéve, ahogy maga az oldal közzéteszi — MI nélkül.",
   "📄 Word": "📄 Word",
   "📊 Difficulty": "📊 Nehézség",
   "📊 Households (management)": "📊 Háztartások (kezelés)",

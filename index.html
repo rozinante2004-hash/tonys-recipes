@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.67 -->
+<!-- Tony's Recipes Collection v39.68 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -5760,7 +5760,8 @@ async function openConnectHousehold() {
   async function connectSend() {
     if (sent && sent.t === t.toLowerCase() && sent.note === note.trim()) return true;
     if (sent && sent.r && sent.r.id) {
-      try { await hhDb().collection('linkRequests').doc(sent.r.id).delete(); syncLog('save', 'Withdrew a link request, sent again changed', sent.r.label || ''); } catch(e) {}
+      try { await hhDb().collection('linkRequests').doc(sent.r.id).delete(); syncLog('save', 'Withdrew a link request, sent again changed', sent.r.label || ''); }
+      catch(e) { syncLog('error', 'A link request sent again could not take back the first one \u2014 the other kitchen may see both', String(e && e.message || e).slice(0, 200)); }   // v39.68 (audit H3)
     }
     var r = await hhSendLinkRequest(t, note);
     if (!r.ok) { await askConfirm({ icon: '\u{1F91D}', title: 'Not sent', message: r.msg, okLabel: 'OK' }); sent = null; return false; }
@@ -11110,7 +11111,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.67';
+var APP_VERSION = 'v39.68';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -14642,7 +14643,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.67</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.68</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14730,7 +14731,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.67</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.68</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -18333,6 +18334,8 @@ window.i18nTemplatesOf = i18nTemplatesOf; window.i18nTemplateCovers = i18nTempla
 // translating a string nobody sees. A `{1}` makes it a shape, matched the same
 // way a built toast is.
 var I18N_EXTRA = [
+  // v39.68 — a recipe taken from the page's own recipe data (the import preview)
+  '\u{1F4C4} Taken as the site itself publishes it \u2014 no AI was needed.',
   // v39.65 — a refused sign-in on the page, video and photo fetches (workerErrorText; Worker v105)
   'Sign in first: importing from web pages, reading videos and searching for photos need a signed-in account.',
   'Confirm your e-mail address first (the link we sent you), then try again.',
@@ -27318,6 +27321,7 @@ function extractInstagramId(url) {
 
 var _pageWasTruncated = false;
 var _pageLinks = [];
+var _pageLd = [];   // v39.68 (audit C2) — the recipe(s) the page publishes about itself, as the server read them
 
 // ─── LINK ROUND-UPS (v36.2) ──────────────────────────────────────────────────
 // Some round-ups do not contain their recipes at all. "10 soups in 15 minutes"
@@ -27661,6 +27665,7 @@ async function runUrlImportSteps() {
   res.innerHTML = spinner('Fetching page via server…');
   let pageText = '';
   _pageWasTruncated = false;
+  _pageLd = [];
   _pageViaProxy = ''; _lastProxyHost = '';
   _pageLinks = [];
   // Why each attempt failed, so the message at the end can be true. Blaming the
@@ -27713,6 +27718,7 @@ async function runUrlImportSteps() {
       // v36.2 — a round-up can be nothing but links to the recipes. Kept aside
       // in case the text alone turns out to hold no recipe at all.
       _pageLinks = Array.isArray(fetchData.links) ? fetchData.links : [];
+      _pageLd = Array.isArray(fetchData.recipes) ? fetchData.recipes.slice(0, 30) : [];   // v39.68 (Worker v106)
       var refused = /Page returned (\d{3})/.exec(String(fetchData.error || ''));
       if (refused && RELAY_WHEN_REFUSED.indexOf(Number(refused[1])) > -1) refusedStatus = Number(refused[1]);
       if (!pageText) attempts.push(refused ? 'the site answered the server with ' + refused[1] + (refusedStatus ? ' (it refuses servers)' : '')
@@ -27817,6 +27823,18 @@ async function runUrlImportSteps() {
   res.innerHTML = spinner('Extracting recipe…');
   syncLog('import', 'URL import: ' + pageText.length + ' chars of page text, '
     + _pageLinks.length + ' link(s)', url.slice(0, 120));
+  // v39.68 (audit C2, Tony: "Yes") — the page's own recipe data: the site's words, at once, without the AI.
+  if (_pageLd.length) {
+    var ldParsed = ldToParsed(_pageLd), ldBuilt = ldParsed ? buildImportFromParsed(ldParsed, url) : { kind: 'none' };
+    if (ldBuilt.kind !== 'none') {
+      syncLog('import', 'URL import: the page\u2019s own recipe data, no AI', { recipes: _pageLd.length, url: url.slice(0, 120) });
+      ldBuilt.recipe._fromPageData = true;
+      if (_pageViaProxy) ldBuilt.recipe._viaProxy = _pageViaProxy;
+      applyParsedRecipe(ldBuilt.recipe, 'urlImportResult', 'urlImportOverlay');
+      return;
+    }
+    syncLog('import', 'URL import: the page\u2019s recipe data was too thin, the AI reads the page', { recipes: _pageLd.length });
+  }
   var progress = function(done, total, label) {
     res.innerHTML = (total > 1 ? spinnerLong : spinner)(label || (total > 1
       ? 'Extracting recipe ' + Math.min(done + 1, total) + ' of ' + total + '…'
@@ -28019,6 +28037,9 @@ function applyParsedRecipe(parsed, resultDivId, overlayId, originalPhoto) {
     + (parsed._fromVideo ? '<div style="background:#EEF2FF;border:1px solid #C0CAFF;border-radius:8px;padding:9px 11px;'
         + 'font-size:12px;color:#3451CC;line-height:1.5;margin-top:10px;">\u25b6\ufe0f Read from the video itself (what is said and shown). '
         + 'Check the amounts before you add it.</div>' : '')
+    // v39.68 (audit C2) — taken from the page's own recipe data: the site's words, no AI.
+    + (parsed._fromPageData ? '<div style="background:var(--cream);border:1px solid var(--border);border-radius:8px;padding:9px 11px;'
+        + 'font-size:12px;color:var(--ink);line-height:1.5;margin-top:10px;">\u{1F4C4} Taken as the site itself publishes it \u2014 no AI was needed.</div>' : '')
     + (parsed._captionCut ? '<div id="captionCutNote" style="background:#FFF8E8;border:1px solid #E8D9A8;border-radius:8px;padding:9px 11px;'
         + 'font-size:12px;color:#7A5C00;line-height:1.5;margin-top:10px;">\u{1F4D8} Facebook shows only the start of this post\u2019s text \u2014 '
         + 'so this was read from the video, which may not show every amount. For the post\u2019s own recipe, take screenshots of its text: '
@@ -28082,6 +28103,8 @@ function applyParsedCollection(parsed, resultDivId, overlayId, originalPhoto) {
   if (parsed._fromVideo) relay += '<div style="background:#EEF2FF;border:1px solid #C0CAFF;border-radius:8px;padding:9px 11px;'
       + 'font-size:12px;color:#3451CC;line-height:1.5;margin-top:10px;">\u25b6\ufe0f Read from the video itself (what is said and shown). '
       + 'Check the amounts before you import it.</div>';
+  if (parsed._fromPageData) relay += '<div style="background:var(--cream);border:1px solid var(--border);border-radius:8px;padding:9px 11px;'
+      + 'font-size:12px;color:var(--ink);line-height:1.5;margin-top:10px;">\u{1F4C4} Taken as the site itself publishes it \u2014 no AI was needed.</div>';
   var missed = parsed._partial
     ? '<div style="background:#FFF8E8;border:1px solid #E8D9A8;border-radius:8px;padding:9px 11px;'
       + 'font-size:12px;color:#7A5C00;line-height:1.5;margin-top:10px;">⚠️ <strong>'
@@ -28654,6 +28677,52 @@ function buildImportFromParsed(parsed, source) {
 window.multiRecipePrompt = multiRecipePrompt;
 window.multiRecipeMaxTokens = multiRecipeMaxTokens;
 window.buildImportFromParsed = buildImportFromParsed;
+// v39.68 (audit C2, Tony: "Yes") — the recipe a page publishes about itself (schema.org Recipe, read by the server's
+// fetch-url as `recipes`) is built here without asking the AI: the site's own words, at once, and nothing spent.
+// The AI stays the way for a page without it, or with too little in it (the server sends a recipe only when it has
+// a name, two ingredients and a step).
+var LD_UNIT = /^(?:cups?|c|tbsp|tbs|tablespoons?|tsp|teaspoons?|g|gr|grams?|kg|kilos?|kilograms?|mg|ml|millilit(?:er|re)s?|cl|dl|l|lit(?:er|re)s?|oz|ounces?|lbs?|pounds?|pinch(?:es)?|dash(?:es)?|cloves?|cans?|tins?|jars?|packets?|packages?|pkg|slices?|sticks?|handfuls?|bunch(?:es)?|sprigs?|heads?|pieces?|pcs|large|medium|small|כוס(?:ות)?|כף|כפות|כפית|כפיות|גרם|גר'|ג'|ג׳|ק"ג|ק״ג|קג|קילו|מ"ל|מ״ל|מל|ליטר|ליטרים|יחידה|יחידות|חבילה|חבילות|חבילת|קורט|שן|שיני|פרוסה|פרוסות|צרור|קופסה|קופסת|קופסאות|שקית|שקיות|שקיק|גבעול|גבעולים|ענף|ענפים|ראש|ראשים)\.?$/i;
+var LD_QTY = /^((?:\d+(?:[.,]\d+)?(?:\s*\/\s*\d+)?|[½⅓⅔¼¾⅛⅜⅝⅞])(?:\s*[½⅓⅔¼¾⅛⅜⅝⅞])?(?:\s+\d+\s*\/\s*\d+)?(?:\s*(?:-|–|to|עד)\s*(?:\d+(?:[.,]\d+)?(?:\s*\/\s*\d+)?|[½⅓⅔¼¾]))?)\s+(.+)$/;
+function ldIngredient(line) {
+  var s = String(line == null ? '' : line).replace(/\s+/g, ' ').trim();
+  var m = LD_QTY.exec(s);
+  if (!m) return { a: '', n: s };
+  var a = m[1].replace(/\s+/g, ' ').trim(), rest = m[2].trim(), w = rest.split(' ');
+  if (w.length > 1 && LD_UNIT.test(w[0])) { a += ' ' + w[0]; rest = w.slice(1).join(' '); }
+  return { a: a, n: rest };
+}
+var LD_CATS = [
+  ['Breakfast', /breakfast|brunch|ארוחת בוקר|בוקר/i],
+  ['Soup', /soups?\b|מרק/i],
+  ['Dessert', /dessert|cake|cookie|biscuit|baking|bake|sweet|pastr|pie|tart|קינוח|עוג|מתוק|מאפ/i],
+  ['Snack', /snack|appeti[sz]er|starter|side|dip|נשנוש|חטיף|מנה ראשונה|תוספת|מטבל/i],
+  ['Lunch', /lunch|salad|sandwich|צהריים|סלט|כריך/i],
+  ['Dinner', /dinner|main|entr[eé]e|supper|ערב|עיקרי/i]
+];
+function ldCategory(x) {
+  var words = [].concat(x.category || [], x.keywords || []).join(' | ');
+  for (var i = 0; i < LD_CATS.length; i++) if (LD_CATS[i][1].test(words)) return LD_CATS[i][0];
+  return '';
+}
+function ldRecipeToApp(x) {
+  if (!x || typeof x !== 'object' || !x.name) return null;
+  var ings = (Array.isArray(x.ingredients) ? x.ingredients : []).map(ldIngredient).filter(function(i){ return i.n || i.a; });
+  var steps = (Array.isArray(x.steps) ? x.steps : []).map(function(s){
+    return typeof s === 'string' ? s.trim() : (s && typeof s.sub === 'string' && s.sub.trim() ? { sub: s.sub.trim() } : null);
+  }).filter(Boolean);
+  if (ings.length < 2 || !steps.some(function(s){ return typeof s === 'string' && s; })) return null;
+  var out = { name: String(x.name).trim(), ingredients: ings, steps: steps,
+    prep: String(x.totalTime || x.prepTime || '').trim(), servings: String(x.servings || '').trim() };
+  var cat = ldCategory(x); if (cat) out.category = cat;
+  return out;
+}
+function ldToParsed(list) {
+  var recipes = (Array.isArray(list) ? list : []).map(ldRecipeToApp).filter(Boolean);
+  if (!recipes.length) return null;
+  return recipes.length === 1 ? recipes[0] : { recipes: recipes };
+}
+window.ldToParsed = ldToParsed;
+window.ldIngredient = ldIngredient;
 
 function importParsedNow(parsed, overlayId) {
   // normalizeRecipe coerces AI output into the expected shape (ingredients sometimes
@@ -30627,8 +30696,10 @@ async function flushCloudDeletes(db) {
       // v38.96 — and wherever else it may be (marked 🔒 on another device): a deleted recipe must not come back
       if (_cloudLayout === 'households') {
         var hb = 'households/' + _cloudHid + '/', inSecret = !!_secretIds[String(id)];
-        try { await db.collection(hb + (inSecret ? 'recipes' : 'secretRecipes')).doc(String(id)).delete(); } catch(e2) {}   // v38.99 — refused
-        try { await db.collection(hb + (inSecret ? 'photos' : 'secretPhotos')).doc(String(id)).delete(); } catch(e2) {}   //   where rules lag
+        // v38.99 — refused where rules lag; v39.68 (audit H3) — said in the log, as a deleted recipe left there could come back
+        try { await db.collection(hb + (inSecret ? 'recipes' : 'secretRecipes')).doc(String(id)).delete(); }
+        catch(e2) { syncLog('save', 'A deleted recipe\u2019s other copy (🔒 or not) was not deleted', { id: id, why: String(e2 && e2.message || e2).slice(0, 120) }); }
+        try { await db.collection(hb + (inSecret ? 'photos' : 'secretPhotos')).doc(String(id)).delete(); } catch(e2) {}
         secretNote(id, false); delete _secretLives[String(id)];
       }
     } catch(e) {
@@ -34116,7 +34187,8 @@ async function testerInvitesAdd(addrs) {
   var done = inviteJson(INVITE_REG_KEY), n = 0, by = String((window._fbUser && _fbUser.uid) || 'owner');
   for (var i = 0; i < addrs.length; i++) {
     var h = await inviteFingerprint(addrs[i]);
-    try { await hhDb().collection('testerInvites').doc(h).set({ at: Date.now(), by: by }); done[h] = 1; n++; } catch (e) {}
+    try { await hhDb().collection('testerInvites').doc(h).set({ at: Date.now(), by: by }); done[h] = 1; n++; }
+    catch (e) { syncLog('error', 'An invited address could not be recorded (it cannot start a kitchen yet)', String(e && e.message || e).slice(0, 200)); }   // v39.68 (audit H3); never the address
   }
   try { localStorage.setItem(INVITE_REG_KEY, JSON.stringify(done)); } catch (e) {}
   return n;
@@ -35638,6 +35710,7 @@ var HELP_SYSTEM_PROMPT = [
   "=== IMPORTING RECIPES ===",
   "Via + Add Recipe ▾ (and 📁 Files & backup ▾ for a file):",
   "- 🔗 Import from URL: paste any recipe website URL — app fetches and extracts the recipe via AI",
+  "- 📄 A PAGE THAT PUBLISHES ITS RECIPE (v39.68): most recipe sites describe their recipe in a standard form (the one search engines read). When the page has it, the recipe is taken from it as the site wrote it — at once, without the AI — and the preview says '📄 Taken as the site itself publishes it'. A page without it is read by the AI as before",
   "- SIGNED IN FOR THE WEB (v39.65): importing from a web page, a Facebook or Instagram post or a video, and searching for photos, go through the app's own server with your sign-in, so a stranger cannot use it. If the app says 'Sign in first', sign in; 'Confirm your e-mail address first' means the confirmation link we e-mailed you has not been opened yet; 'could not be checked' — reload the app and try again",
   "- YouTube: paste a YouTube URL — extracts recipe from video description",
   "- Instagram: paste an Instagram reel/post URL — extracts recipe from caption",

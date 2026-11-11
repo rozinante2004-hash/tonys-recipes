@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v39.67` — app. **Worker: v105**, deployed separately and versioned separately
+**Current version:** `v39.68` — app. **Worker: v106**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -817,6 +817,8 @@ invitation-only (unless adding to the tester's household)."
   with `confirm: make it plural`. The central document per language is the source of every `i18n/<lang>.json`: a
   change to an existing phrase must be made there; a NEW phrase translated by hand in the file is taken by the
   release's `translate-new.mjs` (v39.65).
+- CI (v39.68): "No new silent catch around a write" — `tools/empty-catches.mjs index.html --max-writes 25` lists every
+  error dropped without a word and fails when more than the 25 reviewed sit around a database or server write.
 - CI (v39.64): `self-tests.yml` skips the suite for a commit that already passed on another branch (job
   `already-green`; a release therefore does not run it twice) and does not run on a push that changes only
   `i18n/**`. Every action in every workflow is pinned to a full commit, its version in a comment;
@@ -2396,7 +2398,14 @@ lines accept `amount — name` / `amount - name` separators. Editing preserves `
   `instagram-fetch`; else Worker `fetch-url`, then **fallback CORS proxies**
   (`allorigins.win`, `corsproxy.io`, `codetabs.com`) ONLY when the site refused the Worker (its answer
   "Page returned 401/403/429/451/503", `RELAY_WHEN_REFUSED`; v39.67, audit S3 — a page with no readable text, a
-  missing page or an unreachable Worker never goes to a relay), after `proxyConsent`. Then ask
+  missing page or an unreachable Worker never goes to a relay), after `proxyConsent`. **A page that publishes
+  its recipe (v39.68 + Worker v106, audit C2):** `fetch-url` also returns `recipes` — the schema.org Recipe
+  objects of its `application/ld+json` scripts (`ldRecipes`: @graph / ItemList / mainEntity followed, HowToStep
+  and HowToSection, ISO durations, entities decoded, a raw line break escaped; only with a name, two ingredients
+  and a step; at most 30) — and the app builds from them WITHOUT the AI (`ldToParsed` → `buildImportFromParsed`;
+  `ldIngredient` splits "2 tbsp olive oil" / "1 כוס עדשים" into amount and name; `ldCategory` maps the
+  category and keywords, English and Hebrew; the preview says "📄 Taken as the site itself publishes it"; a
+  round-up becomes a collection). Too thin, or none: the AI reads the page. Otherwise ask
   Claude to return strict recipe JSON *in the original language* (`{name,category,difficulty,
   prep,servings,ingredients:[{a,n}],steps:[]}` or `{error:"no recipe found"}`). No recipe →
   offer **Save as video/link bookmark** (`showSaveAsVideoBookmark`).

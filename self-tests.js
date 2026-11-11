@@ -724,6 +724,53 @@ window.SELF_TESTS = [
       }
       return 'both routes: .xlsx (reader loaded on first use), .docx, .html (lines apart), .txt — each to the AI and the preview';
     } },
+  { id:'import_from_page_data', group:'Import/Export', name:'A page that publishes its recipe is imported from that, without the AI (v39.68, audit C2)',
+    test: async()=>{
+      // Tony: "Yes". Worker v106's fetch-url returns `recipes` (schema.org JSON-LD); the app builds from them and asks
+      // the AI nothing. A round-up becomes a collection; data too thin to be the recipe goes to the AI as before.
+      var real={ fetch:window.fetch, apply:window.applyParsedRecipe, extract:window.extractRecipesFromText, log:window.syncLog, consent:window.proxyConsent };
+      var inp=document.getElementById('urlImportInput'), was=inp.value, res=document.getElementById('urlImportResult'), wasRes=res.innerHTML;
+      var ai=0, got=[], answer=null, page='A long story about the dish. '.repeat(12);
+      try{
+        window.syncLog=function(){}; window.proxyConsent=async function(){ return false; };
+        window.extractRecipesFromText=async function(){ ai++; return { error:'no recipe found' }; };
+        window.applyParsedRecipe=function(r){ got.push(r); };
+        window.fetch=async function(u){ if(String(u).indexOf(WORKER_ENDPOINT)!==0) return { ok:false, status:500, json:async function(){ return {}; } };
+          return { ok:true, status:200, json:async function(){ return answer; } }; };
+        inp.value='https://www.example.com/st-page-data';
+        answer={ text:page, recipes:[{ name:'Shakshuka', ingredients:['2 tbsp olive oil','1 onion, chopped','400 g tomatoes'],
+          steps:[{ sub:'The sauce' },'Heat the oil.','Fry the onion.'], servings:'4', totalTime:'45 min', category:['Breakfast'], keywords:[] }] };
+        await runUrlImport();
+        if(ai) throw new Error('the AI was asked although the page published its recipe');
+        if(got.length!==1) throw new Error('no recipe was built from the page data');
+        var r=got[0];
+        if(r.name!=='Shakshuka' || r.category!=='Breakfast' || r.prep!=='45 min' || r.servings!=='4') throw new Error('the recipe: '+JSON.stringify(r).slice(0,300));
+        if(!r.ingredients[0] || r.ingredients[0].a!=='2 tbsp' || r.ingredients[0].n!=='olive oil') throw new Error('an ingredient was not split into amount and name: '+JSON.stringify(r.ingredients[0]));
+        if(!r.steps[0] || r.steps[0].sub!=='The sauce' || r.steps[1]!=='Heat the oil.') throw new Error('the method lost its heading: '+JSON.stringify(r.steps));
+        if(r._fromPageData!==true || r.source!=='https://www.example.com/st-page-data') throw new Error('not marked as the page\u2019s own, or no source');
+        // Hebrew
+        got=[]; answer={ text:page, recipes:[{ name:'מרק עדשים', ingredients:['1 כוס עדשים כתומות','½ כפית מלח'], steps:['לטגן את הבצל.'], category:['מרקים'] }] };
+        await runUrlImport();
+        if(ai || !got[0] || got[0].ingredients[0].a!=='1 כוס' || got[0].ingredients[1].a!=='½ כפית' || got[0].category!=='Soup') throw new Error('a Hebrew recipe: '+JSON.stringify(got[0]).slice(0,300));
+        // a round-up: a collection of its recipes
+        got=[]; answer={ text:page, recipes:[1,2,3].map(function(i){ return { name:'Dish '+i, ingredients:['1 a','2 b'], steps:['Go.'] }; }) };
+        await runUrlImport();
+        if(ai || !got[0] || !Array.isArray(got[0].parts) || got[0].parts.length!==3) throw new Error('a round-up did not become a collection: '+JSON.stringify(got[0]).slice(0,200));
+        // too thin to be the recipe: the AI reads the page, as before
+        got=[]; answer={ text:page, recipes:[{ name:'Thin', ingredients:['salt'], steps:['Eat.'] }] };
+        await runUrlImport();
+        if(ai!==1 || got.length) throw new Error('thin page data did not go to the AI (asked '+ai+', built '+got.length+')');
+        // the preview says where the recipe came from
+        window.applyParsedRecipe=real.apply;
+        real.apply({ name:'Shakshuka', category:'Breakfast', ingredients:[{a:'1',n:'egg'}], steps:['Cook.'], _fromPageData:true }, 'urlImportResult', 'urlImportOverlay');
+        if(!/Taken as the site itself publishes it/.test(res.textContent)) throw new Error('the preview does not say the recipe is the site\u2019s own: '+res.textContent.slice(0,200));
+      } finally {
+        window.fetch=real.fetch; window.applyParsedRecipe=real.apply; window.extractRecipesFromText=real.extract; window.syncLog=real.log; window.proxyConsent=real.consent;
+        inp.value=was; res.innerHTML=wasRes;
+        var ie=document.getElementById('importErrorModal'); if(ie) ie.remove();
+        if(document.getElementById('urlImportOverlay').classList.contains('open')) closeM('urlImportOverlay');
+      }
+    } },
   { id:'relays_only_for_a_refused_site', group:'Import/Export', name:'A relay is offered only when the site refused the app\u2019s own server (v39.67, audit S3)',
     test: async()=>{
       // Tony: "keep them only for pages the server was refused". The Worker answers a refusal as 200 { error:'Page
@@ -9390,8 +9437,9 @@ window.SELF_TESTS = [
         }
         // ⚙️ at its section, the item marked
         goSettings('data', '[onclick*="showBackupPanel()"]');
-        await wait(150);
         var g=document.querySelector('#settingsDrop .set-group[data-group="data"]'), item=document.querySelector('#settingsDrop [onclick*="showBackupPanel()"]');
+        // v39.68 — it opens after two animation frames: wait for it (up to 1.5 s), not a fixed 150 ms (failed once in CI, v39.65)
+        for(var gw=0; gw<30 && !(document.getElementById('settingsDrop').classList.contains('open') && g.classList.contains('open') && item.classList.contains('toast-landed')); gw++) await wait(50);
         var openNow=document.getElementById('settingsDrop').classList.contains('open') && g.classList.contains('open'), marked=item.classList.contains('toast-landed');
         closeDrop('settingsDrop'); settingsGroupsRefresh(true);
         if(!openNow) throw new Error('goSettings did not open ⚙️ at its section');

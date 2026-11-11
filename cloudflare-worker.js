@@ -1,4 +1,10 @@
-// Tony's Recipes — Cloudflare Worker v105
+// Tony's Recipes — Cloudflare Worker v106
+// v106: A PAGE'S OWN RECIPE DATA (the audit of 10 Nov 2026, item C2; Tony, 11 Nov: "Yes"). fetch-url also returns
+//   `recipes`: the schema.org Recipe objects the page publishes in <script type="application/ld+json"> (what Google
+//   reads for its recipe cards) — @graph, ItemList and mainEntity followed; HowToStep / HowToSection; ISO durations
+//   ("PT1H30M" → "1 h 30 min"); entities decoded and tags taken out; a raw line break inside a string escaped; only a
+//   recipe with a name, two ingredients and a step; at most 30. The app (v39.68) builds the recipe from them without
+//   the AI. Nothing else in the answer changes.
 // v105: THE PAGE, VIDEO AND PHOTO FETCHES TAKE A SIGN-IN (the audit of 10 Nov 2026, item S1; Tony, 11 Nov: "3. Yes").
 //   fetch-url, facebook-fetch, instagram-fetch, fb-probe, video-from-url, video-recipe, photo-fetch and photo-search
 //   take `idToken`; a token that is there must be a valid Firebase sign-in of a served project with a confirmed address
@@ -495,7 +501,7 @@
 //   AI_MAX_TOKENS   – the longest answer one call may ask for (32000; the
 //                     app's largest, reading several recipes at once, asks 8000).
 
-const WORKER_VERSION = 'v105';
+const WORKER_VERSION = 'v106';
 // v105 (audit S1) — the actions that take a sign-in, and whether a call without one is still served (see the top).
 const SIGNED_ACTIONS = new Set(['fetch-url', 'facebook-fetch', 'instagram-fetch', 'fb-probe', 'video-from-url',
   'video-recipe', 'photo-fetch', 'photo-search', 'video-ticket']);
@@ -1603,7 +1609,11 @@ async function handleRequest(request, env, ctx) {
           .trim();
         const truncated = text.length > LIMIT;
         if (truncated) text = text.slice(0, LIMIT);
-        return jsonResp({ text, links, truncated, fullLength: truncated ? undefined : text.length });
+        // v106 (audit C2) — and the recipe the page publishes about itself, when it does.
+        let recipes = [];
+        try { recipes = ldRecipes(html); } catch (e) { recipes = []; }
+        return jsonResp({ text, links, truncated, fullLength: truncated ? undefined : text.length,
+          recipes: recipes.length ? recipes : undefined });
       } catch(err) {
         return jsonResp({ error: err.message, text: '' });
       }
@@ -2010,6 +2020,122 @@ async function verifyIdToken(token, env) {
   if (!(claims.iat < now + 300) || !claims.sub) throw new Error('not valid yet');
   return claims;
 }
+// v106 (audit C2, Tony: "Yes") — the recipe a page publishes about itself: schema.org Recipe in <script type="application/ld+json">
+// (what Google reads for its recipe cards, so most recipe sites have it). Returned to the app as plain lists; the app
+// builds the recipe from them without asking the AI. Anything unexpected is skipped, never thrown.
+const LD_MAX_RECIPES = 30;
+function ldText(v) {
+  if (v == null) return '';
+  if (typeof v === 'number') return String(v);
+  if (typeof v !== 'string') return '';
+  return v.replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]*>/g, ' ')
+    .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#0*39;|&apos;/g, "'")
+    .replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&#(\d+);/g, (m, n) => { const c = Number(n); return c > 0 && c < 0x110000 ? String.fromCodePoint(c) : ''; })
+    .replace(/&#x([0-9a-f]+);/gi, (m, n) => { const c = parseInt(n, 16); return c > 0 && c < 0x110000 ? String.fromCodePoint(c) : ''; })
+    .replace(/[ \t ]+/g, ' ').replace(/\s*\n\s*/g, '\n').trim();
+}
+function ldIsRecipe(o) {
+  const t = o && o['@type'];
+  return t === 'Recipe' || (Array.isArray(t) && t.indexOf('Recipe') !== -1) || /(^|\/)Recipe$/.test(String(t || ''));
+}
+// "PT1H30M" → "1 h 30 min"; anything else as it was (some sites write "30 minutes").
+function ldDuration(v) {
+  const s = ldText(Array.isArray(v) ? v[0] : v);
+  const m = /^P(?:(\d+)D)?(?:T(?:(\d+(?:\.\d+)?)H)?(?:(\d+(?:\.\d+)?)M)?(?:(\d+)S)?)?$/i.exec(s);
+  if (!m) return s.slice(0, 40);
+  const min = (Number(m[1] || 0) * 24 + Number(m[2] || 0)) * 60 + Number(m[3] || 0);
+  if (!min) return '';
+  const h = Math.floor(min / 60), r = Math.round(min % 60);
+  return (h ? h + ' h' : '') + (h && r ? ' ' : '') + (r ? r + ' min' : '');
+}
+function ldSteps(v, out, depth) {
+  out = out || []; depth = depth || 0;
+  if (depth > 4 || out.length > 200) return out;
+  if (typeof v === 'string') {
+    const t = ldText(v);
+    // one string holding the whole method: its lines (or numbered sentences) are the steps
+    t.split(/\n+|(?:^|\s)(?=\d{1,2}[.)]\s)/).map(x => x.replace(/^\d{1,2}[.)]\s*/, '').trim()).filter(Boolean).forEach(x => out.push(x));
+    return out;
+  }
+  if (Array.isArray(v)) { v.forEach(x => ldSteps(x, out, depth + 1)); return out; }
+  if (v && typeof v === 'object') {
+    const t = [].concat(v['@type'] || []);
+    if (t.indexOf('HowToSection') !== -1 || (v.itemListElement && !v.text)) {
+      const name = ldText(v.name);
+      if (name) out.push({ sub: name.slice(0, 200) });
+      ldSteps(v.itemListElement || v.steps || [], out, depth + 1);
+      return out;
+    }
+    const text = ldText(v.text || v.name || v.description);
+    if (text) out.push(text);
+  }
+  return out;
+}
+function ldImage(v) {
+  if (!v) return '';
+  if (typeof v === 'string') return /^https?:\/\//.test(v) ? v : '';
+  if (Array.isArray(v)) { for (const x of v) { const u = ldImage(x); if (u) return u; } return ''; }
+  if (typeof v === 'object') return ldImage(v.url || v.contentUrl || '');
+  return '';
+}
+function ldList(v) { return (Array.isArray(v) ? v : v == null ? [] : [v]).map(x => ldText(typeof x === 'object' && x ? x.name : x)).filter(Boolean); }
+function ldOne(o) {
+  const name = ldText(o.name || o.headline).slice(0, 300);
+  const ingredients = ldList(o.recipeIngredient || o.ingredients).map(x => x.replace(/\n+/g, ' ').slice(0, 400)).slice(0, 150);
+  const steps = ldSteps(o.recipeInstructions).map(x => typeof x === 'string' ? x.slice(0, 2000) : x).slice(0, 150);
+  if (!name || ingredients.length < 2 || !steps.some(x => typeof x === 'string')) return null;   // too little to be the recipe
+  const yieldV = Array.isArray(o.recipeYield) ? o.recipeYield : [o.recipeYield];
+  return {
+    name, ingredients, steps,
+    servings: ldText(yieldV.find(x => x != null && /\d/.test(String(x))) || yieldV[0]).slice(0, 60),
+    totalTime: ldDuration(o.totalTime) || '', prepTime: ldDuration(o.prepTime) || '', cookTime: ldDuration(o.cookTime) || '',
+    category: ldList(o.recipeCategory).slice(0, 3), cuisine: ldList(o.recipeCuisine).slice(0, 3),
+    keywords: (Array.isArray(o.keywords) ? o.keywords.join(',') : ldText(o.keywords)).split(',').map(s => s.trim()).filter(Boolean).slice(0, 12),
+    description: ldText(o.description).slice(0, 600),
+    image: ldImage(o.image).slice(0, 1000),
+  };
+}
+// Many sites write a raw line break inside a JSON string, which JSON does not allow: escaped there (and only there).
+function ldEscapeControls(raw) {
+  let out = '', inStr = false, esc = false;
+  for (const ch of raw) {
+    if (inStr) {
+      if (esc) { esc = false; out += ch; continue; }
+      if (ch === '\\') { esc = true; out += ch; continue; }
+      if (ch === '"') { inStr = false; out += ch; continue; }
+      const c = ch.charCodeAt(0);
+      if (c < 0x20) { out += ch === '\n' ? '\\n' : ch === '\t' ? '\\t' : ch === '\r' ? '' : ' '; continue; }
+      out += ch;
+    } else { if (ch === '"') inStr = true; out += ch; }
+  }
+  return out;
+}
+function ldRecipes(html) {
+  const out = [], seen = new Set();
+  const re = /<script\b[^>]*type\s*=\s*["']?application\/ld\+json["']?[^>]*>([\s\S]*?)<\/script>/gi;
+  let m, blocks = 0;
+  const visit = (o, depth) => {
+    if (!o || typeof o !== 'object' || depth > 6 || out.length >= LD_MAX_RECIPES) return;
+    if (Array.isArray(o)) { o.forEach(x => visit(x, depth + 1)); return; }
+    if (ldIsRecipe(o)) {
+      const r = ldOne(o);
+      if (r && !seen.has(r.name + '|' + r.ingredients.length)) { seen.add(r.name + '|' + r.ingredients.length); out.push(r); }
+      return;
+    }
+    ['@graph', 'mainEntity', 'mainEntityOfPage', 'itemListElement', 'item', 'hasPart'].forEach(k => { if (o[k] && typeof o[k] === 'object') visit(o[k], depth + 1); });
+  };
+  while ((m = re.exec(html)) && blocks < 40) {
+    blocks++;
+    let raw = m[1].trim().replace(/^<!--|-->$/g, '').replace(/^\s*\/\/\s*<!\[CDATA\[|\/\/\s*\]\]>\s*$/g, '');
+    let data = null;
+    try { data = JSON.parse(raw); }
+    catch (e) { try { data = JSON.parse(ldEscapeControls(raw)); } catch (e2) { data = null; } }   // raw line breaks inside strings
+    if (data) visit(data, 0);
+  }
+  return out;
+}
+
 // v105 (audit S1) — the caller of a page, video or photo fetch. → { claims } signed in; {} no token while calls
 // without one are still served; { resp } refused. A token that is there is always checked: a bad one is never
 // served as though it were absent.
@@ -4371,4 +4497,4 @@ export default {
   }
 };
 
-// ── END OF WORKER v105 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
+// ── END OF WORKER v106 ── If this is the last line in the Cloudflare editor, the whole file was pasted.

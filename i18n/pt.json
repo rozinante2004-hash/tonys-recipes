@@ -1,7 +1,7 @@
 {
  "lang": "pt",
  "updatedAt": 1794349607507,
- "count": 2621,
+ "count": 2622,
  "strings": {
   "\"Add to Home Screen\"": "Adicionar à tela inicial",
   "\"Open Bring!\"": "Abrir Bring!",
@@ -2286,6 +2286,7 @@
   "📄 Exported {1} recipe{2} to Word!": "📄 {1} receita{2} exportada{2} para Word!",
   "📄 Preparing: {1}…": "📄 Preparando: {1}…",
   "📄 Step 4: Text extracted ({1} chars), sending to AI…": "📄 Etapa 4: texto extraído ({1} caracteres), enviando para a IA…",
+  "📄 Taken as the site itself publishes it — no AI was needed.": "📄 Obtida tal como o próprio site a publica — sem precisar de IA.",
   "📄 Word": "📄 Word",
   "📊 Difficulty": "📊 Dificuldade",
   "📊 Households (management)": "📊 Famílias (gerenciamento)",
