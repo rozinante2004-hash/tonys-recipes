@@ -4,7 +4,8 @@ What runs where, who puts it there, and what depends on what. Written for Tony
 and for whoever works on the app next. It holds **no secrets**: settings are
 named, never given. Updated for **v36.93** (27 Sep 2026).
 
-For *why* things are the way they are, see [`CLAUDE.md`](CLAUDE.md). For a
+For *why* things are the way they are, see [`CLAUDE.md`](CLAUDE.md) and the history under
+[`docs/history/`](docs/history/). For a
 full specification from which the app could be rebuilt, see
 [`RECONSTRUCTION_PROMPT.md`](RECONSTRUCTION_PROMPT.md).
 

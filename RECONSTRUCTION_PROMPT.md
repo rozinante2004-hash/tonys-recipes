@@ -107,8 +107,9 @@ slide‑up modal animation.
 ## 1b. The household era, the community app and the owner's tools (v36.84 – v38.69)
 
 Everything in this section came after the single-collection design described in the rest of the
-file. Where the two disagree, **this section wins**. The working notes (`CLAUDE.md`, the bullet
-"WP-D — HOUSEHOLDS" and the release notes under it) hold the long version of each item.
+file. Where the two disagree, **this section wins**. The working notes hold the long version of each item: `docs/history/traps.md` (the bullet
+"WP-D — HOUSEHOLDS" and the traps under it) and `docs/history/2026-10.md`, `2026-11.md` (the release notes;
+split out of `CLAUDE.md` on 11 Nov 2026 — `CLAUDE.md` keeps the rules and "where things stand").
 
 ### 1b.1 Three copies, three branches, three Firebase projects
 
@@ -138,7 +139,8 @@ file. Where the two disagree, **this section wins**. The working notes (`CLAUDE.
   that release, with CI green, are `main` AND `beta` fast-forwarded to the same commit:
   `git push origin <sha>:refs/heads/main <sha>:refs/heads/beta` (check
   `git merge-base --is-ancestor origin/main <sha>` and the same for beta first). After every release,
-  check each job that ran (below) and record the release in `CLAUDE.md`.
+  check each job that ran (below) and record the release at the top of `docs/history/<yyyy-mm>.md`, then update
+  "Live now" in `CLAUDE.md` → START HERE (since 11 Nov 2026; before that, everything was in `CLAUDE.md`).
 - **Version strings (five places + one):** line 1 of index.html, `var APP_VERSION`, the two `>vX<`
   badges, `version.json`, and the "Current version" line of this file (which also names the Worker's
   version). Edit those lines; never find-and-replace.
@@ -647,7 +649,7 @@ his live recipes (households link only within one copy), keeping every owner cap
 - The app: `APP_CONFIG.movedTo` (empty today) — set in the family copy on move day, every visit
   forwards with its path, `?url=` and `#share-text` (`appCopyMovedTo`). The owner's Feedback inbox and
   the all-copies list already work in the community copy (`feedbackInboxHere`, `allCopiesHere`).
-- **Move-day checklist** — in `CLAUDE.md` ("MOVE DAY CHECKLIST"); follow that one.
+- **Move-day checklist** — in `docs/history/traps.md` ("MOVE DAY CHECKLIST"); follow that one.
 - **Done on 13 Oct 2026 (v38.31):** the family household, its accounts (same user ids) and the translations
   are in the community project; the family copy has `movedTo` = https://mykitchennotes.community/ (every
   visit forwards, never on 127.0.0.1/localhost so the suites still run) and `languageSource` =
@@ -679,7 +681,7 @@ closes itself once the new version is installed.
 
 ### 1b.12 After the move (v38.32 – v38.45, 13–16 Oct 2026)
 
-Each item names the function or key to look for; `CLAUDE.md` has the long story of each.
+Each item names the function or key to look for; `docs/history/2026-10.md` has the long story of each.
 
 - **The iPhone Safari tab (v38.34):** Firestore's IndexedDB copy breaks there ("INTERNAL ASSERTION FAILED …
   b815" by the hundred — several tabs, or a tab put away). `fsMemoryOnly()`: an iPhone/iPad Safari TAB
@@ -744,7 +746,7 @@ two-step is required (Ente Auth, both owner accounts; Owner recovery job ready);
 
 ### 1b.13 Testers, allowances and the pre-launch audit (v38.46 – v38.69, 16–20 Oct 2026)
 
-Each item names the function or key to look for; `CLAUDE.md` has the long story of each, and
+Each item names the function or key to look for; `docs/history/2026-10.md` has the long story of each, and
 `AUDIT-2026-10-prelaunch.md` the audit (what was found, measured capacity for 20 testers, what is left).
 
 **A newcomer's first minutes**
@@ -2543,7 +2545,7 @@ lines accept `amount — name` / `amount - name` separators. Editing preserves `
   being *sent*, so any website open in any browser could write a file anywhere the user could.
   A file‑writing daemon whose only client is a public web page cannot be secured, because any
   token it checks ships in `index.html`. `sec_no_local_save_helper` fails if it returns, the
-  `connect-src` loopback exception included. Full account in CLAUDE.md → Traps.
+  `connect-src` loopback exception included. Full account in `docs/history/traps.md`.
 
 ---
 

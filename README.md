@@ -52,8 +52,10 @@ Add a check for every behavioural change.
 ## Documentation
 
 - [`ARCHITECTURE.md`](ARCHITECTURE.md) — what runs where, who deploys it, what depends on what.
-- [`CLAUDE.md`](CLAUDE.md) — working notes. Conventions, decisions that must not be silently
-  reverted, and traps this codebase has already sprung. **Read it before changing anything.**
+- [`CLAUDE.md`](CLAUDE.md) — working notes: the rules, the conventions, the decisions that must not be
+  silently reverted, the traps distilled, and where things stand. **Read it before changing anything.**
+- [`docs/history/`](docs/history/) — the long story: every trap this codebase has sprung (`traps.md`) and
+  every version's note and release record by month (`2026-10.md`, `2026-11.md`, newest first).
 - [`IMPROVEMENT_IDEAS.md`](IMPROVEMENT_IDEAS.md) — the backlog, with what shipped in which version.
 - [`PLAN-5.4-per-recipe-docs.md`](PLAN-5.4-per-recipe-docs.md) — the brief for the one large item
   still outstanding: giving each recipe its own Firestore document.
