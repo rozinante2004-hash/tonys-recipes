@@ -51,7 +51,9 @@ new user why they chose well. A new session remembers nothing: read this first b
   the private artifact "Kitchen Notes Clip Sketch" on Tony's Claude account. **Its sources are kept with it** as the
   artifact's files (`src/template.html.txt`, `src/build.js.txt`, `src/narr.json`, `src/rec.py.txt`); the built page
   itself holds the screenshots and Jon's audio (in `NARR`). The screenshots come from `node tests/screen-walk.js <dir>`.
-- **Next:** Tony listens and decides on the length (trim or keep); then the finished clip: real food photos (his own),
+- **The length stays: 69 seconds, nothing cut** (Tony, 12 Nov, on version 4: "It looks good as it is right now in the
+  clip.").
+- **Next:** (the length is settled) then the finished clip: real food photos (his own),
   close-ups of the buttons, smoother movement, richer sound, and a square video file — the picture recorded from the
   page with Playwright, the sound rendered from the same timeline, joined with ffmpeg (installed in the session).
   Hebrew (Nimrod) after the English is final.
