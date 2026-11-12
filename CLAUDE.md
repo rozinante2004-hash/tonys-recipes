@@ -75,6 +75,8 @@ to `test`; releases only on his yes.
     three of them real lost writes, now logged); CI fails when more than 25 sit around a write.
 13. **H4 — keep the screen walk: done** (Tony: "Sure. Let's do that."): `tests/screen-walk.js`, in the repo since
     v39.63, passes or fails since v39.70 (*How to verify*).
+- **The promotional clip (started 12 Nov 2026): `docs/promo-clip.md`** — the script Tony chose, his decisions, the
+  voice service (ElevenLabs) and what comes next. Not part of the app; nothing of it ships.
 - **Not doing** (Tony: no): U7 collapsing the help suggestions; F3 dropping `.doc`; the page's own photo for an
   import (copyright — *Decisions*).
 - **Still open from earlier audits, Tony's side:** restrict the community app's browser key in two stages (APIs
