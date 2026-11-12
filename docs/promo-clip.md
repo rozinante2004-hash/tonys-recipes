@@ -32,12 +32,26 @@ new user why they chose well. A new session remembers nothing: read this first b
   (30k credits a month), then $11 a month (121k), the highest $99. The API is at api.elevenlabs.io (header
   `xi-api-key`). The key goes in the session's secure form, never in the chat or the repository.
 
-## Where things are
-- **The sketch** (a page that plays: captions, the device's computer voice, our own tones) was published as a private
-  artifact on Tony's Claude account, "Kitchen Notes Clip Sketch" (version 2). Tony: "As sketches go, this is a nice
-  one :-)" and "Let's progress with it." Its source was in the session's scratchpad (not kept); the artifact holds the
-  built page and can be read back from his artifacts list.
-- **Next:** Tony opens the ElevenLabs account and makes an API key; the session asks for it with the secure form
-  (which also allows the host). Then: one line read by Adam, Jon and John for him to choose by ear; the full
-  narration per sentence; the clip rebuilt around the real timings; a video file (square) at the end. Hebrew after
-  the English is final.
+## Where things are (12 Nov 2026, late)
+- **The narrator is Jon** ("Jon - Relaxed, Deep and Approachable", ElevenLabs voice `Cz0K1kOv9tD8l0b5Qu53`). Tony heard the
+  same opening lines by Adam, Jon and John: "Adam and John are talking too fast. They sound sped-up. Only Jon sounds
+  natural." (Adam = "Engaging, Friendly and Bright" `s3TPKV1kjDlVtZbl4Ksh`, John `OEHTkiHZj6OczWZHu0Aj`; Hebrew later:
+  Nimrod `ZiofZHcEBTn5sRySe5h8`, which needs the v4 models.)
+- **The key** is a network secret on Tony's Default cloud environment: host `api.elevenlabs.io`, header `xi-api-key`
+  (he entered it in the environment's settings; the secure form could not open in that long session). Its permissions:
+  Text to Speech and Voices → Read (not Models). ElevenLabs plan: Starter at the $1 first-month promotion, with the
+  commercial licence ("It indeed includes the commercial license").
+- **The narration is recorded** in Jon's voice, one request per scene (`eleven_multilingual_v2`, stability 0.5,
+  similarity 0.75, `previous_text`/`next_text` for a steady tone), with `/with-timestamps` so every word's time is
+  known: 60.9 s of speech (3.6, 9.5, 14.4, 14.2, 10.1, 4.6, 4.7 s for scenes 1–7). With 0.45 s before and 0.65 s after
+  each scene the clip runs **68.6 s** — over the 60 s Tony asked for; trimming is his call.
+- **The sketch, version 4**, plays that recording (Web Audio), shows each sentence as a caption when it starts, and
+  moves the pictures when the words are said ("dead", "vanish", "paste", "tap once", "saved", "servings", "the amounts
+  follow", "shopping list", "pantry", "language", "share", "family", "latest version", "computer", "offline"). It is
+  the private artifact "Kitchen Notes Clip Sketch" on Tony's Claude account. **Its sources are kept with it** as the
+  artifact's files (`src/template.html.txt`, `src/build.js.txt`, `src/narr.json`, `src/rec.py.txt`); the built page
+  itself holds the screenshots and Jon's audio (in `NARR`). The screenshots come from `node tests/screen-walk.js <dir>`.
+- **Next:** Tony listens and decides on the length (trim or keep); then the finished clip: real food photos (his own),
+  close-ups of the buttons, smoother movement, richer sound, and a square video file — the picture recorded from the
+  page with Playwright, the sound rendered from the same timeline, joined with ffmpeg (installed in the session).
+  Hebrew (Nimrod) after the English is final.
