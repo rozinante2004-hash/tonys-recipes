@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.70 -->
+<!-- Tony's Recipes Collection v39.71 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -11111,7 +11111,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.70';
+var APP_VERSION = 'v39.71';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -14643,7 +14643,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.70</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.71</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14731,7 +14731,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.70</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.71</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -35754,7 +35754,15 @@ var HELP_SYSTEM_PROMPT = [
   "- Select which ingredients to send (all checked by default)",
   "- Tap 📲 Open in Bring! — Bring!'s own page opens with those ingredients; choose your list there",
   "- NO BRING! APP YET? The Send to Bring! window links to it: the App Store on an iPhone or iPad, Google Play on Android, Bring!'s own page on a computer (its phone apps, and Bring! on the web). On a phone without Bring!, 📲 Open in Bring! itself goes to the store",
-  "- SAMSUNG PHONES (Samsung Internet): Bring! may open the Galaxy Store or Play Store instead of the list, and opening Bring! from there loses it. Fix it once: Samsung Internet's ☰ menu → Settings → Useful features → turn on 'Open links in other apps'; or use the app in Chrome. The Send to Bring! window stays open with the ingredients still ticked, so 📲 Open in Bring! can simply be pressed again",
+  // v39.71 — Tony, 12 Nov 2026: a tester's Samsung phone opened the store instead of Bring!; "We should add to the Help, if
+  // someone asks about this issue the solution" — his five steps, word for word, and why.
+  "- SAMSUNG PHONES — 🛒 SEND TO BRING! OPENS THE APP STORE (the Galaxy Store or Google Play) INSTEAD OF BRING!: when someone asks about this, give these five steps, as written:",
+  "  1. Open Samsung Internet.",
+  "  2. Tap ☰ (the menu, bottom right), then Settings.",
+  "  3. Tap Useful features.",
+  "  4. Turn on “Open links in other apps”.",
+  "  5. Make sure the Bring! app is installed on the phone, then try sending the shopping list again.",
+  "  Why: with that setting off, Samsung Internet won't hand the link to another app, so it sends the person to the store instead. That happens even when Bring! is installed (and opening Bring! from the store then loses the list). The Send to Bring! window stays open with the ingredients still ticked, so 📲 Open in Bring! can simply be pressed again. Using the app in Chrome instead also avoids it.",
   "",
   "=== FAVOURITES & CLIPS ===",
   "- Tap the ❤ heart on any recipe card to favourite it",
@@ -35904,6 +35912,7 @@ var HELP_SYSTEM_PROMPT = [
   "- ON A PHONE, SMALL BUTTONS: the round buttons at the top, a card's ❤️ and a recipe's tick boxes take a tap a little beside them too, and no text on a touch screen is smaller than 12 pixels.",
   "- ON A PHONE, A WINDOW TOO BIG OR OFF TO ONE SIDE, OR TINY TEXT: every window and menu opens fitted to what the screen shows — even when the page is zoomed (a pinch, or the phone zooming into a text box) — and at its normal size. Text boxes use 16-pixel letters on a touch screen, so the phone does not zoom in when you tap one, and the kitchen's name in the header wraps on a narrow screen (an iPhone with Display Zoom, a small phone) instead of making the page wider than the screen. If it still happens, send the log from ⚙️ → 🔧 Troubleshooting: it notes each window it had to fit, with the zoom and the widths.",
   "- WHITE BLOCKS (white blobs or panels) covering the fields while editing a recipe, sliding as you scroll: that is the GINGER grammar browser extension, not the app. In a window that scrolls it draws its underline layer in the wrong place — in Chrome on any computer (Windows, Mac, Linux). Fix: click Ginger's icon in the browser toolbar → switch it off for this site → reload. The app says so once when it notices Ginger in the editor. Other writing assistants can do the same; switching them off for this site fixes it too",
+  "- 🛒 SEND TO BRING! OPENS THE STORE INSTEAD OF BRING! on a Samsung phone: the five steps under SEND TO BRING! (Samsung Internet's “Open links in other apps”).",
   "- Something not working at all: ⚙️ → 🔧 Troubleshooting → 🧪 Self Test, then 📋 Copy report (or Send to admin)",
   "",
   "=== TIPS ===",

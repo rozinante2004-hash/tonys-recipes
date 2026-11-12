@@ -30,7 +30,7 @@ where.
   `docs/history/2026-11.md`, and update "Live now" here.
 - The rules were last published on 10 Nov 2026 (deploy-rules on 99558ae, success). A push to `test` that changes
   them publishes to the test project only; a release publishes to the family's and the beta's.
-- The Self Tests: **470 pass, 0 fail, 7 skipped** (the network ones) on v39.70, locally.
+- The Self Tests: **471 pass, 0 fail, 7 skipped** (the network ones) on v39.71, locally.
 
 **The audit of 10 Nov 2026 (`AUDIT-2026-11-10.md`) — Tony's answers of 11 Nov, and where each item is.** In the
 order of work; update this list as items land. Each change: Self Tests + knock-outs, the local checks, Help and

@@ -21159,6 +21159,20 @@ window.SELF_TESTS = [
         recipes=saved; if(q) q.value=qv; sortMode=prev; sortPaint(prev); renderGrid();
       }
     } },
+  { id:'help_knows_bring_on_samsung', group:'Features', name:'The help assistant gives Tony’s five steps when Send to Bring! opens the store on a Samsung phone (v39.71)',
+    test: async()=>{
+      // Tony, 12 Nov 2026: a tester's Samsung phone opened the app store instead of Bring!. "We should add to the Help,
+      // if someone asks about this issue the solution" — Samsung Internet's "Open links in other apps", in five steps.
+      var k=String(HELP_SYSTEM_PROMPT);
+      var steps=['1. Open Samsung Internet.', '2. Tap ☰ (the menu, bottom right), then Settings.', '3. Tap Useful features.',
+        '4. Turn on “Open links in other apps”.', '5. Make sure the Bring! app is installed on the phone, then try sending the shopping list again.'];
+      var at=k.indexOf('SAMSUNG PHONES — \u{1F6D2} SEND TO BRING! OPENS THE APP STORE');
+      if(at===-1) throw new Error('Help does not name the problem (Send to Bring! opens the store on a Samsung phone)');
+      steps.forEach(function(st){ var i=k.indexOf(st, at); if(i===-1) throw new Error('Help is missing the step “'+st+'”, or has it out of order'); at=i; });
+      if(!/won't hand the link to another app[^"]*even when Bring! is installed/.test(k)) throw new Error('Help does not say why it happens');
+      if(!/SEND TO BRING! OPENS THE STORE INSTEAD OF BRING! on a Samsung phone/.test(k.slice(k.indexOf('=== IF SOMETHING LOOKS WRONG ===')))) throw new Error('“If something looks wrong” does not point to the steps');
+    } },
+
   { id:'help_knows_whatsapp_import', group:'Features', name:'The help assistant knows how a WhatsApp export is put into the app — by the names the menus really use (v39.42)',
     test: async()=>{
       // v39.42 — Tony: "I have forgotten how to upload a WhatsApp group export to the server. I've tried using the Help,

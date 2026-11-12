@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v39.70` — app. **Worker: v106**, deployed separately and versioned separately
+**Current version:** `v39.71` — app. **Worker: v106**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -825,6 +825,13 @@ invitation-only (unless adding to the tester's household)."
   stays הבעלים.
 - **A recipe never takes a web page's own photo** (Tony, 11 Nov 2026: copyright). Photos come from the person or
   from the photo search, which keeps the photographer's credit and licence; the Worker's `image` (v106) is not used.
+- **Send to Bring! on a Samsung phone** (v38.71, Help v39.71). Samsung Internet (`bringIsSamsung`: `SamsungBrowser/`)
+  will not hand a web link to another app unless its "Open links in other apps" is on, so Bring!'s import link opened
+  the store even with Bring! installed. There the link goes as an Android intent for `ch.publisheria.bring` with the
+  web link as its fallback (`bringLinkFor`); the Send to Bring! window shows a tip (`#bringSamsungTip`) and stays open
+  with the ingredients ticked. The help assistant gives Tony's five steps word for word when asked (Samsung Internet →
+  ☰ bottom right → Settings → Useful features → "Open links in other apps" on → Bring! installed, send again), and
+  why; "If something looks wrong" points to them (Self Test `help_knows_bring_on_samsung`).
 - CI (v39.68): "No new silent catch around a write" — `tools/empty-catches.mjs index.html --max-writes 25` lists every
   error dropped without a word and fails when more than the 25 reviewed sit around a database or server write.
 - CI (v39.64): `self-tests.yml` skips the suite for a commit that already passed on another branch (job
