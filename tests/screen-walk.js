@@ -7,7 +7,14 @@
  * for looking, after a change to the screens):
  *
  *     python3 -m http.server 8137 &
- *     node tests/screen-walk.js <out-dir> [phone-en,phone-he,phone-dark,pc-en] [--port 8137]
+ *     node tests/screen-walk.js [out-dir] [phone-en,phone-he,phone-dark,pc-en] [--port 8137]
+ *
+ * v39.70 — Tony, 11 Nov 2026, on keeping it as a test: "Sure. Let's do that." So it also passes or fails: it exits 1
+ * when a screen did not open (its step threw), the page threw an error, or the page scrolls sideways — those are
+ * always wrong. Small text, small tap targets and things past the screen's edge are listed under "look:" for a person
+ * to judge (many are deliberate: a 10 px version badge, a sideways-scrolling filter row), and do not fail it. The
+ * screenshots (out-dir, by default a folder in the system's temp directory) are the point: look at them.
+ * The people and kitchens are made up (example.com addresses), never real ones.
  */
 function loadPlaywright() {
   for (const m of ['playwright', '/opt/node22/lib/node_modules/playwright']) { try { return require(m); } catch (e) { /* next */ } }
@@ -15,9 +22,10 @@ function loadPlaywright() {
 }
 const { chromium } = loadPlaywright();
 const PORT = (function () { const i = process.argv.indexOf('--port'); return (i > -1 && process.argv[i + 1]) ? process.argv[i + 1] : '8137'; })();
-const fs = require('fs');
-const OUT = process.argv[2]; fs.mkdirSync(OUT, { recursive: true });
-const WANT = (process.argv[3] || 'phone-en,phone-he,phone-dark,pc-en').split(',');
+const fs = require('fs'), os = require('os'), path = require('path');
+const ARGS = process.argv.slice(2).filter((a, i, all) => a !== '--port' && all[i - 1] !== '--port');
+const OUT = ARGS[0] || path.join(os.tmpdir(), 'screen-walk'); fs.mkdirSync(OUT, { recursive: true });
+const WANT = (ARGS[1] || 'phone-en,phone-he,phone-dark,pc-en').split(',');
 const VARIANTS = {
   'phone-en':   { w: 390, h: 844, mobile: true, scheme: 'light', lang: '' },
   'phone-he':   { w: 390, h: 844, mobile: true, scheme: 'light', lang: 'he' },
@@ -26,9 +34,9 @@ const VARIANTS = {
 };
 const FIX = `
   const l = document.getElementById('loginScreen'); if (l) l.style.display = 'none';
-  window._fbUser = { uid: 'uMe', email: 'dana.cohen@example.com', displayName: 'Dana Cohen', emailVerified: true, providerData: [{ providerId: 'google.com' }], getIdToken: async () => 'tok' };
-  window._household = { hid: 'hH', role: 'owner', name: 'Dana’s Kitchen', code: 'MKN-J5DM-F9BX', ownerUid: 'uMe', ownerName: 'Dana Cohen',
-    links: [{ hid: 'hL', name: 'Grandma’s Kitchen', code: 'MKN-QPMV-F5VB', at: 1 }], asking: [] };
+  window._fbUser = { uid: 'uMe', email: 'cook.one@example.com', displayName: 'Cook One', emailVerified: true, providerData: [{ providerId: 'google.com' }], getIdToken: async () => 'tok' };
+  window._household = { hid: 'hH', role: 'owner', name: 'Sample Kitchen', code: 'MKN-J5DM-F9BX', ownerUid: 'uMe', ownerName: 'Cook One',
+    links: [{ hid: 'hL', name: 'Second Kitchen', code: 'MKN-QPMV-F5VB', at: 1 }], asking: [] };
   window.cloudLayout = () => 'households';
   recipes.length = 0;
   const mk = (id, name, cat, extra) => normalizeRecipe(Object.assign({ id, uid: 'u' + id, name, category: cat, emoji: '🍲', time: '45m', servings: 4, difficulty: 'Medium',
@@ -69,8 +77,8 @@ const SCREENS = [
   ['rl-picker', `openAddModal(700005); setTimeout(()=>{ try { var f=document.getElementById('f-ingredients')||document.querySelector('#editOverlay textarea'); rlPickOpen('ing'); } catch(e){ console.log('rlPickOpen: '+e.message); } }, 400)`],
   ['select', `toggleSelectMode(); setTimeout(()=>{ try { selectedIds.add(700001); selectedIds.add(700002); renderGrid(); if(typeof updateDeleteBar==='function') updateDeleteBar(); if(typeof renderSelectBar==='function') renderSelectBar(); } catch(e){} }, 150)`],
   ['ask-admin-delete', `_household.role='viewer'; _household.ownerUid='uX'; toggleSelectMode(); setTimeout(()=>{ try { selectedIds.add(700001); selectedIds.add(700002); renderGrid(); if(typeof deleteSelected==='function') deleteSelected(); } catch(e){ console.log('del: '+e.message); } }, 150)`],
-  ['del-asks', `window.householdCanManage=()=>true; window.hhRef=()=>({ collection:()=>({ get: async()=>({ forEach(f){ [{id:'a1',d:{by:'u1',name:'Yael',what:'recipe',rid:'700002',puid:'',title:'Slow-roasted lamb shoulder with pomegranate',at:Date.now()-3600e3}},{id:'a2',d:{by:'u2',name:'Omer',what:'part',rid:'700007',puid:'p3',title:'Apple cake',at:Date.now()-7200e3}}].forEach(x=>f({id:x.id,data:()=>x.d})); } }) }) }); openDeleteAsks()`],
-  ['family-access', `localStorage.setItem(ACCESS_STORAGE_KEY, JSON.stringify([{ email: 'yael.levi@example.com', name: 'Yael Levi', role: 'write', hhRole: 'editor', uid: 'u1' },{ email: 'omer.cohen@example.com', name: 'Omer Cohen', role: 'read', hhRole: 'viewer', uid: 'u2', asks: true },{ email: 'guest@example.com', name: '', role: 'read', hhRole: 'viewer', pending: true }])); window.householdOf=()=>null; window.householdCanManage=()=>true; openAccessControl()`],
+  ['del-asks', `window.householdCanManage=()=>true; window.hhRef=()=>({ collection:()=>({ get: async()=>({ forEach(f){ [{id:'a1',d:{by:'u1',name:'Cook Two',what:'recipe',rid:'700002',puid:'',title:'Slow-roasted lamb shoulder with pomegranate',at:Date.now()-3600e3}},{id:'a2',d:{by:'u2',name:'Cook Three',what:'part',rid:'700007',puid:'p3',title:'Apple cake',at:Date.now()-7200e3}}].forEach(x=>f({id:x.id,data:()=>x.d})); } }) }) }); openDeleteAsks()`],
+  ['family-access', `localStorage.setItem(ACCESS_STORAGE_KEY, JSON.stringify([{ email: 'cook.two@example.com', name: 'Cook Two', role: 'write', hhRole: 'editor', uid: 'u1' },{ email: 'cook.three@example.com', name: 'Cook Three', role: 'read', hhRole: 'viewer', uid: 'u2', asks: true },{ email: 'guest@example.com', name: '', role: 'read', hhRole: 'viewer', pending: true }])); window.householdOf=()=>null; window.householdCanManage=()=>true; openAccessControl()`],
   ['help', `openHelp()`],
   ['help-answer', `window.aiCall=async()=>'**Link one recipe to another**\\n\\n1. Open the recipe and tap ✏️ Edit.\\n2. Select the words (for example "tahini sauce") and tap 🔗.\\n3. Pick the recipe and save.\\n\\nThe words become a link; ← Back returns you.'; openHelp(); setTimeout(()=>{ try { askHelpQ('How do I link one recipe to another?'); } catch(e){ console.log('help: '+e.message); } }, 300)`],
   ['share-app', `window.hhFoundingOpen=async()=>true; openShareAppModal()`],
@@ -128,16 +136,23 @@ const SCREENS = [
     }
   }
   fs.writeFileSync(`${OUT}/report.json`, JSON.stringify(report, null, 1));
+  const failed = [];
   for (const vn of Object.keys(report)) for (const s of Object.keys(report[vn])) {
     const m = report[vn][s];
-    const flags = [];
-    if (m.sideways > 1) flags.push('sideways ' + m.sideways);
-    if (m.outside.length) flags.push('outside: ' + m.outside.join(' | '));
-    if (m.small.length) flags.push('small: ' + m.small.join(' | '));
-    if (m.taps.length) flags.push('taps: ' + m.taps.join(' | '));
-    if (m.errors.length) flags.push('ERR: ' + m.errors.join(' | '));
-    if (m.logs.length) flags.push('log: ' + m.logs.join(' | '));
-    console.log(vn + '/' + s + ': ' + (flags.length ? flags.join(' ;; ') : 'ok') + ' [' + m.open.join(',') + ']');
+    const bad = [], look = [];
+    if (m.sideways > 1) bad.push('the page scrolls sideways by ' + m.sideways + ' px');
+    if (m.errors.length) bad.push('ERR: ' + m.errors.join(' | '));
+    if (m.logs.length) bad.push('log: ' + m.logs.join(' | '));
+    if (m.outside.length) look.push('outside: ' + m.outside.join(' | '));
+    if (m.small.length) look.push('small: ' + m.small.join(' | '));
+    if (m.taps.length) look.push('taps: ' + m.taps.join(' | '));
+    if (bad.length) failed.push(vn + '/' + s);
+    console.log((bad.length ? 'FAIL ' : 'ok   ') + vn + '/' + s + ' [' + m.open.join(',') + ']'
+      + (bad.length ? '\n       ' + bad.join('\n       ') : '') + (look.length ? '\n       look: ' + look.join(' ;; ') : ''));
   }
   await b.close();
-})();
+  const n = Object.values(report).reduce((a, v) => a + Object.keys(v).length, 0);
+  console.log('\n' + (n - failed.length) + ' of ' + n + ' screens opened cleanly' + (failed.length ? '; FAILED: ' + failed.join(', ') : '')
+    + '. Screenshots: ' + OUT);
+  process.exit(failed.length ? 1 : 0);
+})().catch(e => { console.error(e); process.exit(2); });

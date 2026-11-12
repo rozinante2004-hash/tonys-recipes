@@ -30,7 +30,7 @@ where.
   `docs/history/2026-11.md`, and update "Live now" here.
 - The rules were last published on 10 Nov 2026 (deploy-rules on 99558ae, success). A push to `test` that changes
   them publishes to the test project only; a release publishes to the family's and the beta's.
-- The Self Tests: **466 pass, 0 fail, 7 skipped** (the network ones) on v39.64, locally; 463 on v39.63 in CI too.
+- The Self Tests: **470 pass, 0 fail, 7 skipped** (the network ones) on v39.70, locally.
 
 **The audit of 10 Nov 2026 (`AUDIT-2026-11-10.md`) — Tony's answers of 11 Nov, and where each item is.** In the
 order of work; update this list as items land. Each change: Self Tests + knock-outs, the local checks, Help and
@@ -43,13 +43,14 @@ to `test`; releases only on his yes.
    sends the sign-in (`workerBodySigned`; a video file a ticket, `videoFileTicket`); the Worker checks any token sent
    (`signedCaller`, the address confirmed) but still serves a call with none (`SIGNED_FETCH_DEFAULT = 'accept'`),
    because the apps released before v39.65 send none. **Step 2, after Tony releases v39.65 to Family and Beta:**
-   Worker v106 with `SIGNED_FETCH_DEFAULT = 'require'` (its tests already cover the 'require' mode) — it deploys
+   Worker v107 with `SIGNED_FETCH_DEFAULT = 'require'` (its tests already cover the 'require' mode) — it deploys
    from `test` at once, so push it only once the release is out, and tell Tony.
 4. **C2 — a page's own recipe data, without the AI: v39.68 + Worker v106 on Test** (Tony: "Yes. YouTube" — YouTube
-   goes through the Data API, title + description → AI; page data does not apply there). Follow-up, not done: the
-   page's own photo (`image`, returned by the Worker) as the recipe's photo.
+   goes through the Data API, title + description → AI; page data does not apply there). **The page's own photo is
+   never taken** (Tony, 11 Nov: copyright — see Decisions); the Worker's `image` field is not used.
 5. **H1 — the page size budget: done, v39.64** (2,000 → 2,300 KB; the built page is 1,997 KB).
-6. **U6 — Hebrew in the plural: APPROVED by Tony (11 Nov, after his review; 577 phrases, 124 fixed by hand).** On
+6. **U6 — Hebrew in the plural: APPROVED by Tony (11 Nov, after his review; 577 phrases; 163 set by hand, his
+   wording included: "מנהל/ת משק הבית" for a household's owner, "מנהל האפליקציה" for the app's, v39.70).** On
    Test now as the file `i18n/he.json` (written from the tool, on `test`). **Right after the next release** (when
    he-plural.yml reaches `main` — GitHub starts a workflow by hand only once it is on the default branch), and after
    that release's "Translate new phrases" and "Publish languages" have finished: run it —
@@ -57,7 +58,7 @@ to `test`; releases only on his yes.
    every copy's file; until then a publish would put the singular back on `main`/`test`), then check its run and the
    publish after it. If the central Hebrew changes before the release (someone edits a translation), the publish's
    merge into `test` conflicts on `i18n/he.json`: take `test`'s side and rerun. The prompt (rule 7a) keeps new
-   phrases plural.
+   phrases plural, and the app's owner "מנהל האפליקציה".
 7. **C3 — Explore and Suggest on `AI_MODEL_SMALL`: done, v39.64** — Tony tries them on the test copy. ("What can I
    make" uses no AI: it matches the pantry on the device.)
 8. **C4 — diet tagging in batches of 20: done, v39.64** (`DIET_TAG_BATCH`, `dietTagPrompt`).
@@ -72,7 +73,10 @@ to `test`; releases only on his yes.
     `vendor/libs/xlsx-0.20.3.full.min.js` + its LICENSE; `CDN_XLSX` points at it; the 0.18.5 files are gone.
 12. **H3 — the empty-catch review: done, v39.68.** `tools/empty-catches.mjs` (622 dropped errors; 28 around a write,
     three of them real lost writes, now logged); CI fails when more than 25 sit around a write.
-- **Not doing** (Tony: no): U7 collapsing the help suggestions; F3 dropping `.doc`.
+13. **H4 — keep the screen walk: done** (Tony: "Sure. Let's do that."): `tests/screen-walk.js`, in the repo since
+    v39.63, passes or fails since v39.70 (*How to verify*).
+- **Not doing** (Tony: no): U7 collapsing the help suggestions; F3 dropping `.doc`; the page's own photo for an
+  import (copyright — *Decisions*).
 - **Still open from earlier audits, Tony's side:** restrict the community app's browser key in two stages (APIs
   first, then websites; 🔑 Check the app's key after each); the Pushover licence (bought in the app's 30-day trial,
   ~26 Nov; else https://pushover.net/licensing); Gmail "Send mail as" contact@; the Chrome Web Store listing's
@@ -381,6 +385,13 @@ because a single-file app fails silently and completely on a syntax error.
 **Add a self test for every behavioural change.** Several real bugs in this app were
 found only because a test was written first and disagreed with the code.
 
+**After a change to what is on the screen, walk the screens** (audit H4; Tony, 11 Nov 2026: "Sure. Let's do that."):
+`node tests/screen-walk.js [out-dir] --port 8137` opens 30 screens (the menus, a recipe, a collection, the editor,
+Help, Family Access, the sign-in…) with a made-up kitchen of ten recipes, on a phone in English, Hebrew and dark and
+on a computer, and saves a screenshot of each. It FAILS (exit 1) when a screen did not open, the page threw, or the
+page scrolls sideways; small text, small tap targets and things past the edge are listed as "look:" for a person.
+Look at the screenshots — that is what it is for. Not in CI (about 10 minutes).
+
 ## Conventions
 
 - **Versioning:** minor bumps (`v28.2` → `v28.3`) for ordinary work; majors reserved
@@ -438,6 +449,8 @@ found only because a test was written first and disagreed with the code.
 | **A collection's recipes live in `parts`, and ONLY there.** | A collection's own `ingredients`/`steps` stay EMPTY; everything that wants the whole list calls `allIngredients()`/`allSteps()`. Copying the parts up into the flat fields would spare ~20 read-only consumers a one-line change and create two copies that drift, with no way to say which is right. `isCollection(r)` is derived from `parts.length`, never stored — a stored flag is what let `isVideoBookmark` and `isClip` disagree for three releases. Each part carries its own `uid` **from import**, so promoting the same part on two devices yields one recipe, not two. |
 | **Full photos stay base64, everywhere.** | Export, email and print consume data URLs; only thumbnails are Blobs. The Firebase Storage path (a `photoUrl` pointer instead of base64) was removed in **v34.4** — it needed a paid plan, was never switched on, and put branches into photo sync and backup. ONE shape now. A **backup must stay self-contained**: that is free while photos are base64, but if a remote shape is ever reintroduced, `backupSave` has to download and inline them again. |
 | **A local photo fix must reach the CLOUD.** | The cloud wins on every load — `loadFromFirestore` replaces `recipes` with the cloud copies and the local-photo net only fires when the cloud gives nothing. A rescue that only fixes memory is undone by the next reload, which is why Tony's photos "came back wrong" twice. `runPhotoRescue` awaits `pushLocalPhotosToCloud`; `healCloudPhotos` repairs a cloud already gone wrong. |
+| **Never take a web page's own photo (Tony, 11 Nov 2026).** | "If I save the page's photo, without giving credit to the owner of the photo (I probably won't know it) wouldn't it constitute as theft? I could be sued for it." A recipe's photo comes from the person (their own picture or a link they choose) or from the photo search (Pixabay, Pexels, Unsplash, Wikimedia Commons), which keeps the photographer's credit and licence (`photoCredit`). An import — a page's data (`image` from the Worker's `recipes`, v106), Open Graph, the AI's answer — never sets `r.photo`. |
+| **The app's owner is "מנהל האפליקציה" in Hebrew (Tony, 11 Nov 2026).** | "All should be referred to as "מנהל האפליקציה". Although I am indeed the App's owner, in this capacity I should be referred to as the App's manager." Never בעל/ת האפליקציה, הבעלים של האפליקציה, לבעלי האפליקציה, כלי הבעלים. A household's owner stays הבעלים (or "מנהל/ת משק הבית", his wording in three phrases — "The manager is indeed the admin in this case"). The translation prompt's rule 7a says so (v39.70); `tools/he-plural-overrides.json` carries every hand-set phrase into the central write. |
 | **Sharing produces a file, not a public link.** | Publishing family recipes to a public endpoint is Tony's decision to make, not a share button's. |
 | **Declined:** 3.8 nutrition per-serving; 4.4 filter counts; 4.8 header touch targets. | Asked for and declined. Don't re-propose without reason. **5.6 (CI) was accepted in Aug 2026**; 3.1 (meal planner) is not declined but low priority — Tony cooks once a week. |
 

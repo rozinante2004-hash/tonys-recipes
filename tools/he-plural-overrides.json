@@ -538,5 +538,117 @@
  "{1}The farm visitors are chosen in the family app — every copy uses those.{2}Only the app’s owner chooses the farm visitors.": {
   "from": "{1}מבקרי החווה נבחרים באפליקציית המשפחה — כל עותק משתמש בהם.{2}רק בעל/ת האפליקציה בוחר/ת את מבקרי החווה.",
   "to": "{1}מבקרי החווה נבחרים באפליקציית המשפחה — כל עותק משתמש בהם.{2}רק מנהל האפליקציה בוחר את מבקרי החווה."
+ },
+ "An authenticator app's code on top of your Google sign-in for the owner's tools — so even someone in your mailbox cannot use them (the app's owner only).": {
+  "from": "קוד מאפליקציית אימות בנוסף להתחברות עם Google לכלי הבעלים — כך שגם מי שפרץ לתיבת הדוא\"ל שלכם לא יוכל להשתמש בהם (לבעלי האפליקציה בלבד).",
+  "to": "קוד מאפליקציית אימות בנוסף להתחברות עם Google לכלי מנהל האפליקציה — כך שגם מי שפרץ לתיבת הדוא\"ל שלכם לא יוכל להשתמש בהם (למנהל האפליקציה בלבד)."
+ },
+ "Checks that the key in this copy's page still works for every Firebase service the app uses — before and after you restrict it in Google Cloud (the app's owner only).": {
+  "from": "בודק שהמפתח בעמוד של העותק הזה עדיין עובד עם כל שירות Firebase שהאפליקציה משתמשת בו — לפני ואחרי שתגבילו אותו ב-Google Cloud (לבעלי האפליקציה בלבד).",
+  "to": "בודק שהמפתח בעמוד של העותק הזה עדיין עובד עם כל שירות Firebase שהאפליקציה משתמשת בו — לפני ואחרי שתגבילו אותו ב-Google Cloud (למנהל האפליקציה בלבד)."
+ },
+ "Households, payments, deployments, and the Gmail and Bring! connections — the app's owner only.": {
+  "from": "משקי בית, תשלומים, ארכיטקטורה, וחיבורי Gmail ו-Bring! — לבעלי האפליקציה בלבד.",
+  "to": "משקי בית, תשלומים, ארכיטקטורה, וחיבורי Gmail ו-Bring! — למנהל האפליקציה בלבד."
+ },
+ "Know someone who would enjoy My Kitchen Notes? The beta is by invitation only: ask the app’s owner to invite them. The owner decides, and sends the invitation.": {
+  "from": "מכירים מישהו שיהנה מ-My Kitchen Notes? הגרסה הניסיונית היא בהזמנה בלבד: בקשו מבעל האפליקציה להזמין אותם. הוא מחליט, והוא שולח את ההזמנה.",
+  "to": "מכירים מישהו שיהנה מ-My Kitchen Notes? הגרסה הניסיונית היא בהזמנה בלבד: בקשו ממנהל האפליקציה להזמין אותם. הוא מחליט, והוא שולח את ההזמנה."
+ },
+ "Know someone who would enjoy it? While the app takes new members by invitation only, the share button asks its owner to invite them.": {
+  "from": "מכירים מישהו שיהנה מזה? האפליקציה מצטרפת רק בהזמנה, וכפתור השיתוף פשוט מבקש מבעל האפליקציה להזמין אותם.",
+  "to": "מכירים מישהו שיהנה מזה? האפליקציה מצטרפת רק בהזמנה, וכפתור השיתוף פשוט מבקש ממנהל האפליקציה להזמין אותם."
+ },
+ "Only the app’s owner can send invitations.": {
+  "from": "רק הבעלים של האפליקציה יכול לשלוח הזמנות.",
+  "to": "רק מנהל האפליקציה יכול לשלוח הזמנות."
+ },
+ "Only the owner of the app can do this.": {
+  "from": "רק הבעלים של האפליקציה יכול לעשות זאת.",
+  "to": "רק מנהל האפליקציה יכול לעשות זאת."
+ },
+ "Require it now for your owner’s tools? You will sign in once more, with Google and its code.": {
+  "from": "לדרוש את זה מעכשיו עבור כלי הבעלים? תתחברו פעם נוספת, עם Google והקוד שלו.",
+  "to": "לדרוש את זה מעכשיו עבור כלי מנהל האפליקציה? תתחברו פעם נוספת, עם Google והקוד שלו."
+ },
+ "The app’s owner (through the app’s own server)": {
+  "from": "בעל האפליקציה (דרך השרת שלה)",
+  "to": "מנהל האפליקציה (דרך השרת שלה)"
+ },
+ "The app’s owner account stays": {
+  "from": "חשבון הבעלים של האפליקציה נשאר",
+  "to": "חשבון מנהל האפליקציה נשאר"
+ },
+ "The app’s owner could not be asked from this account: {1}": {
+  "from": "לא הצלחנו לפנות לבעל האפליקציה מהחשבון הזה: {1}",
+  "to": "לא הצלחנו לפנות למנהל האפליקציה מהחשבון הזה: {1}"
+ },
+ "The tester invitation, in English or Hebrew, with this copy's link — sent by the app's own e-mail, one to each person (Gmail as a backup), or by WhatsApp or the mail app (the app's owner only).": {
+  "from": "הזמנת הבודקים, באנגלית או בעברית, עם הקישור של העותק הזה — נשלחת במייל של האפליקציה עצמה, אחד לכל אדם (Gmail כגיבוי), או דרך WhatsApp או אפליקציית המייל (רק לבעל האפליקציה).",
+  "to": "הזמנת הבודקים, באנגלית או בעברית, עם הקישור של העותק הזה — נשלחת במייל של האפליקציה עצמה, אחד לכל אדם (Gmail כגיבוי), או דרך WhatsApp או אפליקציית המייל (רק למנהל האפליקציה)."
+ },
+ "The tester invitation, in English or Hebrew, with this copy's link — sent through your Gmail, one e-mail to each person, or by WhatsApp or the mail app (the app's owner only).": {
+  "from": "הזמנת הבודקים, באנגלית או בעברית, עם הקישור של העותק הזה - נשלחת דרך ה-Gmail שלכם, מייל אחד לכל אדם, או דרך WhatsApp או אפליקציית המייל (רק הבעלים של האפליקציה).",
+  "to": "הזמנת הבודקים, באנגלית או בעברית, עם הקישור של העותק הזה - נשלחת דרך ה-Gmail שלכם, מייל אחד לכל אדם, או דרך WhatsApp או אפליקציית המייל (רק למנהל האפליקציה)."
+ },
+ "Their address, and what you write, goes only to the app’s owner, to decide on the invitation.": {
+  "from": "הכתובת שלהם, והמילים שתכתבו, מגיעות רק לבעל האפליקציה, כדי להחליט על ההזמנה.",
+  "to": "הכתובת שלהם, והמילים שתכתבו, מגיעות רק למנהל האפליקציה, כדי להחליט על ההזמנה."
+ },
+ "Their e-mail address, the name and the words you add about them, the invitation’s language, and who asked — for the app’s owner, to decide on the invitation. Kept like a note to us.": {
+  "from": "כתובת האימייל שלהם, השם והמילים שתוסיפו עליהם, שפת ההזמנה, ומי ביקש — עבור בעל האפליקציה, כדי להחליט על ההזמנה. נשמר כמו פתק אלינו.",
+  "to": "כתובת האימייל שלהם, השם והמילים שתוסיפו עליהם, שפת ההזמנה, ומי ביקש — עבור מנהל האפליקציה, כדי להחליט על ההזמנה. נשמר כמו פתק אלינו."
+ },
+ "This device is signed in with an e-mail link or a password, and the owner’s tools need a sign-in with Google and your authenticator’s code.": {
+  "from": "המכשיר הזה מחובר עם קישור אימייל או סיסמה, וכלי הבעלים דורשים התחברות עם Google וקוד מאפליקציית האימות שלכם.",
+  "to": "המכשיר הזה מחובר עם קישור אימייל או סיסמה, וכלי מנהל האפליקציה דורשים התחברות עם Google וקוד מאפליקציית האימות שלכם."
+ },
+ "This device’s sign-in was made without the code from your authenticator app (it may be older than the authenticator), and the owner’s tools need it.": {
+  "from": "ההתחברות במכשיר הזה בוצעה בלי הקוד מאפליקציית האימות (ייתכן שהיא מלפני השימוש באפליקציית האימות), וכלי הבעלים דורשים אותו.",
+  "to": "ההתחברות במכשיר הזה בוצעה בלי הקוד מאפליקציית האימות (ייתכן שהיא מלפני השימוש באפליקציית האימות), וכלי מנהל האפליקציה דורשים אותו."
+ },
+ "This is the app’s owner account, so the app never deletes it.": {
+  "from": "זהו חשבון הבעלים של האפליקציה, ולכן האפליקציה אף פעם לא מוחקת אותו.",
+  "to": "זהו חשבון מנהל האפליקציה, ולכן האפליקציה אף פעם לא מוחקת אותו."
+ },
+ "You (or someone) already asked for {1} — the request waits for the app’s owner.": {
+  "from": "כבר ביקשתם (או שמישהו ביקש) עבור {1} — הבקשה ממתינה לבעל האפליקציה.",
+  "to": "כבר ביקשתם (או שמישהו ביקש) עבור {1} — הבקשה ממתינה למנהל האפליקציה."
+ },
+ "{1}Changes that cannot be undone need the owner to sign in with Google again (and the authenticator’s code, once that is switched on).": {
+  "from": "{1}שינויים שלא ניתן לבטל דורשים מהבעלים להתחבר שוב עם Google (ועם קוד האימות, ברגע שהוא יופעל).",
+  "to": "{1}שינויים שלא ניתן לבטל דורשים ממנהל האפליקציה להתחבר שוב עם Google (ועם קוד האימות, ברגע שהוא יופעל)."
+ },
+ "{1}The authenticator is not switched on for this copy’s sign-in yet (one setting in Firebase — the owner’s step in the instructions). Nothing changed.{2}Could not start it: {3}": {
+  "from": "{1}אפליקציית האימות עדיין לא מופעלת עבור הכניסה בעותק הזה (הגדרה אחת ב-Firebase — השלב של הבעלים בהוראות). שום דבר לא השתנה.{2}לא ניתן היה להפעיל אותה: {3}",
+  "to": "{1}אפליקציית האימות עדיין לא מופעלת עבור הכניסה בעותק הזה (הגדרה אחת ב-Firebase — השלב של מנהל האפליקציה בהוראות). שום דבר לא השתנה.{2}לא ניתן היה להפעיל אותה: {3}"
+ },
+ "{1}🔐 Your owner’s tools now need the authenticator’s code.{2}The authenticator is no longer required.": {
+  "from": "{1}🔐 כלי הבעלים שלכם דורשים כעת את הקוד מאפליקציית האימות.{2}אפליקציית האימות כבר לא נדרשת.",
+  "to": "{1}🔐 כלי מנהל האפליקציה דורשים כעת את הקוד מאפליקציית האימות.{2}אפליקציית האימות כבר לא נדרשת."
+ },
+ "✅ Require it for the owner’s tools": {
+  "from": "✅ לדרוש אותה עבור כלי הבעלים",
+  "to": "✅ לדרוש אותה עבור כלי מנהל האפליקציה"
+ },
+ "✉️ {1} new invitation request(s) — ⚙️ → 👑 App owner → 📊 Households → ✉️ Beta invitation requests": {
+  "from": "✉️ {1} בקשות הזמנה חדשות — ⚙️ → 👑 בעל האפליקציה → 📊 משקי בית → ✉️ בקשות הזמנה לבטא",
+  "to": "✉️ {1} בקשות הזמנה חדשות — ⚙️ → 👑 מנהל האפליקציה → 📊 משקי בית → ✉️ בקשות הזמנה לבטא"
+ },
+ "📨 Sent — the app’s owner decides, and if yes, the invitation goes to {1}.": {
+  "from": "📨 נשלח — בעל האפליקציה מחליט, ואם כן, ההזמנה תישלח ל-{1}.",
+  "to": "📨 נשלח — מנהל האפליקציה מחליט, ואם כן, ההזמנה תישלח ל-{1}."
+ },
+ "🔐 Two-step sign-in for the owner": {
+  "from": "🔐 כניסה דו-שלבית לבעלים",
+  "to": "🔐 כניסה דו-שלבית למנהל האפליקציה"
+ },
+ "🔐 Two-step sign-in for the owner — {1} {2}": {
+  "from": "🔐 כניסה דו-שלבית לבעלים — {1} {2}",
+  "to": "🔐 כניסה דו-שלבית למנהל האפליקציה — {1} {2}"
+ },
+ "Deployments are for the owner of this app.": {
+  "from": "ארכיטקטורה - לאדמין בלבד",
+  "to": "ארכיטקטורה - למנהל האפליקציה בלבד"
  }
 }

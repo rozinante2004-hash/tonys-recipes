@@ -17159,13 +17159,16 @@ window.SELF_TESTS = [
       } finally { window._fbUser=realUser; window.fetch=realFetch; _workerHealth=realHealth; }
     } },
 
-  { id:'i18n_prompt_hebrew_plural', group:'Features', name:'The AI is told to write Hebrew in the plural, and only Hebrew (v39.66, audit U6)',
+  { id:'i18n_prompt_hebrew_plural', group:'Features', name:'The AI is told to write Hebrew in the plural, and to call the app\u2019s owner “מנהל האפליקציה” — only Hebrew (v39.66, v39.70)',
     test: async()=>{
       // Tony: "Plural". The central Hebrew is rewritten to the plural (.github/workflows/he-plural.yml); without this
       // rule every release's new phrases came back in the masculine singular from the AI.
       var he=i18nPrompt('he', ['Send the request']), fr=i18nPrompt('fr', ['Send the request']);
       if(!/HEBREW: address the reader in the PLURAL/.test(he)) throw new Error('the Hebrew prompt does not ask for the plural');
       if(he.indexOf('לחצו')===-1 || he.indexOf('שלכם')===-1) throw new Error('the Hebrew prompt gives no plural examples');
+      // v39.70 — Tony: the app's owner is "מנהל האפליקציה", as the 👑 button says, never בעל האפליקציה.
+      if(he.indexOf('is always מנהל האפליקציה')===-1 || he.indexOf('never בעל האפליקציה')===-1) throw new Error('the Hebrew prompt does not name the app\u2019s owner \u201cמנהל האפליקציה\u201d');
+      if(fr.indexOf('מנהל האפליקציה')!==-1) throw new Error('the Hebrew app-owner rule is given to another language');
       if(/HEBREW/.test(fr)) throw new Error('the Hebrew rule is given to another language');
       if(he.indexOf('Strings:\n0. Send the request')===-1) throw new Error('the strings no longer follow the rules');
     } },

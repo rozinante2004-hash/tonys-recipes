@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v39.69` — app. **Worker: v106**, deployed separately and versioned separately
+**Current version:** `v39.70` — app. **Worker: v106**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -799,7 +799,9 @@ invitation-only (unless adding to the tester's household)."
   never the page's path. `_headers` at the root (copied into every build): the Cloudflare copies answer with
   `X-Frame-Options: DENY`, `Content-Security-Policy: frame-ancestors 'none'`, `nosniff`, a referrer policy (v39.63).
 - The help window's answers (`askHelp`): 🔍 Details beside numbered/bulleted steps only; an answer with no steps keeps
-  one per line (v39.63). `tests/screen-walk.js` walks every screen in four variants with screenshots and measurements.
+  one per line (v39.63). `tests/screen-walk.js` walks every screen in four variants with screenshots and measurements;
+  since v39.70 it fails (exit 1) on a screen that did not open, a page error or a sideways scroll, and lists the rest
+  (small text, small taps, past the edge) under "look:". Its people and kitchens are made up (example.com).
 - **The page, video and photo fetches take the sign-in (v39.65 + Worker v105, audit S1).** The app's
   `workerBodySigned(payload)` adds `idToken` (from `fbSignedInUser().getIdToken()`; none when signed out or not to be
   had) to fetch-url, facebook-fetch, instagram-fetch, video-recipe / video-from-url, photo-fetch and photo-search; a
@@ -816,7 +818,13 @@ invitation-only (unless adding to the tester's household)."
   pronoun forms), reading and writing the CENTRAL Hebrew document; `.github/workflows/he-plural.yml` runs it by hand
   with `confirm: make it plural`. The central document per language is the source of every `i18n/<lang>.json`: a
   change to an existing phrase must be made there; a NEW phrase translated by hand in the file is taken by the
-  release's `translate-new.mjs` (v39.65).
+  release's `translate-new.mjs` (v39.65). Phrases set by hand (Tony's review) are kept in
+  `tools/he-plural-overrides.json` as {english: {from, to}}; the central write uses one only when `from` is still what
+  the rules make of the central phrase. **The app's owner is "מנהל האפליקציה"** (Tony, v39.70: "in this capacity I
+  should be referred to as the App's manager"), as the 👑 button says — rule 7a tells the AI so; a household's owner
+  stays הבעלים.
+- **A recipe never takes a web page's own photo** (Tony, 11 Nov 2026: copyright). Photos come from the person or
+  from the photo search, which keeps the photographer's credit and licence; the Worker's `image` (v106) is not used.
 - CI (v39.68): "No new silent catch around a write" — `tools/empty-catches.mjs index.html --max-writes 25` lists every
   error dropped without a word and fails when more than the 25 reviewed sit around a database or server write.
 - CI (v39.64): `self-tests.yml` skips the suite for a commit that already passed on another branch (job
