@@ -77,7 +77,7 @@ Tony reviewed the Hebrew script and rewrote parts of it; **these are his words �
 scene by scene, as recorded:
 1. ברוכים הבאים ל-My Kitchen Notes. תראו למה כל כך טוב שהגעתם לכאן.
 2. לא עוד קישורים למתכונים שהולכים לאיבוד בצ'אטים, או מפסיקים לעבוד בדיוק כשצריך אותם. לא עוד דפים מוכתמים מפוזרים על השיש, ונעלמים.
-3. מצאתם מתכון באתר, בסרטון, או בדף ממחברת ישנה? הדביקו את הקישור או צלמו תמונה, הקישו פעם אחת, והוא שמור במטבח שלכם. מאורגן, מלא ושלכם לתמיד.
+3. מצאתם מתכון באתר, בסרטון, או בדף ממחברת ישנה? הדביקו את הקישור או צלמו תמונה, הקליקו פעם אחת, והוא שמור במטבח שלכם. מאורגן, מלא ושלכם לתמיד.
 4. ומנקודה זו, הוא עובד בשבילכם. שנו את מספר המנות, והכמויות מתעדכנות. שלחו את המצרכים לרשימת הקניות. בדקו מה אפשר להכין ממה שכבר יש לכם במזווה. קראו אותו בכל שפה שתרצו.
 5. הרכיבו אוספים: ארוחת חג, או הקלאסיקות של סבתא. ושתפו אותם. המשפחה מצטרפת למטבח שלכם, ולכולם תמיד יש את הגרסה העדכנית.
 6. בטלפון, בטאבלט, במחשב. אפילו כשאין אינטרנט.
@@ -89,7 +89,9 @@ scene 6 "בכל מכשיר. גם ללא אינטרנט.", "מסונכרן בכל
 לתמיד." and "בהזמנה בלבד. בינתיים" (he confirmed). The rest of the on-screen Hebrew (labels, tiles, family) is the draft he
 left unchanged; every text is in the artifact's `src/he.json`. The name is said in English ("Yes. However, I would need
 to hear it, to understand how he copes with English and accent."). The paper notes in Hebrew handwriting: "Great".
-Open: the narration says "הקישו פעם אחת" while his on-screen words are "הקלקה / הקלק" — asked, not changed.
+The narration first said "הקישו פעם אחת"; asked, Tony: "Yes. Use הקליקו instead" — scene 3 was recorded again.
+His verdicts: Nimrod "Yes. His voice is excellent"; the Hebrew recipe names "Fine"; "The Hebrew clip sounds great. We
+can progress with it." 
 
 - **The Hebrew sketch** ("Let's start with a low-budget sketch and progress from there, like we did with the English
   version") is the private artifact "Kitchen Notes Clip Hebrew": **Nimrod** (`ZiofZHcEBTn5sRySe5h8`, model `eleven_v4`,
@@ -102,8 +104,24 @@ Open: the narration says "הקישו פעם אחת" while his on-screen words ar
   כרובית אלמוגים בבשמל קשיו; the collection ארוחת חג; the kitchen המטבח שלנו), the tap positions for the mirrored screens,
   then `node render.js my-kitchen-notes-clip-he.mp4`.
 
+- **The Hebrew video is made (13 Nov 2026):** `my-kitchen-notes-clip-he.mp4`, 68.2 s, 1080 × 1080, 10.2 MB, sent to Tony
+  with a download card (as the English one was, again: `SendUserFile` with `display: "attach"` — the first card offered
+  no download). The app's screens in it are the app in Hebrew (`node shots.js photos/web shots-he he`: the interface
+  language set to Hebrew, Hebrew recipes, the kitchen "המטבח שלנו", the collection "ארוחת חג"); the close-up finds
+  "Import from URL" from where the app drew it (`rects.json` → `--ox/--oy/--hx…` on `.zoom`), so it is right in both
+  directions; the window's own ✕ is hidden for the servings close-up (in a right-to-left screen it floats over it).
+  Nimrod's recordings are about 5.5 dB quieter than Jon's: `he.json` has `voiceGain` 1.85 and everything passes one
+  limiter (`A.out`), so the Hebrew clip is about as loud as the English one (mean −18.4 dB against −16.8 dB).
+  The English MP4 Tony approved ("The clip looks great!") was NOT rendered again after these changes.
+
 ## Afterwards, in the app (Tony, 13 Nov 2026 — not started)
 "After the clips are done, I would like to be able to play them from the Help section and also add a link to them in
-the testers' invites." To settle with him first: where the two MP4 files live (with the app's own site, about 11 MB
-each, or a video site), which clip a person gets (by the app's language), and the invitation's wording. It is an app
-change like any other: a version, Self Tests, Help, translations, his yes for the release.
+the testers' invites." And, 13 Nov: "When saying that I would like to play it from Help, I mean to create some kind of
+an in-app player. We could use it to play other sources as well, like youtube and other clips from the source field.
+We will address it indeed later as it is an app change." Where the files live: "If the clip is playable without having
+to install the app, then the app's own site is fine. However, if installing the app is mandatory for the clip to be
+viewable, then it cannot be used as a marketing tool" — so: the two MP4 files on the app's own site, with a small
+public page that plays them in any browser (no install, no sign-in; outside the app's sign-in gate), linked from the
+invitations; and an in-app player window (the clips by the app's language; later YouTube and a recipe's source clip).
+Still to settle: the invitation's wording. It is an app change like any other: a version, Self Tests, Help,
+translations, his yes for the release.
