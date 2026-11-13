@@ -11780,7 +11780,19 @@ window.SELF_TESTS = [
         if(!/בהזמנה בלבד/.test(he) || !/שאליה נשלחה ההזמנה/.test(he) || !/אם תועבר הלאה, היא לא תכניס/.test(he) || !/\n5\. /.test(he)) throw new Error('Hebrew: '+he);
         if(!/^חדשות טובות: ההזמנה שלכם לבטא/.test(he) || !/לפני כולם/.test(he) || /תעזרו לי|בבקשה/.test(he+INVITE_TEXTS.he.subject)) throw new Error('Hebrew, the tone: '+he.slice(0,160));
         if(!/\n4\. [^\n]*משק הבית שלי \u2190 \u{1F465} ניהול משק בית\./u.test(he) || /כפתור השיתוף/.test(he)) throw new Error('Hebrew, step 4: '+he);
-        if(INVITE_TEXTS_REV < 3) throw new Error('the revision did not move, so a saved older wording is not flagged: '+INVITE_TEXTS_REV);
+        if(INVITE_TEXTS_REV < 4) throw new Error('the revision did not move, so a saved older wording is not flagged: '+INVITE_TEXTS_REV);
+        // v39.73 — Tony: "add a link to the clip (language dependent) to the testers invitations": each invitation links
+        // the clip's public page in its own language, before the steps, and an edit keeps it as {clip}
+        localStorage.removeItem(INVITE_DRAFTS_KEY);
+        var site=(appConfigValue('siteUrl')||(location.origin+'/')).replace(/\/?$/,'/'), ten=inviteText('en').body, the=inviteText('he').body;
+        if(inviteClipLink('en')!==site+'clip.html' || inviteClipLink('fr')!==site+'clip.html' || inviteClipLink('he')!==site+'clip.html?lang=he') throw new Error('the clip\u2019s link: '+inviteClipLink('en')+' / '+inviteClipLink('he'));
+        if(ten.indexOf(site+'clip.html')===-1 || ten.indexOf('clip.html?lang=he')!==-1 || /\{clip\}|\{link\}/.test(ten)) throw new Error('the English invitation does not link the English clip: '+ten.slice(0,400));
+        if(the.indexOf(site+'clip.html?lang=he')===-1 || /\{clip\}|\{link\}/.test(the)) throw new Error('the Hebrew invitation does not link the Hebrew clip: '+the.slice(0,400));
+        if(ten.indexOf('clip.html')>ten.indexOf('\n1. ') || the.indexOf('clip.html')>the.indexOf('\n1. ')) throw new Error('the clip\u2019s link comes after the steps');
+        inviteDraftSave('he', 'S3', the+' !');
+        var k3=JSON.parse(localStorage.getItem(INVITE_DRAFTS_KEY)).he.body;
+        if(k3.indexOf('{clip}')===-1 || k3.indexOf('{link}')===-1 || k3.indexOf('clip.html')!==-1) throw new Error('an edited invitation does not keep the clip\u2019s link as {clip}: '+k3.slice(0,300));
+        if(inviteText('he').body!==the+' !') throw new Error('an edited invitation does not come back with its links');
         // wording kept from before says the original words changed
         localStorage.setItem(INVITE_DRAFTS_KEY, JSON.stringify({ en:{ subject:'S', body:'B {link}' } }));
         inviteDraftSave('he', 'S2', 'B2');
@@ -21202,6 +21214,31 @@ window.SELF_TESTS = [
       }
     } },
 
+  { id:'help_says_an_import_brings_no_photo', group:'Features', name:'The help assistant says an import brings no photo — and an import really sets none (v39.73)',
+    test: async()=>{
+      // Tony, 13 Nov 2026: 'Help says that when importing from a url, the photo is copied automatically
+      // "התמונה של המתכון מועתקת אוטומטית". This is incorrect. Please fix it anywhere it appears.' No text of the app said
+      // so — the assistant made it up. So it is told, in plain words, what an import does and does not bring.
+      var k=String(HELP_SYSTEM_PROMPT), at=k.indexOf('AN IMPORT NEVER BRINGS A PHOTO');
+      if(at===-1) throw new Error('Help does not say that an import brings no photo');
+      var line=k.slice(at, k.indexOf('\n', at));
+      if(!/The page's own photo is NOT copied, taken or saved/.test(line)) throw new Error('Help does not say the page\u2019s photo is not copied');
+      if(!/NEVER say that an import copies, takes, saves or adds the recipe's photo automatically/.test(line)) throw new Error('the assistant is not told never to say it');
+      if(!/\u{1F4F7} Add photo/u.test(line) || !/Auto-fetch missing photos/.test(line) || !/search the web's free photo libraries/.test(line)) throw new Error('Help does not say how to give the recipe a photo');
+      if(k.indexOf('\u{1F517} Import from URL: paste any recipe website URL')>at) throw new Error('the line does not follow Import from URL');
+      // nothing in the help text says the opposite
+      var bad=k.split('\n').filter(function(l){ return l.indexOf('AN IMPORT NEVER BRINGS A PHOTO')===-1 && /(import|url|link)[^.]*photo[^.]*(copied|taken|saved|added) automatically|photo is (copied|taken|imported|saved) (automatically|with the recipe)/i.test(l); });
+      if(bad.length) throw new Error('Help still says a photo comes with an import: '+bad[0].slice(0,160));
+      // and it is true: the button that really exists, and an imported recipe with no photo even when the page offers one
+      if(String(drawView).indexOf("'Add photo'")===-1) throw new Error('the recipe view has no \u{1F4F7} Add photo button to point to');
+      var keepRecipes=recipes, keepNext=nextId, keepCat=activeCat;
+      try{
+        recipes=[];
+        importParsedNow({ name:'ST no photo', ingredients:[{a:'1',n:'egg'}], steps:['Cook.'], source:'https://example.com/r', image:'https://example.com/p.jpg', photo:'https://example.com/p.jpg' }, 'urlImportOverlay');
+        if(recipes.length!==1) throw new Error('the import saved nothing');
+        if(recipes[0].photo) throw new Error('an imported recipe took a photo: '+String(recipes[0].photo).slice(0,60));
+      } finally { recipes=keepRecipes; nextId=keepNext; activeCat=keepCat; renderFilters(); renderGrid(); }
+    } },
   { id:'help_knows_bring_on_samsung', group:'Features', name:'The help assistant gives Tony’s five steps when Send to Bring! opens the store on a Samsung phone (v39.71)',
     test: async()=>{
       // Tony, 12 Nov 2026: a tester's Samsung phone opened the app store instead of Bring!. "We should add to the Help,

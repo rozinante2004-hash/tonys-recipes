@@ -17,8 +17,9 @@ where.
 **Live now**
 - The family's copy (`main`, https://rozinante2004-hash.github.io/tonys-recipes/ — it forwards to the community app)
   and the community app (`beta`, https://mykitchennotes.community, Firebase project my-kitchen-notes-beta) run
-  **v39.63 + Worker v104** (released 11 Nov 2026, 10:01 Israel time, on 3d6a568; the jobs are listed at the top of
-  `docs/history/2026-11.md`). The test copy (https://tonys-recipes-test.pages.dev, its own database and rules)
+  **v39.72 + Worker v106** (released 14 Nov 2026, 00:39 Israel time, on 64d974a; the jobs are listed near the top
+  of `docs/history/2026-11.md`). **v39.73 is on Test** (the clip's link in the invitations, `clip.html`; Help: an
+  import brings no photo; the clips open on the logo) and waits for Tony's yes. The test copy (https://tonys-recipes-test.pages.dev, its own database and rules)
   follows `test`.
 - **The beta has had testers since Sunday 25 Oct 2026** and is **by invitation only**: the owner invites with
   ⚙️ → 👑 → ✉️ Invite testers (the congratulatory wording of v39.60); a tester's share button asks the owner for an
@@ -30,7 +31,7 @@ where.
   `docs/history/2026-11.md`, and update "Live now" here.
 - The rules were last published on 10 Nov 2026 (deploy-rules on 99558ae, success). A push to `test` that changes
   them publishes to the test project only; a release publishes to the family's and the beta's.
-- The Self Tests: **472 pass, 0 fail, 7 skipped** (the network ones) on v39.72, locally.
+- The Self Tests: **473 pass, 0 fail, 7 skipped** (the network ones) on v39.73, locally.
 
 **The audit of 10 Nov 2026 (`AUDIT-2026-11-10.md`) — Tony's answers of 11 Nov, and where each item is.** In the
 order of work; update this list as items land. Each change: Self Tests + knock-outs, the local checks, Help and
@@ -39,25 +40,22 @@ to `test`; releases only on his yes.
 1. **H6 — split CLAUDE.md: done** (this file; `docs/history/`).
 2. **U1(a) — the nutrition box folded on phones: done, v39.64 on Test** (one line, "Nutrition per 100g · 245 kcal ▸",
    a tap opens the four values; a computer always shows them; screenshots sent to Tony).
-3. **S1 — a verified sign-in for the page, video and photo fetches: v39.65 + Worker v105 on Test, STAGED.** The app
+3. **S1 — a verified sign-in for the page, video and photo fetches: v39.65 + Worker v105, released in v39.72 —
+   STEP 2 STILL TO DO.** The app
    sends the sign-in (`workerBodySigned`; a video file a ticket, `videoFileTicket`); the Worker checks any token sent
    (`signedCaller`, the address confirmed) but still serves a call with none (`SIGNED_FETCH_DEFAULT = 'accept'`),
-   because the apps released before v39.65 send none. **Step 2, after Tony releases v39.65 to Family and Beta:**
+   because the apps released before v39.65 send none. **Step 2 — the release is out (14 Nov, 00:39):**
    Worker v107 with `SIGNED_FETCH_DEFAULT = 'require'` (its tests already cover the 'require' mode) — it deploys
-   from `test` at once, so push it only once the release is out, and tell Tony.
+   from `test` at once. Held until about Sunday 15 Nov evening (Israel time) so devices still on v39.63 take the
+   update first — Tony was told on 14 Nov and can say "now" or "hold"; then push it and tell him.
 4. **C2 — a page's own recipe data, without the AI: v39.68 + Worker v106 on Test** (Tony: "Yes. YouTube" — YouTube
    goes through the Data API, title + description → AI; page data does not apply there). **The page's own photo is
    never taken** (Tony, 11 Nov: copyright — see Decisions); the Worker's `image` field is not used.
 5. **H1 — the page size budget: done, v39.64** (2,000 → 2,300 KB; the built page is 1,997 KB).
 6. **U6 — Hebrew in the plural: APPROVED by Tony (11 Nov, after his review; 577 phrases; 163 set by hand, his
    wording included: "מנהל/ת משק הבית" for a household's owner, "מנהל האפליקציה" for the app's, v39.70).** On
-   Test now as the file `i18n/he.json` (written from the tool, on `test`). **Right after the next release** (when
-   he-plural.yml reaches `main` — GitHub starts a workflow by hand only once it is on the default branch), and after
-   that release's "Translate new phrases" and "Publish languages" have finished: run it —
-   `gh workflow run he-plural.yml --ref main -f confirm='make it plural'` — to write the CENTRAL Hebrew (the source of
-   every copy's file; until then a publish would put the singular back on `main`/`test`), then check its run and the
-   publish after it. If the central Hebrew changes before the release (someone edits a translation), the publish's
-   merge into `test` conflicts on `i18n/he.json`: take `test`'s side and rerun. The prompt (rule 7a) keeps new
+   **LIVE since 14 Nov 2026**: he-plural.yml ran on `main` right after the v39.72 release (609 central phrases
+   changed; the publish after it put exactly the approved file on `main` and `test`). The prompt (rule 7a) keeps new
    phrases plural, and the app's owner "מנהל האפליקציה".
 7. **C3 — Explore and Suggest on `AI_MODEL_SMALL`: done, v39.64** — Tony tries them on the test copy. ("What can I
    make" uses no AI: it matches the pantry on the device.)
@@ -76,10 +74,11 @@ to `test`; releases only on his yes.
 13. **H4 — keep the screen walk: done** (Tony: "Sure. Let's do that."): `tests/screen-walk.js`, in the repo since
     v39.63, passes or fails since v39.70 (*How to verify*).
 - **The promotional clip (12–13 Nov 2026): `docs/promo-clip.md`** — both clips are made and approved (English: Jon;
-  Hebrew: Nimrod), with how they are made and Tony's decisions. **v39.72 on Test: the in-app player** plays them
+  Hebrew: Nimrod), with how they are made and Tony's decisions. **The in-app player (v39.72, live)** plays them
   from 🎬 Watch the one-minute clip in 💬 Ask About the App (Hebrew for a Hebrew interface, English otherwise; the
-  files are in `media/`). Still to come, on his word: a public page that plays the clip without the app (for the
-  testers' invitations), the invitation's link, and other sources in the player (YouTube, a recipe's source clip).
+  files are in `media/`). **v39.73 on Test:** `clip.html`, a public page that plays the clip without the app, linked
+  from the testers' invitations in the invitation's language; both files now open on the logo (a chat shows the
+  first frame). Still to come, on his word: other sources in the player (YouTube, a recipe's source clip).
 - **Not doing** (Tony: no): U7 collapsing the help suggestions; F3 dropping `.doc`; the page's own photo for an
   import (copyright — *Decisions*).
 - **Still open from earlier audits, Tony's side:** restrict the community app's browser key in two stages (APIs
@@ -389,6 +388,10 @@ because a single-file app fails silently and completely on a syntax error.
 
 **Add a self test for every behavioural change.** Several real bugs in this app were
 found only because a test was written first and disagreed with the code.
+
+**The clip's public page has its own check** (v39.73): `node tests/clip-page.js --port 8137` (it needs `axe-core`
+where `tests/axe-scan.js` finds it) opens `clip.html` as someone without the app would — English and `?lang=he`,
+phone and computer, light and dark — and is a CI step. Run it after touching `clip.html` or the files in `media/`.
 
 **After a change to what is on the screen, walk the screens** (audit H4; Tony, 11 Nov 2026: "Sure. Let's do that."):
 `node tests/screen-walk.js [out-dir] --port 8137` opens 30 screens (the menus, a recipe, a collection, the editor,

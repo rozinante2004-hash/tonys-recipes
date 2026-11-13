@@ -387,3 +387,11 @@ jobs:
       # a scan of the start page never sees. Serious or critical fails.
       - name: Accessibility scan (axe, every dialog)
         run: node tests/axe-scan.js --port 8137
+
+      # v39.73 — a tester's invitation links to clip.html, and the person who opens it has no app and no
+      # account. Opened as a stranger would (empty browser; phone and computer; light and dark; English and
+      # ?lang=he): the right clip for the language, nothing of the app, nothing from any other site, the whole
+      # clip on the screen, readable. (Playwright's Chromium cannot play H.264, so here it checks the file is
+      # there; where a browser can play it, the clip must start.)
+      - name: The clip's public page (no app needed)
+        run: node tests/clip-page.js --port 8137

@@ -161,6 +161,15 @@ function copyTree(from, to) {
 }
 fs.rmSync(outDir, { recursive: true, force: true });
 copyTree(repo, outDir);
+// v39.73 — the clip's public page (an invitation links to it): it must be in the copy and name both clips, and its
+// link preview points at this copy's own address (the source says the community's).
+{
+  const f = path.join(outDir, 'clip.html');
+  if (!fs.existsSync(f)) fail('clip.html is missing: the invitation\u2019s link to the clip would lead nowhere');
+  let c = fs.readFileSync(f, 'utf8');
+  for (const l of ['en', 'he']) if (c.indexOf('media/my-kitchen-notes-clip-' + l + '.mp4') === -1) fail('clip.html does not play the ' + l + ' clip');
+  if (envName !== 'live' && cfg.siteOrigin) { c = c.split('https://mykitchennotes.community/').join(cfg.siteOrigin + cfg.sitePath); fs.writeFileSync(f, c); }
+}
 // v39.72 — the clips the in-app player names must be in the copy (the page asks for them by these names).
 for (const l of ['en', 'he']) for (const ext of ['mp4', 'jpg']) {
   const f = path.join('media', 'my-kitchen-notes-clip-' + l + '.' + ext);

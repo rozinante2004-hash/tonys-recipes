@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- The one-minute clip for someone who does not have the app (v39.73) — a tester's invitation links here.
+     Tony, 13 Nov 2026: "if installing the app is mandatory for the clip to be viewable, then it cannot be used as a
+     marketing tool". So: a plain page. No app code, no sign-in, nothing stored, nothing loaded from anywhere else.
+     English by default; ?lang=he plays the Hebrew clip (the invitation's language chooses the link). -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self'; media-src 'self'; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
+<meta name="robots" content="noindex">
+<title>My Kitchen Notes — the app in one minute</title>
+<meta name="description" content="A one-minute clip that shows what My Kitchen Notes does.">
+<meta property="og:type" content="video.other">
+<meta property="og:title" content="My Kitchen Notes — the app in one minute">
+<meta property="og:description" content="All your recipes. One place. For good.">
+<meta property="og:url" content="https://mykitchennotes.community/clip.html">
+<meta property="og:image" content="https://mykitchennotes.community/media/my-kitchen-notes-clip-en.jpg">
+<link rel="icon" href="icons/icon-192.png">
+<link href="fonts/fonts.css" rel="stylesheet">
+<style>
+  :root { --bg: #FAF7F2; --ink: #1C1A18; --heading: #5C3D2E; --accent: #C1440E; --muted: #6F6A60; color-scheme: light dark; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #1B1714; --ink: #F1EAE0; --heading: #F1EAE0; --accent: #E8703A; --muted: #B5AA9C; } }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--ink); font-family: 'DM Sans', 'Heebo', system-ui, -apple-system, 'Segoe UI', sans-serif; }
+  main { max-width: 600px; margin: 0 auto; padding: max(20px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(28px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); display: flex; flex-direction: column; gap: 14px; }
+  header { display: flex; align-items: center; gap: 12px; }
+  header img { width: 56px; height: 56px; border-radius: 13px; flex: none; }
+  h1 { margin: 0; font-family: 'Playfair Display', 'Frank Ruhl Libre', Georgia, serif; font-size: 26px; line-height: 1.1; color: var(--heading); }
+  #sub { margin: 2px 0 0; font-size: 14px; color: var(--muted); }
+  video { display: block; width: min(100%, calc(100vh - 220px)); min-width: 240px; aspect-ratio: 1 / 1; height: auto; margin: 0 auto; background: #000; border-radius: 12px; }
+  #tag { margin: 0; text-align: center; font-size: 17px; }
+  #by { margin: 0; text-align: center; font-size: 13px; color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <img src="icons/icon-192.png" alt="" width="56" height="56">
+    <div><h1>My Kitchen Notes</h1><p id="sub">The app in one minute</p></div>
+  </header>
+  <video id="clip" controls playsinline preload="none"></video>
+  <noscript><p><a href="media/my-kitchen-notes-clip-en.mp4">Play the clip</a></p></noscript>
+  <p id="tag">All your recipes. One place. For good.</p>
+  <p id="by">By invitation only. For now</p>
+</main>
+<script>
+// Which clip: Hebrew when the link asks for it (?lang=he) — with the words on this page — English otherwise.
+// Set here and not in the tag above, so a Hebrew visitor's browser never starts on the English still first.
+(function () {
+  var CLIPS = { en: ['media/my-kitchen-notes-clip-en.mp4', 'media/my-kitchen-notes-clip-en.jpg'],
+                he: ['media/my-kitchen-notes-clip-he.mp4', 'media/my-kitchen-notes-clip-he.jpg'] };
+  var he = /[?&]lang=he(&|$)/.test(location.search), d = document, v = d.getElementById('clip'), c = CLIPS[he ? 'he' : 'en'];
+  v.poster = c[1]; v.src = c[0];
+  if (!he) return;
+  d.documentElement.lang = 'he'; d.documentElement.dir = 'rtl';
+  d.getElementById('sub').textContent = 'האפליקציה בדקה אחת';
+  d.getElementById('tag').textContent = 'כל המתכונים שלכם. במקום אחד. לתמיד.';
+  d.getElementById('by').textContent = 'בהזמנה בלבד. בינתיים';
+  d.title = 'My Kitchen Notes — האפליקציה בדקה אחת';
+})();
+</script>
+</body>
+</html>

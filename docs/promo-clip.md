@@ -120,7 +120,33 @@ can progress with it."
   languages link the English version. No point in linking both for everyone. Link it in the "💬 Ask About the App"
   modal. Let's start with creating the in-app player." The two MP4s and their stills are `media/my-kitchen-notes-clip-
   en|he.mp4|.jpg` in the repository; a new render of a clip replaces its file there (and its still: the frame at 3.6 s).
-- Next, on his word: the public page, the invitation's link, other sources in the player.
+- **v39.73 (on Test, 14 Nov 2026): the public page and the invitation's link.** `clip.html` plays the clip for
+  someone without the app (English; `?lang=he` for the Hebrew clip); the testers' invitation links to it in the
+  invitation's language. Details: `docs/history/2026-11.md`, v39.73.
+- Next, on his word: other sources in the player (YouTube, a recipe's source clip).
+
+## The first frame is the logo (14 Nov 2026)
+Tony, with a WhatsApp screenshot of the two files he had sent: "when sending the clips, there is nothing but a blank
+square before starting playback. I would like them to present our logo instead of a blank square." A chat shows a
+video's first frame; scene 1 used to fade in from nothing, so that frame was the empty background over the caption.
+- **The template:** scene 1's logo has the class `open` instead of `pop`, takes `{{iconbig}}` (`icons/icon-512.png`,
+  so it is sharp when large) and runs `@keyframes settle`: for the first 0.3 s it sits in the middle of the picture
+  at 2.6 times its size, then moves into its place by 1.05 s. `openAt()` measures where "the middle" is from where
+  the logo ends up (in the stage's own units, so it holds at any size and in both directions) — after the fonts are
+  in, and again in `__clip.capture()`. Nothing else in the clip changed; the chime and the narration start as before.
+- **The files:** only the opening was made again, so that what Tony approved stays what he approved. `render-open.js`
+  photographs the first 250 frames (8.33 s — exactly the approved file's first group of pictures; its key frames are
+  every 250 frames) and encodes them as `render.js` does; `splice.sh <en|he>` then joins that opening to the approved
+  file's own picture from frame 251 on (`ffmpeg -f segment -segment_frames 250`, then the concat demuxer, `-c copy`)
+  and to the approved file's own sound (`-c copy`). Checked for both: the same frame count and length, no decode
+  error, every frame 1/30 s apart, every frame after the 250th identical to the approved file's, the sound identical;
+  the first 250 differ only in the opening second (after it, about 46 dB against the approved encode — the same
+  pictures, encoded again). A whole new render of the English clip would NOT do: the template's close-up in scene 3
+  moved a little since the English file was approved (41 dB there), so splice, do not re-render.
+- The stills in `media/` (the frame at 3.6 s) did not change. The two new files replaced the old ones in `media/`.
+  The files as Tony first approved them (the input to `splice.sh`, its `approved/` folder) are `media/*.mp4` at commit
+  64d974a. The template, `build.js`, `render-open.js` and `splice.sh` are stored with the clips' pages (the two
+  artifacts, under `src/`), as the other sources are.
 
 ## What Tony asked for, in his words (13 Nov 2026)
 "After the clips are done, I would like to be able to play them from the Help section and also add a link to them in

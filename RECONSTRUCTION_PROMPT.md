@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v39.72` — app. **Worker: v106**, deployed separately and versioned separately
+**Current version:** `v39.73` — app. **Worker: v106**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -840,6 +840,26 @@ invitation-only (unless adding to the tester's household)."
   **🎬 Watch the one-minute clip** at the top of 💬 Ask About the App (`#helpClipBtn`). Meant to grow (Tony: "other
   sources as well, like youtube and other clips from the source field") — not yet. How the clips are made:
   `docs/promo-clip.md`. Self Test `player_plays_the_clip`; `tests/phone-fit.js` opens it on the phone sizes.
+- **The clip's public page and the invitation's link (v39.73).** `clip.html` at the site's root plays the clip for
+  someone who has no app and no account (Tony: "if installing the app is mandatory for the clip to be viewable, then
+  it cannot be used as a marketing tool"): the icon, the name, one `<video controls playsinline preload="none">`, two
+  lines; **no app code, no sign-in, nothing stored, nothing from another site** — its own `<meta>` policy is
+  `default-src 'none'; img-src 'self'; media-src 'self'; font-src 'self'; style-src 'self' 'unsafe-inline';
+  script-src 'unsafe-inline'`; `noindex`. Its one inline script sets the clip and its still: English, or — with
+  `?lang=he` — the Hebrew clip, `dir="rtl"` and the Hebrew lines ("האפליקציה בדקה אחת", "כל המתכונים שלכם. במקום אחד.
+  לתמיד.", "בהזמנה בלבד. בינתיים"). The og tags name the community address; `tools/build.js` rewrites them for every
+  other copy and refuses a copy without the page. The testers' invitation (`INVITE_TEXTS`, revision 4) has one line
+  after its opening paragraph, "🎬 See what it does in one minute: {clip}" / "🎬 סרטון של דקה שמראה מה היא יודעת
+  לעשות: {clip}"; `inviteClipLink(lang)` is the copy's site + `clip.html`, with `?lang=he` for the Hebrew invitation;
+  `inviteText` fills `{clip}` then `{link}`; `inviteDraftSave` puts `{clip}` back first (the site's bare address is a
+  prefix of the clip's). `tests/clip-page.js` opens the page as a stranger (two languages, three sizes, light and
+  dark) and is a CI step.
+- **An import brings no photo — and Help says so (v39.73).** `importParsedNow` saves `photo: ''` whatever the page
+  offers (*a recipe never takes a web page's own photo*, above). The help assistant once told Tony the photo "is
+  copied automatically"; no text said so, so `HELP_SYSTEM_PROMPT` now states it: "AN IMPORT NEVER BRINGS A PHOTO" —
+  the words only; how to add one (📷 Add photo on the recipe's picture: upload, or search the free libraries; or
+  📸 Auto-fetch missing photos); never to say an import copies, takes, saves or adds a photo. Self Test
+  `help_says_an_import_brings_no_photo`.
 - **Send to Bring! on a Samsung phone** (v38.71, Help v39.71). Samsung Internet (`bringIsSamsung`: `SamsungBrowser/`)
   will not hand a web link to another app unless its "Open links in other apps" is on, so Bring!'s import link opened
   the store even with Bring! installed. There the link goes as an Android intent for `ch.publisheria.bring` with the

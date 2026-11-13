@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.72 -->
+<!-- Tony's Recipes Collection v39.73 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -11111,7 +11111,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.72';
+var APP_VERSION = 'v39.73';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -14649,7 +14649,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.72</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.73</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14737,7 +14737,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.72</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.73</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -34154,7 +34154,10 @@ var INVITE_DRAFTS_KEY = 'mkn_invite_drafts', INVITE_SENT_KEY = 'mkn_invite_sent'
 // v38.69 — the original words changed (invitation only, sign in with this address, invite family from inside):
 // wording saved on this device before that says so in the window, until "The original words" or a new edit.
 // v39.60 — rev 3: the congratulatory wording (Tony's), family through 👥 Family Access.
-var INVITE_TEXTS_REV = 3, INVITE_REG_KEY = 'mkn_invite_reg';
+// v39.73 — rev 4: a line with the one-minute clip's link ({clip}) — Tony, 13 Nov 2026: "Please remember to add a link to
+// the clip (language dependent) to the testers invitations". The link is clip.html on this copy's site: a plain page
+// that plays the clip in any browser, no app and no sign-in (the Hebrew invitation's link plays the Hebrew clip).
+var INVITE_TEXTS_REV = 4, INVITE_REG_KEY = 'mkn_invite_reg';
 var INVITE_TEXTS = {
   // v39.60 — Tony, 10 Nov 2026: "less pleading and more congratulatory … I would like them to feel proud/fortunate
   // about the fact that they are given the opportunity to join the app in its Beta stage, before everyone else." His
@@ -34162,6 +34165,8 @@ var INVITE_TEXTS = {
   // access option").
   en: { subject: 'Your seat at the table: the My Kitchen Notes beta \u{1F389}', body: [
     'Good news: your invitation to the My Kitchen Notes beta is here. It is a feature-rich recipe app that keeps every recipe you love in one place, and you get it before everyone else.',
+    '',
+    '\u{1F3AC} See what it does in one minute: {clip}',
     '',
     '1. Open {link} and sign in with Google or with this e-mail address, the one this invitation came to. The beta is by invitation only, and your address is on the list.',
     '2. Start your own collection. It’s private: only you and the people you invite can see it.',
@@ -34173,6 +34178,8 @@ var INVITE_TEXTS = {
   ].join('\n') },
   he: { subject: 'שמרנו לכם מקום ליד השולחן: הבטא של My Kitchen Notes \u{1F389}', body: [
     'חדשות טובות: ההזמנה שלכם לבטא של My Kitchen Notes הגיעה. זו אפליקציית מתכונים עשירה ביכולות, שמרכזת את כל המתכונים שאתם אוהבים במקום אחד, ואתם מקבלים אותה לפני כולם.',
+    '',
+    '\u{1F3AC} סרטון של דקה שמראה מה היא יודעת לעשות: {clip}',
     '',
     '1. היכנסו ל־{link} והתחברו עם Google או עם כתובת המייל הזו, שאליה נשלחה ההזמנה. הבטא פתוחה בהזמנה בלבד, והכתובת שלכם ברשימה.',
     '2. פתחו אוסף מתכונים משלכם. הוא פרטי: רק אתם ומי שתזמינו תראו אותו.',
@@ -34189,16 +34196,23 @@ function inviteLink() {
   var code = (typeof _household !== 'undefined' && _household && _household.code) || '';
   return code ? site.replace(/\/?$/, '/') + '?ref=' + encodeURIComponent(code) : site;
 }
+// The clip's public page on this copy's site, in the invitation's language (v39.73): Hebrew for a Hebrew invitation,
+// English for any other — the same rule as the app's own player (tourClip).
+function inviteClipLink(lang) {
+  var site = (appConfigValue('siteUrl') || (location.origin + '/')).replace(/\/?$/, '/');
+  return site + 'clip.html' + (lang === 'he' ? '?lang=he' : '');
+}
 function inviteJson(key) { try { return JSON.parse(localStorage.getItem(key) || '{}') || {}; } catch (e) { return {}; } }
 // The wording for one language: his own if he changed it on this device, with this copy's link in it.
 function inviteText(lang) {
   var o = INVITE_TEXTS[lang] || INVITE_TEXTS.en, d = inviteJson(INVITE_DRAFTS_KEY)[lang] || {}, link = inviteLink();
   return { subject: typeof d.subject === 'string' ? d.subject : o.subject,
-           body: String(typeof d.body === 'string' ? d.body : o.body).split('{link}').join(link) };
+           body: String(typeof d.body === 'string' ? d.body : o.body).split('{clip}').join(inviteClipLink(lang)).split('{link}').join(link) };
 }
 function inviteDraftSave(lang, subject, body) {
   var o = INVITE_TEXTS[lang]; if (!o) return;
-  var all = inviteJson(INVITE_DRAFTS_KEY), b = String(body || '').split(inviteLink()).join('{link}');
+  // the clip's link first: with no household code the invitation's link is the site's address, which the clip's begins with
+  var all = inviteJson(INVITE_DRAFTS_KEY), b = String(body || '').split(inviteClipLink(lang)).join('{clip}').split(inviteLink()).join('{link}');
   if (subject === o.subject && b === o.body) delete all[lang]; else all[lang] = { subject: String(subject || ''), body: b, rev: INVITE_TEXTS_REV };
   try { if (Object.keys(all).length) localStorage.setItem(INVITE_DRAFTS_KEY, JSON.stringify(all)); else localStorage.removeItem(INVITE_DRAFTS_KEY); } catch (e) {}
 }
@@ -35739,7 +35753,8 @@ var HELP_SYSTEM_PROMPT = [
   "",
   "=== IMPORTING RECIPES ===",
   "Via + Add Recipe ▾ (and 📁 Files & backup ▾ for a file):",
-  "- 🔗 Import from URL: paste any recipe website URL — app fetches and extracts the recipe via AI",
+  "- 🔗 Import from URL: paste any recipe website URL — app fetches and extracts the recipe via AI (the recipe's words — never the page's photo, see the next line)",
+  "- AN IMPORT NEVER BRINGS A PHOTO (v39.73): importing — from a link (a website, YouTube, Instagram, Facebook, TikTok), a file, pasted text or a scan — brings the recipe's words only: its name, ingredients, steps, notes and the link it came from. The page's own photo is NOT copied, taken or saved — on purpose: a photo belongs to whoever took it. So a newly imported recipe has no photo, and shows an emoji in its place. To give it one: open the recipe and tap 📷 Add photo on its picture — upload your own from the device, or 🔍 search the web's free photo libraries (the photographer's credit is kept with it); for many recipes at once, ··· More → 🧹 Tidy up → 📸 Auto-fetch missing photos. NEVER say that an import copies, takes, saves or adds the recipe's photo automatically — it does not. (A scan keeps the picture YOU took of the page, under 📸 Show Original in the recipe; that is your own picture of the page, not a photo of the dish.)",
   "- 📄 A PAGE THAT PUBLISHES ITS RECIPE (v39.68): most recipe sites describe their recipe in a standard form (the one search engines read). When the page has it, the recipe is taken from it as the site wrote it — at once, without the AI — and the preview says '📄 Taken as the site itself publishes it'. A page without it is read by the AI as before",
   "- SIGNED IN FOR THE WEB (v39.65): importing from a web page, a Facebook or Instagram post or a video, and searching for photos, go through the app's own server with your sign-in, so a stranger cannot use it. If the app says 'Sign in first', sign in; 'Confirm your e-mail address first' means the confirmation link we e-mailed you has not been opened yet; 'could not be checked' — reload the app and try again",
   "- YouTube: paste a YouTube URL — extracts recipe from video description",
@@ -35926,6 +35941,7 @@ var HELP_SYSTEM_PROMPT = [
   "- 📊 Households → ✉️ Beta invitation requests (the owner's; v39.61): every request for an invitation, apart from 💬 Feedback — a tester's for someone else (who asked, the person's name, a word about them, the invitation's language) and someone's own, from a sent recipe's link. ✉️ Invite opens ✉️ Invite testers with the address and the language filled in — you see it and press Send (a request from another copy opens that copy's app, where its invitations belong); once sent, the request is done. 🙅 Not now sets it aside (under All; ↩︎ Back to waiting); 🗑 removes it. An address invited before says so. The tab counts the waiting ones, and while one waits a red dot marks the way to it — ⚙️ → 👑 App owner → 📊 Households — as for testers' notes (v39.62); the owner also hears of each by e-mail (and a phone alert: 'Someone asks for an invitation'). In the test copy the tab and the dot are that copy's own requests.",
   "- 📊 Households → 💬 Feedback and ⚠️ Errors (the owner's): tick several (or Select all shown), then 👀 Seen (n), ✅ Done (n) or 🗑 Delete selected (n) for all of them at once. 👀 Seen = read, off the ⚙️ red dot, still under 'Not done yet'; ✅ Done = also off that list (still under All). Deleting several asks once and sends one alert",
   "- ✉️ Invite testers: the tester invitation in English or עברית, with this copy's link; the wording can be changed (this device keeps it; 'The original words' brings it back). Paste the addresses; 📨 Send sends each person their own e-mail from the app's address (contact@…), by the app's own e-mail service — no Google window — and their replies come to that address; up to 40 a day; the owner's sign-in as his other tools need it (with Google, and the authenticator's code once that is on). a small 📧 Backup: send with Gmail below the buttons sends them from the owner's Gmail instead (Google asks for permission the first time, and may say it has not verified the app: Advanced, then continue). Also ✉️ Mail app, 💬 WhatsApp and 📋 Copy",
+  "- (The app's owner) The invitation also carries a link to the one-minute clip (v39.73), in the invitation's language: the Hebrew invitation's link plays the Hebrew clip, the English one's the English clip. It opens a plain page that plays in any browser — the person needs neither the app nor an account to watch it. Wording saved on a device before v39.73 has no such line until 'The original words' is pressed.",
   "- The beta is by invitation only when 📊 Households says so: every address in To (however the invitation goes) may then start a kitchen, signed in with that address; the window says how many are invited. Only a fingerprint of each address is kept, never the address. The invitation asks testers to sign in with that address, not to forward it, and to invite family from inside the app",
   "- 🩺 Server allowances: a table of every free allowance — Cloudflare's day (Worker requests, KV, D1, server errors), Pages builds this month per copy, what is running now, Firestore reads as the apps count them, sign-in-link e-mails (today, the most in a day, days all 5 went, days someone was turned away), and recipe e-mails (today of the app's 90, and Resend's own day and month). ⚠️ near the limit, ⛔ stopped",
   "- 🔐 Two-step sign-in: an authenticator app's 6-digit code on top of the Google sign-in, for the owner's tools",
@@ -36057,7 +36073,7 @@ function openTourClip() {
   var c = tourClip();
   return openPlayer({ title: '\u{1F3AC} The app in one minute', src: c.src, poster: c.poster, aspect: '1 / 1' });
 }
-window.tourClip = tourClip; window.openPlayer = openPlayer; window.playerStop = playerStop; window.openTourClip = openTourClip;
+window.inviteClipLink = inviteClipLink; window.tourClip = tourClip; window.openPlayer = openPlayer; window.playerStop = playerStop; window.openTourClip = openTourClip;
 
 function askHelpQ(q) { document.getElementById('helpInput').value = (_i18nLang !== 'en' && _i18nDict && _i18nDict[q]) || q; askHelp(); }
 
