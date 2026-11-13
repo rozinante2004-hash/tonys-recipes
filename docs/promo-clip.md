@@ -53,7 +53,25 @@ new user why they chose well. A new session remembers nothing: read this first b
   itself holds the screenshots and Jon's audio (in `NARR`). The screenshots come from `node tests/screen-walk.js <dir>`.
 - **The length stays: 69 seconds, nothing cut** (Tony, 12 Nov, on version 4: "It looks good as it is right now in the
   clip.").
-- **Next:** (the length is settled) then the finished clip: real food photos (his own),
-  close-ups of the buttons, smoother movement, richer sound, and a square video file — the picture recorded from the
-  page with Playwright, the sound rendered from the same timeline, joined with ffmpeg (installed in the session).
-  Hebrew (Nimrod) after the English is final.
+- **The English video is made (13 Nov 2026):** `my-kitchen-notes-clip-en.mp4`, 70.1 s, 1080 × 1080, 30 frames a second,
+  H.264 + AAC, 10.9 MB — sent to Tony in the session; the same clip plays as the artifact's page (version 5).
+  - **Tony's own ten photos** ("please ignore the pics I've sent thus far and use these, which I've made myself";
+    "Please feel free to edit the photos as you see fit"): Pickled cucumbers, Turkey Pastrami, Ratatouille, Stuffed
+    cabbage, Roast beef, Beef (sliced, criss-cross crust), Pickled cucumbers and tomatoes, Pickled red cabbage and
+    cucumbers, Stuffed peppers, Romanesco in cashew Béchamel sauce — in Hebrew "כרובית אלמוגים בבשמל קשיו" (his words).
+    Brand names behind two of them are blurred. Photos from the Family app with a BY / BY-SA / CC credit are NOT used
+    in a promotion (credit and share-alike); Pixabay / Pexels / Unsplash licences would do, his own are best.
+  - **The app's real screens with those photos** come from a made-up kitchen ("Our Kitchen", recipes with plain
+    invented ingredients) photographed by `shots.js` (the app served locally; the stand-in account's "Offline mode" and
+    "Sign in to sync" lines hidden, as a signed-in kitchen shows neither): the recipe grid on a phone and a computer,
+    the Add Recipe menu, a whole recipe and a whole collection as tall pictures the clip scrolls through, and the
+    scaling row at ×1 and ×2.
+  - **How the video is made** (`render.js`): the page has `__clip.seek(t)` — every CSS animation paused and set to the
+    clip's clock — so each of the 2,104 frames is exact; `__clip.soundtrack()` renders Jon's recordings, the tune and
+    the effects from the same clock (OfflineAudioContext → WAV); ffmpeg joins them. About 90 seconds to render.
+  - The last scene holds 2.2 s after the last word, so the clip is 70 s (Tony approved the 69 s sketch as it was).
+- **Sources:** with the artifact as its files (`src/template.html.txt`, `build.js.txt`, `render.js.txt`, `shots.js.txt`,
+  `frames.js.txt`, `narr.json`, `rec.py.txt`); Jon's audio and the pictures are inside the built page.
+- **Next: the Hebrew version.** Tony reviews the Hebrew script (text) first — "I'd like to go over it before it becomes
+  a clip". Then: Nimrod's narration (ElevenLabs v4 models), the app's screens in Hebrew, right-to-left layout, Hebrew
+  handwriting on the paper notes.
