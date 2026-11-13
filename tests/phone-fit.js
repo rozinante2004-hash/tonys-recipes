@@ -146,6 +146,7 @@ async function windowsFit(page) {
     ['··· More', "toggleDrop('moreDrop')", '#moreDrop', "closeDrop('moreDrop')"],
     ['⚙️ Settings', "toggleDrop('settingsDrop')", '#settingsDrop', "closeDrop('settingsDrop')"],
     ['Help', 'openHelp()', '#helpOverlay', "document.getElementById('helpOverlay').classList.remove('open')"],
+    ['the player', 'openTourClip()', '#playerOverlay', "closeM('playerOverlay')"],   // v39.72
     ['👥 Family Access', 'openAccessControl()', '#accessOverlay', "document.getElementById('accessOverlay').classList.remove('open')"],
     ['📤 Share', 'toggleShare(9000)', '#shareRecipeOverlay', "document.getElementById('shareRecipeOverlay').classList.remove('open')"],
     ['a question', "askConfirm({ icon: '🔑', title: 'Reset their password?', message: 'Sends someone.with.a.long.address@example.com an e-mail.', okLabel: 'Send the e-mail' })", '#askOverlay', "document.getElementById('askOverlay').remove()"],

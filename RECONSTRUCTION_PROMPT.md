@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v39.71` — app. **Worker: v106**, deployed separately and versioned separately
+**Current version:** `v39.72` — app. **Worker: v106**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -825,6 +825,21 @@ invitation-only (unless adding to the tester's household)."
   stays הבעלים.
 - **A recipe never takes a web page's own photo** (Tony, 11 Nov 2026: copyright). Photos come from the person or
   from the photo search, which keeps the photographer's credit and licence; the Worker's `image` (v106) is not used.
+- **The in-app player (v39.72).** One window, `#playerOverlay` (a `.modal-overlay` like Help's, z-index 900: a title row
+  with the ✕, then `<video id="playerVideo" controls playsinline preload="metadata">` and a note line `#playerNote`).
+  `openPlayer({ title, src, poster, aspect })` sets the title, the picture's shape (`aspect-ratio`, and a width that
+  keeps the whole picture on the screen: `min(100%, (90vh − 150px) × ratio)`), the still and the file, opens the
+  window and starts the clip (it was opened by a tap; where the browser refuses, the ▶ is there). `closeM` calls
+  `playerStop()` for it: pause, the `src` and the still removed, `load()` — a closed player plays nothing. A clip that
+  cannot be played says so in the window ("The clip needs an internet connection…" when offline, else "The clip could
+  not be played here.") and in the log. **The app's own one-minute clip** is its first use: two MP4s (1080 × 1080,
+  about 70 s, 10–11 MB each) and their stills in `media/` (`my-kitchen-notes-clip-en|he.mp4|.jpg`), played from the
+  app's own site — `media-src 'self'`; the service worker does not touch `media/`, so the browser streams and seeks;
+  `tools/build.js` refuses a copy without the four files. `tourClip(lang)`: **Hebrew when the interface is Hebrew,
+  English for every other language** (Tony: "No point in linking both for everyone"). `openTourClip()` is the button
+  **🎬 Watch the one-minute clip** at the top of 💬 Ask About the App (`#helpClipBtn`). Meant to grow (Tony: "other
+  sources as well, like youtube and other clips from the source field") — not yet. How the clips are made:
+  `docs/promo-clip.md`. Self Test `player_plays_the_clip`; `tests/phone-fit.js` opens it on the phone sizes.
 - **Send to Bring! on a Samsung phone** (v38.71, Help v39.71). Samsung Internet (`bringIsSamsung`: `SamsungBrowser/`)
   will not hand a web link to another app unless its "Open links in other apps" is on, so Bring!'s import link opened
   the store even with Bring! installed. There the link goes as an Android intent for `ch.publisheria.bring` with the

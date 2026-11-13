@@ -114,7 +114,15 @@ can progress with it."
   limiter (`A.out`), so the Hebrew clip is about as loud as the English one (mean −18.4 dB against −16.8 dB).
   The English MP4 Tony approved ("The clip looks great!") was NOT rendered again after these changes.
 
-## Afterwards, in the app (Tony, 13 Nov 2026 — not started)
+## In the app
+- **v39.72 (on Test, 13 Nov 2026): the in-app player.** Tony approved the Hebrew clip ("looks great and sounds great")
+  and said where it goes: "The Hebrew clip should be linked if the interface language is Hebrew. For all other
+  languages link the English version. No point in linking both for everyone. Link it in the "💬 Ask About the App"
+  modal. Let's start with creating the in-app player." The two MP4s and their stills are `media/my-kitchen-notes-clip-
+  en|he.mp4|.jpg` in the repository; a new render of a clip replaces its file there (and its still: the frame at 3.6 s).
+- Next, on his word: the public page, the invitation's link, other sources in the player.
+
+## What Tony asked for, in his words (13 Nov 2026)
 "After the clips are done, I would like to be able to play them from the Help section and also add a link to them in
 the testers' invites." And, 13 Nov: "When saying that I would like to play it from Help, I mean to create some kind of
 an in-app player. We could use it to play other sources as well, like youtube and other clips from the source field.

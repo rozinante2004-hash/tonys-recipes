@@ -30,7 +30,7 @@ where.
   `docs/history/2026-11.md`, and update "Live now" here.
 - The rules were last published on 10 Nov 2026 (deploy-rules on 99558ae, success). A push to `test` that changes
   them publishes to the test project only; a release publishes to the family's and the beta's.
-- The Self Tests: **471 pass, 0 fail, 7 skipped** (the network ones) on v39.71, locally.
+- The Self Tests: **472 pass, 0 fail, 7 skipped** (the network ones) on v39.72, locally.
 
 **The audit of 10 Nov 2026 (`AUDIT-2026-11-10.md`) — Tony's answers of 11 Nov, and where each item is.** In the
 order of work; update this list as items land. Each change: Self Tests + knock-outs, the local checks, Help and
@@ -75,8 +75,11 @@ to `test`; releases only on his yes.
     three of them real lost writes, now logged); CI fails when more than 25 sit around a write.
 13. **H4 — keep the screen walk: done** (Tony: "Sure. Let's do that."): `tests/screen-walk.js`, in the repo since
     v39.63, passes or fails since v39.70 (*How to verify*).
-- **The promotional clip (started 12 Nov 2026): `docs/promo-clip.md`** — the script Tony chose, his decisions, the
-  voice service (ElevenLabs) and what comes next. Not part of the app; nothing of it ships.
+- **The promotional clip (12–13 Nov 2026): `docs/promo-clip.md`** — both clips are made and approved (English: Jon;
+  Hebrew: Nimrod), with how they are made and Tony's decisions. **v39.72 on Test: the in-app player** plays them
+  from 🎬 Watch the one-minute clip in 💬 Ask About the App (Hebrew for a Hebrew interface, English otherwise; the
+  files are in `media/`). Still to come, on his word: a public page that plays the clip without the app (for the
+  testers' invitations), the invitation's link, and other sources in the player (YouTube, a recipe's source clip).
 - **Not doing** (Tony: no): U7 collapsing the help suggestions; F3 dropping `.doc`; the page's own photo for an
   import (copyright — *Decisions*).
 - **Still open from earlier audits, Tony's side:** restrict the community app's browser key in two stages (APIs
@@ -453,6 +456,7 @@ Look at the screenshots — that is what it is for. Not in CI (about 10 minutes)
 | **A local photo fix must reach the CLOUD.** | The cloud wins on every load — `loadFromFirestore` replaces `recipes` with the cloud copies and the local-photo net only fires when the cloud gives nothing. A rescue that only fixes memory is undone by the next reload, which is why Tony's photos "came back wrong" twice. `runPhotoRescue` awaits `pushLocalPhotosToCloud`; `healCloudPhotos` repairs a cloud already gone wrong. |
 | **Never take a web page's own photo (Tony, 11 Nov 2026).** | "If I save the page's photo, without giving credit to the owner of the photo (I probably won't know it) wouldn't it constitute as theft? I could be sued for it." A recipe's photo comes from the person (their own picture or a link they choose) or from the photo search (Pixabay, Pexels, Unsplash, Wikimedia Commons), which keeps the photographer's credit and licence (`photoCredit`). An import — a page's data (`image` from the Worker's `recipes`, v106), Open Graph, the AI's answer — never sets `r.photo`. |
 | **The app's owner is "מנהל האפליקציה" in Hebrew (Tony, 11 Nov 2026).** | "All should be referred to as "מנהל האפליקציה". Although I am indeed the App's owner, in this capacity I should be referred to as the App's manager." Never בעל/ת האפליקציה, הבעלים של האפליקציה, לבעלי האפליקציה, כלי הבעלים. A household's owner stays הבעלים (or "מנהל/ת משק הבית", his wording in three phrases — "The manager is indeed the admin in this case"). The translation prompt's rule 7a says so (v39.70); `tools/he-plural-overrides.json` carries every hand-set phrase into the central write. |
+| **The one-minute clip: Hebrew for a Hebrew interface, English for every other language (Tony, 13 Nov 2026).** | "The Hebrew clip should be linked if the interface language is Hebrew. For all other languages link the English version. No point in linking both for everyone. Link it in the '💬 Ask About the App' modal." `tourClip()`. The clips play from the app's own site (`media/`), inside the app's player — no video site; "if installing the app is mandatory for the clip to be viewable, then it cannot be used as a marketing tool", so a link for people without the app must play in a plain browser. The service worker must keep leaving `media/` alone (a cached video cannot be seeked on an iPhone). |
 | **Sharing produces a file, not a public link.** | Publishing family recipes to a public endpoint is Tony's decision to make, not a share button's. |
 | **Declined:** 3.8 nutrition per-serving; 4.4 filter counts; 4.8 header touch targets. | Asked for and declined. Don't re-propose without reason. **5.6 (CI) was accepted in Aug 2026**; 3.1 (meal planner) is not declined but low priority — Tony cooks once a week. |
 

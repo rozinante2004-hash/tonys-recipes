@@ -161,6 +161,11 @@ function copyTree(from, to) {
 }
 fs.rmSync(outDir, { recursive: true, force: true });
 copyTree(repo, outDir);
+// v39.72 — the clips the in-app player names must be in the copy (the page asks for them by these names).
+for (const l of ['en', 'he']) for (const ext of ['mp4', 'jpg']) {
+  const f = path.join('media', 'my-kitchen-notes-clip-' + l + '.' + ext);
+  if (!fs.existsSync(path.join(outDir, f))) fail(f + ' is missing: the in-app player would have nothing to play');
+}
 // …except what the in-app Self Test itself loads from tests/ (the live site
 // serves the whole repository, so there it has always been reachable).
 const SELF_TEST_FILES = ['tests/sw-probe.js'];

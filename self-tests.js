@@ -21159,6 +21159,49 @@ window.SELF_TESTS = [
         recipes=saved; if(q) q.value=qv; sortMode=prev; sortPaint(prev); renderGrid();
       }
     } },
+  { id:'player_plays_the_clip', group:'Features', name:'The in-app player: the one-minute clip from \u{1F4AC} Ask About the App — Hebrew for a Hebrew app, English otherwise; closing it stops it (v39.72)',
+    test: async()=>{
+      // Tony, 13 Nov 2026: "create some kind of an in-app player", and "The Hebrew clip should be linked if the interface
+      // language is Hebrew. For all other languages link the English version. No point in linking both for everyone.
+      // Link it in the '💬 Ask About the App' modal."
+      var real={ lang:_i18nLang, play:HTMLMediaElement.prototype.play, load:HTMLMediaElement.prototype.load, log:window.syncLog }, played=0, logged=[];
+      var ov=document.getElementById('playerOverlay'), v=document.getElementById('playerVideo'), btn=document.getElementById('helpClipBtn'), note=document.getElementById('playerNote');
+      try{
+        if(!ov || !v || !note) throw new Error('there is no player window');
+        if(!btn || !document.getElementById('helpOverlay').contains(btn)) throw new Error('\u{1F4AC} Ask About the App has no button for the clip');
+        if(!v.hasAttribute('controls') || !v.hasAttribute('playsinline')) throw new Error('the player has no controls, or would take over an iPhone’s whole screen');
+        // which clip: Hebrew for Hebrew, English for every other language
+        if(tourClip('he').src!=='media/my-kitchen-notes-clip-he.mp4') throw new Error('a Hebrew app does not get the Hebrew clip: '+tourClip('he').src);
+        ['en','fr','ar','ru','zh','de'].forEach(function(l){ if(tourClip(l).src!=='media/my-kitchen-notes-clip-en.mp4') throw new Error(l+' does not get the English clip: '+tourClip(l).src); });
+        // the test plays nothing: the <video>'s own play and load stand in, and the log's
+        HTMLMediaElement.prototype.play=function(){ played++; return Promise.resolve(); };
+        HTMLMediaElement.prototype.load=function(){};
+        window.syncLog=function(kind, what){ logged.push(kind+': '+what); };
+        _i18nLang='he'; btn.click();
+        if(!ov.classList.contains('open')) throw new Error('the button did not open the player');
+        if(v.getAttribute('src')!=='media/my-kitchen-notes-clip-he.mp4') throw new Error('in Hebrew the player was given '+v.getAttribute('src'));
+        if(!played) throw new Error('the clip was not started');
+        if(!document.getElementById('playerTitle').textContent.trim()) throw new Error('the player has no title');
+        if(v.style.aspectRatio.replace(/\s/g,'')!=='1/1') throw new Error('the square clip is not shown square: '+v.style.aspectRatio);
+        closeM('playerOverlay');
+        if(ov.classList.contains('open')) throw new Error('the player did not close');
+        if(v.getAttribute('src')) throw new Error('a closed player still holds the clip (it would go on playing)');
+        _i18nLang='fr'; openTourClip();
+        if(v.getAttribute('src')!=='media/my-kitchen-notes-clip-en.mp4') throw new Error('in French the player was given '+v.getAttribute('src'));
+        // a clip that cannot be played says so in the window, and in the log
+        v.onerror();
+        if(note.hidden || !note.textContent.trim()) throw new Error('a clip that fails says nothing');
+        if(!logged.some(function(x){ return /^error: /.test(x); })) throw new Error('a clip that fails is not in the log');
+        closeM('playerOverlay');
+        if(!note.hidden) throw new Error('the failure note outlives the window');
+        if(openPlayer({ title:'x' })!==false || ov.classList.contains('open')) throw new Error('the player opened with nothing to play');
+      } finally {
+        HTMLMediaElement.prototype.play=real.play; HTMLMediaElement.prototype.load=real.load; window.syncLog=real.log; _i18nLang=real.lang;
+        try{ if(ov && ov.classList.contains('open')) closeM('playerOverlay'); }catch(e){}
+        try{ if(v){ v.removeAttribute('src'); v.load(); } }catch(e){}
+      }
+    } },
+
   { id:'help_knows_bring_on_samsung', group:'Features', name:'The help assistant gives Tony’s five steps when Send to Bring! opens the store on a Samsung phone (v39.71)',
     test: async()=>{
       // Tony, 12 Nov 2026: a tester's Samsung phone opened the app store instead of Bring!. "We should add to the Help,

@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.71 -->
+<!-- Tony's Recipes Collection v39.72 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -11111,7 +11111,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.71';
+var APP_VERSION = 'v39.72';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -14242,6 +14242,12 @@ body.banner-shown .header {
   transition: border-color 0.15s;
 }
 .help-suggestion:hover { border-color: var(--terracotta); color: var(--ink); }
+/* v39.72 — the clip's button in 💬 Ask About the App, and the in-app player */
+.help-clip { display: block; width: 100%; margin: 0 0 12px; padding: 9px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--card-bg);
+  color: var(--terracotta); font: 600 13.5px 'DM Sans','Heebo',sans-serif; cursor: pointer; text-align: center; }
+.help-clip:hover { border-color: var(--terracotta); }
+#playerVideo { display: block; margin: 0 auto; width: 100%; height: auto; max-width: 100%; background: #000; border-radius: 10px; }
+#playerNote { margin-top: 10px; font-size: 13px; line-height: 1.5; color: var(--ink); text-align: center; }
 .help-icon-btn {
   background: rgba(255,255,255,0.15);
   border: 1px solid rgba(255,255,255,0.3);
@@ -14643,7 +14649,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.71</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.72</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14731,7 +14737,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.71</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.72</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -15947,6 +15953,8 @@ body.banner-shown .header {
       <div style="font-family:'Playfair Display','Frank Ruhl Libre',serif;font-size:17px;color:var(--heading);">💬 Ask About the App</div>
       <button class="modal-close" onclick="closeM('helpOverlay')" style="position:relative;top:auto;right:auto;">✕</button>
     </div>
+    <!-- v39.72 — Tony: "Link it in the '💬 Ask About the App' modal": the one-minute clip, played in the app -->
+    <button type="button" id="helpClipBtn" class="help-clip" onclick="openTourClip()" title="A one-minute clip that shows what the app does.">🎬 Watch the one-minute clip</button>
     <div class="help-input-row">
       <input id="helpInput" class="help-input" placeholder="e.g. How do I add a recipe?" onkeydown="if(event.key==='Enter')askHelp()">
       <button class="help-btn" onclick="askHelp()">Ask</button>
@@ -15973,6 +15981,18 @@ body.banner-shown .header {
     <div style="border-top:1px solid var(--border);margin-top:14px;padding-top:10px;text-align:center;">
       <button type="button" id="helpAboutLink" onclick="closeM('helpOverlay');openAbout()" title="The app's version, updates, privacy and terms." style="background:none;border:none;color:var(--terracotta);font-family:'DM Sans','Heebo',sans-serif;font-size:13px;font-weight:600;cursor:pointer;padding:8px;">ℹ️ About</button>
     </div>
+  </div>
+</div>
+
+<!-- THE IN-APP PLAYER (v39.72) — one window that plays a clip inside the app; today the app's own one-minute clip -->
+<div id="playerOverlay" onclick="bgClose(event,'playerOverlay')" class="modal-overlay" style="z-index:900;">
+  <div style="background:var(--card-bg);border-radius:16px;width:92%;max-width:560px;padding:20px;box-shadow:0 8px 30px rgba(0,0,0,0.2);max-height:90vh;overflow-y:auto;">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;">
+      <div id="playerTitle" style="font-family:'Playfair Display','Frank Ruhl Libre',serif;font-size:17px;color:var(--heading);min-width:0;">🎬 The app in one minute</div>
+      <button class="modal-close" onclick="closeM('playerOverlay')" style="position:relative;top:auto;right:auto;flex:none;">✕</button>
+    </div>
+    <video id="playerVideo" controls playsinline preload="metadata" aria-labelledby="playerTitle"></video>
+    <div id="playerNote" aria-live="polite" hidden></div>
   </div>
 </div>
 
@@ -18334,6 +18354,10 @@ window.i18nTemplatesOf = i18nTemplatesOf; window.i18nTemplateCovers = i18nTempla
 // translating a string nobody sees. A `{1}` makes it a shape, matched the same
 // way a built toast is.
 var I18N_EXTRA = [
+  // v39.72 — the in-app player
+  '\u{1F3AC} The app in one minute',
+  'The clip needs an internet connection. Try again when you are online.',
+  'The clip could not be played here.',
   // v39.68 — a recipe taken from the page's own recipe data (the import preview)
   '\u{1F4C4} Taken as the site itself publishes it \u2014 no AI was needed.',
   // v39.65 — a refused sign-in on the page, video and photo fetches (workerErrorText; Worker v105)
@@ -26588,6 +26612,7 @@ function closeM(id){
   if (id === 'i18nOverlay' && typeof i18nEdClosed === 'function' && !window._i18nEdQuietClose) setTimeout(i18nEdClosed, 0);
   document.getElementById(id).classList.remove('open');
   releaseFocus(id);   // 5c.1b — hand focus back to whatever opened THIS one (v36.65)
+  if (id === 'playerOverlay') playerStop();   // v39.72 — a closed player plays nothing
   if(id==='viewOverlay') { releaseWakeLock(); clearCookTimers(); stopVoice(); _ticks = {}; }
   if ((id === 'viewOverlay' || id === 'linkedViewOverlay') && !_rlMoving && typeof rlBackForget === 'function') rlBackForget();   // v39.53 — ✕ ends the trail
   if(id==='editOverlay') { _editFormSnapshot = null; _editBaseAt = null; }
@@ -35915,6 +35940,8 @@ var HELP_SYSTEM_PROMPT = [
   "- 🛒 SEND TO BRING! OPENS THE STORE INSTEAD OF BRING! on a Samsung phone: the five steps under SEND TO BRING! (Samsung Internet's “Open links in other apps”).",
   "- Something not working at all: ⚙️ → 🔧 Troubleshooting → 🧪 Self Test, then 📋 Copy report (or Send to admin)",
   "",
+  "- 🎬 THE ONE-MINUTE CLIP (v39.72): the ? button → 💬 Ask About the App → 🎬 Watch the one-minute clip plays a short film of what the app does, in a window inside the app (✕ closes it and stops it). It plays in Hebrew when the app is in Hebrew and in English in every other language. It needs an internet connection.",
+  "",
   "=== TIPS ===",
   "- The app works fully offline for reading recipes — photos and all",
   "- Hebrew text is automatically right-aligned throughout the app",
@@ -35981,6 +36008,56 @@ function openHelp() {
   document.getElementById('helpOverlay').classList.add('open');
   setTimeout(function(){ document.getElementById('helpInput').focus(); },200);
 }
+
+// ─── THE IN-APP PLAYER (v39.72) ──────────────────────────────────────────────
+// Tony, 13 Nov 2026: "When saying that I would like to play it from Help, I mean to create some kind of an in-app
+// player. We could use it to play other sources as well, like youtube and other clips from the source field." And:
+// "The Hebrew clip should be linked if the interface language is Hebrew. For all other languages link the English
+// version. No point in linking both for everyone. Link it in the '💬 Ask About the App' modal."
+// One window, one <video>: openPlayer({ title, src, poster, aspect }) plays a file from the app's own site (the
+// Content-Security-Policy lets media come from nowhere else, and the service worker leaves media/ alone, so the
+// browser streams it and seeking works). Closing the window — ✕, Escape, a tap beside it — stops the clip and lets
+// go of the file. Other sources come later, as other kinds of the same call.
+var PLAYER_TOUR = 'media/my-kitchen-notes-clip-';   // + en|he + .mp4 (and .jpg, the still shown before it plays)
+function tourClip(lang) {
+  var l = (lang == null ? _i18nLang : lang) === 'he' ? 'he' : 'en';
+  return { lang: l, src: PLAYER_TOUR + l + '.mp4', poster: PLAYER_TOUR + l + '.jpg' };
+}
+function playerSay(text) { var n = document.getElementById('playerNote'); if (!n) return; n.textContent = text || ''; n.hidden = !text; }
+function openPlayer(o) {
+  o = o || {};
+  var v = document.getElementById('playerVideo'), ov = document.getElementById('playerOverlay');
+  if (!v || !ov || !o.src) return false;
+  var a = String(o.aspect || '16 / 9').split('/'), ratio = (parseFloat(a[0]) || 16) / (parseFloat(a[1]) || 9);
+  document.getElementById('playerTitle').textContent = o.title || '';
+  playerSay('');
+  v.style.aspectRatio = a[0].trim() + ' / ' + (a[1] || '9').trim();
+  v.style.width = 'min(100%, calc((90vh - 150px) * ' + ratio.toFixed(4) + '))';   // the whole picture on the screen, whatever its shape
+  if (o.poster) v.setAttribute('poster', o.poster); else v.removeAttribute('poster');
+  v.onerror = function() {
+    if (!v.getAttribute('src')) return;   // let go of on purpose (playerStop)
+    playerSay(navigator.onLine === false ? 'The clip needs an internet connection. Try again when you are online.' : 'The clip could not be played here.');
+    syncLog('error', 'The player could not play a clip', { src: String(o.src).slice(0, 120), online: navigator.onLine !== false, code: v.error && v.error.code });
+  };
+  v.setAttribute('src', o.src);
+  ov.classList.add('open');
+  if (typeof insightCount === 'function') insightCount('player');
+  // It was opened by a tap, so it may start by itself; where the browser says no, the ▶ on the picture is one tap away.
+  try { var p = v.play(); if (p && p.catch) p.catch(function() {}); } catch (e) {}
+  return true;
+}
+function playerStop() {
+  var v = document.getElementById('playerVideo'); if (!v) return;
+  try { v.pause(); } catch (e) {}
+  v.removeAttribute('src'); v.removeAttribute('poster');
+  try { v.load(); } catch (e) {}
+  playerSay('');
+}
+function openTourClip() {
+  var c = tourClip();
+  return openPlayer({ title: '\u{1F3AC} The app in one minute', src: c.src, poster: c.poster, aspect: '1 / 1' });
+}
+window.tourClip = tourClip; window.openPlayer = openPlayer; window.playerStop = playerStop; window.openTourClip = openTourClip;
 
 function askHelpQ(q) { document.getElementById('helpInput').value = (_i18nLang !== 'en' && _i18nDict && _i18nDict[q]) || q; askHelp(); }
 
