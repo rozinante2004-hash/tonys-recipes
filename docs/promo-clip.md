@@ -72,6 +72,38 @@ new user why they chose well. A new session remembers nothing: read this first b
   - The last scene holds 2.2 s after the last word, so the clip is 70 s (Tony approved the 69 s sketch as it was).
 - **Sources:** with the artifact as its files (`src/template.html.txt`, `build.js.txt`, `render.js.txt`, `shots.js.txt`,
   `frames.js.txt`, `narr.json`, `rec.py.txt`); Jon's audio and the pictures are inside the built page.
-- **Next: the Hebrew version.** Tony reviews the Hebrew script (text) first — "I'd like to go over it before it becomes
-  a clip". Then: Nimrod's narration (ElevenLabs v4 models), the app's screens in Hebrew, right-to-left layout, Hebrew
-  handwriting on the paper notes.
+## The Hebrew version (13 Nov 2026)
+Tony reviewed the Hebrew script and rewrote parts of it; **these are his words — do not "improve" them.** The narration,
+scene by scene, as recorded:
+1. ברוכים הבאים ל-My Kitchen Notes. תראו למה כל כך טוב שהגעתם לכאן.
+2. לא עוד קישורים למתכונים שהולכים לאיבוד בצ'אטים, או מפסיקים לעבוד בדיוק כשצריך אותם. לא עוד דפים מוכתמים מפוזרים על השיש, ונעלמים.
+3. מצאתם מתכון באתר, בסרטון, או בדף ממחברת ישנה? הדביקו את הקישור או צלמו תמונה, הקישו פעם אחת, והוא שמור במטבח שלכם. מאורגן, מלא ושלכם לתמיד.
+4. ומנקודה זו, הוא עובד בשבילכם. שנו את מספר המנות, והכמויות מתעדכנות. שלחו את המצרכים לרשימת הקניות. בדקו מה אפשר להכין ממה שכבר יש לכם במזווה. קראו אותו בכל שפה שתרצו.
+5. הרכיבו אוספים: ארוחת חג, או הקלאסיקות של סבתא. ושתפו אותם. המשפחה מצטרפת למטבח שלכם, ולכולם תמיד יש את הגרסה העדכנית.
+6. בטלפון, בטאבלט, במחשב. אפילו כשאין אינטרנט.
+7. My Kitchen Notes. כל המתכונים שלכם, במקום אחד, לתמיד.
+
+On screen (his): scene 2 "בלי קישורים אבודים ובלי פתקים אבודים."; scene 3 "הקלקה אחת, והמתכון שמור במטבח שלכם.", steps
+"1 הדבק · 2 הקלק · 3 נשמר"; scene 4 "ומעכשיו הוא עובד בשבילכם."; scene 5 "הרכיבו אוספים. שתפו אותם עם המשפחה ועם החברים.";
+scene 6 "בכל מכשיר. גם ללא אינטרנט.", "מסונכרן בכל מקום", "עובד גם ללא אינטרנט"; the last screen "כל המתכונים שלכם. במקום אחד.
+לתמיד." and "בהזמנה בלבד. בינתיים" (he confirmed). The rest of the on-screen Hebrew (labels, tiles, family) is the draft he
+left unchanged; every text is in the artifact's `src/he.json`. The name is said in English ("Yes. However, I would need
+to hear it, to understand how he copes with English and accent."). The paper notes in Hebrew handwriting: "Great".
+Open: the narration says "הקישו פעם אחת" while his on-screen words are "הקלקה / הקלק" — asked, not changed.
+
+- **The Hebrew sketch** ("Let's start with a low-budget sketch and progress from there, like we did with the English
+  version") is the private artifact "Kitchen Notes Clip Hebrew": **Nimrod** (`ZiofZHcEBTn5sRySe5h8`, model `eleven_v4`,
+  `/with-timestamps`, no previous/next text), 58.6 s of speech, 67.9 s in all; the stage is `dir="rtl" lang="he"` with
+  Frank Ruhl Libre / Heebo and the handwriting face Gveret Levin; `node build.js he` makes it from the same template
+  (`he.json` holds every replaced text, the three paper notes, the extra CSS and the Hebrew phrases the pictures wait
+  for). The app's screens in it are still the English ones.
+- **After Tony's verdict on Nimrod and the sketch:** the app's screens in Hebrew (the interface in Hebrew, Hebrew recipe
+  names — suggested: מלפפונים חמוצים, פסטרמת הודו, רטטוי, כרוב ממולא, רוסטביף, עגבניות כבושות, כרוב אדום כבוש, פלפלים ממולאים,
+  כרובית אלמוגים בבשמל קשיו; the collection ארוחת חג; the kitchen המטבח שלנו), the tap positions for the mirrored screens,
+  then `node render.js my-kitchen-notes-clip-he.mp4`.
+
+## Afterwards, in the app (Tony, 13 Nov 2026 — not started)
+"After the clips are done, I would like to be able to play them from the Help section and also add a link to them in
+the testers' invites." To settle with him first: where the two MP4 files live (with the app's own site, about 11 MB
+each, or a video site), which clip a person gets (by the app's language), and the invitation's wording. It is an app
+change like any other: a version, Self Tests, Help, translations, his yes for the release.
