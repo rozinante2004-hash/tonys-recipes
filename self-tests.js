@@ -21478,6 +21478,68 @@ window.SELF_TESTS = [
         if(wasOpen && prevView!=null && recipes.some(function(r){ return r.id===prevView; })){ viewId=prevView; drawView(); } else { viewId=prevView; closeM('viewOverlay'); }
       }
     } },
+  { id:'player_opens_like_a_lens', group:'Features', name:'🎬 The player opens through a camera lens in one second — and is simply there on a device that asks for less motion (v39.77)',
+    test: async()=>{
+      // Tony, 14 Nov 2026: "I would like it to start as something a lot smaller and open up to it's fullest in 1 second, in an
+      // elaborate way… It's a marketing eye-catcher. Please prepare 3 options for me to pick from." — then: "The Lens looks best.
+      // Let's use it".
+      var realPlay=HTMLMediaElement.prototype.play, realLoad=HTMLMediaElement.prototype.load, realMM=window.matchMedia, realRAF=window.requestAnimationFrame;
+      var ov=document.getElementById('playerOverlay'), card=document.getElementById('playerCard'), fx=document.getElementById('playerFx');
+      var motion=function(less){ window.matchMedia=function(q){ return { matches: less && /reduced-motion/.test(String(q)), media:String(q), addEventListener:function(){}, removeEventListener:function(){}, addListener:function(){}, removeListener:function(){} }; }; };
+      var open=function(){ return openPlayer({ title:'\u{1F3AC} ST lens', titleIsData:true, embed:'about:blank#st-lens', aspect:'16 / 9', outside:'https://example.com/v/1' }); };
+      var atRest=function(){ return fx.children.length===0 && !card.style.clipPath && !card.style.webkitClipPath; };
+      try{
+        if(!card || !fx || fx.parentNode!==ov || ov.firstElementChild!==card) throw new Error('the window or the layer the lens is drawn on is not where it should be');
+        if(getComputedStyle(fx).pointerEvents!=='none') throw new Error('the lens’s layer would take the taps meant for the window');
+        if(PLAYER_OPEN_MS!==1000) throw new Error('the opening is meant to take one second, not '+PLAYER_OPEN_MS+' ms');
+        HTMLMediaElement.prototype.play=function(){ return Promise.resolve(); }; HTMLMediaElement.prototype.load=function(){};
+        motion(false);
+        // it starts as a lens: the drawing is there at once, and the window is cut to a small circle
+        if(!open()) throw new Error('the player did not open');
+        var svg=fx.querySelector('svg.player-iris');
+        if(!svg || !/^circle\(/.test(card.style.clipPath||'')) throw new Error('the player just appears: no lens drawn, or the window is not cut to it');
+        var c=card.getBoundingClientRect(), sv=svg.getBoundingClientRect();
+        if(Math.abs(c.left-sv.left)>1 || Math.abs(c.top-sv.top)>1 || Math.abs(c.width-sv.width)>1 || Math.abs(c.height-sv.height)>1) throw new Error('the lens is not drawn over the window');
+        // the moments of it: something a lot smaller, the blades opening, the whole window at the end
+        var g={ W:c.width, H:c.height }, side=Math.min(c.width, c.height), at=function(t){ return playerIrisFrame(g, t); };
+        var f0=at(0), f2=at(.2), f35=at(.35), f5=at(.5), f65=at(.65), f8=at(.8), f1=at(1);
+        if(f0.r>1) throw new Error('it does not start from (almost) nothing: '+f0.r);
+        if(f2.r<side*.1 || f2.r>side*.25) throw new Error('the lens at first is not a lot smaller than the window: '+f2.r+' of '+side);
+        if(f2.hole>f2.r*.2) throw new Error('the blades are open before the lens has arrived');
+        if(!(f35.hole>f2.hole && f5.hole>f35.hole && f65.hole>f5.hole)) throw new Error('the blades do not open: '+[f2.hole,f35.hole,f5.hole,f65.hole].join(' '));
+        if(!(f5.r>=f2.r-0.5 && f65.r>f5.r && f8.r>f65.r && f1.r>f8.r)) throw new Error('the lens does not widen: '+[f2.r,f5.r,f65.r,f8.r,f1.r].join(' '));
+        if(fx.querySelectorAll('#playerIrisBlades polygon').length!==7) throw new Error('a lens of seven blades has '+fx.querySelectorAll('#playerIrisBlades polygon').length);
+        var half=Math.sqrt(c.width*c.width+c.height*c.height)/2;
+        if(f1.r<half || f1.hole<=f1.r) throw new Error('at the end part of the window is still hidden: lens '+f1.r+', needed '+half+', blades '+f1.hole);
+        if((card.style.clipPath||'').indexOf(f1.r.toFixed(2)+'px')===-1) throw new Error('the window is not cut to the lens: '+card.style.clipPath);
+        // …and by itself, in real time: after the second, the lens is gone and the window is whole
+        closeM('playerOverlay'); if(!atRest()) throw new Error('closing the player left the lens on the screen');
+        open(); await wait(PLAYER_OPEN_MS+450);
+        if(!atRest() || !ov.classList.contains('open')) throw new Error('more than a second on, the lens is still there or the window is still cut');
+        closeM('playerOverlay');
+        // closed in the middle: gone at once, and no late frame draws it again
+        open(); await wait(180);
+        if(!fx.querySelector('svg')) throw new Error('nothing was moving a moment after opening');
+        closeM('playerOverlay');
+        if(!atRest() || ov.classList.contains('open')) throw new Error('closing in the middle left the lens or the cut');
+        await wait(400); if(!atRest()) throw new Error('a late frame drew the lens again after the player closed');
+        // a device that asks for less motion: the window, at once, as before
+        motion(true); open();
+        if(!atRest() || !ov.classList.contains('open')) throw new Error('a device that asks for less motion still gets the movement');
+        closeM('playerOverlay');
+        // frames that never come must not leave the window cut to a circle
+        motion(false); window.requestAnimationFrame=function(){ return 1; };
+        open();
+        if(!/^circle\(/.test(card.style.clipPath||'')) throw new Error('the stand-in for a stalled browser did not start the opening');
+        await wait(PLAYER_OPEN_MS+800);
+        if(!atRest()) throw new Error('with no frames coming, the window stays cut to a small circle');
+        // Help says so
+        if(!/opens through a camera lens/.test(String(HELP_SYSTEM_PROMPT))) throw new Error('Help does not mention how the player opens');
+      } finally {
+        window.requestAnimationFrame=realRAF; window.matchMedia=realMM; HTMLMediaElement.prototype.play=realPlay; HTMLMediaElement.prototype.load=realLoad;
+        try{ closeM('playerOverlay'); playerAnimStop(); }catch(e){}
+      }
+    } },
   { id:'help_says_an_import_brings_no_photo', group:'Features', name:'The help assistant says an import brings no photo — and an import really sets none (v39.73)',
     test: async()=>{
       // Tony, 13 Nov 2026: 'Help says that when importing from a url, the photo is copied automatically

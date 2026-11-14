@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.76 -->
+<!-- Tony's Recipes Collection v39.77 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -11134,7 +11134,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.76';
+var APP_VERSION = 'v39.77';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -14284,6 +14284,9 @@ body.banner-shown .header {
 #playerOutsideRow { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; justify-content: center; font-size: 13px; line-height: 1.5; color: var(--muted); text-align: center; }
 #playerOutside { color: var(--terracotta); font-weight: 600; text-decoration: underline; min-height: 32px; display: inline-flex; align-items: center; }
 .src-play { color: var(--terracotta); font-size: 10px; margin-inline-end: 4px; }
+/* v39.77 — the lens: a layer over the whole screen that takes no taps; the drawing sits exactly over the window */
+#playerOverlay > #playerFx { position: fixed; inset: 0; pointer-events: none; z-index: 2; max-height: none !important; }
+.player-iris { position: absolute; overflow: visible; }
 .help-icon-btn {
   background: rgba(255,255,255,0.15);
   border: 1px solid rgba(255,255,255,0.3);
@@ -14685,7 +14688,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.76</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.77</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14773,7 +14776,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.76</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.77</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -16024,7 +16027,7 @@ body.banner-shown .header {
 
 <!-- THE IN-APP PLAYER (v39.72) — one window that plays a clip inside the app; today the app's own one-minute clip -->
 <div id="playerOverlay" onclick="bgClose(event,'playerOverlay')" class="modal-overlay" style="z-index:900;">
-  <div style="background:var(--card-bg);border-radius:16px;width:92%;max-width:560px;padding:20px;box-shadow:0 8px 30px rgba(0,0,0,0.2);max-height:90vh;overflow-y:auto;">
+  <div id="playerCard" style="background:var(--card-bg);border-radius:16px;width:92%;max-width:560px;padding:20px;box-shadow:0 8px 30px rgba(0,0,0,0.2);max-height:90vh;overflow-y:auto;">
     <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;">
       <div id="playerTitle" style="font-family:'Playfair Display','Frank Ruhl Libre',serif;font-size:17px;color:var(--heading);min-width:0;">🎬 The app in one minute</div>
       <button class="modal-close" onclick="closeM('playerOverlay')" style="position:relative;top:auto;right:auto;flex:none;">✕</button>
@@ -16034,6 +16037,8 @@ body.banner-shown .header {
     <div id="playerNote" aria-live="polite" hidden></div>
     <div id="playerOutsideRow" hidden><span>If the clip does not play here, open it outside the app.</span> <a id="playerOutside" target="_blank" rel="noopener noreferrer">↗ Open outside the app</a></div>
   </div>
+  <!-- v39.77 — the lens the window opens through is drawn here, over the window, for one second -->
+  <div id="playerFx" aria-hidden="true"></div>
 </div>
 
 <!-- BRING! BOOKMARKLET MODAL -->
@@ -36091,7 +36096,7 @@ var HELP_SYSTEM_PROMPT = [
   "- Something not working at all: ⚙️ → 🔧 Troubleshooting → 🧪 Self Test, then 📋 Copy report (or Send to admin)",
   "",
   "- 🎬 THE ONE-MINUTE CLIP (v39.72): the ? button → 💬 Ask About the App → 🎬 Watch the one-minute clip plays a short film of what the app does, in a window inside the app (✕ closes it and stops it). It plays in Hebrew when the app is in Hebrew and in English in every other language. It needs an internet connection.",
-  "- ▶ A RECIPE'S VIDEO PLAYS INSIDE THE APP (v39.74): in a recipe (or a recipe inside a collection — your own or a linked kitchen's — or a linked kitchen's recipe, or a recipe sent to you), a Source link with a small ▶ before it is a video the app can play: tap the link and it plays in a window inside the app — a YouTube video (Shorts too), Vimeo, an Instagram post or reel, a Facebook video or reel, a TikTok video, or a link straight to a video or sound file. ✕ closes the window and stops the video. Under the video, ↗ Open outside the app opens it in its own app or site — use it if the video does not play here (a private video, or one whose owner does not allow playing it elsewhere). A source that is an ordinary web page (a recipe site) has no ▶ and opens in the browser as before; so do short links that hide where they lead (fb.watch, vm.tiktok.com). TO ALWAYS OPEN VIDEOS OUTSIDE THE APP: ⚙️ Settings → 🎨 How it looks → tick 🎬 Use external players only (on this device; untick to play inside the app again). When a video plays inside the app, the device loads it from the site that hosts it, as when opening it there; the app sends that site nothing about you or your recipes (🔒 What leaves this device lists it).",
+  "- ▶ A RECIPE'S VIDEO PLAYS INSIDE THE APP (v39.74): in a recipe (or a recipe inside a collection — your own or a linked kitchen's — or a linked kitchen's recipe, or a recipe sent to you), a Source link with a small ▶ before it is a video the app can play: tap the link and it plays in a window inside the app — a YouTube video (Shorts too), Vimeo, an Instagram post or reel, a Facebook video or reel, a TikTok video, or a link straight to a video or sound file. The window opens through a camera lens — a small lens appears, its blades open, and it widens into the window, in about a second (a device set to reduce motion shows the window at once). ✕ closes the window and stops the video. Under the video, ↗ Open outside the app opens it in its own app or site — use it if the video does not play here (a private video, or one whose owner does not allow playing it elsewhere). A source that is an ordinary web page (a recipe site) has no ▶ and opens in the browser as before; so do short links that hide where they lead (fb.watch, vm.tiktok.com). TO ALWAYS OPEN VIDEOS OUTSIDE THE APP: ⚙️ Settings → 🎨 How it looks → tick 🎬 Use external players only (on this device; untick to play inside the app again). When a video plays inside the app, the device loads it from the site that hosts it, as when opening it there; the app sends that site nothing about you or your recipes (🔒 What leaves this device lists it).",
   "",
   "=== TIPS ===",
   "- The app works fully offline for reading recipes — photos and all",
@@ -36255,12 +36260,14 @@ function openPlayer(o) {
     v.setAttribute('src', o.src);
   }
   ov.classList.add('open');
+  playerOpenAnim();                                // v39.77 — it opens like a camera lens, in a second
   if (typeof insightCount === 'function') insightCount(o.outside ? 'player-source' : 'player');
   // It was opened by a tap, so it may start by itself; where the browser says no, the ▶ on the picture is one tap away.
   if (!o.embed) try { var p = v.play(); if (p && p.catch) p.catch(function() {}); } catch (e) {}
   return true;
 }
 function playerStop() {
+  playerAnimStop();
   var v = document.getElementById('playerVideo'), f = document.getElementById('playerFrame'); if (!v) return;
   try { v.pause(); } catch (e) {}
   v.removeAttribute('src'); v.removeAttribute('poster');
@@ -36272,12 +36279,98 @@ function playerStop() {
   if (row) row.hidden = true; if (out) out.removeAttribute('href');
   playerSay('');
 }
+// ─── THE PLAYER OPENS LIKE A CAMERA LENS (v39.77) ────────────────────────────
+// Tony, 14 Nov 2026: "Please shortly animate the opening of the in-app player. Currently, it just appears. I would like it
+// to start as something a lot smaller and open up to it's fullest in 1 second, in an elaborate way, like opening up an
+// origami or some other complicated / sophisticated way. It's a marketing eye-catcher. Please prepare 3 options for me to
+// pick from." Three were shown on a page (origami, camera lens, clapperboard); his choice: "The Lens looks best. Let's
+// use it". A small lens appears in the middle of the window's place, its seven blades twist open on the picture, and the
+// lens widens until the whole window is there — one second. The window itself is complete underneath from the first
+// moment (the clip is already starting); only what shows of it grows. A device that asks for less motion gets the window
+// at once, as before.
+var PLAYER_OPEN_MS = 1000, _playerAnim = 0, _playerAnimRun = 0, _playerAnimTimer = 0;
+function playerReducedMotion() { try { return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (e) { return false; } }
+// The lens drawn over the window's place: a ground that covers everything but a seven-sided hole, seven blades round
+// the hole, and the lens's rim. Returns the window's size, which every moment of the movement is worked out from.
+function playerIrisBuild() {
+  var card = document.getElementById('playerCard'), fx = document.getElementById('playerFx');
+  if (!card || !fx) return null;
+  var c = card.getBoundingClientRect(), o = fx.getBoundingClientRect(), W = c.width, H = c.height;
+  if (!(W > 0) || !(H > 0)) return null;
+  fx.innerHTML = '<svg class="player-iris" style="left:' + (c.left - o.left).toFixed(2) + 'px;top:' + (c.top - o.top).toFixed(2) + 'px;width:' + W.toFixed(2) + 'px;height:' + H.toFixed(2) + 'px" viewBox="0 0 ' + W.toFixed(2) + ' ' + H.toFixed(2) + '">'
+    + '<defs><clipPath id="playerIrisClip"><circle id="playerIrisC" cx="' + (W / 2).toFixed(2) + '" cy="' + (H / 2).toFixed(2) + '" r="0.01"/></clipPath>'
+    + '<linearGradient id="playerIrisG" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5C3D2E"/><stop offset="1" stop-color="#2C1F18"/></linearGradient></defs>'
+    + '<g clip-path="url(#playerIrisClip)"><path id="playerIrisBase" fill="#2C1F18" fill-rule="evenodd"/><g id="playerIrisBlades"></g></g>'
+    + '<circle id="playerIrisRing" cx="' + (W / 2).toFixed(2) + '" cy="' + (H / 2).toFixed(2) + '" r="0.01" fill="none" stroke="#F4EDE2" stroke-width="3"/>'
+    + '<circle id="playerIrisRim" cx="' + (W / 2).toFixed(2) + '" cy="' + (H / 2).toFixed(2) + '" r="0.01" fill="none" stroke="#2C1F18" stroke-width="7"/></svg>';
+  return { W: W, H: H };
+}
+// One moment of the opening, t from 0 to 1: how wide the lens is (r), how far its blades have opened (hole), and the
+// width at which the whole window shows (cover). The window is cut to the lens's circle; the blades cover what is left
+// of the circle outside their hole.
+function playerIrisFrame(g, t) {
+  var card = document.getElementById('playerCard'), fx = document.getElementById('playerFx');
+  if (!card || !fx || !g) return null;
+  var q = function (id) { return fx.querySelector('#' + id); };
+  var clamp = function (x) { return x < 0 ? 0 : x > 1 ? 1 : x; }, seg = function (a, b) { return clamp((t - a) / (b - a)); }, lerp = function (a, b, p) { return a + (b - a) * p; };
+  var ease = function (p) { return p < .5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2; }, back = function (p) { var c = 1.70158; return 1 + (c + 1) * Math.pow(p - 1, 3) + c * Math.pow(p - 1, 2); };
+  var W = g.W, H = g.H, cx = W / 2, cy = H / 2, R = Math.sqrt(W * W + H * H) / 2 + 6, r0 = Math.min(W, H) * .17, N = 7, k;
+  var r = Math.max(.01, lerp(r0 * back(seg(0, .2)), R, ease(seg(.46, 1)))), open = ease(seg(.16, .74)), h = Math.max(.01, r * lerp(0, 1.32, open)), phi = lerp(-1.1, .55, open);
+  var V = [];
+  for (k = 0; k < N; k++) V.push([cx + h * Math.cos(phi + 2 * Math.PI * k / N), cy + h * Math.sin(phi + 2 * Math.PI * k / N)]);
+  var two = function (n) { return n.toFixed(2); };
+  if (q('playerIrisC')) {
+    q('playerIrisC').setAttribute('r', two(r));
+    // the ground reaches far past the lens, so the hole is always a hole in it
+    q('playerIrisBase').setAttribute('d', 'M' + two(-4 * R) + ' ' + two(-4 * R) + 'H' + two(5 * R) + 'V' + two(5 * R) + 'H' + two(-4 * R) + 'Z M' + V.map(function (v) { return two(v[0]) + ' ' + two(v[1]); }).join('L') + 'Z');
+    var far = 2 * R + 20, blades = '';
+    for (k = 0; k < N; k++) {
+      var a = V[k], b = V[(k + 1) % N], dl = Math.sqrt(Math.pow(b[0] - a[0], 2) + Math.pow(b[1] - a[1], 2)) || 1, dx = (b[0] - a[0]) / dl, dy = (b[1] - a[1]) / dl;
+      var nx = Math.cos(phi + 2 * Math.PI * (k + .5) / N), ny = Math.sin(phi + 2 * Math.PI * (k + .5) / N);
+      blades += '<polygon fill="url(#playerIrisG)" stroke="rgba(244,237,226,.28)" stroke-width="1" points="' + [a[0], a[1], a[0] + far * dx, a[1] + far * dy, a[0] + far * (dx + nx), a[1] + far * (dy + ny), a[0] + far * nx, a[1] + far * ny].map(two).join(' ') + '"/>';
+    }
+    q('playerIrisBlades').innerHTML = blades;
+    var rim = 1 - seg(.78, .98);
+    q('playerIrisRing').setAttribute('r', two(Math.max(.01, r - 1.5))); q('playerIrisRing').style.opacity = rim * .9;
+    q('playerIrisRim').setAttribute('r', two(r + 3)); q('playerIrisRim').style.opacity = rim;
+  }
+  card.style.clipPath = card.style.webkitClipPath = 'circle(' + two(r) + 'px at 50% 50%)';
+  return { r: r, hole: h, cover: R - 6 };
+}
+// The lens away and the whole window back — at the end of the second, when the player closes, or if the movement
+// could not run (a timer makes sure the window is never left cut to a circle).
+function playerAnimStop() {
+  if (_playerAnim) { try { cancelAnimationFrame(_playerAnim); } catch (e) {} }
+  if (_playerAnimTimer) clearTimeout(_playerAnimTimer);
+  _playerAnim = 0; _playerAnimTimer = 0; _playerAnimRun++;
+  var fx = document.getElementById('playerFx'), card = document.getElementById('playerCard');
+  if (fx) fx.innerHTML = '';
+  if (card) { card.style.clipPath = ''; card.style.webkitClipPath = ''; }
+}
+function playerOpenAnim() {
+  playerAnimStop();
+  if (playerReducedMotion() || typeof requestAnimationFrame !== 'function') return false;
+  var g = playerIrisBuild();
+  if (!g) return false;
+  var run = _playerAnimRun, t0 = 0;
+  playerIrisFrame(g, 0);
+  _playerAnim = requestAnimationFrame(function tick(now) {
+    if (run !== _playerAnimRun) return;
+    if (!t0) t0 = now;
+    var t = Math.min(1, (now - t0) / PLAYER_OPEN_MS);
+    playerIrisFrame(g, t);
+    if (t < 1) _playerAnim = requestAnimationFrame(tick); else playerAnimStop();
+  });
+  _playerAnimTimer = setTimeout(function () { if (run === _playerAnimRun) playerAnimStop(); }, PLAYER_OPEN_MS + 600);
+  return true;
+}
 function openTourClip() {
   var c = tourClip();
   return openPlayer({ title: PLAYER_TITLE, src: c.src, poster: c.poster, aspect: '1 / 1' });
 }
 window.inviteClipLink = inviteClipLink; window.tourClip = tourClip; window.openPlayer = openPlayer; window.playerStop = playerStop; window.openTourClip = openTourClip;
 window.playerSource = playerSource; window.sourcePlay = sourcePlay;
+window.playerOpenAnim = playerOpenAnim; window.playerAnimStop = playerAnimStop; window.playerIrisBuild = playerIrisBuild; window.playerIrisFrame = playerIrisFrame; window.playerReducedMotion = playerReducedMotion;
 
 function askHelpQ(q) { document.getElementById('helpInput').value = (_i18nLang !== 'en' && _i18nDict && _i18nDict[q]) || q; askHelp(); }
 

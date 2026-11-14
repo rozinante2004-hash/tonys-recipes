@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v39.76` — app. **Worker: v106**, deployed separately and versioned separately
+**Current version:** `v39.77` — app. **Worker: v106**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -869,6 +869,20 @@ invitation-only (unless adding to the tester's household)."
   an entry "Video sites (…)" in What leaves this device (on = the setting is off) and Privacy Statement **1.16**
   (14 Nov 2026), a row in all 11 pages. Self Test `player_plays_a_recipes_source`; `tests/phone-fit.js` opens a tall
   and a wide framed video.
+- **The player opens through a camera lens (v39.77).** Tony asked for an eye-catcher ("start as something a lot
+  smaller and open up to it's fullest in 1 second, in an elaborate way") and chose the lens of three shown. The
+  overlay holds the window `#playerCard` and, after it, `<div id="playerFx" aria-hidden="true">` (`position: fixed;
+  inset: 0; pointer-events: none`). `openPlayer` calls `playerOpenAnim()` right after opening: unless
+  `prefers-reduced-motion: reduce`, `playerIrisBuild()` puts an `<svg class="player-iris">` on `#playerFx` exactly
+  over the window (a clip circle `#playerIrisC`; a dark ground `#playerIrisBase` with an even-odd seven-sided hole;
+  seven blade polygons in `#playerIrisBlades`, each a large square from one corner of the hole along its edge and its
+  outward normal, filled with the browns #5C3D2E → #2C1F18; rim circles `#playerIrisRing`, `#playerIrisRim`) and
+  `playerIrisFrame(g, t)` draws the moment t (0…1) over `PLAYER_OPEN_MS` = 1000 ms on `requestAnimationFrame`:
+  lens radius r = lerp(0.17 × the shorter side × back-ease(t: 0–0.2), half the diagonal + 6, ease(t: 0.46–1)); hole
+  radius = r × lerp(0, 1.32, ease(t: 0.16–0.74)); the hole turns from −1.1 to 0.55 rad as it opens; the rim fades over
+  t 0.78–0.98; the window gets `clip-path: circle(r px at 50% 50%)`. `playerAnimStop()` empties the layer and removes
+  the cut: at t = 1, from `playerStop()` (so closing is clean), and from a timer at 1600 ms in case no frame came.
+  Self Test `player_opens_like_a_lens`.
 - **The clip's public page and the invitation's link (v39.73).** `clip.html` at the site's root plays the clip for
   someone who has no app and no account (Tony: "if installing the app is mandatory for the clip to be viewable, then
   it cannot be used as a marketing tool"): the icon, the name, one `<video controls playsinline preload="none">`, two
