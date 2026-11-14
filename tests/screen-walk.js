@@ -101,7 +101,7 @@ const SCREENS = [
       const p = await ctx.newPage();
       const errs = [], logs = [];
       p.on('pageerror', e => errs.push(String(e.message).slice(0, 160)));
-      p.on('console', m => { const t = m.text(); if (/Failed to load resource|firestore: Firestore|frame-ancestors|ERR_TUNNEL|net::ERR/.test(t)) return; if (m.type() === 'error' || /rlPickOpen|del:|help:|translate:/.test(t)) logs.push(t.slice(0, 160)); });
+      p.on('console', m => { const t = m.text(); if (/Failed to load resource|firestore: Firestore|frame-ancestors' is ignored when delivered via a <meta>|ERR_TUNNEL|net::ERR/.test(t)) return; if (m.type() === 'error' || /rlPickOpen|del:|help:|translate:/.test(t)) logs.push(t.slice(0, 160)); });
       if (v.lang) await p.addInitScript(l => { try { localStorage.setItem('tonys_ui_lang', l); } catch (e) {} }, v.lang);
       await p.route(/firebasejs|gstatic|googleapis|workers\.dev|accounts\.google/, r => r.fulfill({ status: 503, body: '' }));
       await p.goto('http://127.0.0.1:' + PORT + '/index.html', { waitUntil: 'domcontentloaded' });

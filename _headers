@@ -2,8 +2,12 @@
 # frame-ancestors cannot be set from the page's <meta> policy (browsers ignore it there), so the clickjacking guard
 # was the page's own script alone; now the browser refuses the framing before any script runs. GitHub Pages (the
 # family's copy) takes no headers; its guard stays the script. Nothing here changes what the page may load.
+# v39.81 — SAMEORIGIN / 'self', not DENY / 'none': the app shows its own privacy statement and terms INSIDE itself (ℹ️ About,
+# the sign-in screen, the translation editor's document window) in a frame of its own, and "never in any frame" refused
+# that too — on the beta and the test copy those windows stayed empty from v39.63 until Tony's installed iPhone ran the
+# Self Test (15 Nov 2026: about_and_legal, legal_corrections). Other sites still cannot frame any page of the app.
 /*
   X-Content-Type-Options: nosniff
-  X-Frame-Options: DENY
-  Content-Security-Policy: frame-ancestors 'none'
+  X-Frame-Options: SAMEORIGIN
+  Content-Security-Policy: frame-ancestors 'self'
   Referrer-Policy: strict-origin-when-cross-origin

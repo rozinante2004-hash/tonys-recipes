@@ -170,6 +170,19 @@ copyTree(repo, outDir);
   for (const l of ['en', 'he']) if (c.indexOf('media/my-kitchen-notes-clip-' + l + '.mp4') === -1) fail('clip.html does not play the ' + l + ' clip');
   if (envName !== 'live' && cfg.siteOrigin) { c = c.split('https://mykitchennotes.community/').join(cfg.siteOrigin + cfg.sitePath); fs.writeFileSync(f, c); }
 }
+// v39.81 — the Cloudflare copies' headers must let the app frame its OWN pages: it shows the privacy statement and the
+// terms inside itself (ℹ️ About, sign-in, the translation editor's document window). v39.63's DENY / frame-ancestors
+// 'none' refused that, and those windows stayed empty on the beta and the test copy until Tony's iPhone Self Test.
+{
+  const f = path.join(outDir, '_headers');
+  if (fs.existsSync(f)) {
+    const h = fs.readFileSync(f, 'utf8').split('\n').filter(l => !/^\s*#/.test(l)).join('\n');
+    if (/X-Frame-Options:\s*DENY/i.test(h) || /frame-ancestors\s+'none'/i.test(h))
+      fail("_headers forbids every frame (DENY / frame-ancestors 'none'): the app's own privacy statement and terms windows would stay empty — use SAMEORIGIN / frame-ancestors 'self'");
+    if (!/X-Frame-Options:\s*SAMEORIGIN/i.test(h) || !/frame-ancestors\s+'self'/i.test(h))
+      fail("_headers no longer guards against other sites framing the app (X-Frame-Options SAMEORIGIN, frame-ancestors 'self')");
+  }
+}
 // v39.72 — the clips the in-app player names must be in the copy (the page asks for them by these names).
 for (const l of ['en', 'he']) for (const ext of ['mp4', 'jpg']) {
   const f = path.join('media', 'my-kitchen-notes-clip-' + l + '.' + ext);

@@ -26,6 +26,14 @@
 // run in the first layout; every other test runs in the copy's own layout, and
 // the household paths themselves are tested end to end on the Firebase
 // emulator (tests/e2e-sync.mjs --layout households).
+// v39.81 — a 📊 Households test starts on the 🏠 Households tab, whatever tab this device left open, and puts that tab
+// back after. Tony's installed iPhone (15 Nov 2026): the window had been left on another tab (✉️ Beta invitation
+// requests, or 💬 Feedback) — the tab is remembered while the app stays open — and four tests found no table.
+async function _onHouseholdsTab(){
+  await loadManagement();
+  var was=mknManage._state.tab; mknManage._state.tab='households';
+  return function(){ try{ if(window.mknManage) mknManage._state.tab=was; }catch(e){} };
+}
 async function _inFirstLayout(fn){
   var was=_cloudLayout; _cloudLayout='shared';
   try{ return await fn(); } finally{ _cloudLayout=was; }
@@ -1875,6 +1883,7 @@ window.SELF_TESTS = [
 
   { id:'management_app', group:'Sharing', name:'📊 The management app: every household, its members, AI spending and allowance, links, shares and last use; caps changed through the server (v37.58)',
     test: async()=>{
+      var tabBack=await _onHouseholdsTab();   // v39.81
       if(!document.querySelector('#settingsDrop [onclick*="openManagement"][data-owner-only]')) throw new Error('⚙️ has no owner-only 📊 Households');
       var now=Date.now(), month=new Date().toISOString().slice(0,7);
       var docs={ households:{ hA:{ name:'Kitchen A', code:'MKN-AAAA-2222', ownerUid:'uA', createdAt:now-90*864e5 }, hB:{ name:'Kitchen B', code:'MKN-BBBB-3333', ownerUid:'uB', createdAt:now-5*864e5, referredBy:'MKN-AAAA-2222' } },
@@ -1940,7 +1949,7 @@ window.SELF_TESTS = [
         fakeDb.collection=realColl;
         window.isAppOwner=function(){ return false; }; mknManage.close();
         if(await openManagement()!==false || document.getElementById('manageOverlay')) throw new Error('someone who is not the owner opened it');
-      } finally {
+      } finally { tabBack();
         window._fbDb=real.db; window._fbUser=real.user; window.isAppOwner=real.owner; window.fetch=real.fetch; window.toast=real.toast; window.showServiceError=real.err; _workerHealth=real.h;
         if(window.mknManage) mknManage.close();
       }
@@ -2071,6 +2080,7 @@ window.SELF_TESTS = [
 
   { id:'owner_signin_why', group:'Sharing', name:'📊 Households refused because of THIS sign-in (no authenticator code, or not Google): says so and what to do — not "publish the rules" (v39.21)',
     test: async()=>{
+      var tabBack=await _onHouseholdsTab();   // v39.81
       if(typeof ownerSignInWhy!=='function') throw new Error('ownerSignInWhy not defined');
       var real={ db:window._fbDb, user:window._fbUser, owner:window.isAppOwner, fetch:window.fetch, toast:window.toast, err:window.showServiceError, h:_workerHealth };
       var claims={};
@@ -2095,7 +2105,7 @@ window.SELF_TESTS = [
         if(!le || !/without the code from your authenticator app/.test(le.textContent) || /rules need publishing/.test(le.textContent)) throw new Error('the households error: '+(le ? le.textContent : 'none'));
         if((ov.textContent.match(/without the code from your authenticator app/g) || []).length!==1) throw new Error('the reason is said more than once');
         return 'Google without the code, a password, a good sign-in; the page gives the reason once, not the rules';
-      } finally {
+      } finally { tabBack();
         window._fbDb=real.db; window._fbUser=real.user; window.isAppOwner=real.owner; window.fetch=real.fetch; window.toast=real.toast; window.showServiceError=real.err; _workerHealth=real.h;
         if(window.mknManage) mknManage.close();
       }
@@ -2103,6 +2113,7 @@ window.SELF_TESTS = [
 
   { id:'management_all_copies', group:'Sharing', name:'📊 One Households page for every copy: each household reports itself once a day, and the owner\u2019s page lists every copy\u2019s with its copy, allowance and notes (v37.71)',
     test: async()=>{
+      var tabBack=await _onHouseholdsTab();   // v39.81
       var now=Date.now(), month=new Date().toISOString().slice(0,7), here=String(APP_CONFIG.firebase.projectId);
       var other=here==='my-kitchen-notes-beta' ? 'tonys-recipes-test' : 'my-kitchen-notes-beta', otherName=other==='my-kitchen-notes-beta' ? 'beta' : 'test';
       function snap(list){ return { size:list.length, forEach:function(fn){ list.forEach(fn); } }; }
@@ -2247,7 +2258,7 @@ window.SELF_TESTS = [
         if(!l2 || l2.all) throw new Error('the beta/test page asked for every copy');
         if(mknManage._state.rows.some(function(r){ return r.project && r.project!==here; })) throw new Error('the beta/test page lists another copy\u2019s household');
         if(/every copy/.test(document.getElementById('manageOverlay').textContent)) throw new Error('the beta/test page says "every copy"');
-      } finally {
+      } finally { tabBack();
         window._fbDb=real.db; window._fbUser=real.user; window.isAppOwner=real.owner; window.fetch=real.fetch; window.toast=real.toast; window.showServiceError=real.err; _workerHealth=real.h; window._household=real.hh;
         delete window._allCopiesOverride;
         try{ if(keptRep) localStorage.setItem(HH_REPORT_KEY+'hA', keptRep); else localStorage.removeItem(HH_REPORT_KEY+'hA'); }catch(e){}
@@ -2257,6 +2268,7 @@ window.SELF_TESTS = [
 
   { id:'management_delete_household', group:'Sharing', name:'📊 The owner deletes a household from the management app: typed name, everything in it, both halves of its links — and never his own (v37.61)',
     test: async()=>{
+      var tabBack=await _onHouseholdsTab();   // v39.81
       var store={};
       function ref(path){ var parts=path.split('/'); return { id:parts[parts.length-1], path:path,
         collection:function(c){ return coll(path+'/'+c); },
@@ -2311,7 +2323,7 @@ window.SELF_TESTS = [
         await mknManage.reload(); mknManage.show('hZ');
         window.askConfirm=async function(o){ return o.input!==undefined ? 'something else' : false; };
         if(await mknManage.del()!==false || !store['households/hZ']) throw new Error('deleted without the name typed');
-      } finally {
+      } finally { tabBack();
         window._fbDb=real.db; window._fbUser=real.user; window.isAppOwner=real.owner; window.fetch=real.fetch; window.toast=real.toast; window.showServiceError=real.err;
         window.askConfirm=real.ask; window._household=real.hh; window.open=real.open; _workerHealth=real.h;
         if(window.mknManage) mknManage.close();
@@ -7866,6 +7878,10 @@ window.SELF_TESTS = [
       var input=document.getElementById('photoSearchInput');
       if(!input) throw new Error('no photo search input to drive');
       var realAi=window.aiCall, realFetch=window.fetch, realVal=input.value;
+      // v39.81 — Tony's installed iPhone, signed in: each request first waited for his sign-in token, so the test looked
+      // before it had gone out, and the last search's "next source, asked ahead" landed in the next one's count. The
+      // token is stood in for here (nothing leaves: fetch is stood in for too), as it is on a device not signed in.
+      var realSignIn=window.workerSignIn; window.workerSignIn=function(){ return Promise.resolve(null); };
       // Driven through searchPhotos() — the route every entry point uses (the
       // Search button, the Enter key, and the auto-search when the panel opens
       // from a recipe). Calling photoQueryForSearch directly would leave all
@@ -7905,13 +7921,17 @@ window.SELF_TESTS = [
         var st=(document.getElementById('photoSearchStatus')||{}).textContent||'';
         if(st.indexOf('⚠')===-1)
           throw new Error('a failed translation was not reported — the user would think English was searched');
-      } finally { window.aiCall=realAi; window.fetch=realFetch; input.value=realVal; }
+      } finally { window.workerSignIn=realSignIn; window.aiCall=realAi; window.fetch=realFetch; input.value=realVal; }
     } },
 
   { id:'photo_search_fast_first', group:'Features', name:'📷 Photo search: one request per source, kept — See more shows the next source at once (it is asked while you look); an older search\u2019s answer never replaces a newer one; a slow picture gives way (v38.45)',
     test: async()=>{
       var input=document.getElementById('photoSearchInput'), status=document.getElementById('photoSearchStatus');
       var realFetch=window.fetch, realVal=input.value, calls=[];
+      // v39.81 — Tony's installed iPhone, signed in: each request first waited for his sign-in token, so the test looked
+      // before it had gone out, and the last search's "next source, asked ahead" landed in the next one's count. The
+      // token is stood in for here (nothing leaves: fetch is stood in for too), as it is on a device not signed in.
+      var realSignIn=window.workerSignIn; window.workerSignIn=function(){ return Promise.resolve(null); };
       function tick(ms){ return new Promise(function(r){ setTimeout(r, ms||20); }); }
       try{
         window.fetch=function(url, opt){
@@ -7944,7 +7964,7 @@ window.SELF_TESTS = [
         if(!d1.error || !d2.images || n!==2) throw new Error('a refusal was kept instead of asked again: '+n);
         var g=String(renderPhotoSearchGrid);
         if(g.indexOf('8000')===-1 || g.indexOf('nextTry')===-1) throw new Error('a slow picture does not give way to the next');
-      } finally { window.fetch=realFetch; input.value=realVal; _photoCache={}; }
+      } finally { window.workerSignIn=realSignIn; window.fetch=realFetch; input.value=realVal; _photoCache={}; }
     } },
 
   { id:'sec_no_local_save_helper', group:'Network', name:'Exports go straight to the browser, with no local helper (v35.0)',
@@ -8803,9 +8823,13 @@ window.SELF_TESTS = [
       // v38.02 — Tony's family app: "opening the page did not clear the dots". The ⚙️ dot is EVERY
       // red dot (his new notes, an answer to his own note); this test is about link requests alone,
       // so the others are set aside here and put back after.
+      // v39.81 — EVERY other one (Tony's iPhone on the beta, 15 Nov 2026: an invitation request waiting, a kitchen's
+      // chat, the family's, a recipe sent — seven sources now), and the ⚙️ dot judged against whatever else is lit.
       var dotsWere=Object.assign({}, _pathDots);
+      var othersLit=function(){ return Object.keys(_pathDots).some(function(k){ return k!=='links' && _pathDots[k]; }); };
       try{
-        pathDots({ feedback:0, replies:0 });
+        var aside={}; Object.keys(_pathDots).concat(Object.keys(PATH_DOTS)).forEach(function(k){ if(k!=='links') aside[k]=0; });
+        pathDots(aside);
         window._fbDb=fake; window._fbUser={ uid:'uA', email:'a@example.com', emailVerified:true }; window.toast=function(){};
         window._household={ hid:'hA', role:'owner', name:'My Kitchen', code:'MKN-AAAA-2222', appRequests:true,
           links:[{ hid:'hL', name:'Linked Kitchen', code:'MKN-LLLL-3333', at:now-864e5 }], asking:[{ id:'hA_hS', label:'MKN-SSSS-7777' }] };
@@ -8826,7 +8850,7 @@ window.SELF_TESTS = [
         var t=document.getElementById('linkReqOverlay').textContent;
         ['New Kitchen','NEW','MKN-SSSS-7777','Linked Kitchen','Revoke access','Pushy Kitchen','Blocked','Old Refusal','Rejected','Link requests through the app'].forEach(function(w){
           if(t.indexOf(w)===-1) throw new Error('the page does not show '+w); });
-        if(linkNewCount()!==0 || !gearDot.hidden || document.querySelector('#linkRequestsItem > .path-dot')) throw new Error('opening the page did not clear the dots');
+        if(linkNewCount()!==0 || gearDot.hidden!==!othersLit() || document.querySelector('#linkRequestsItem > .path-dot')) throw new Error('opening the page did not clear the dots'+(othersLit() ? ' (another red dot came on meanwhile: '+JSON.stringify(_pathDots)+')' : ''));
         var ask=document.getElementById('lrAskBtn');
         if(!ask || !/Ask a household to link/.test(ask.textContent) || !/openConnectHousehold/.test(ask.getAttribute('onclick'))) throw new Error('the page offers no way to ask a household by its identifier');
         // 3. Block from the page: refused, logged, and they are not told.
@@ -10754,7 +10778,11 @@ window.SELF_TESTS = [
         pf.src='privacy.html?t='+Date.now(); document.body.appendChild(pf);
         try{
           await new Promise(function(res, rej){ pf.onload=res; setTimeout(function(){ rej(new Error('privacy.html did not load')); }, 8000); });
-          var pd=pf.contentDocument, shown=pd && pd.querySelector('a.mkn-mail');
+          var pd=null; try{ pd=pf.contentDocument; }catch(e){}
+          // v39.81 — refused by the copy's own headers (DENY / frame-ancestors 'none', v39.63–v39.80 on the Cloudflare copies)
+          if(!pd || !pd.querySelector('body') || !/privacy/i.test(String(pd.location && pd.location.href)))
+            throw new Error('the privacy statement was refused inside the app\u2019s own frame — the copy\u2019s headers must let the app frame its own pages (_headers: X-Frame-Options SAMEORIGIN, frame-ancestors \'self\')');
+          var shown=pd.querySelector('a.mkn-mail');
           if(!shown || shown.getAttribute('href')!=='mailto:'+appSupportEmail() || shown.textContent!==appSupportEmail())
             throw new Error('opened, the privacy statement does not show the address as a link: '+(shown ? shown.outerHTML.slice(0,160) : 'no link'));
         } finally { pf.remove(); }

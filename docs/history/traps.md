@@ -5,6 +5,12 @@ Moved out of `CLAUDE.md` unchanged on 11 Nov 2026 (audit item H6). Each entry is
 rules, distilled* has the one-line versions. A new trap goes at the TOP of this list. The versions' notes from
 v38.30 on are in `2026-10.md` and `2026-11.md`.
 
+- **THE APP FRAMES ITS OWN PAGES — A HEADER THAT FORBIDS EVERY FRAME EMPTIES ITS WINDOWS (v39.81).** The privacy
+  statement and the terms open inside the app, in a frame (`#legalDocFrame`). v39.63's `_headers` sent
+  `X-Frame-Options: DENY` / `frame-ancestors 'none'` on every path, and on the Cloudflare copies those windows stayed
+  empty for five days: CI serves no headers, GitHub Pages ignores `_headers`, and the screen walk filtered the
+  console's "frame-ancestors" lines. The guard is SAMEORIGIN / `'self'` (`tools/build.js` refuses anything else); a
+  header change is tried against a local server that sends it (scratch `hdrserver.js` pattern) before it ships.
 
 - **NO E-MAIL ADDRESS IS WRITTEN IN THE REPOSITORY (v38.27).** It is public and harvested for addresses — and so
   are its Actions logs. The owner is `APP_CONFIG.ownerKeys` (salted fingerprints: the owner, then the spare
