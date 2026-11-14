@@ -17,10 +17,10 @@ where.
 **Live now**
 - The family's copy (`main`, https://rozinante2004-hash.github.io/tonys-recipes/ — it forwards to the community app)
   and the community app (`beta`, https://mykitchennotes.community, Firebase project my-kitchen-notes-beta) run
-  **v39.80 + Worker v106** (released 15 Nov 2026, 00:58 Israel time, on 4b17e8b — the "Recent:" row; v39.75–v39.79
-  went out at 00:19 on 1a29275; the jobs are listed near the top of `docs/history/2026-11.md`). **v39.81 is on Test**
-  (Tony's iPhone Self Test: the Cloudflare copies' headers let the app frame its own privacy statement and terms again
-  — empty windows on the beta since v39.63 — and three test faults fixed) and waits for Tony's yes. The test copy (https://tonys-recipes-test.pages.dev, its own database and rules)
+  **v39.81 + Worker v106** (released 15 Nov 2026, 01:38 Israel time, on afdbbe4 — the Cloudflare copies' headers let
+  the app frame its own privacy statement and terms again (empty windows on the beta since v39.63), and three Self
+  Test faults from Tony's iPhone report; v39.80, the "Recent:" row, went out at 00:58 on 4b17e8b; the jobs are listed
+  near the top of `docs/history/2026-11.md`). Nothing waits on Test. The test copy (https://tonys-recipes-test.pages.dev, its own database and rules)
   follows `test`.
 - **The beta has had testers since Sunday 25 Oct 2026** and is **by invitation only**: the owner invites with
   ⚙️ → 👑 → ✉️ Invite testers (the congratulatory wording of v39.60); a tester's share button asks the owner for an
