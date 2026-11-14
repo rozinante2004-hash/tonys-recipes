@@ -1,7 +1,7 @@
 {
  "lang": "he",
- "updatedAt": 1794609889631,
- "count": 3301,
+ "updatedAt": 1794643835555,
+ "count": 3300,
  "strings": {
   "\"Add to Home Screen\"": "הוספה למסך הבית",
   "\"One item away\" filter ({1}f.{2})": "פילטר \"פריט אחד חסר\" ({1}f.{2})",
@@ -1529,7 +1529,6 @@
   "Tabitha the turkey": "טביתה, תרנגול ההודו",
   "Tag them": "לתייג אותם",
   "Tagged {1}/{2}": "תויגו {1}/{2}",
-  "Tagged {1}/{2}: {3}": "תויגו {1}/{2}: {3}",
   "Tagging {1} recipes...": "מתייג {1} מתכונים...",
   "Take a photo of a recipe or choose an existing image — AI will extract it automatically.": "צלמו מתכון או בחרו תמונה קיימת — הבינה המלאכותית תחלץ אותו אוטומטית.",
   "Take back {1}?": "לבטל את {1}?",

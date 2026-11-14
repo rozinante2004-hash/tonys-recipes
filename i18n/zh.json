@@ -1,7 +1,7 @@
 {
  "lang": "zh",
- "updatedAt": 1794609605673,
- "count": 2876,
+ "updatedAt": 1794643835555,
+ "count": 2875,
  "strings": {
   "\"Add to Home Screen\"": "添加到主屏幕",
   "\"Open Bring!\"": "打开 Bring!",
@@ -1254,7 +1254,6 @@
   "Tabitha the turkey": "火鸡塔比莎",
   "Tag them": "给它们打标签",
   "Tagged {1}/{2}": "已标记 {1}/{2}",
-  "Tagged {1}/{2}: {3}": "已标记 {1}/{2}：{3}",
   "Tagging {1} recipes...": "正在为 {1} 道菜谱打标签…",
   "Take a photo of a recipe or choose an existing image — AI will extract it automatically.": "拍摄食谱照片或选择现有图片，AI 会自动提取内容。",
   "Take back {1}?": "撤回{1}？",

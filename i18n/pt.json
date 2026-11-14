@@ -1,7 +1,7 @@
 {
  "lang": "pt",
- "updatedAt": 1794609605673,
- "count": 2635,
+ "updatedAt": 1794643835555,
+ "count": 2634,
  "strings": {
   "\"Add to Home Screen\"": "Adicionar à tela inicial",
   "\"Open Bring!\"": "Abrir Bring!",
@@ -1147,7 +1147,6 @@
   "Tabitha the turkey": "Tabitha, a perua",
   "Tag them": "Etiquetar",
   "Tagged {1}/{2}": "{1}/{2} marcadas",
-  "Tagged {1}/{2}: {3}": "Etiquetado {1}/{2}: {3}",
   "Tagging {1} recipes...": "A etiquetar {1} receitas...",
   "Take a photo of a recipe or choose an existing image — AI will extract it automatically.": "Tira uma foto de uma receita ou escolhe uma imagem existente — a IA extrai-a automaticamente.",
   "Take back {1}?": "Retirar {1}?",

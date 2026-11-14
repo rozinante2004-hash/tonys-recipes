@@ -1,7 +1,7 @@
 {
  "lang": "ru",
- "updatedAt": 1794609605673,
- "count": 3172,
+ "updatedAt": 1794643835555,
+ "count": 3171,
  "strings": {
   "\"Add to Home Screen\"": "Добавить на главный экран",
   "\"One item away\" filter ({1}f.{2})": "Фильтр «Не хватает одного» ({1}ф.{2})",
@@ -1474,7 +1474,6 @@
   "Tabitha the turkey": "Индюшка Табита",
   "Tag them": "Отметить их",
   "Tagged {1}/{2}": "Помечено: {1}/{2}",
-  "Tagged {1}/{2}: {3}": "Помечено {1}/{2}: {3}",
   "Tagging {1} recipes...": "Помечаем {1} рецептов...",
   "Take a photo of a recipe or choose an existing image — AI will extract it automatically.": "Сфотографируйте рецепт или выберите готовое изображение — AI распознает его автоматически.",
   "Take back {1}?": "Отозвать {1}?",

@@ -1,7 +1,7 @@
 {
  "lang": "it",
- "updatedAt": 1794609605673,
- "count": 2777,
+ "updatedAt": 1794643835555,
+ "count": 2776,
  "strings": {
   "\"Add to Home Screen\"": "Aggiungi a Home",
   "\"Open Bring!\"": "Apri Bring!",
@@ -1212,7 +1212,6 @@
   "Tabitha the turkey": "Tabitha la tacchina",
   "Tag them": "Taggale",
   "Tagged {1}/{2}": "Taggate {1}/{2}",
-  "Tagged {1}/{2}: {3}": "Taggate {1}/{2}: {3}",
   "Tagging {1} recipes...": "Taggatura di {1} ricette...",
   "Take a photo of a recipe or choose an existing image — AI will extract it automatically.": "Scatta una foto di una ricetta o scegli un'immagine esistente — l'IA la estrarrà automaticamente.",
   "Take back {1}?": "Ritirare {1}?",

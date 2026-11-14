@@ -1,7 +1,7 @@
 {
  "lang": "ja",
- "updatedAt": 1794609605673,
- "count": 3177,
+ "updatedAt": 1794643835555,
+ "count": 3176,
  "strings": {
   "\"Add to Home Screen\"": "ホーム画面に追加",
   "\"One item away\" filter ({1}f.{2})": "「あと1品」フィルター（{1}f.{2}）",
@@ -1476,7 +1476,6 @@
   "Tabitha the turkey": "七面鳥のタビサ",
   "Tag them": "タグ付けする",
   "Tagged {1}/{2}": "{1}/{2}件タグ付け済み",
-  "Tagged {1}/{2}: {3}": "タグ付け {1}/{2}：{3}",
   "Tagging {1} recipes...": "{1}件のレシピにタグ付け中...",
   "Take a photo of a recipe or choose an existing image — AI will extract it automatically.": "レシピの写真を撮るか、既存の画像を選んでください — AIが自動で読み取ります。",
   "Take back {1}?": "{1}を取り消す？",

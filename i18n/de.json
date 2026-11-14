@@ -1,7 +1,7 @@
 {
  "lang": "de",
- "updatedAt": 1794609605673,
- "count": 2871,
+ "updatedAt": 1794643835555,
+ "count": 2870,
  "strings": {
   "\"Add to Home Screen\"": "Zum Home-Bildschirm hinzufügen",
   "\"Open Bring!\"": "Bring! öffnen",
@@ -1254,7 +1254,6 @@
   "Tabitha the turkey": "Tabitha, der Truthahn",
   "Tag them": "Markieren",
   "Tagged {1}/{2}": "{1}/{2} getaggt",
-  "Tagged {1}/{2}: {3}": "{1}/{2} markiert: {3}",
   "Tagging {1} recipes...": "{1} Rezepte werden markiert...",
   "Take a photo of a recipe or choose an existing image — AI will extract it automatically.": "Mach ein Foto von einem Rezept oder wähle ein vorhandenes Bild — die KI liest es automatisch aus.",
   "Take back {1}?": "{1} zurücknehmen?",

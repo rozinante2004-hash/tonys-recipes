@@ -1,7 +1,7 @@
 {
  "lang": "es",
- "updatedAt": 1794609605673,
- "count": 2871,
+ "updatedAt": 1794643835555,
+ "count": 2870,
  "strings": {
   "\"Add to Home Screen\"": "Añadir a pantalla de inicio",
   "\"Open Bring!\"": "Abrir Bring!",
@@ -1254,7 +1254,6 @@
   "Tabitha the turkey": "Tabitha, el pavo",
   "Tag them": "Etiquétalas",
   "Tagged {1}/{2}": "Etiquetadas {1}/{2}",
-  "Tagged {1}/{2}: {3}": "Etiquetadas {1}/{2}: {3}",
   "Tagging {1} recipes...": "Etiquetando {1} recetas...",
   "Take a photo of a recipe or choose an existing image — AI will extract it automatically.": "Haz una foto de una receta o elige una imagen existente — la IA la extraerá automáticamente.",
   "Take back {1}?": "¿Retirar {1}?",

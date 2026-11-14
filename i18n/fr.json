@@ -1,7 +1,7 @@
 {
  "lang": "fr",
- "updatedAt": 1794609605673,
- "count": 2872,
+ "updatedAt": 1794643835555,
+ "count": 2871,
  "strings": {
   "\"Add to Home Screen\"": "Ajouter à l'écran d'accueil",
   "\"Open Bring!\"": "Ouvrir Bring!",
@@ -1254,7 +1254,6 @@
   "Tabitha the turkey": "Tabitha la dinde",
   "Tag them": "Étiquetez-les",
   "Tagged {1}/{2}": "{1}/{2} taguées",
-  "Tagged {1}/{2}: {3}": "Étiquetées {1}/{2} : {3}",
   "Tagging {1} recipes...": "Étiquetage de {1} recettes...",
   "Take a photo of a recipe or choose an existing image — AI will extract it automatically.": "Prenez une recette en photo ou choisissez une image existante — l'IA l'extrait automatiquement.",
   "Take back {1}?": "Annuler {1} ?",

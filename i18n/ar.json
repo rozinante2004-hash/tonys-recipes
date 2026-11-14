@@ -1,7 +1,7 @@
 {
  "lang": "ar",
- "updatedAt": 1794609605673,
- "count": 2874,
+ "updatedAt": 1794643835555,
+ "count": 2873,
  "strings": {
   "\"Add to Home Screen\"": "إضافة إلى الشاشة الرئيسية",
   "\"Open Bring!\"": "فتح Bring!",
@@ -1254,7 +1254,6 @@
   "Tabitha the turkey": "تابيثا الديكة الرومية",
   "Tag them": "أضف لها وسومًا",
   "Tagged {1}/{2}": "تم وسم {1}/{2}",
-  "Tagged {1}/{2}: {3}": "تم وسم {1}/{2}: {3}",
   "Tagging {1} recipes...": "جارٍ وسم {1} وصفة...",
   "Take a photo of a recipe or choose an existing image — AI will extract it automatically.": "التقط صورة لوصفة أو اختر صورة موجودة — سيستخرجها الذكاء الاصطناعي تلقائيًا.",
   "Take back {1}?": "التراجع عن {1}؟",
