@@ -1,7 +1,7 @@
 {
  "lang": "hu",
  "updatedAt": 1794643835555,
- "count": 2647,
+ "count": 2649,
  "strings": {
   "\"Add to Home Screen\"": "Hozzáadás a kezdőképernyőhöz",
   "\"Open Bring!\"": "Bring! megnyitása",
@@ -192,6 +192,7 @@
   "Category": "Kategória",
   "Change it": "Módosítás",
   "Change my password": "Jelszó módosítása",
+  "Change the servings or any amount — everything else follows, the method too.": "Módosítsd az adagok számát vagy bármelyik mennyiséget – minden más igazodik hozzá, az elkészítés is.",
   "Change the servings: the amounts follow, even in the method — in metric or imperial.": "Add meg az adagok számát: a mennyiségek — metrikus vagy angolszász mértékegységben — ennek megfelelően változnak, még a leírásban is.",
   "Changes not yet sent stay on this device until you sign in again.": "A még el nem küldött módosítások ezen az eszközön maradnak, amíg újra be nem jelentkezel.",
   "Chat with the people in your household: one person at a time, or everyone at once for announcements.": "Csevegj a háztartásodban élőkkel: egyénileg, vagy mindenkivel egyszerre, ha bejelentést teszel.",
@@ -365,6 +366,7 @@
   "Drink": "Ital",
   "Drop your file here": "Ejtsd ide a fájlodat",
   "Duncan the duck": "Duncan, a kacsa",
+  "Dynamic": "Dinamikus",
   "E-mail address": "E-mail cím",
   "EDITED_ELSEWHERE: {1} recipe(s) were changed on another device after this one last synced, so they were NOT overwritten: {2} Your version is still safe on this device, and nothing has been lost — but the two versions have to be reconciled by you rather than guessed at.{3}": "EDITED_ELSEWHERE: {1} recept megváltozott egy másik eszközön, miután ez utoljára szinkronizált, ezért NEM lettek felülírva: {2} A te verziód biztonságban van ezen az eszközön, és semmi nem veszett el — de a két verziót neked kell összeegyeztetned, nem találgatással.{3}",
   "Each becomes a normal recipe of its own, and the collection “{1}” is removed. You can undo this straight afterwards, and nothing is lost either way — every recipe survives as its own card.": "Mindegyik önálló recepté válik, a(z) „{1}” gyűjtemény pedig megszűnik. Ezt rögtön utána visszavonhatod, és semmi nem vész el — minden recept megmarad saját kártyaként.",

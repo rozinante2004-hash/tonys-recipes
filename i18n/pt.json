@@ -1,7 +1,7 @@
 {
  "lang": "pt",
  "updatedAt": 1794643835555,
- "count": 2634,
+ "count": 2636,
  "strings": {
   "\"Add to Home Screen\"": "Adicionar à tela inicial",
   "\"Open Bring!\"": "Abrir Bring!",
@@ -189,6 +189,7 @@
   "Category": "Categoria",
   "Change it": "Alterar",
   "Change my password": "Alterar minha senha",
+  "Change the servings or any amount — everything else follows, the method too.": "Altera as doses ou qualquer quantidade — tudo o resto acompanha, a preparação também.",
   "Change the servings: the amounts follow, even in the method — in metric or imperial.": "Muda as doses: as quantidades acompanham, até no modo de preparação — em métrico ou imperial.",
   "Changes not yet sent stay on this device until you sign in again.": "As alterações ainda não enviadas ficam neste dispositivo até voltares a iniciar sessão.",
   "Chat with the people in your household: one person at a time, or everyone at once for announcements.": "Conversa com as pessoas da tua casa: uma de cada vez, ou todas ao mesmo tempo para anúncios.",
@@ -362,6 +363,7 @@
   "Drink": "Bebida",
   "Drop your file here": "Larga o teu ficheiro aqui",
   "Duncan the duck": "Duncan, o pato",
+  "Dynamic": "Dinâmico",
   "E-mail address": "Endereço de e-mail",
   "EDITED_ELSEWHERE: {1} recipe(s) were changed on another device after this one last synced, so they were NOT overwritten: {2} Your version is still safe on this device, and nothing has been lost — but the two versions have to be reconciled by you rather than guessed at.{3}": "EDITED_ELSEWHERE: {1} receita(s) foram alteradas em outro dispositivo depois da última sincronização deste, por isso NÃO foram substituídas: {2} Sua versão continua segura neste dispositivo, e nada foi perdido — mas as duas versões precisam ser reconciliadas por você, em vez de adivinhadas.{3}",
   "Each becomes a normal recipe of its own, and the collection “{1}” is removed. You can undo this straight afterwards, and nothing is lost either way — every recipe survives as its own card.": "Cada uma se torna uma receita normal e independente, e a coleção “{1}” é removida. Você pode desfazer isso logo em seguida, e nada se perde de qualquer forma — cada receita sobrevive como seu próprio cartão.",

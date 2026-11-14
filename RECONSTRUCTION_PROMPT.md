@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v39.75` — app. **Worker: v106**, deployed separately and versioned separately
+**Current version:** `v39.76` — app. **Worker: v106**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -2441,7 +2441,7 @@ per 100g** panel (shows values or a "✨ Calculate" button → `calcNutrition` v
 of the finished dish, v39.64; on a phone, `max-width: 600px`, the panel with values is one line — the title,
 the calories and a ▸ — `data-folded` on the panel, `toggleNutrition(id, open)` flips it and the head button's
 `aria-expanded`; a computer always shows the four values), **Scale**
-buttons ×1–×6 (persisted per recipe in `scale_<id>`), **Metric/Imperial** unit toggle
+buttons ×0.5 ×1–×4 and **Dynamic** (persisted per recipe in `scale_<id>` and `scale_dyn_<id>`; §11b), **Metric/Imperial** unit toggle
 (`cvtIng`/`M2I`/`I2M` conversion + `scaleAmt`/`parseFraction`), diet tags, cook‑count line, a
 NOTES callout, **Ingredients** list, **Method** (per‑step RTL detection for Hebrew), and an
 action bar: ✏️ Edit · 🍳 Cooked! · 🌐 Translate · 📊 Excel · 📄 Word · 🖨️ Print · 📤 Share ·
@@ -2743,8 +2743,22 @@ deliberately incapable of reaching any function that writes data.
 
 ## 11b. Scaling, and the cooking log
 
-**Scaling (3.3)** offers two routes to the same multiplier, both kept on purpose:
-- the `×1`–`×6` buttons (`setMult`), and
+**Scaling (3.3)** offers three routes to the same multiplier, all kept on purpose:
+- the `×0.5`, `×1`–`×4` buttons (`multPreset` → `setMult`; ×5 and ×6 went in v39.76),
+- **Dynamic** (v39.76; Tony: "open up both the servings and amount of ingredients to changes by the user. Changing each
+  of the values should automatically change all other values to fit it… reflected in the Methods as well"): the last
+  button of the row, `toggleDynamic()`, `viewDynamic` (kept as `scale_dyn_<id>` = '1'). While on, the servings input is
+  a text box that takes any number, and `ingredientLinesHtml` draws each amount that begins with a number
+  (`dynBase(cv) !== null`, on the amount AFTER unit conversion and BEFORE scaling) as `<input class="dyn-amt"
+  inputmode="decimal" data-dyn="<line key>" data-base="<its own number>" aria-label="<the ingredient>">` followed by
+  the rest of the amount as words (`.dyn-rest`: the unit, or "-3 tbsp" of a range). On `change` (leaving the box,
+  Enter) `dynAmountChanged` sets `viewMult = dynParse(typed) / base` through `setMult(m, { key, text })`; the
+  `viewDynAnchor` it leaves makes the box typed in show exactly what was typed, while every other value is the usual
+  `scaleAmt` + `fmtAmt` rounding. `dynParse`: 300, 1.5, 1,5, 3/4, 1 1/2, ½, 1½ — NaN otherwise; a value ≤ 0, junk or
+  a share outside 0.01–100 just redraws. `dynNumber` shows the servings (whole, or one decimal). A tap in a box stops
+  at the box (`event.stopPropagation()`), so it does not mark the line. A multiple turns Dynamic off; Dynamic again
+  turns it off and keeps the scale. A line `.dyn-hint` under the row says what to do. The recipe is never changed.
+  Self Test `scale_dynamic`. And
 - a **"Make it for [N] servings"** stepper (`setServings`/`nudgeServings`), rendered only when
   `parseServings(r.servings)` finds a number — a recipe whose servings field reads "—" gets no
   control rather than a broken one. `viewMult` becomes fractional (6 from a base of 4 → ×1.5),

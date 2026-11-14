@@ -21385,6 +21385,99 @@ window.SELF_TESTS = [
         try{ if(keepPref==null) localStorage.removeItem(PLAYER_EXTERNAL_KEY); else localStorage.setItem(PLAYER_EXTERNAL_KEY, keepPref); }catch(e){}
       }
     } },
+  { id:'scale_dynamic', group:'Features', name:'Dynamic: change the servings or any one amount and every other amount, the servings and the Method follow (v39.76)',
+    test: async()=>{
+      // Tony, 14 Nov 2026: "Please reduce the scaling ingredients options from 0.5 -6 to 0.5-4 and add, at the end of the line a
+      // new button called "Dynamic". Selecting this option will open up both the servings and amount of ingredients to changes
+      // by the user. Changing each of the values should automatically change all other values to fit it, to retain the original
+      // ratios between components. Please make sure the changes are reflected in the Methods as well."
+      var testId=888976, keepR=recipes, prevView=viewId, prevMult=viewMult, prevDyn=viewDynamic, prevAnchor=viewDynAnchor, prevUnitPref=null, wasOpen=document.getElementById('viewOverlay').classList.contains('open');
+      try{ prevUnitPref=localStorage.getItem(VIEW_UNIT_KEY); localStorage.removeItem(VIEW_UNIT_KEY); }catch(e){}
+      var $$=function(sel){ return document.querySelector('#viewModal '+sel); };
+      var box=function(i){ return $$('.dyn-amt[data-dyn="ing-'+i+'"]'); };
+      var type=function(el, text){ el.value=text; el.dispatchEvent(new Event('change', { bubbles:true })); };
+      var amounts=function(){ return Array.prototype.map.call(document.querySelectorAll('#viewModal .ingredients-list li'), function(li){ var i=li.querySelector('.dyn-amt'), r=li.querySelector('.dyn-rest'); return i ? i.value+(r?r.textContent:'') : li.querySelector('.ing-amount').textContent; }); };
+      var steps=function(){ return Array.prototype.map.call(document.querySelectorAll('#viewModal .steps-list .step-text'), function(x){ return x.textContent; }).join(' / '); };
+      try{
+        // the numbers a person types
+        [['300',300],['1.5',1.5],['1,5',1.5],['3/4',0.75],['1 1/2',1.5],['½',0.5],['1½',1.5],[' 2 ',2],['.5',0.5]].forEach(function(c){ if(Math.abs(dynParse(c[0])-c[1])>1e-9) throw new Error('reading “'+c[0]+'”: '+dynParse(c[0])); });
+        ['', 'abc', '1/0', '2 cups', '-3', '1..2', '1/2/3'].forEach(function(c){ if(!isNaN(dynParse(c))) throw new Error('“'+c+'” was read as a number: '+dynParse(c)); });
+        if(dynBase('200 g')!==200 || dynBase('1/2 tsp')!==0.5 || dynBase('2-3 tbsp')!==2 || dynBase('a pinch')!==null || dynBase('')!==null || dynBase('0 g')!==null) throw new Error('which amounts can be typed over');
+        if(dynNumber(2.4)!=='2.4' || dynNumber(3)!=='3' || dynNumber(2.6667)!=='2.7' || dynNumber(0.25)!=='0.25' || dynNumber(4.999)!=='5') throw new Error('a number for a box: '+[dynNumber(2.4),dynNumber(3),dynNumber(2.6667),dynNumber(0.25),dynNumber(4.999)].join(' '));
+
+        recipes=[normalizeRecipe({ id:testId, name:'ST dynamic cake', servings:'4', updatedAt:Date.now(),
+          ingredients:[{a:'500 g',n:'flour'},{a:'150 g',n:'sugar'},{a:'3',n:'eggs'},{a:'1/2 tsp',n:'salt'},{a:'2-3 tbsp',n:'oil'},{a:'a pinch',n:'pepper'}],
+          steps:['Mix the 500 g flour with 150 g sugar.','Beat in 3 eggs and bake for 30 minutes.'] })];
+        try{ localStorage.removeItem('scale_'+testId); localStorage.removeItem('scale_dyn_'+testId); }catch(e){}
+        openView(testId); await wait(60);
+        if(viewDynamic || viewMult!==1) throw new Error('a recipe opened for the first time is not as written');
+        if(document.querySelector('#viewModal .dyn-amt') || $$('.dyn-hint')) throw new Error('boxes to type in before Dynamic was chosen');
+        var btn=document.getElementById('dynBtn');
+        if(!btn || btn.textContent.trim()!=='Dynamic' || btn.getAttribute('aria-pressed')!=='false' || btn!==Array.prototype.slice.call(document.querySelectorAll('#viewModal .mult-btn')).pop()) throw new Error('the Dynamic button is not the last of the row');
+        // Dynamic on: the servings and every amount that begins with a number are boxes; words stay words
+        btn.click(); await wait(30);
+        if(!viewDynamic || document.getElementById('dynBtn').getAttribute('aria-pressed')!=='true' || !document.getElementById('dynBtn').classList.contains('active')) throw new Error('Dynamic did not turn on');
+        if(document.querySelectorAll('#viewModal .mult-btn.active').length!==1) throw new Error('a multiple is still shown as chosen beside Dynamic');
+        if(document.querySelectorAll('#viewModal .dyn-amt').length!==5) throw new Error('five amounts begin with a number: '+document.querySelectorAll('#viewModal .dyn-amt').length+' boxes');
+        if(amounts().join(' | ')!=='500 g | 150 g | 3 | 1/2 tsp | 2-3 tbsp | a pinch') throw new Error('opening the boxes changed the amounts: '+amounts().join(' | '));
+        if(!$$('.dyn-hint') || !$$('.serv-input.dyn-open') || $$('.serv-input').value!=='4') throw new Error('the servings box or the line that says what to do is missing');
+        if(box(0).getAttribute('aria-label')!=='flour' || box(0).getAttribute('inputmode')!=='decimal') throw new Error('a box does not say which ingredient it is, or asks for letters');
+        // one amount changed: everything moves by the same share — the other amounts, the servings, the Method
+        type(box(0), '300'); await wait(30);
+        if(Math.abs(viewMult-0.6)>1e-9) throw new Error('300 of 500 is ×0.6, got '+viewMult);
+        if(amounts().join(' | ')!=='300 g | 90 g | 1.75 | 0.3 tsp | 1.25-1.75 tbsp | a pinch') throw new Error('after flour → 300: '+amounts().join(' | '));
+        if($$('.serv-input').value!=='2.4') throw new Error('the servings did not follow: '+$$('.serv-input').value);
+        if(steps().indexOf('300 g flour with 90 g sugar')===-1 || steps().indexOf('1.75 eggs')===-1) throw new Error('the Method did not follow: '+steps());
+        if(steps().indexOf('30 minutes')===-1) throw new Error('a time in the Method was scaled: '+steps());
+        if(recipes[0].ingredients[0].a!=='500 g' || recipes[0].servings!=='4') throw new Error('the recipe itself was changed');
+        // the box typed in keeps exactly what was typed, though the others are rounded to what a cook measures
+        type(box(0), '333'); await wait(30);
+        if(box(0).value!=='333') throw new Error('the box typed in shows '+box(0).value+', not the 333 typed');
+        if(box(1).value!=='100') throw new Error('sugar beside 333 g flour: '+box(1).value);
+        // a count: 2 eggs of 3
+        type(box(2), '2'); await wait(30);
+        if(Math.abs(viewMult-2/3)>1e-9 || box(2).value!=='2' || box(0).value!=='335' || $$('.serv-input').value!=='2.7') throw new Error('after eggs → 2: '+amounts().join(' | ')+' for '+$$('.serv-input').value);
+        // a fraction typed as a cook writes it; the far end of a range follows its near end
+        type(box(3), '1 1/2'); await wait(30);
+        if(Math.abs(viewMult-3)>1e-9 || box(3).value!=='1 1/2' || box(0).value!=='1500' || amounts()[4]!=='6-9 tbsp') throw new Error('after salt → 1 1/2 tsp: '+amounts().join(' | '));
+        // the servings: any number, as typed
+        type($$('.serv-input'), '5'); await wait(30);
+        if(Math.abs(viewMult-1.25)>1e-9 || $$('.serv-input').value!=='5' || box(0).value!=='625' || steps().indexOf('625 g flour')===-1) throw new Error('after servings → 5: '+amounts().join(' | ')+' / '+steps());
+        type($$('.serv-input'), '2,5'); await wait(30);
+        if(Math.abs(viewMult-0.625)>1e-9 || $$('.serv-input').value!=='2,5') throw new Error('half servings are not taken as typed: '+viewMult+' '+$$('.serv-input').value);
+        // junk, nothing, zero: the box goes back, nothing moves
+        var before=viewMult;
+        ['abc', '', '0', '-2'].forEach(function(j){ type(box(1), j); if(viewMult!==before) throw new Error('“'+j+'” moved the recipe'); if(!box(1) || isNaN(dynParse(box(1).value))) throw new Error('“'+j+'” was left in the box'); });
+        type($$('.serv-input'), 'x'); if(viewMult!==before) throw new Error('junk in the servings moved the recipe');
+        // a tap in a box is not a tap on the line
+        var li=box(1).closest('li'), cls=li.className; box(1).click();
+        if(box(1).closest('li').className!==cls) throw new Error('a tap in a box marked the line');
+        // remembered with the recipe's scale; a multiple closes the boxes; Dynamic again closes them and keeps the scale
+        type(box(0), '250'); await wait(30);
+        closeM('viewOverlay'); openView(testId); await wait(60);
+        if(!viewDynamic || Math.abs(viewMult-0.5)>1e-9 || !box(0) || box(0).value!=='250') throw new Error('reopened, Dynamic and its scale were not remembered: '+viewDynamic+' '+viewMult);
+        Array.prototype.filter.call(document.querySelectorAll('#viewModal .mult-btn'), function(b){ return b.textContent.trim()==='×2'; })[0].click(); await wait(30);
+        if(viewDynamic || viewMult!==2 || document.querySelector('#viewModal .dyn-amt') || localStorage.getItem('scale_dyn_'+testId)!==null) throw new Error('×2 did not close the boxes');
+        if(amounts().join(' | ')!=='1000 g | 300 g | 6 | 1 tsp | 4-6 tbsp | a pinch') throw new Error('×2 after Dynamic: '+amounts().join(' | '));
+        toggleDynamic(true); type(box(0), '750'); await wait(30); toggleDynamic(); await wait(30);
+        if(viewDynamic || Math.abs(viewMult-1.5)>1e-9 || document.querySelector('#viewModal .dyn-amt') || amounts()[0]!=='750 g') throw new Error('Dynamic tapped again did not close the boxes and keep the scale');
+        // in the units shown: imperial amounts are typed in imperial
+        toggleDynamic(true); setMult(1); setUnit('imperial'); await wait(30);
+        var ib=box(0), was=ib.value, baseImp=parseFloat(ib.getAttribute('data-base'));
+        if(!(baseImp>0) || Math.abs(baseImp-500)<1) throw new Error('in imperial the flour box still counts grams: '+was);
+        type(ib, String(baseImp*2)); await wait(30);
+        if(Math.abs(viewMult-2)>1e-6) throw new Error('twice the imperial amount is not ×2: '+viewMult);
+        // Help knows it, with the new range of the buttons
+        var k=String(HELP_SYSTEM_PROMPT);
+        if(!/DYNAMIC SCALING \(v39\.76\)/.test(k) || !/×0\.5–×4/.test(k) || /×0\.5–×6/.test(k)) throw new Error('Help does not know Dynamic, or still offers ×6');
+      } finally {
+        try{ localStorage.removeItem('scale_'+testId); localStorage.removeItem('scale_dyn_'+testId); }catch(e){}
+        try{ if(prevUnitPref==null) localStorage.removeItem(VIEW_UNIT_KEY); else localStorage.setItem(VIEW_UNIT_KEY, prevUnitPref); }catch(e){}
+        recipes=keepR; viewDynamic=prevDyn; viewDynAnchor=prevAnchor; viewMult=prevMult; viewUnit='metric';
+        try{ viewUnit=(localStorage.getItem(VIEW_UNIT_KEY)==='imperial')?'imperial':'metric'; }catch(e){}
+        if(wasOpen && prevView!=null && recipes.some(function(r){ return r.id===prevView; })){ viewId=prevView; drawView(); } else { viewId=prevView; closeM('viewOverlay'); }
+      }
+    } },
   { id:'help_says_an_import_brings_no_photo', group:'Features', name:'The help assistant says an import brings no photo — and an import really sets none (v39.73)',
     test: async()=>{
       // Tony, 13 Nov 2026: 'Help says that when importing from a url, the photo is copied automatically
@@ -22952,9 +23045,12 @@ window.SELF_TESTS = [
         // swapped for a ×7 nobody asked for.
         var multBtns = Array.prototype.map.call(
           document.querySelectorAll('#viewModal .mult-btn'), function(b){ return b.textContent.trim(); });
-        if(multBtns.length!==7)
-          throw new Error('expected ×0.5 plus ×1–×6, got '+multBtns.length+': '+multBtns.join(' '));
-        ['×0.5','×1','×2','×3','×4','×5','×6'].forEach(function(want){
+        // v39.76 — Tony: "reduce the scaling ingredients options from 0.5 -6 to 0.5-4 and add, at the end of the line a new
+        // button called "Dynamic"": five multiples and Dynamic, in that order.
+        if(multBtns.length!==6 || multBtns[5]!=='Dynamic')
+          throw new Error('expected ×0.5, ×1–×4 and Dynamic at the end, got '+multBtns.length+': '+multBtns.join(' '));
+        if(multBtns.indexOf('×5')!==-1 || multBtns.indexOf('×6')!==-1) throw new Error('×5 or ×6 is still offered: '+multBtns.join(' '));
+        ['×0.5','×1','×2','×3','×4'].forEach(function(want){
           if(multBtns.indexOf(want)===-1) throw new Error(want+' is missing: '+multBtns.join(' '));
         });
         if(multBtns[0]!=='×0.5') throw new Error('×0.5 should come first, before ×1: '+multBtns.join(' '));

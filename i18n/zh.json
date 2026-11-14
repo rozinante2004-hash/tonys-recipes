@@ -1,7 +1,7 @@
 {
  "lang": "zh",
  "updatedAt": 1794643835555,
- "count": 2875,
+ "count": 2877,
  "strings": {
   "\"Add to Home Screen\"": "添加到主屏幕",
   "\"Open Bring!\"": "打开 Bring!",
@@ -213,6 +213,7 @@
   "Change folder…": "更改文件夹…",
   "Change it": "修改",
   "Change my password": "修改我的密码",
+  "Change the servings or any amount — everything else follows, the method too.": "更改份量或任意一种用量，其余用量和做法中的数值都会随之变化。",
   "Change the servings: the amounts follow, even in the method — in metric or imperial.": "调整份量,用量会自动换算,连做法里的也会——支持公制或英制。",
   "Changes not yet sent stay on this device until you sign in again.": "尚未发送的更改会保留在此设备上，直到你再次登录。",
   "Chat with the people in your household: one person at a time, or everyone at once for announcements.": "和你家庭中的成员聊天：可以单独聊，也可以一次性发给所有人作为公告。",
@@ -392,6 +393,7 @@
   "Drink": "饮品",
   "Drop your file here": "将文件拖放到此处",
   "Duncan the duck": "鸭子邓肯",
+  "Dynamic": "动态",
   "E-mail address": "电子邮箱",
   "EDITED_ELSEWHERE: {1} recipe(s) were changed on another device after this one last synced, so they were NOT overwritten: {2} Your version is still safe on this device, and nothing has been lost — but the two versions have to be reconciled by you rather than guessed at.{3}": "EDITED_ELSEWHERE：{1} 个食谱在另一台设备上被修改，且是在本设备上次同步之后，因此未被覆盖：{2} 你的版本仍安全保存在本设备上，没有任何丢失——但这两个版本需要由你来协调，而不是靠猜测。{3}",
   "Each becomes a normal recipe of its own, and the collection “{1}” is removed. You can undo this straight afterwards, and nothing is lost either way — every recipe survives as its own card.": "每个都会变成独立的普通食谱，集合“{1}”将被删除。之后你可以立即撤销此操作，无论哪种情况都不会丢失任何内容——每个食谱都会作为独立卡片保留下来。",
