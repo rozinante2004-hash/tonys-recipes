@@ -1,7 +1,7 @@
 {
  "lang": "pt",
  "updatedAt": 1794694804828,
- "count": 2636,
+ "count": 2637,
  "strings": {
   "\"Add to Home Screen\"": "Adicionar à tela inicial",
   "\"Open Bring!\"": "Abrir Bring!",
@@ -902,6 +902,7 @@
   "Reads the file straight from this device — {1} (the full steps are at the bottom of this panel). With the box below ticked it is also synced to your other devices; untick it and the chat stays in this browser and nowhere else.": "Lê o arquivo diretamente deste dispositivo — {1} (o passo a passo completo está no final deste painel). Com a caixa abaixo marcada, também é sincronizado com seus outros dispositivos; desmarque-a e a conversa fica só neste navegador.",
   "Ready to send": "Pronto para enviar",
   "Ready? Let’s go! 🍳": "Pronto? Vamos lá! 🍳",
+  "Recent:": "Recentes:",
   "Recents": "Recentes",
   "Recipe documents seen in cloud": "Documentos de receitas vistos na nuvem",
   "Recipe imported!": "Receita importada!",

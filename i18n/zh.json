@@ -1,7 +1,7 @@
 {
  "lang": "zh",
  "updatedAt": 1794694804828,
- "count": 2877,
+ "count": 2878,
  "strings": {
   "\"Add to Home Screen\"": "添加到主屏幕",
   "\"Open Bring!\"": "打开 Bring!",
@@ -989,6 +989,7 @@
   "Reads the file straight from this device — {1} (the full steps are at the bottom of this panel). With the box below ticked it is also synced to your other devices; untick it and the chat stays in this browser and nowhere else.": "直接从本设备读取文件——{1}（完整步骤见本面板底部）。勾选下方选项后，还会同步到你的其他设备；取消勾选则聊天记录仅保留在此浏览器中。",
   "Ready to send": "可以发送了",
   "Ready? Let’s go! 🍳": "准备好了吗？开始吧！🍳",
+  "Recent:": "最近查看：",
   "Recents": "最近使用",
   "Recipe documents seen in cloud": "云端中的食谱文档",
   "Recipe imported!": "食谱已导入！",

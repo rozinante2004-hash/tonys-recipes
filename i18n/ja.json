@@ -1,7 +1,7 @@
 {
  "lang": "ja",
  "updatedAt": 1794694804828,
- "count": 3178,
+ "count": 3179,
  "strings": {
   "\"Add to Home Screen\"": "ホーム画面に追加",
   "\"One item away\" filter ({1}f.{2})": "「あと1品」フィルター（{1}f.{2}）",
@@ -1164,6 +1164,7 @@
   "Reads the file straight from this device — {1} (the full steps are at the bottom of this panel). With the box below ticked it is also synced to your other devices; untick it and the chat stays in this browser and nowhere else.": "このデバイスから直接ファイルを読み込みます — {1}（詳しい手順はこのパネルの下部）。下のチェックを入れると他のデバイスとも同期され、外すとチャットはこのブラウザだけに残ります。",
   "Ready to send": "送信準備完了",
   "Ready? Let’s go! 🍳": "準備はいい？始めよう！🍳",
+  "Recent:": "最近見たもの：",
   "Recently viewed tracking": "最近見た履歴のトラッキング",
   "Recently-added sort": "追加順で並べ替え",
   "Recents": "最近使ったもの",

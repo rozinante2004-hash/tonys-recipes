@@ -1,7 +1,7 @@
 {
  "lang": "he",
  "updatedAt": 1794694804828,
- "count": 3302,
+ "count": 3303,
  "strings": {
   "\"Add to Home Screen\"": "הוספה למסך הבית",
   "\"One item away\" filter ({1}f.{2})": "פילטר \"פריט אחד חסר\" ({1}f.{2})",
@@ -1204,6 +1204,7 @@
   "Reads the file straight from this device — {1} (the full steps are at the bottom of this panel). With the box below ticked it is also synced to your other devices; untick it and the chat stays in this browser and nowhere else.": "קורא את הקובץ ישירות מהמכשיר הזה — {1} (כל השלבים בתחתית הפאנל הזה). כשהתיבה למטה מסומנת זה גם מסתנכרן למכשירים אחרים שלכם; בטלו את הסימון והצ'אט יישאר רק בדפדפן הזה ובשום מקום אחר.",
   "Ready to send": "מוכן לשליחה",
   "Ready? Let’s go! 🍳": "מוכנים? בואו נתחיל! 🍳",
+  "Recent:": "אחרונים:",
   "Recently viewed tracking": "מעקב אחרי צפייה אחרונה",
   "Recently-added sort": "מיון לפי נוספו לאחרונה",
   "Recents": "אחרונים",

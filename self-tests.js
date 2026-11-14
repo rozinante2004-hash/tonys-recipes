@@ -21241,6 +21241,79 @@ window.SELF_TESTS = [
         recipes=saved; if(q) q.value=qv; sortMode=prev; sortPaint(prev); renderGrid();
       }
     } },
+  { id:'recent_row_on_top', group:'Features', name:'"Recent:" — the recipes opened last fill the top row of the list, in a box with its title; the rest follow in the order chosen, without them (v39.80)',
+    test: async()=>{
+      // Tony, 15 Nov 2026: "In the list of recipes, I would like to see in the top row the recent recipes accessed. The rest
+      // should be sorted normally. Give it a small "Recent:" title too, to make it clear and a square around the recipes in
+      // that row."
+      var keepR=recipes, keepSort=sortMode, keepView=viewMode, si=document.getElementById('searchInput'), keepQ=si?si.value:'';
+      var keepFav=showFavOnly, keepRecent=null, g=document.getElementById('recipeGrid');
+      try{ keepRecent=localStorage.getItem('recent_views'); }catch(e){}
+      var N=function(i){ return 'ST recent '+i; };
+      var names=function(sel){ return Array.prototype.map.call(g.querySelectorAll(sel), function(el){ var b=el.querySelector('.card-open'); return b?b.textContent:'?'; }); };
+      try{
+        recipes=[1,2,3,4,5,6,7,8,9,10].map(function(i){ return normalizeRecipe({ id:889000+i, name:N(i), servings:'2', ingredients:[{a:'1',n:'x'}], steps:['y'] }); });
+        // opened last: 5, then 2, one no longer there, 7, 1, 9, 3, 10
+        localStorage.setItem('recent_views', JSON.stringify([889005, 889002, 123456789, 889007, 889001, 889009, 889003, 889010]));
+        if(si) si.value=''; showFavOnly=false; sortMode='added'; viewMode='grid';
+        renderGrid();
+        var box=g.querySelector(':scope > .recent-row');
+        if(!box) throw new Error('no Recent row at the top of the list');
+        if(g.firstElementChild!==box) throw new Error('the Recent row is not the first thing in the list');
+        var title=box.firstElementChild;
+        if(!title || !title.classList.contains('recent-title') || title.textContent!==i18nPhrase('Recent:')) throw new Error('the box has no "Recent:" title above its recipes');
+        var cols=recentRowCols(g), opened=[5,2,7,1,9,3,10].map(N), want=opened.slice(0, cols);
+        if(cols<1 || cols>=opened.length) throw new Error('this screen holds '+cols+' recipes to a row — the test needs fewer than seven');
+        var inBox=names(':scope > .recent-row > .recipe-card');
+        if(inBox.join('|')!==want.join('|')) throw new Error('the Recent row holds '+inBox.join(', ')+' — wanted '+want.join(', ')+' ('+cols+' to a row)');
+        // one row: every card in it at the same height
+        var tops=Array.prototype.map.call(box.querySelectorAll('.recipe-card'), function(c){ return Math.round(c.getBoundingClientRect().top); });
+        if(tops.some(function(t){ return Math.abs(t-tops[0])>1; })) throw new Error('the Recent recipes take more than one row: '+tops.join(', '));
+        // a square round them, as wide as the list
+        var cs=getComputedStyle(box);
+        if(!(parseFloat(cs.borderTopWidth)>=1) || cs.borderTopStyle!=='solid' || cs.borderTopColor===cs.backgroundColor || !(parseFloat(cs.borderBottomWidth)>=1)) throw new Error('no square round the Recent row');
+        if(Math.abs(box.getBoundingClientRect().width-g.getBoundingClientRect().width)>2) throw new Error('the Recent box is not as wide as the list');
+        // the rest: newest first (the order chosen), without the ones in the box — nothing twice, nothing lost
+        var rest=names(':scope > .recipe-card'), wantRest=[10,9,8,7,6,5,4,3,2,1].map(N).filter(function(n){ return want.indexOf(n)<0; });
+        if(rest.join('|')!==wantRest.join('|')) throw new Error('the rest of the list: '+rest.join(', ')+' — wanted '+wantRest.join(', '));
+        // another order: the rest follows it
+        sortMode='alpha'; renderGrid();
+        var restA=names(':scope > .recipe-card'), wantA=recipes.map(function(r){ return r.name; }).filter(function(n){ return want.indexOf(n)<0; }).sort(function(a,b){ return a.localeCompare(b); });
+        if(names(':scope > .recent-row > .recipe-card').join('|')!==want.join('|') || restA.join('|')!==wantA.join('|')) throw new Error('A–Z: '+restA.join(', '));
+        sortMode='added';
+        // the List view: three in the box
+        viewMode='list'; renderGrid();
+        if(names(':scope > .recent-row > .recipe-list-item').join('|')!==opened.slice(0,3).join('|') || names(':scope > .recipe-list-item').length!==7) throw new Error('the List view: '+names(':scope > .recent-row > .recipe-list-item').join(', '));
+        viewMode='grid'; renderGrid();
+        // nothing redrawn for nothing
+        if(recentRowRefresh()) throw new Error('the list was redrawn although the Recent row had not changed');
+        // a recipe opened from the rest and closed: first in the row
+        var last=wantRest[wantRest.length-1], lastId=recipes.filter(function(r){ return r.name===last; })[0].id;
+        openView(lastId); await wait(60); closeM('viewOverlay'); await wait(40);
+        if(names(':scope > .recent-row > .recipe-card')[0]!==last) throw new Error('the recipe just closed is not first in the Recent row: '+names(':scope > .recent-row > .recipe-card').join(', '));
+        if(names(':scope > .recipe-card').indexOf(last)>=0) throw new Error('the recipe just closed is still in the rest of the list too');
+        // searching, a filter, or the 🕐 Recently viewed order: no row
+        if(si){ si.value='recent 3'; renderGrid(); if(g.querySelector('.recent-row')) throw new Error('a Recent row while searching'); si.value=''; }
+        recipes[0].fav=true; showFavOnly=true; renderGrid();
+        if(g.querySelector('.recent-row')) throw new Error('a Recent row with ❤ Favourites on');
+        showFavOnly=false; recipes[0].fav=false;
+        sortMode='recent'; renderGrid();
+        if(g.querySelector('.recent-row')) throw new Error('a Recent row while the whole list is in the 🕐 Recently viewed order');
+        sortMode='added';
+        // nothing opened yet on this device: no row, every recipe in the list
+        localStorage.removeItem('recent_views'); renderGrid();
+        if(g.querySelector('.recent-row') || names(':scope > .recipe-card').length!==10) throw new Error('a Recent row with nothing opened, or recipes missing');
+        var k=String(HELP_SYSTEM_PROMPT||'');
+        if(!/RECENT: \(v39\.80\)/.test(k) || !/titled "Recent:"/.test(k)) throw new Error('Help does not know the Recent row');
+        if(I18N_EXTRA.indexOf('Recent:')<0) throw new Error('"Recent:" is not among the phrases to translate');
+        return 'top row: '+want.join(', ')+' ('+cols+' to a row) in a box titled Recent:; the rest newest first / A–Z without them; three in the List view; a closed recipe goes first; no row while searching, filtered or in recent order';
+      } finally {
+        try{ if(keepRecent==null) localStorage.removeItem('recent_views'); else localStorage.setItem('recent_views', keepRecent); }catch(e){}
+        recipes=keepR; sortMode=keepSort; viewMode=keepView; showFavOnly=keepFav; if(si) si.value=keepQ;
+        try{ if(document.getElementById('viewOverlay').classList.contains('open')) closeM('viewOverlay'); }catch(e){}
+        renderGrid();
+      }
+    } },
   { id:'player_plays_the_clip', group:'Features', name:'The in-app player: the one-minute clip from \u{1F4AC} Ask About the App — Hebrew for a Hebrew app, English otherwise; closing it stops it (v39.72)',
     test: async()=>{
       // Tony, 13 Nov 2026: "create some kind of an in-app player", and "The Hebrew clip should be linked if the interface

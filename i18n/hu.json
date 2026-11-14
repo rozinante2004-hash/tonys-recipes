@@ -1,7 +1,7 @@
 {
  "lang": "hu",
  "updatedAt": 1794694804828,
- "count": 2649,
+ "count": 2650,
  "strings": {
   "\"Add to Home Screen\"": "Hozzáadás a kezdőképernyőhöz",
   "\"Open Bring!\"": "Bring! megnyitása",
@@ -906,6 +906,7 @@
   "Reads the file straight from this device — {1} (the full steps are at the bottom of this panel). With the box below ticked it is also synced to your other devices; untick it and the chat stays in this browser and nowhere else.": "A fájlt közvetlenül erről az eszközről olvassa be — {1} (a teljes lépések lent találhatók a panelen). Ha az alábbi jelölőnégyzet be van pipálva, a chat a többi eszközöddel is szinkronizálódik; vedd ki a pipát, és a chat csak ebben a böngészőben marad, sehol máshol.",
   "Ready to send": "Küldésre kész",
   "Ready? Let’s go! 🍳": "Készen állsz? Vágjunk bele! 🍳",
+  "Recent:": "Legutóbbiak:",
   "Recents": "Legutóbbiak",
   "Recipe documents seen in cloud": "A felhőben talált receptdokumentumok",
   "Recipe imported!": "Recept importálva!",

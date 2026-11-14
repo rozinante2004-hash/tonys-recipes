@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.79 -->
+<!-- Tony's Recipes Collection v39.80 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -11134,7 +11134,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.79';
+var APP_VERSION = 'v39.80';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -11952,6 +11952,7 @@ window.addEventListener('unhandledrejection', function(e) {
   --bg:         #FAF7F2;
   --green:      #2E7D32;
   --linked-bg:     #E7F0FA;  --linked-border: #9DB9DC;   /* v38.49 — a linked household's recipes; v38.51 a shade deeper */
+  --recent-bg:     #FFF4EC;  --recent-border: #DE9A74;  --recent-title: #A63A0C;   /* v39.80 — the Recent: row */
   /* --warm-brown does double duty as a *surface* (header, bars, active pills)
      and as heading *text*. Those two have to move in opposite directions when
      the theme flips, so headings get their own variable — identical in light
@@ -11995,6 +11996,7 @@ window.addEventListener('unhandledrejection', function(e) {
   --bg:         #17140F;
   --green:      #6FBF73;
   --linked-bg:     #1C2638;  --linked-border: #44628A;
+  --recent-bg:     #2A1D15;  --recent-border: #8C4E2E;  --recent-title: #FF9A6E;   /* v39.80 */
   --heading:    #F0E3D2;   /* headings invert; --warm-brown stays a surface */
   --note-bg:     #2B2416;  --note-border: #B8923A;  --note-label: #E3BC63;
   --bad-bg:      #3A1D1D;  --bad-border:  #6E3434;  --bad-text:   #F4A3A3;
@@ -12706,6 +12708,11 @@ html.setup-first #loginScreen > * { visibility: hidden; }   /* v39.02 — a firs
 .search-also { font-size: 13px; color: var(--muted); margin: -0.5rem 0 0.9rem; line-height: 1.5; }
 .search-also bdi { color: var(--ink); }
 .recipe-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
+/* v39.80 — "Recent:" — the recipes opened last, boxed, in the top row */
+.recent-row { border: 1.5px solid var(--recent-border); border-radius: 14px; background: var(--recent-bg); padding: 6px 10px 10px; }
+.recipe-grid > .recent-row { grid-column: 1 / -1; display: grid; gap: inherit; align-items: stretch; }
+.recipe-list > .recent-row { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+.recent-row > .recent-title { grid-column: 1 / -1; font-size: 12px; font-weight: 700; letter-spacing: 0.3px; color: var(--recent-title); line-height: 1.4; }
 
 /* CARD */
 /* 5b.2 — column flex with a growing body so the footer pins to the bottom of
@@ -14693,7 +14700,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.79</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.80</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14781,7 +14788,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.79</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.80</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -18408,6 +18415,8 @@ window.i18nTemplatesOf = i18nTemplatesOf; window.i18nTemplateCovers = i18nTempla
 // translating a string nobody sees. A `{1}` makes it a shape, matched the same
 // way a built toast is.
 var I18N_EXTRA = [
+  // v39.80 — the title of the top row of recipes opened last
+  'Recent:',
   // v39.74 — a recipe's source in the player (the ▶ link's tooltip is looked up in code)
   'Plays here, inside the app',
   // v39.72 — the in-app player
@@ -22347,6 +22356,63 @@ function gridBadgesHtml(r) {
     + (isCollection(r) ? '<div class="collection-badge" style="position:absolute;top:8px;right:8px;">\u{1F4DA}<span class="collection-count">' + recipeParts(r).length + '</span></div>' : '');
 }
 window.listBadgesHtml = listBadgesHtml; window.gridBadgesHtml = gridBadgesHtml;
+// ─── RECENT: THE TOP ROW (v39.80) ────────────────────────────────────────────
+// Tony, 15 Nov 2026: "In the list of recipes, I would like to see in the top row the recent recipes accessed. The rest
+// should be sorted normally. Give it a small "Recent:" title too, to make it clear and a square around the recipes in
+// that row." The recipes opened last on this device (recent_views, written by openView: newest first, eight at most)
+// fill the first row of the list — as many as the row holds (the grid's columns as drawn; three in the list view) —
+// in a box with its title. The rest follow in the order chosen (⇅), without the ones already in the box. The row is
+// for the plain list only: a search, a filter, or the 🕐 Recently viewed order (the whole list is then in that order)
+// leave the list as it was. Only this kitchen's own recipes (a linked kitchen's are opened elsewhere).
+function recentRowWanted(q) {
+  return !q && ownShown() && sortMode !== 'recent' && !showFavOnly && !showClipsOnly && !showCollectionsOnly
+    && !showNoPhotoOnly && !showRecentOnly && !showOneAwayOnly && !activeCategories.size && !activeDiets.size;
+}
+function recentRowCols(g) {             // how many recipes one row of the list holds, as it is drawn now
+  if (viewMode === 'list') return 3;
+  var t = ''; try { t = getComputedStyle(g).gridTemplateColumns || ''; } catch(e) {}
+  if (/^\s*[\d.]+px(\s+[\d.]+px)*\s*$/.test(t)) return t.trim().split(/\s+/).length;   // the tracks as laid out
+  try { if (matchMedia('(max-width: 700px)').matches) return getMobileCols(); } catch(e) {}
+  return Math.max(1, Math.floor((((g && g.clientWidth) || window.innerWidth) + 16) / (220 + 16)));   // the desktop grid: 220 px columns, 16 px apart
+}
+function recentRowIds(q, g) {           // the ids for the row, newest first; [] when there is no row
+  if (!recentRowWanted(q)) return [];
+  var ids = []; try { ids = JSON.parse(localStorage.getItem('recent_views') || '[]'); } catch(e) {}
+  if (!Array.isArray(ids)) return [];
+  var have = {}; recipes.forEach(function(r){ have[r.id] = 1; });
+  return ids.filter(function(id){ return have[id]; }).slice(0, Math.max(1, recentRowCols(g)));
+}
+function recentRowOf(list, q, g) {      // the recipes of the row, from the list being drawn
+  var byId = {}; list.forEach(function(r){ byId[r.id] = r; });
+  return recentRowIds(q, g).map(function(id){ return byId[id]; }).filter(Boolean);
+}
+function recentRowRest(list, row) {
+  if (!row.length) return list;
+  return list.filter(function(r){ return row.indexOf(r) < 0; });
+}
+function recentRowHtml(row, itemHtml, cols) {
+  if (!row.length) return '';
+  return '<div class="recent-row" role="group" aria-labelledby="recentRowTitle" data-ids="' + row.map(function(r){ return r.id; }).join(',') + '"'
+    + (cols ? ' style="grid-template-columns:repeat(' + cols + ',minmax(0,1fr));"' : '') + '>'
+    + '<div class="recent-title" id="recentRowTitle" data-no-i18n>' + escH(i18nPhrase('Recent:')) + '</div>'
+    + row.map(itemHtml).join('') + '</div>';
+}
+// After a recipe is closed, or the screen turns: the row again if it would now hold other recipes (or another number
+// of them) — the list is not redrawn for nothing.
+function recentRowRefresh() {
+  var g = document.getElementById('recipeGrid'); if (!g || !g.className) return false;
+  var si = document.getElementById('searchInput'), q = si ? String(si.value || '').toLowerCase() : '';
+  var box = g.querySelector('.recent-row'), had = box ? box.getAttribute('data-ids') : '';
+  if (recentRowIds(q, g).join(',') === had) return false;
+  renderGrid();
+  return true;
+}
+(function(){
+  var t = 0;
+  window.addEventListener('resize', function(){ clearTimeout(t); t = setTimeout(function(){ try { recentRowRefresh(); } catch(e) {} }, 250); });
+})();
+window.recentRowRefresh = recentRowRefresh;
+
 function renderGrid() {
   if (typeof recipeBadgeUpdate === 'function') try { recipeBadgeUpdate(); } catch(e) {}   // v38.40
   if (typeof renderSearchAlso === 'function') try { renderSearchAlso(); } catch(e) {}     // v39.46 — 🌐 Also searching
@@ -22503,7 +22569,8 @@ function renderGrid() {
   function srvHtml(v) { return escH(srvParts[0]) + '<span>' + escH(v) + '</span>' + escH(srvParts[1]); }
   if (viewMode === 'list') {
     g.className = 'recipe-list';
-    g.innerHTML = list.map(r => `
+    var recentRow = recentRowOf(list, q, g), rest = recentRowRest(list, recentRow);
+    var itemHtml = r => `
       <div class="recipe-list-item${selectedIds.has(r.id) ? ' selected' : ''}" data-no-i18n ontouchstart="swipeStart(event,${r.id})" ontouchmove="swipeMove(event)" ontouchend="swipeEnd(event)" onclick="selectMode ? toggleRecipeSelect(event,${r.id}) : openView(${r.id})">
         ${selectHtml(r)}
         <div class="recipe-list-thumb" style="background:${escA(r.bg)};position:relative;overflow:hidden;">
@@ -22523,10 +22590,12 @@ function renderGrid() {
         <div class="recipe-list-right">
           <button class="fav-btn" aria-label="${escA(favLabel(r))}" onclick="toggleFav(event,${r.id})">${r.fav ? '❤️' : '🤍'}</button>
         </div>
-      </div>`).join('');
+      </div>`;
+    g.innerHTML = recentRowHtml(recentRow, itemHtml, 0) + rest.map(itemHtml).join('');
   } else {
     g.className = 'recipe-grid';
-    g.innerHTML = list.map(r => `
+    var recentRow = recentRowOf(list, q, g), rest = recentRowRest(list, recentRow);
+    var cardHtml = r => `
       <div class="recipe-card${selectedIds.has(r.id) ? ' selected' : ''}" data-no-i18n ontouchstart="swipeStart(event,${r.id})" ontouchmove="swipeMove(event)" ontouchend="swipeEnd(event)" onclick="selectMode ? toggleRecipeSelect(event,${r.id}) : openView(${r.id})">
         ${selectHtml(r)}
         <div class="card-image" style="background:${escA(r.bg)}">
@@ -22545,7 +22614,8 @@ function renderGrid() {
           <span class="difficulty ${escA(String(r.difficulty||'').toLowerCase())}">${escH(T(r.difficulty))}</span>
           <button class="fav-btn" aria-label="${escA(favLabel(r))}" onclick="toggleFav(event,${r.id})">${r.fav ? '❤️' : '🤍'}</button>
         </div>
-      </div>`).join('');
+      </div>`;
+    g.innerHTML = recentRowHtml(recentRow, cardHtml, recentRowCols(g)) + rest.map(cardHtml).join('');
   }
   prunePhotoUrlCache(); // release blob URLs for recipes that are gone
   applyAriaLabels(g);   // label the freshly rendered ❤/🤍 buttons
@@ -26861,6 +26931,7 @@ function closeM(id){
   releaseFocus(id);   // 5c.1b — hand focus back to whatever opened THIS one (v36.65)
   if (id === 'playerOverlay') playerStop();   // v39.72 — a closed player plays nothing
   if(id==='viewOverlay') { releaseWakeLock(); clearCookTimers(); stopVoice(); _ticks = {}; }
+  if (id === 'viewOverlay' && typeof recentRowRefresh === 'function') setTimeout(function(){ try { recentRowRefresh(); } catch(e) {} }, 0);   // v39.80 — Recent: the one just closed first
   if ((id === 'viewOverlay' || id === 'linkedViewOverlay') && !_rlMoving && typeof rlBackForget === 'function') rlBackForget();   // v39.53 — ✕ ends the trail
   if(id==='editOverlay') { _editFormSnapshot = null; _editBaseAt = null; }
   // The harvest import queue advances here, because this is the one funnel every
@@ -36120,6 +36191,7 @@ var HELP_SYSTEM_PROMPT = [
   "- 🐄 The farm visitors speak more slowly, and the child and the female a little higher (v39.36)",
   "- 🐄 The farm visitors speak with the voice chosen for everyone: a child or a female is never a man's voice on a device that has another, Microsoft Edge's own child voice speaks for the child, and the owner's farm window says which voice speaks for each choice on that device (v39.35)",
   "- 🕐 Recently Viewed: a 'Recent' chip appears in the filter bar after you open any recipe — shows your last 8 viewed",
+  "- RECENT: (v39.80): the top row of the recipe list shows, in a box titled \"Recent:\", the recipes opened last on this device (newest first) — as many as fit in one row (in the List view, three). The rest of the list follows in the order chosen with ⇅ Sort, without those. The row is not shown while searching, while a filter is on, or when sorted by 🕐 Recently viewed (then the whole list is in that order). Only your own kitchen's recipes.",
   "- ⇅ Sort: the recipes start newest first (🆕 Recently added — the button says 🆕 Newest; v39.41). Click the button next to Grid/List to sort by Recently viewed, A–Z, Prep time, Difficulty, Most cooked, or 📋 Saved order (the order they are kept in); each time the app is opened it starts newest first again",
   "- 🍳 COOKED!: open a recipe and tap 🍳 Cooked! — 'How did it go?' asks for a rating (stars) and a Note for next time (e.g. too salty — halve the soy next time): ✅ Save, or Just log it — no note. The recipe then shows 🍳 Cooked N times · last <date> and its average rating, and 📓 Cooking log (N) lists the notes and ratings (✕ removes one). Recipes cooked 3+ times show a 🔥 badge; ⇅ Sort → 🔥 Most cooked. ☑ Select → 🍳 Cooked marks several at once (v39.43)",
   "- 📸 Auto-fetch missing photos: ··· More → 🧹 Tidy up → 📸 Auto-fetch missing photos — AI translates Hebrew names to English and finds a matching photo (Pexels, Unsplash, Pixabay or Wikimedia Commons) for every recipe that has none; a library that asks for a pause (\"too many searches\") is waited for and asked again. Afterwards ⚙️ → 💾 Backups and photos → ↩︎ Undo last auto-fetch takes away the photos it added and puts back what was there before (shown only after a run)",

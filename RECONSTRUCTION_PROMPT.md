@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v39.79` — app. **Worker: v106**, deployed separately and versioned separately
+**Current version:** `v39.80` — app. **Worker: v106**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -2429,6 +2429,21 @@ panels (`toggleMobilePanel`, `mobileCatChange`, etc.) shown only on narrow scree
 first); ⇅ Sort changes it for the visit (Recently added, Recently viewed, A–Z, Prep time, Difficulty, Most cooked,
 📋 Saved order — the array's own order), not remembered. The button's word for each (`SORT_LABELS`, put on it by
 `sortPaint`, also at load: "🆕 Newest") is in I18N_EXTRA so it is translated.
+**Recent: (v39.80; Tony: "In the list of recipes, I would like to see in the top row the recent recipes accessed. The
+rest should be sorted normally. Give it a small "Recent:" title too … and a square around the recipes in that row.")**
+The first thing in `#recipeGrid` is `.recent-row` (role group, labelled by its `.recent-title` "Recent:", which goes
+through `i18nPhrase` and is in I18N_EXTRA; `data-ids` = the ids shown): the recipes of `recent_views` that exist, in
+that order, as many as one row holds — `recentRowCols(g)`: the count of laid-out tracks in the grid's computed
+`grid-template-columns` (px values only), else `getMobileCols()` under 700 px, else ⌊(width+16)/236⌋; 3 in the List
+view. In the grid the box spans all columns (`grid-column: 1 / -1`) and is a grid of its own with
+`repeat(cols, minmax(0,1fr))` and the parent's gap; in the list it is a flex column. Border 1.5 px
+`--recent-border`, radius 14, background `--recent-bg`, title 12 px bold `--recent-title` (light #FFF4EC / #DE9A74 /
+#A63A0C; dark #2A1D15 / #8C4E2E / #FF9A6E). The rest of the list follows in the ⇅ order without those recipes. No
+row (`recentRowWanted(q)` false) while there is a search query, any filter (❤, Clips, Collections, No photo, 🕐 Recent,
+One item away, a meal type, a diet), the own kitchen unticked, or `sortMode === 'recent'`. `recentRowRefresh()` (on
+closing the recipe view, and 250 ms after a resize) redraws the grid only when the ids the row would hold differ from
+its `data-ids`. Each card is built by one function (`cardHtml` / `itemHtml` in `renderGrid`) for the box and the
+rest.
 **Grid** (`#recipeGrid`): a `list` or `grid` view (`setView`). The choice is remembered in
 `tonys_view_mode`; desktop defaults to `list`, **phones default to `grid`** so the layout
 resembles the desktop cube grid. Cards show photo or emoji tile, a category **pill badge**
