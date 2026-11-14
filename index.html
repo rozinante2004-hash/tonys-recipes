@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.78 -->
+<!-- Tony's Recipes Collection v39.79 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -11134,7 +11134,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.78';
+var APP_VERSION = 'v39.79';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -12259,6 +12259,8 @@ window.addEventListener('unhandledrejection', function(e) {
   .recipe-columns[dir="rtl"] .recipe-col-ings,
   .recipe-columns[dir="rtl"] .recipe-col-steps { text-align: start; }
   .recipe-col-ings { position: sticky; top: 0; max-height: 72vh; overflow-y: auto; padding-inline-end: 6px; }
+  /* v39.79 — the window laid over what the screen shows (a tablet's keyboard is up): the column as tall as that, not the page */
+  .modal-overlay[data-screen-fit] .recipe-col-ings { max-height: calc(var(--fit-h, 100vh) * 0.72); }
   .recipe-col-ings .modal-section-title,
   .recipe-col-steps .modal-section-title { margin-top: 0; }
 }
@@ -12936,6 +12938,8 @@ html.setup-first #loginScreen > * { visibility: hidden; }   /* v39.02 — a firs
 #serviceErrorOverlay { padding-bottom: var(--bottom-safe) !important; }
 #offlineBanner { padding-top: calc(8px + var(--top-safe)) !important; }
 .modal-overlay > :not(.view-sized) { max-height: min(92vh, 100%) !important; }
+/* v39.79 — laid over what the screen shows (the keyboard is up): a hand-sized window too is no taller than the room there is */
+.modal-overlay[data-screen-fit] > .view-sized { max-height: 100% !important; }
 .calc-overlay > *, .prog-overlay > *, #stDetailOverlay > *, #emailModalOverlay > *, #importErrorModal > *,
 #serviceErrorOverlay > * { max-height: min(90vh, 100%) !important; }
 #helpDetailOverlay > * { max-height: min(85vh, 100%) !important; }
@@ -14689,7 +14693,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.78</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.79</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14777,7 +14781,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.78</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.79</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -26730,14 +26734,16 @@ function screenFitApply(f) {
   el.style.left = b.left + 'px'; el.style.top = b.top + 'px'; el.style.right = 'auto'; el.style.bottom = 'auto';
   el.style.width = (b.width * s) + 'px'; el.style.height = (b.height * s) + 'px';
   el.style.transformOrigin = '0 0'; el.style.transform = Math.abs(s - 1) > 0.001 ? 'scale(' + (1 / s) + ')' : '';
+  el.style.setProperty('--fit-h', (b.height * s) + 'px');   // v39.79 — the height a window's own parts measure by, in place of the page's (vh)
   f.scale = s;
 }
 function screenFitRelease(f) {
   SCREEN_FIT_PROPS.forEach(function(p){ f.el.style[p] = f.orig[p]; });
+  f.el.style.removeProperty('--fit-h');
   f.el.removeAttribute('data-screen-fit');
   _screenFitted = _screenFitted.filter(function(x){ return x !== f; });
 }
-function screenFitCheck(el) {
+function screenFitCheck(el, quiet) {
   var f = _screenFitted.filter(function(x){ return x.el === el; })[0];
   if (!screenWindow(el)) { if (f && (!el.isConnected || getComputedStyle(el).display === 'none')) screenFitRelease(f); return false; }
   if (f) return true;
@@ -26747,6 +26753,7 @@ function screenFitCheck(el) {
   f = { el: el, scale: b.scale, orig: orig };
   _screenFitted.push(f); el.setAttribute('data-screen-fit', '');
   screenFitApply(f);
+  if (quiet) return true;
   try { if (typeof syncLog === 'function') syncLog('system', 'A window was fitted to the screen (zoom ' + (Math.round(b.scale * 100) / 100)
     + ', the page ' + Math.round(document.documentElement.scrollWidth) + ' px wide, the screen ' + Math.round(b.width * b.scale) + ')', el.id || el.className); } catch(e) {}
   return true;
@@ -26756,13 +26763,60 @@ function screenFitFollow() {
     if (!f.el.isConnected || getComputedStyle(f.el).display === 'none') { screenFitRelease(f); return; }
     var s = screenBox().scale;
     if (Math.abs(s - f.scale) > 0.02) { screenFitRelease(f); return; }   // a pinch inside it: it zooms with the page
+    // v39.79 — fitted for the keyboard, and the keyboard has gone (the screen shows the window's own box again): its own
+    // place back. Measured against the box it had before it was fitted — the same measure that fitted it — so it is
+    // never let go and taken again frame after frame.
+    if (f.keyboard && f.own && !screenFitOff(f.own, screenBox())) { screenFitRelease(f); return; }
     screenFitApply(f);
   });
 }
+// ─── …AND WHEN THE KEYBOARD COMES UP (v39.79) ────────────────────────────────
+// Tony, 14 Nov 2026, typing in the Dynamic boxes on his phone: "The keyboard stays when changing parameters. However, I
+// can['t] see the "x" until I close it." A window is laid over the page's box. A phone's keyboard does not shrink that
+// box: it shrinks what the SCREEN shows, and the page is slid up to bring the text box into what is left — so the
+// window's top, with its ✕, went off the top of the screen for as long as the keyboard was up. A window that opened
+// fitted (above) already followed the screen; one that opened on an ordinary screen did not. Now, while a text box
+// inside a window has the keyboard, that window is laid over what the screen shows: it is as tall as the room above the
+// keyboard, its ✕ sits at its top as always, and the text box is brought into view inside it. When the keyboard goes,
+// the window is given back its own place. Every window, not only the recipe: the ✕ is the way out of each of them.
+function screenFitKeyboard() {
+  var a = document.activeElement;
+  if (!a || a === document.body || !a.tagName) return false;
+  if (!(/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) || a.isContentEditable)) return false;
+  if (a.tagName === 'INPUT' && /^(checkbox|radio|button|submit|reset|range|file|color|image)$/i.test(a.type || '')) return false;   // nothing to type: no keyboard
+  var el = a;
+  while (el.parentNode && el.parentNode !== document.body) el = el.parentNode;   // the window it is in: a layer of the page
+  if (!el.parentNode) return false;
+  if (_screenFitted.some(function(x){ return x.el === el; })) return true;      // already following the screen
+  if (Math.abs(screenBox().scale - 1) > 0.02) return false;                     // zoomed in by a pinch: the window zooms with the page (v39.24)
+  var r = el.getBoundingClientRect(), own = { left: r.left, top: r.top, width: r.width, height: r.height };
+  if (!screenFitCheck(el, true)) return false;                                   // the screen shows the window's own box: nothing to do
+  var f = _screenFitted.filter(function(x){ return x.el === el; })[0];
+  if (f) { f.keyboard = true; f.own = own; }
+  screenFitBringIn(a, el, f ? f.scale : 1);
+  return true;
+}
+// The window is now only as tall as the room above the keyboard: the box in hand is scrolled into the middle of each
+// part of the window that scrolls (the recipe's card; on a wide screen its ingredients column inside it, nearest first)
+// — those parts only, never the page under it.
+function screenFitBringIn(a, win, scale) {
+  var moved = false;
+  for (var p = a.parentNode; p && p !== win.parentNode; p = p.parentNode) {
+    if (p.nodeType !== 1) continue;
+    var oy = getComputedStyle(p).overflowY;
+    if ((oy !== 'auto' && oy !== 'scroll') || p.scrollHeight <= p.clientHeight + 1) continue;
+    var pr = p.getBoundingClientRect(), ar = a.getBoundingClientRect();
+    if (ar.top < pr.top + 8 || ar.bottom > pr.bottom - 8) {
+      p.scrollTop += ((ar.top + ar.height / 2) - (pr.top + pr.height / 2)) * (scale || 1);   // drawn at 1/zoom: back to the card's own pixels
+      moved = true;
+    }
+  }
+  return moved;
+}
 var _screenFitRaf = 0;
 function screenFitOnScreen() {   // the screen moved or changed size (a pinch, the keyboard, a pan): once a frame at most
-  if (_screenFitRaf || !_screenFitted.length) return;
-  _screenFitRaf = requestAnimationFrame(function(){ _screenFitRaf = 0; screenFitFollow(); });
+  if (_screenFitRaf) return;
+  _screenFitRaf = requestAnimationFrame(function(){ _screenFitRaf = 0; screenFitFollow(); screenFitKeyboard(); });
 }
 (function screenFitStart() {
   if (!window.MutationObserver || !document.body) return;
@@ -26778,8 +26832,12 @@ function screenFitOnScreen() {   // the screen moved or changed size (a pinch, t
   }).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'style'] });
   if (window.visualViewport) { visualViewport.addEventListener('resize', screenFitOnScreen); visualViewport.addEventListener('scroll', screenFitOnScreen, { passive: true }); }
   window.addEventListener('resize', screenFitOnScreen);
+  // v39.79 — a text box taken in hand: the keyboard is on its way up (a third of a second), or already up from the box before
+  document.addEventListener('focusin', function() { screenFitOnScreen(); setTimeout(screenFitOnScreen, 350); setTimeout(screenFitOnScreen, 700); }, true);
+  document.addEventListener('focusout', function() { setTimeout(screenFitOnScreen, 350); }, true);
 })();
 window.screenBox = screenBox; window.screenFitCheck = screenFitCheck; window.screenFitFollow = screenFitFollow;
+window.screenFitKeyboard = screenFitKeyboard; window.screenFitOnScreen = screenFitOnScreen;
 
 // ═══════════════════════════════════
 // MODAL / UTILS
@@ -35975,6 +36033,7 @@ var HELP_SYSTEM_PROMPT = [
   "- Tap any recipe card to open it",
   "- Scale ingredients: use the ×0.5–×4 multiplier buttons (×0.5 halves a recipe), or Dynamic (next line)",
   "- DYNAMIC SCALING (v39.76, as you type since v39.78): in a recipe, the last button of the Scale ingredients row is Dynamic. Tap it and the number of servings and every ingredient's amount become boxes you can type in. Type a new number in ANY one of them — say you only have 300 g of flour where the recipe asks for 500 g, or you want it for 5 people — and AS YOU TYPE every other amount, the servings, and the amounts mentioned in the Method all change by the same share, so the recipe keeps its proportions (v39.78; nothing to press — you can go straight from one box to the next). The box you typed in keeps exactly what you typed; the others are rounded to what a cook can measure. An amount with no number (a pinch, to taste) stays as words. Amounts are typed in the units shown (Metric / Imperial). Tapping ×0.5–×4 goes back to that multiple and closes the boxes; tapping Dynamic again closes them and keeps the scale; 'reset to …' beside the servings returns to the recipe as written. Nothing is changed in the recipe itself — it is only how it is shown on this device, and it is remembered per recipe, like any scale. What you send to Bring! follows it too.",
+  "- THE KEYBOARD AND A WINDOW'S ✕ (v39.79): while you type in a window on a phone (a recipe's Dynamic boxes, the editor, any text box), the window shrinks to the room above the keyboard, so its ✕ stays in sight at its top and the box you are typing in stays in view. Closing the keyboard gives the window its full size back.",
   "- Metric / Imperial (in the recipe) shows its amounts the other way, on this device; ⚙️ → 🎨 How it looks → 📏 Units sets it for every recipe. The recipe itself is not changed",
   "- Hebrew recipes: method steps are right-aligned with step numbers on the right",
   "- Tap the photo to change it: upload one from the device, or 🔍 search the web — the free photo libraries Pexels, Unsplash and Pixabay, then Wikimedia Commons; 🔄 See more shows the next library at once. Where a photo's licence asks for it, the photographer's credit is kept with it and shown under the photo",

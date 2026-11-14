@@ -19,10 +19,11 @@ where.
   and the community app (`beta`, https://mykitchennotes.community, Firebase project my-kitchen-notes-beta) run
   **v39.74 + Worker v106** (released 14 Nov 2026, 10:08 Israel time, on 507d03f; the jobs are listed near the top
   of `docs/history/2026-11.md` — the family copy's own deploy failed on GitHub's side for that commit and went out
-  with the languages publish right after it). **v39.75–v39.78 are on Test** (v39.75: a linked kitchen's
+  with the languages publish right after it). **v39.75–v39.79 are on Test** (v39.75: a linked kitchen's
   collection shows each recipe's own source, playable. v39.76: "Dynamic" scaling — ×0.5–×4 and a Dynamic button that
   opens the servings and every amount to change. v39.77: the player opens through a camera lens in one second.
-  v39.78: Dynamic moves the other values as you type) and wait for Tony's yes. The test copy (https://tonys-recipes-test.pages.dev, its own database and rules)
+  v39.78: Dynamic moves the other values as you type. v39.79: while a phone's keyboard is up, the window being typed
+  in shrinks to the room above it, so its ✕ stays in sight) and wait for Tony's yes. The test copy (https://tonys-recipes-test.pages.dev, its own database and rules)
   follows `test`.
 - **The beta has had testers since Sunday 25 Oct 2026** and is **by invitation only**: the owner invites with
   ⚙️ → 👑 → ✉️ Invite testers (the congratulatory wording of v39.60); a tester's share button asks the owner for an
@@ -34,7 +35,7 @@ where.
   `docs/history/2026-11.md`, and update "Live now" here.
 - The rules were last published on 10 Nov 2026 (deploy-rules on 99558ae, success). A push to `test` that changes
   them publishes to the test project only; a release publishes to the family's and the beta's.
-- The Self Tests: **477 pass, 0 fail, 7 skipped** (the network ones) on v39.78, locally.
+- The Self Tests: **478 pass, 0 fail, 7 skipped** (the network ones) on v39.79, locally.
 
 **The audit of 10 Nov 2026 (`AUDIT-2026-11-10.md`) — Tony's answers of 11 Nov, and where each item is.** In the
 order of work; update this list as items land. Each change: Self Tests + knock-outs, the local checks, Help and

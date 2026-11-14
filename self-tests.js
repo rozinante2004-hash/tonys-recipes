@@ -12156,6 +12156,76 @@ window.SELF_TESTS = [
       return 'fitted as it opens (zoom 1.25), follows the screen, lets go on a pinch and on closing; ··· More inside the screen at its size';
     } },
 
+  { id:'keyboard_keeps_the_close_in_sight', group:'UI', name:'📱 While a phone\'s keyboard is up, the window being typed in shrinks to the room above it — its ✕ in sight, the box in hand in view, the keyboard kept; the keyboard gone, its own place back (v39.79)',
+    test: async()=>{
+      // Tony, 14 Nov 2026, typing in a recipe's Dynamic boxes on his phone: "The keyboard stays when changing parameters.
+      // However, I can['t] see the "x" until I close it." The keyboard is stood in for here as a phone makes it: the screen
+      // shows only the part above it, and the page is slid up under it. The recipe window must come along.
+      var realBox=window.screenBox, testId=888979, keepR=recipes, prevView=viewId, prevMult=viewMult, prevDyn=viewDynamic, prevAnchor=viewDynAnchor;
+      var ov=document.getElementById('viewOverlay'), wasOpen=ov.classList.contains('open'), probe=null;
+      var frames=function(){ return new Promise(function(r){ requestAnimationFrame(function(){ requestAnimationFrame(function(){ setTimeout(r, 20); }); }); }); };
+      var inSight=function(el, b, what){ var r=el.getBoundingClientRect();
+        if(!(r.height>0) || r.top<b.top-1 || r.bottom>b.top+b.height+1) throw new Error(what+' is out of sight: '+Math.round(r.top)+'–'+Math.round(r.bottom)+' px, while the screen shows '+Math.round(b.top)+'–'+Math.round(b.top+b.height)); };
+      try{
+        // a window's own box: what a layer over the whole page covers
+        probe=document.createElement('div'); probe.style.cssText='position:fixed;inset:0;visibility:hidden;pointer-events:none;';
+        document.body.appendChild(probe); var pr=probe.getBoundingClientRect(); probe.remove(); probe=null;
+        var own={ left:pr.left, top:pr.top, width:pr.width, height:pr.height, scale:1 }, box=Object.assign({}, own);
+        window.screenBox=function(){ return Object.assign({}, box); };
+        var ings=[]; for(var i=0;i<16;i++) ings.push({ a:(100+i*10)+' g', n:'ingredient '+(i+1) });
+        recipes=[normalizeRecipe({ id:testId, name:'ST keyboard cake', servings:'4', updatedAt:Date.now(), ingredients:ings, steps:['Mix everything.','Bake for 30 minutes.'] })];
+        try{ localStorage.removeItem('scale_'+testId); localStorage.removeItem('scale_dyn_'+testId); }catch(e){}
+        openView(testId); await frames();
+        if(!viewDynamic) toggleDynamic(); await frames();
+        var amt=document.querySelector('#viewModal .dyn-amt[data-dyn="ing-15"]');
+        var x=document.querySelector('#viewModal > div:first-child > button[onclick="closeM(\'viewOverlay\')"]');
+        if(!amt || !x) throw new Error('the recipe window has no box for its last amount, or no ✕');
+        // the box taken in hand, the keyboard not up yet: nothing is touched
+        amt.focus(); await frames();
+        if(ov.hasAttribute('data-screen-fit') || ov.style.top) throw new Error('a window was moved while the screen still showed all of it');
+        // the keyboard comes up: the screen shows 45% of the page, which is slid up by 40%
+        box={ left:own.left, top:Math.round(own.height*0.4), width:own.width, height:Math.round(own.height*0.45), scale:1 };
+        screenFitOnScreen(); await frames();
+        if(!ov.hasAttribute('data-screen-fit') || ov.style.top!==box.top+'px' || ov.style.height!==box.height+'px')
+          throw new Error('the recipe window was not laid over the room above the keyboard: '+ov.style.cssText);
+        inSight(x, box, 'the ✕'); inSight(amt, box, 'the box being typed in');
+        if(document.activeElement!==amt) throw new Error('the box lost the keyboard as the window shrank');
+        // a wide screen (a tablet's keyboard): the ingredients column beside the Method is no taller than the room there is
+        var col=document.querySelector('#viewModal .recipe-col-ings');
+        if(col && getComputedStyle(col).position==='sticky' && col.getBoundingClientRect().height>box.height)
+          throw new Error('the ingredients column is taller than the room above the keyboard: '+Math.round(col.getBoundingClientRect().height)+' px in '+box.height);
+        // typing on: the others follow (v39.78), and the window stays where it is
+        var serv=document.querySelector('#viewModal .serv-input');
+        amt.value='500'; amt.dispatchEvent(new Event('input', { bubbles:true })); await frames();
+        if(!ov.hasAttribute('data-screen-fit') || document.activeElement!==amt || !serv || serv.value!=='8') throw new Error('typing in the shrunken window: '+(serv && serv.value)+' servings, the box '+(document.activeElement===amt?'in hand':'lost'));
+        inSight(x, box, 'the ✕ while typing');
+        // the page is slid a little further: the window comes along
+        box.top-=60; screenFitOnScreen(); await frames();
+        if(ov.style.top!==box.top+'px') throw new Error('the window did not follow the screen: '+ov.style.top+', the screen at '+box.top);
+        inSight(x, box, 'the ✕ after the page slid');
+        // the keyboard goes: its own place back
+        box=Object.assign({}, own); screenFitOnScreen(); await frames();
+        if(ov.hasAttribute('data-screen-fit') || ov.style.top || ov.style.height || ov.style.transform) throw new Error('the window kept the keyboard\'s size after the keyboard went: '+ov.style.cssText);
+        // zoomed in by a pinch, then a box tapped: the window keeps zooming with the page, as a pinch asks (v39.24)
+        box={ left:own.left+40, top:Math.round(own.height*0.3), width:Math.round(own.width/1.6), height:Math.round(own.height*0.3), scale:1.6 };
+        if(screenFitKeyboard() || ov.hasAttribute('data-screen-fit')) throw new Error('a window zoomed in by a pinch was snapped back to the screen when a box was tapped');
+        box=Object.assign({}, own);
+        // the keyboard up, nothing being typed: nothing is done here (a window that opens on a zoomed page is fitted as it opens)
+        amt.blur(); box={ left:own.left, top:Math.round(own.height*0.4), width:own.width, height:Math.round(own.height*0.45), scale:1 };
+        if(screenFitKeyboard() || ov.hasAttribute('data-screen-fit')) throw new Error('a window was fitted to the keyboard with nothing being typed in it');
+        var k=String(HELP_SYSTEM_PROMPT||'');
+        if(!/THE KEYBOARD AND A WINDOW'S ✕ \(v39\.79\)/.test(k) || !/its ✕ stays in sight/.test(k)) throw new Error('Help does not say the ✕ stays in sight while typing');
+      } finally {
+        window.screenBox=realBox; try{ if(probe) probe.remove(); }catch(e){}
+        try{ _screenFitted.filter(function(f){ return f.el===ov; }).forEach(screenFitRelease); }catch(e){}
+        try{ if(document.activeElement && document.activeElement.blur) document.activeElement.blur(); }catch(e){}
+        try{ localStorage.removeItem('scale_'+testId); localStorage.removeItem('scale_dyn_'+testId); }catch(e){}
+        recipes=keepR; viewDynamic=prevDyn; viewDynAnchor=prevAnchor; viewMult=prevMult;
+        if(wasOpen && prevView!=null && recipes.some(function(r){ return r.id===prevView; })){ viewId=prevView; drawView(); } else { viewId=prevView; closeM('viewOverlay'); }
+      }
+      return 'the keyboard up: the recipe window over the room above it, the ✕ and the box in sight, typing goes on; it follows the page; the keyboard gone, its own place back';
+    } },
+
   { id:'menus_files_and_more_headings', group:'UI', name:'📁 Files & backup holds what only it has (adding stays in + Add Recipe); ··· More shows five headings that open their items in place, pushing the next down, one at a time; one with nothing to show is hidden (v39.26, v39.30)',
     test: async()=>{
       // Tony, 3 Nov 2026, from the audit: "I accept suggestions 1, 2".

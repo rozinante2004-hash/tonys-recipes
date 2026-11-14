@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v39.78` — app. **Worker: v106**, deployed separately and versioned separately
+**Current version:** `v39.79` — app. **Worker: v106**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -1084,7 +1084,18 @@ while its box differs from the visual viewport (`screenBox()`: offset, size, sca
 wider than the screen) is laid over the visual viewport — left/top at its offset, width/height × scale,
 `transform: scale(1/scale)` from its corner — so it shows at its normal size on what the screen shows; it follows
 visualViewport resize/scroll (keyboard, bars, pan), is let go on a pinch inside it (scale changes) or when it closes
-(inline styles restored); a line in the log each time. `toggleDrop` places a menu the same way when zoomed or too
+(inline styles restored); a line in the log each time. **The keyboard (v39.79; Tony: "I can['t] see the "x" until I
+close it")**: a phone's keyboard shrinks only the visual viewport and slides the page under it, so a window that
+opened on an ordinary screen lost its top (and ✕) while typing. `screenFitOnScreen` (also on `focusin`, at once and
+350/700 ms later, and `focusout` + 350 ms) runs `screenFitFollow()` + `screenFitKeyboard()` once a frame:
+when the focused element is a text box (not checkbox/radio/button/range/file/colour) inside a window that is a child of
+body, the zoom is 1 (a pinch-zoomed window keeps zooming with the page) and the screen shows less than that window's
+box, the window is fitted quietly (no log line), flagged `keyboard`
+with its own box kept (`own`), and `screenFitBringIn` scrolls each scrolling ancestor inside the window (nearest first)
+so the box is in its middle — never the page. `screenFitFollow` lets a keyboard fit go when `screenBox()` equals `own`
+again. `screenFitApply` sets `--fit-h` (the window's height in its own px); while fitted, the ≥1000 px ingredients
+column is `calc(var(--fit-h) * 0.72)` tall instead of 72vh and a `.view-sized` card `max-height: 100%`. Self Test
+`keyboard_keeps_the_close_in_sight`. `toggleDrop` places a menu the same way when zoomed or too
 wide. The viewport meta has `shrink-to-fit=no` (WebKit). tests/phone-fit.js also opens ten windows and menus with a
 signed-in kitchen at 320, 390 and 390 zoomed 1.25 (CDP `Emulation.setPageScaleFactor`) and requires each inside the
 visual viewport; Self Test `windows_fit_the_screen` stands in for the screen with a stubbed `screenBox`.
