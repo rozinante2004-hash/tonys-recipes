@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v39.74` — app. **Worker: v106**, deployed separately and versioned separately
+**Current version:** `v39.75` — app. **Worker: v106**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -858,7 +858,9 @@ invitation-only (unless adding to the tester's household)."
   aspect, outside, src | embed })`: the title of a source is the recipe's name with `data-no-i18n`; offline, an embed
   is not loaded and the note says the clip needs a connection; `playerStop()` replaces the frame by an empty clone
   (removing `src` does not stop a frame) and restores the window's own title. `sourceHtml(src, style, play)` — the
-  recipe view (`drawView`), `collectionSectionsHtml`, `openLinkedRecipeObj` and `giftLook` pass `{ title }`: the link
+  recipe view (`drawView`), `collectionSectionsHtml`, `openLinkedRecipeObj`, `giftLook` and — v39.75 — `linkedLinesHtml` (a
+  linked kitchen's or a sent **collection**: under each recipe's name its own "Source:" line and, for a clip, the 🎬
+  badge; before, only the collection's own source showed and a clip inside it was a bare name) pass `{ title }`: the link
   gets `onclick="return sourcePlay(event,this)"`, and, when playable and the setting is off, a `.src-play` ▶ and the
   tooltip "Plays here, inside the app"; `sourcePlay` leaves Ctrl/⌘/Shift/Alt/middle clicks alone. The e-mailed
   recipe's link stays plain. **The setting:** ⚙️ → 🎨 How it looks → 🎬 Use external players only (a checkbox,

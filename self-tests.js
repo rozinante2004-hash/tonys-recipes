@@ -21262,7 +21262,7 @@ window.SELF_TESTS = [
         var h3=sourceHtml('https://youtu.be/aqz-KE-bpKQ', 'color:#C1440E;');
         if(h3.indexOf('onclick')!==-1 || h3.indexOf('src-play')!==-1) throw new Error('the e-mailed recipe’s link is not a plain link: '+h3);
         // every place a recipe is shown inside the app: its own view, a collection's parts, a linked kitchen's recipe, a recipe sent to you
-        [drawView, collectionSectionsHtml, openLinkedRecipeObj, giftLook].forEach(function(fn){ var src=String(fn), calls=src.split('sourceHtml(').length-1, playing=(src.match(/sourceHtml\([^)]*\{ title:/g)||[]).length;
+        [drawView, collectionSectionsHtml, openLinkedRecipeObj, giftLook, linkedLinesHtml].forEach(function(fn){ var src=String(fn), calls=src.split('sourceHtml(').length-1, playing=(src.match(/sourceHtml\([^)]*\{ title:/g)||[]).length;
           if(!calls || calls!==playing) throw new Error((fn.name||'a recipe view')+' draws a source link that cannot play ('+playing+' of '+calls+')'); });
 
         // 3. the tap: the player gets the site's own player, the recipe's name and the way out
@@ -21337,6 +21337,52 @@ window.SELF_TESTS = [
         try{ closeM('playerOverlay'); }catch(e){}
         try{ if(keepPref==null) localStorage.removeItem(PLAYER_EXTERNAL_KEY); else localStorage.setItem(PLAYER_EXTERNAL_KEY, keepPref); }catch(e){}
         try{ accessRefreshSettings(); }catch(e){}
+      }
+    } },
+  { id:'linked_collection_shows_each_source', group:'Features', name:'🤝 A linked kitchen’s collection shows each recipe’s own source, playable — a clip inside it is not a bare name (v39.75)',
+    test: async()=>{
+      // Tony, 14 Nov 2026: "In joint recipes from kitchens, the source link is not visible/existing. Please make visible and
+      // playable the same way as from my own kitchen." A plain linked recipe showed its source; a collection's recipes did not.
+      var keepPref=null; try{ keepPref=localStorage.getItem(PLAYER_EXTERNAL_KEY); localStorage.removeItem(PLAYER_EXTERNAL_KEY); }catch(e){}
+      var realOpen=window.openPlayer, ov=document.getElementById('linkedViewOverlay'), wasOpen=ov.classList.contains('open'), modal=document.getElementById('linkedViewModal'), keepHtml=modal.innerHTML, keepViewing=_linkedViewing;
+      try{
+        var coll=normalizeRecipe({ id:930301, uid:'st-lk-c', name:'ST their holiday', source:'https://www.example.com/roundup', parts:[
+          { name:'ST soup', source:'https://youtu.be/aqz-KE-bpKQ', ingredients:[{a:'1',n:'carrot'}], steps:['Boil.'] },
+          { name:'ST a clip', isClip:true, source:'https://www.tiktok.com/@some.cook/video/7301234567890123456', ingredients:[], steps:[] },
+          { name:'ST from a book', source:'Grandma’s notebook, p. 12', ingredients:[{a:'2',n:'eggs'}], steps:['Mix.'] },
+          { name:'ST no source', ingredients:[{a:'1',n:'x'}], steps:['y'] } ] });
+        if(!isCollection(coll) || recipeParts(coll).length!==4) throw new Error('the stand-in collection did not come out as one');
+        var box=document.createElement('div'); box.innerHTML=linkedLinesHtml(coll, 'hST');
+        var lines=box.querySelectorAll('.source-link'), links=box.querySelectorAll('.source-link a');
+        if(lines.length!==3) throw new Error('the three recipes that have a source do not each show it: '+lines.length);
+        if(links.length!==2 || links[0].getAttribute('href')!=='https://youtu.be/aqz-KE-bpKQ' || links[1].getAttribute('href')!=='https://www.tiktok.com/@some.cook/video/7301234567890123456') throw new Error('the links: '+Array.prototype.map.call(links,function(a){ return a.getAttribute('href'); }).join(' | '));
+        Array.prototype.forEach.call(links, function(a){ if(a.getAttribute('onclick')!=='return sourcePlay(event,this)' || a.getAttribute('target')!=='_blank') throw new Error('a recipe’s source in a linked collection is not playable: '+a.outerHTML.slice(0,160)); });
+        if(links[0].getAttribute('data-title')!=='ST soup' || links[1].getAttribute('data-title')!=='ST a clip') throw new Error('the player would not carry the recipe’s own name');
+        if(box.querySelectorAll('.src-play').length!==2) throw new Error('the playable ones are not marked ▶');
+        if(lines[2].textContent.indexOf('Grandma’s notebook, p. 12')===-1 || lines[2].querySelector('a')) throw new Error('a source that is not an address is not shown as words: '+lines[2].textContent);
+        // each under its own recipe, in order; the clip has its badge and nothing else
+        var heads=box.querySelectorAll('[data-coll-part]');
+        if(heads.length!==4) throw new Error('the four recipes’ headings: '+heads.length);
+        if(heads[0].nextElementSibling!==lines[0] || heads[1].nextElementSibling!==lines[1] || heads[2].nextElementSibling!==lines[2]) throw new Error('a source is not right under its own recipe’s name');
+        if(!heads[1].querySelector('.clip-badge') || heads[0].querySelector('.clip-badge')) throw new Error('the clip inside the collection is not marked as one');
+        if(heads[3].nextElementSibling && heads[3].nextElementSibling.classList.contains('source-link')) throw new Error('a recipe with no source shows a source line');
+        // a plain recipe from a linked kitchen: its source once (at the top of the window), never twice
+        var plain=normalizeRecipe({ id:930302, uid:'st-lk-p', name:'ST their shakshuka', source:'https://www.instagram.com/reel/Cx1_abcDEf2/', ingredients:[{a:'4',n:'eggs'}], steps:['Fry.'] });
+        var b2=document.createElement('div'); b2.innerHTML=linkedLinesHtml(plain, 'hST');
+        if(b2.querySelector('.source-link')) throw new Error('a plain linked recipe draws its source among its lines as well');
+        // …and in the window itself, with a real tap going to the player
+        var got=null; window.openPlayer=function(o){ got=o; return true; };
+        if(!openLinkedRecipeObj(coll, 'hST')) throw new Error('the linked collection did not open');
+        var shown=ov.querySelectorAll('.source-link a');
+        if(shown.length!==3) throw new Error('the window shows '+shown.length+' source links (the collection’s and two recipes’)');
+        var tk=ov.querySelector('.source-link a[href*="tiktok.com"]'), stopped=0;
+        if(sourcePlay({ preventDefault:function(){ stopped++; } }, tk)!==false || !stopped || !got || got.embed!=='https://www.tiktok.com/embed/v2/7301234567890123456' || got.title!=='\u{1F3AC} ST a clip') throw new Error('a tap on the clip inside the linked collection did not play it: '+JSON.stringify(got));
+        if(!openLinkedRecipeObj(plain, 'hST') || ov.querySelectorAll('.source-link a').length!==1) throw new Error('a plain linked recipe does not show its source exactly once');
+      } finally {
+        window.openPlayer=realOpen;
+        if(!wasOpen) ov.classList.remove('open');
+        modal.innerHTML=keepHtml; _linkedViewing=keepViewing;
+        try{ if(keepPref==null) localStorage.removeItem(PLAYER_EXTERNAL_KEY); else localStorage.setItem(PLAYER_EXTERNAL_KEY, keepPref); }catch(e){}
       }
     } },
   { id:'help_says_an_import_brings_no_photo', group:'Features', name:'The help assistant says an import brings no photo — and an import really sets none (v39.73)',

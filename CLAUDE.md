@@ -17,10 +17,10 @@ where.
 **Live now**
 - The family's copy (`main`, https://rozinante2004-hash.github.io/tonys-recipes/ — it forwards to the community app)
   and the community app (`beta`, https://mykitchennotes.community, Firebase project my-kitchen-notes-beta) run
-  **v39.72 + Worker v106** (released 14 Nov 2026, 00:39 Israel time, on 64d974a; the jobs are listed near the top
-  of `docs/history/2026-11.md`). **v39.73 and v39.74 are on Test** (v39.73: the clip's link in the
-  invitations, `clip.html`; Help: an import brings no photo; the clips open on the logo. v39.74: a recipe's video
-  source plays inside the app, ⚙️ "Use external players only", Privacy Statement 1.16) and wait for Tony's yes. The test copy (https://tonys-recipes-test.pages.dev, its own database and rules)
+  **v39.74 + Worker v106** (released 14 Nov 2026, 10:08 Israel time, on 507d03f; the jobs are listed near the top
+  of `docs/history/2026-11.md` — the family copy's own deploy failed on GitHub's side for that commit and went out
+  with the languages publish right after it). **v39.75 is on Test** (a linked kitchen's collection shows each
+  recipe's own source, playable) and waits for Tony's yes. The test copy (https://tonys-recipes-test.pages.dev, its own database and rules)
   follows `test`.
 - **The beta has had testers since Sunday 25 Oct 2026** and is **by invitation only**: the owner invites with
   ⚙️ → 👑 → ✉️ Invite testers (the congratulatory wording of v39.60); a tester's share button asks the owner for an
@@ -32,7 +32,7 @@ where.
   `docs/history/2026-11.md`, and update "Live now" here.
 - The rules were last published on 10 Nov 2026 (deploy-rules on 99558ae, success). A push to `test` that changes
   them publishes to the test project only; a release publishes to the family's and the beta's.
-- The Self Tests: **474 pass, 0 fail, 7 skipped** (the network ones) on v39.74, locally.
+- The Self Tests: **475 pass, 0 fail, 7 skipped** (the network ones) on v39.75, locally.
 
 **The audit of 10 Nov 2026 (`AUDIT-2026-11-10.md`) — Tony's answers of 11 Nov, and where each item is.** In the
 order of work; update this list as items land. Each change: Self Tests + knock-outs, the local checks, Help and
@@ -79,10 +79,12 @@ to `test`; releases only on his yes.
   from 🎬 Watch the one-minute clip in 💬 Ask About the App (Hebrew for a Hebrew interface, English otherwise; the
   files are in `media/`). **v39.73 on Test:** `clip.html`, a public page that plays the clip without the app, linked
   from the testers' invitations in the invitation's language; both files now open on the logo (a chat shows the
-  first frame). **v39.74 on Test:** a recipe's video source plays in the player by default (YouTube, Vimeo,
+  first frame). **v39.74 (live):** a recipe's video source plays in the player by default (YouTube, Vimeo,
   Instagram, Facebook, TikTok, video files — `playerSource`); ⚙️ → 🎨 How it looks → 🎬 Use external players only
-  turns it off; a recipe's web page still opens in the browser. **Not verified from here: that each site's own
-  player really plays** (the video sites are not reachable) — Tony tries one of each on Test.
+  turns it off; a recipe's web page still opens in the browser. Tony tried it on Test ("It seems to be working well") — the
+  sites' own players cannot be reached from this environment. **v39.75 on Test:** the same in a linked kitchen's
+  collection (each recipe's own source). **Asked for, 14 Nov:** an opening animation for the player (three options
+  for him to pick from) and "Dynamic" ingredient scaling — see the top of `docs/history/2026-11.md`.
 - **Not doing** (Tony: no): U7 collapsing the help suggestions; F3 dropping `.doc`; the page's own photo for an
   import (copyright — *Decisions*).
 - **Still open from earlier audits, Tony's side:** restrict the community app's browser key in two stages (APIs

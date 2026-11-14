@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.74 -->
+<!-- Tony's Recipes Collection v39.75 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -7393,8 +7393,16 @@ window.linkedReload = linkedReload;
 window.renderLinkedInAll = renderLinkedInAll; window.linkedInAllOn = linkedInAllOn; window.linkedPhotoLoad = linkedPhotoLoad;
 // hid: the linked kitchen whose recipe it is — its links lead to recipes there (v39.53); none: a sent recipe, no links
 function linkedLinesHtml(r, hid) {
-  var parts = isCollection(r) ? recipeParts(r) : [r];
+  var coll = isCollection(r), parts = coll ? recipeParts(r) : [r];
   return (parts.length > 1 ? collectionTocHtml(parts) : '') + parts.map(function(p, pi) {
+    // v39.75 — each recipe's OWN source inside a collection, as one's own collection shows it (Tony, 14 Nov 2026: "In
+    // joint recipes from kitchens, the source link is not visible/existing. Please make visible and playable the same
+    // way as from my own kitchen."). Only the collection's own source was drawn, at the top; a recipe inside it had
+    // none, and a clip inside it — which IS its link — was a bare name. (A plain recipe's source is drawn once, above.)
+    var srcLine = (coll && p.source && (parts.length > 1 || p.source !== r.source))
+      ? '<div class="source-link" style="margin:0 0 8px;font-size:11.5px;"><bdi style="color:var(--muted);">Source:</bdi> '
+        + '<span dir="auto" data-no-i18n' + (sourceUrlIn(p.source) ? '' : ' style="color:var(--muted);"') + '>' + sourceHtml(p.source, '', { title: p.name || r.name }) + '</span></div>'
+      : '';
     var num = 0, lk = rlPrep(p.links, hid === undefined ? false : hid);
     var ings = (p.ingredients || []).map(function(i) {
       if (isSubLine(i)) return '<li class="line-sub" dir="auto">' + escB(i.sub) + '</li>';
@@ -7407,8 +7415,10 @@ function linkedLinesHtml(r, hid) {
     }).join('');
     // v39.52 — the same contents and the way back to them as one's own collection
     return (parts.length > 1 ? '<div data-coll-part="' + pi + '" tabindex="-1" style="display:flex;align-items:baseline;gap:10px;margin:14px 0 6px;">'
-        + '<div dir="auto" data-no-i18n style="flex:1;min-width:0;font-family:Georgia,serif;font-size:18px;font-weight:700;color:var(--heading);">' + escH(p.name) + '</div>'
+        + '<div dir="auto" data-no-i18n style="flex:1;min-width:0;font-family:Georgia,serif;font-size:18px;font-weight:700;color:var(--heading);">'
+        + (p.isClip ? '<span class="clip-badge clip-badge-sm" style="display:inline-flex;vertical-align:middle;margin-inline-end:6px;">\u{1F3AC}</span>' : '') + escH(p.name) + '</div>'
         + collTopLinkHtml() + '</div>' : '')
+      + srcLine
       + ((ings || steps) ? '<div class="recipe-columns"' + (recipeIsRTL(r) ? ' dir="rtl"' : '') + '>'
       + '<div class="recipe-col-ings"><div class="modal-section-title">Ingredients</div><ul class="ingredients-list" data-no-i18n>' + ings + '</ul></div>'
       + '<div class="recipe-col-steps"><div class="modal-section-title">Method</div><ol class="steps-list" dir="auto" data-no-i18n>' + steps + '</ol></div></div>' : '');
@@ -11124,7 +11134,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.74';
+var APP_VERSION = 'v39.75';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -14667,7 +14677,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.74</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.75</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14755,7 +14765,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.74</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.75</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -35988,7 +35998,7 @@ var HELP_SYSTEM_PROMPT = [
   "- Something not working at all: ⚙️ → 🔧 Troubleshooting → 🧪 Self Test, then 📋 Copy report (or Send to admin)",
   "",
   "- 🎬 THE ONE-MINUTE CLIP (v39.72): the ? button → 💬 Ask About the App → 🎬 Watch the one-minute clip plays a short film of what the app does, in a window inside the app (✕ closes it and stops it). It plays in Hebrew when the app is in Hebrew and in English in every other language. It needs an internet connection.",
-  "- ▶ A RECIPE'S VIDEO PLAYS INSIDE THE APP (v39.74): in a recipe (or a recipe inside a collection, or a linked kitchen's recipe), a Source link with a small ▶ before it is a video the app can play: tap the link and it plays in a window inside the app — a YouTube video (Shorts too), Vimeo, an Instagram post or reel, a Facebook video or reel, a TikTok video, or a link straight to a video or sound file. ✕ closes the window and stops the video. Under the video, ↗ Open outside the app opens it in its own app or site — use it if the video does not play here (a private video, or one whose owner does not allow playing it elsewhere). A source that is an ordinary web page (a recipe site) has no ▶ and opens in the browser as before; so do short links that hide where they lead (fb.watch, vm.tiktok.com). TO ALWAYS OPEN VIDEOS OUTSIDE THE APP: ⚙️ Settings → 🎨 How it looks → tick 🎬 Use external players only (on this device; untick to play inside the app again). When a video plays inside the app, the device loads it from the site that hosts it, as when opening it there; the app sends that site nothing about you or your recipes (🔒 What leaves this device lists it).",
+  "- ▶ A RECIPE'S VIDEO PLAYS INSIDE THE APP (v39.74): in a recipe (or a recipe inside a collection — your own or a linked kitchen's — or a linked kitchen's recipe, or a recipe sent to you), a Source link with a small ▶ before it is a video the app can play: tap the link and it plays in a window inside the app — a YouTube video (Shorts too), Vimeo, an Instagram post or reel, a Facebook video or reel, a TikTok video, or a link straight to a video or sound file. ✕ closes the window and stops the video. Under the video, ↗ Open outside the app opens it in its own app or site — use it if the video does not play here (a private video, or one whose owner does not allow playing it elsewhere). A source that is an ordinary web page (a recipe site) has no ▶ and opens in the browser as before; so do short links that hide where they lead (fb.watch, vm.tiktok.com). TO ALWAYS OPEN VIDEOS OUTSIDE THE APP: ⚙️ Settings → 🎨 How it looks → tick 🎬 Use external players only (on this device; untick to play inside the app again). When a video plays inside the app, the device loads it from the site that hosts it, as when opening it there; the app sends that site nothing about you or your recipes (🔒 What leaves this device lists it).",
   "",
   "=== TIPS ===",
   "- The app works fully offline for reading recipes — photos and all",
