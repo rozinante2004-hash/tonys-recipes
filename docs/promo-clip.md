@@ -123,7 +123,8 @@ can progress with it."
 - **v39.73 (on Test, 14 Nov 2026): the public page and the invitation's link.** `clip.html` plays the clip for
   someone without the app (English; `?lang=he` for the Hebrew clip); the testers' invitation links to it in the
   invitation's language. Details: `docs/history/2026-11.md`, v39.73.
-- Next, on his word: other sources in the player (YouTube, a recipe's source clip).
+- **v39.74 (on Test, 14 Nov 2026): a recipe's own video source plays in the same player** (YouTube, Vimeo, Instagram,
+  Facebook, TikTok, video files), with ⚙️ "Use external players only" to turn it off. Details: `docs/history/2026-11.md`.
 
 ## The first frame is the logo (14 Nov 2026)
 Tony, with a WhatsApp screenshot of the two files he had sent: "when sending the clips, there is nothing but a blank

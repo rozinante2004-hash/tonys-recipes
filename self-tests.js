@@ -21214,6 +21214,131 @@ window.SELF_TESTS = [
       }
     } },
 
+  { id:'player_plays_a_recipes_source', group:'Features', name:'▶ A recipe’s video source plays inside the app — and “Use external players only” sends it outside again (v39.74)',
+    test: async()=>{
+      // Tony, 14 Nov 2026: "Please allow all sources in recipes to be played in the in-app player by default. However, let it
+      // be overwritten, if desired, by a checkbox in settings, called "use external players only"."
+      var keepPref=null; try{ keepPref=localStorage.getItem(PLAYER_EXTERNAL_KEY); localStorage.removeItem(PLAYER_EXTERNAL_KEY); }catch(e){}
+      var realOpen=window.openPlayer, realOnline=Object.getOwnPropertyDescriptor(Navigator.prototype,'onLine');
+      var realPlay=HTMLMediaElement.prototype.play, realLoad=HTMLMediaElement.prototype.load;
+      var ov=document.getElementById('playerOverlay');
+      try{
+        // 1. what plays, and where its player is
+        var yes=[
+          ['https://www.youtube.com/watch?v=aqz-KE-bpKQ', 'youtube', 'https://www.youtube-nocookie.com/embed/aqz-KE-bpKQ?autoplay=1&playsinline=1&rel=0', '16 / 9'],
+          ['https://youtu.be/aqz-KE-bpKQ?t=1m5s', 'youtube', 'https://www.youtube-nocookie.com/embed/aqz-KE-bpKQ?autoplay=1&playsinline=1&rel=0&start=65', '16 / 9'],
+          ['https://m.youtube.com/shorts/Ab3_dEf-9Xy', 'youtube', 'https://www.youtube-nocookie.com/embed/Ab3_dEf-9Xy?autoplay=1&playsinline=1&rel=0', '9 / 16'],
+          ['https://www.youtube.com/watch?v=aqz-KE-bpKQ&t=90', 'youtube', 'https://www.youtube-nocookie.com/embed/aqz-KE-bpKQ?autoplay=1&playsinline=1&rel=0&start=90', '16 / 9'],
+          ['https://vimeo.com/76979871', 'vimeo', 'https://player.vimeo.com/video/76979871?autoplay=1', '16 / 9'],
+          ['https://www.instagram.com/reel/Cx1_abcDEf2/?igsh=xyz', 'instagram', 'https://www.instagram.com/reel/Cx1_abcDEf2/embed/', '9 / 16'],
+          ['https://www.instagram.com/some.cook/p/Cx1_abcDEf2/', 'instagram', 'https://www.instagram.com/p/Cx1_abcDEf2/embed/', '9 / 16'],
+          ['https://www.instagram.com/reels/Cx1_abcDEf2/', 'instagram', 'https://www.instagram.com/reel/Cx1_abcDEf2/embed/', '9 / 16'],
+          ['https://www.facebook.com/watch/?v=1234567890123', 'facebook', 'https://www.facebook.com/plugins/video.php?href='+encodeURIComponent('https://www.facebook.com/watch/?v=1234567890123')+'&show_text=false', '16 / 9'],
+          ['https://www.facebook.com/somecook/videos/1234567890123/', 'facebook', 'https://www.facebook.com/plugins/video.php?href='+encodeURIComponent('https://www.facebook.com/somecook/videos/1234567890123/')+'&show_text=false', '16 / 9'],
+          ['https://m.facebook.com/reel/1234567890123', 'facebook', 'https://www.facebook.com/plugins/video.php?href='+encodeURIComponent('https://m.facebook.com/reel/1234567890123')+'&show_text=false', '9 / 16'],
+          ['https://www.tiktok.com/@some.cook/video/7301234567890123456?lang=en', 'tiktok', 'https://www.tiktok.com/embed/v2/7301234567890123456', '9 / 16']
+        ];
+        yes.forEach(function(c){ var g=playerSource(c[0]);
+          if(!g || g.kind!==c[1] || g.embed!==c[2] || g.aspect!==c[3] || g.outside!==new URL(c[0]).href) throw new Error('what plays: '+c[0]+' gave '+JSON.stringify(g)); });
+        var file=playerSource('https://example.com/clips/soup.MP4?x=1');
+        if(!file || file.kind!=='file' || file.src!=='https://example.com/clips/soup.MP4?x=1' || file.embed) throw new Error('a video file: '+JSON.stringify(file));
+        // a recipe's page is read, not played; a short link hides what it leads to; nothing odd reaches a frame
+        ['https://www.example.com/recipes/lemon-pasta', 'https://www.youtube.com/@somecook', 'https://www.youtube.com/playlist?list=PL123456', 'https://fb.watch/abc123/',
+         'https://www.facebook.com/share/v/abc123/', 'https://www.facebook.com/somecook/posts/123', 'https://vm.tiktok.com/ZM123abc/', 'https://www.tiktok.com/@some.cook',
+         'https://www.instagram.com/some.cook/', 'http://example.com/clips/soup.mp4', 'javascript:alert(1)', 'data:text/html,<b>x</b>', 'Grandma’s notebook', '', null,
+         'https://evil.example/www.youtube.com/watch?v=aqz-KE-bpKQ', 'https://youtube.com.evil.example/watch?v=aqz-KE-bpKQ', 'https://www.youtube.com/watch?v=x"onload=alert(1)'
+        ].forEach(function(u){ var g=playerSource(u); if(g) throw new Error('this should not play in the app: '+u+' gave '+JSON.stringify(g)); });
+        // …and every player's site is one the page's own policy lets it frame; a video file may come from its own site
+        var csp=document.querySelector('meta[http-equiv="Content-Security-Policy"]').getAttribute('content'), fs=(csp.match(/frame-src([^;]*)/)||[])[1]||'';
+        yes.forEach(function(c){ var o=new URL(c[2]).origin; if(fs.split(/\s+/).indexOf(o)===-1) throw new Error('the page may not frame '+o+', so '+c[1]+' would show nothing'); });
+        if(!/media-src[^;]*\shttps:/.test(csp)) throw new Error('media-src has no https:, so a video file from another site would not play');
+        if(/frame-src[^;]*(\s\*|\shttps:)(\s|$)/.test(fs+' ')) throw new Error('frame-src lets any site be framed');
+
+        // 2. the link in a recipe: a ▶, and the tap goes to sourcePlay; the e-mailed recipe's link stays a plain link
+        var h1=sourceHtml('From https://youtu.be/aqz-KE-bpKQ.', '', { title:'Soup "A" <b>' });
+        if(h1.indexOf('class="src-play"')===-1 || h1.indexOf('onclick="return sourcePlay(event,this)"')===-1 || h1.indexOf('data-title="Soup &quot;A&quot; &lt;b&gt;"')===-1 || h1.indexOf('href="https://youtu.be/aqz-KE-bpKQ"')===-1) throw new Error('a playable source’s link: '+h1);
+        var h2=sourceHtml('https://www.example.com/recipes/lemon-pasta', '', { title:'Pasta' });
+        if(h2.indexOf('src-play')!==-1 || h2.indexOf('target="_blank"')===-1) throw new Error('a web page’s link is marked as playing here: '+h2);
+        var h3=sourceHtml('https://youtu.be/aqz-KE-bpKQ', 'color:#C1440E;');
+        if(h3.indexOf('onclick')!==-1 || h3.indexOf('src-play')!==-1) throw new Error('the e-mailed recipe’s link is not a plain link: '+h3);
+        // every place a recipe is shown inside the app: its own view, a collection's parts, a linked kitchen's recipe, a recipe sent to you
+        [drawView, collectionSectionsHtml, openLinkedRecipeObj, giftLook].forEach(function(fn){ var src=String(fn), calls=src.split('sourceHtml(').length-1, playing=(src.match(/sourceHtml\([^)]*\{ title:/g)||[]).length;
+          if(!calls || calls!==playing) throw new Error((fn.name||'a recipe view')+' draws a source link that cannot play ('+playing+' of '+calls+')'); });
+
+        // 3. the tap: the player gets the site's own player, the recipe's name and the way out
+        var got=null; window.openPlayer=function(o){ got=o; return true; };
+        var a=document.createElement('a'); a.setAttribute('href','https://www.instagram.com/reel/Cx1_abcDEf2/'); a.setAttribute('data-title','Shakshuka');
+        var stopped=0, ev={ preventDefault:function(){ stopped++; } };
+        if(sourcePlay(ev, a)!==false || stopped!==1 || !got) throw new Error('a tap on a playable source did not go to the player');
+        if(got.embed!=='https://www.instagram.com/reel/Cx1_abcDEf2/embed/' || got.title!=='\u{1F3AC} Shakshuka' || !got.titleIsData || got.outside!=='https://www.instagram.com/reel/Cx1_abcDEf2/' || got.aspect!=='9 / 16') throw new Error('what the player was given: '+JSON.stringify(got));
+        got=null; stopped=0;
+        if(sourcePlay({ ctrlKey:true, preventDefault:function(){ stopped++; } }, a)!==true || got || stopped) throw new Error('Ctrl+click did not stay a new tab');
+        var page=document.createElement('a'); page.setAttribute('href','https://www.example.com/recipes/lemon-pasta');
+        if(sourcePlay(ev, page)!==true || got) throw new Error('a web page was sent to the player');
+        // "Use external players only": the same tap is an ordinary link again, and the ▶ is gone
+        if(playerExternalOnly()) throw new Error('external players only is on before anyone ticked it');
+        playerExternalSet(true); stopped=0;
+        if(!playerExternalOnly() || localStorage.getItem(PLAYER_EXTERNAL_KEY)!=='1') throw new Error('ticking the box is not kept');
+        if(sourcePlay({ preventDefault:function(){ stopped++; } }, a)!==true || got || stopped) throw new Error('with external players only, the source still played inside the app');
+        if(sourceHtml('https://youtu.be/aqz-KE-bpKQ', '', { title:'x' }).indexOf('src-play')!==-1) throw new Error('with external players only, the link still shows ▶');
+        if(privacyEntries().filter(function(e){ return /^Video sites/.test(e.who); })[0].on!==false) throw new Error('What leaves this device still shows the video sites as on');
+        playerExternalSet(false);
+        if(playerExternalOnly() || localStorage.getItem(PLAYER_EXTERNAL_KEY)!==null) throw new Error('unticking the box is not kept');
+        var pe=privacyEntries().filter(function(e){ return /^Video sites \(YouTube, Vimeo, Instagram, Facebook, TikTok\)$/.test(e.who); })[0];
+        if(!pe || pe.on!==true || !/Nothing about you or your recipes/.test(pe.sends) || !/Use external players only/.test(pe.sends)) throw new Error('What leaves this device does not list the video sites: '+JSON.stringify(pe));
+        window.openPlayer=realOpen;
+
+        // 4. the checkbox, where Tony asked for it, saying what he called it
+        var box=document.getElementById('playerExternalToggle'), item=document.getElementById('playerExternalItem');
+        if(!box || !item || box.type!=='checkbox' || !document.getElementById('settingsDrop').contains(item)) throw new Error('Settings has no “Use external players only” box');
+        if(String(item.getAttribute('title')||'').indexOf('opens in its own app or site')===-1) throw new Error('the box does not say what it does');
+        if(String(document.getElementById('playerExternalItem').outerHTML).indexOf('Use external players only')===-1) throw new Error('the box is not called “Use external players only”');
+        playerExternalSet(true); accessRefreshSettings(); if(!box.checked) throw new Error('the box does not show that it is ticked');
+        playerExternalSet(false); accessRefreshSettings(); if(box.checked) throw new Error('the box does not show that it is unticked');
+        if(String(box.getAttribute('onchange'))!=='playerExternalSet(this.checked)') throw new Error('ticking the box does nothing');
+
+        // 5. the window itself: a frame for the site's player (a stand-in address — nothing is fetched), then let go of
+        HTMLMediaElement.prototype.play=function(){ return Promise.resolve(); }; HTMLMediaElement.prototype.load=function(){};
+        if(!openPlayer({ title:'\u{1F3AC} Shakshuka', titleIsData:true, embed:'about:blank#st-player', aspect:'9 / 16', outside:'https://example.com/v/1' })) throw new Error('the player did not open for a site’s video');
+        var f=document.getElementById('playerFrame'), v=document.getElementById('playerVideo'), t=document.getElementById('playerTitle'), row=document.getElementById('playerOutsideRow'), out=document.getElementById('playerOutside');
+        if(!ov.classList.contains('open') || f.hidden || !v.hidden || f.getAttribute('src')!=='about:blank#st-player' || v.getAttribute('src')) throw new Error('the site’s player is not what is shown');
+        if(t.textContent!=='\u{1F3AC} Shakshuka' || !t.hasAttribute('data-no-i18n')) throw new Error('the recipe’s name is not the title, or could be taken for a phrase');
+        if(row.hidden || out.getAttribute('href')!=='https://example.com/v/1' || out.getAttribute('target')!=='_blank' || !/noopener/.test(out.getAttribute('rel')||'')) throw new Error('no way out to the video’s own site');
+        if(getComputedStyle(f).display==='none' || getComputedStyle(v).display!=='none') throw new Error('the hidden player is still drawn');
+        var sb=String(f.getAttribute('sandbox')||''); if(sb.indexOf('allow-scripts')===-1 || /allow-top-navigation(\s|$)/.test(sb) || !f.hasAttribute('allowfullscreen')) throw new Error('the frame’s limits: '+sb);
+        closeM('playerOverlay');
+        var f2=document.getElementById('playerFrame');
+        if(ov.classList.contains('open') || f2===f || f2.getAttribute('src') || !f2.hidden || document.querySelectorAll('#playerFrame').length!==1) throw new Error('closing the player did not let go of the site’s player');
+        if(t.textContent!==PLAYER_TITLE || t.hasAttribute('data-no-i18n') || !row.hidden || out.getAttribute('href')) throw new Error('the closed player kept the last recipe’s name or link');
+        // a video file: the <video> plays it, with the way out under it
+        if(!openPlayer({ title:'\u{1F3AC} Soup', titleIsData:true, src:'https://example.invalid/soup.mp4', aspect:'16 / 9', outside:'https://example.invalid/soup.mp4' })) throw new Error('the player did not open for a video file');
+        v=document.getElementById('playerVideo'); f=document.getElementById('playerFrame');
+        if(v.hidden || !f.hidden || v.getAttribute('src')!=='https://example.invalid/soup.mp4' || f.getAttribute('src') || document.getElementById('playerOutsideRow').hidden) throw new Error('a video file is not played by the video player');
+        if(ov.firstElementChild.style.maxWidth!=='860px') throw new Error('a wide film from a source does not get the wider window: '+ov.firstElementChild.style.maxWidth);
+        closeM('playerOverlay');
+        // offline: the app says so itself, and nothing is put in the frame
+        Object.defineProperty(navigator,'onLine',{ get:function(){ return false; }, configurable:true });
+        openPlayer({ title:'\u{1F3AC} Shakshuka', titleIsData:true, embed:'about:blank#st-offline', aspect:'16 / 9', outside:'https://example.com/v/1' });
+        var note=document.getElementById('playerNote');
+        if(document.getElementById('playerFrame').getAttribute('src') || note.hidden || note.textContent.indexOf('internet connection')===-1) throw new Error('offline, the player does not say the clip needs a connection');
+        closeM('playerOverlay');
+        // the app's own clip still plays as before, with no way-out row
+        delete navigator.onLine;
+        openTourClip();
+        if(document.getElementById('playerVideo').hidden || !document.getElementById('playerOutsideRow').hidden || document.getElementById('playerTitle').hasAttribute('data-no-i18n')) throw new Error('the one-minute clip no longer opens as it did');
+        if(ov.firstElementChild.style.maxWidth!=='560px') throw new Error('the one-minute clip\u2019s window lost its width: '+ov.firstElementChild.style.maxWidth);
+        closeM('playerOverlay');
+        // Help knows it
+        var k=String(HELP_SYSTEM_PROMPT);
+        if(!/A RECIPE'S VIDEO PLAYS INSIDE THE APP \(v39\.74\)/.test(k) || !/tick \u{1F3AC} Use external players only/u.test(k) || !/↗ Open outside the app/.test(k)) throw new Error('Help does not know that a source plays inside the app, or how to turn it off');
+      } finally {
+        window.openPlayer=realOpen; HTMLMediaElement.prototype.play=realPlay; HTMLMediaElement.prototype.load=realLoad;
+        try{ delete navigator.onLine; }catch(e){} if(realOnline) try{ Object.defineProperty(Navigator.prototype,'onLine',realOnline); }catch(e){}
+        try{ closeM('playerOverlay'); }catch(e){}
+        try{ if(keepPref==null) localStorage.removeItem(PLAYER_EXTERNAL_KEY); else localStorage.setItem(PLAYER_EXTERNAL_KEY, keepPref); }catch(e){}
+        try{ accessRefreshSettings(); }catch(e){}
+      }
+    } },
   { id:'help_says_an_import_brings_no_photo', group:'Features', name:'The help assistant says an import brings no photo — and an import really sets none (v39.73)',
     test: async()=>{
       // Tony, 13 Nov 2026: 'Help says that when importing from a url, the photo is copied automatically

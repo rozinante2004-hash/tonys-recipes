@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.73 -->
+<!-- Tony's Recipes Collection v39.74 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -53,7 +53,7 @@
      If photo selection ever starts failing with a CSP error in the console, the
      Worker is the thing to check first: ⚙️ → 📡 Sync Health reports its live
      version. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://accounts.google.com https://apis.google.com; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob: https:; media-src 'self' data: blob:; connect-src 'self' https://lively-bread-273a.rozinante2004.workers.dev https://api.allorigins.win https://corsproxy.io https://api.codetabs.com https://*.firebaseapp.com https://*.googleapis.com https://*.google.com https://*.firebaseio.com wss://*.firebaseio.com https://accounts.google.com; frame-src 'self' https://accounts.google.com https://content.googleapis.com https://*.firebaseapp.com https://*.web.app; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://accounts.google.com https://apis.google.com; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob: https:; media-src 'self' data: blob: https:; connect-src 'self' https://lively-bread-273a.rozinante2004.workers.dev https://api.allorigins.win https://corsproxy.io https://api.codetabs.com https://*.firebaseapp.com https://*.googleapis.com https://*.google.com https://*.firebaseio.com wss://*.firebaseio.com https://accounts.google.com; frame-src 'self' https://accounts.google.com https://content.googleapis.com https://*.firebaseapp.com https://*.web.app https://www.youtube-nocookie.com https://player.vimeo.com https://www.instagram.com https://www.facebook.com https://www.tiktok.com; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 80'><circle cx='40' cy='40' r='40' fill='%235C3D2E'/><circle cx='40' cy='40' r='34' fill='none' stroke='%23D4A843' stroke-width='1.5'/><line x1='28' y1='18' x2='28' y2='58' stroke='%23FAF7F2' stroke-width='2.5' stroke-linecap='round'/><line x1='23' y1='18' x2='23' y2='30' stroke='%23FAF7F2' stroke-width='2' stroke-linecap='round'/><line x1='28' y1='18' x2='28' y2='30' stroke='%23FAF7F2' stroke-width='2' stroke-linecap='round'/><line x1='33' y1='18' x2='33' y2='30' stroke='%23FAF7F2' stroke-width='2' stroke-linecap='round'/><path d='M44 58 C36 46 34 36 42 24 C45 30 43 35 47 31 C51 24 49 14 54 8 C58 18 57 30 52 37 C55 33 57 28 56 36 C59 44 55 54 48 58 Z' fill='%23C1440E'/><path d='M46 58 C42 50 43 42 47 36 C49 40 47 44 50 41 C53 36 52 28 55 24 C57 31 55 40 58 36 C60 44 57 54 51 58 Z' fill='%23D4A843'/></svg>">
@@ -1584,6 +1584,17 @@ window.setTheme = setTheme; window.getTheme = getTheme; window.cycleTheme = cycl
 var CVD_KEY = 'mkn_cvd', DOT_RING_KEY = 'mkn_dot_ring';
 function cvdOn() { try { return localStorage.getItem(CVD_KEY) === 'rg'; } catch(e) { return false; } }
 function dotRingOn() { try { return localStorage.getItem(DOT_RING_KEY) !== 'off'; } catch(e) { return true; } }
+// v39.74 — "Use external players only" (Tony, 14 Nov 2026: "Please allow all sources in recipes to be played in the
+// in-app player by default. However, let it be overwritten, if desired, by a checkbox in settings, called "use external
+// players only"."). Unticked (the default) a recipe's video source plays inside the app; ticked, on this device, it
+// opens in its own app or site, as every source did before.
+var PLAYER_EXTERNAL_KEY = 'mkn_player_external';
+function playerExternalOnly() { try { return localStorage.getItem(PLAYER_EXTERNAL_KEY) === '1'; } catch(e) { return false; } }
+function playerExternalSet(on) {
+  try { if (on) localStorage.setItem(PLAYER_EXTERNAL_KEY, '1'); else localStorage.removeItem(PLAYER_EXTERNAL_KEY); } catch(e) {}
+  if (typeof insightCount === 'function') insightCount(on ? 'player-external-on' : 'player-external-off');
+  return !!on;
+}
 function accessApply() {
   var h = document.documentElement;
   if (cvdOn()) h.setAttribute('data-cvd', 'rg'); else h.removeAttribute('data-cvd');
@@ -1593,6 +1604,7 @@ function accessApply() {
 function accessRefreshSettings() {
   var a = document.getElementById('cvdToggle'); if (a) a.checked = cvdOn();
   var b = document.getElementById('dotRingToggle'); if (b) b.checked = dotRingOn();
+  var c = document.getElementById('playerExternalToggle'); if (c) c.checked = playerExternalOnly();
 }
 function cvdSet(on) {
   try { if (on) localStorage.setItem(CVD_KEY, 'rg'); else localStorage.removeItem(CVD_KEY); } catch(e) {}
@@ -1608,6 +1620,7 @@ function dotRingSet(on) {
 }
 accessApply();
 window.cvdOn = cvdOn; window.cvdSet = cvdSet; window.dotRingOn = dotRingOn; window.dotRingSet = dotRingSet;
+window.playerExternalOnly = playerExternalOnly; window.playerExternalSet = playerExternalSet;
 window.accessApply = accessApply; window.accessRefreshSettings = accessRefreshSettings;
 
 // ─── SELECT MODE ─────────────────────────────────────────────────────────────
@@ -7430,7 +7443,7 @@ function openLinkedRecipeObj(r, hid) {
           : (metaVal(r.prep) ? '<bdi data-no-i18n>⏱ ' + escH(r.prep) + '</bdi>' : '') + (metaVal(r.servings) ? '<bdi>\u{1F37D} <span dir="auto" data-no-i18n>' + escH(r.servings) + '</span></bdi>' : '')
           + '<span class="difficulty ' + escA(String(r.difficulty || '').toLowerCase()) + '">' + escH(r.difficulty) + '</span>') + '</div>'
     +   (r.source ? '<div class="source-link" style="margin-bottom:8px;font-size:12px;"><bdi style="color:var(--muted);">Source:</bdi> '
-          + '<span dir="auto" data-no-i18n>' + sourceHtml(r.source) + '</span></div>' : '')
+          + '<span dir="auto" data-no-i18n>' + sourceHtml(r.source, '', { title: r.name }) + '</span></div>' : '')
     +   (r.notes ? '<div dir="auto" data-no-i18n style="background:var(--note-bg);border-inline-start:3px solid var(--note-border);padding:10px 14px;margin-bottom:14px;font-size:13px;line-height:1.6;">' + rlHtml(escH(r.notes), lk) + '</div>' : '')
     +   linkedLinesHtml(r, hid)
     +   '<div class="recipe-actions" style="margin-top:16px;">'
@@ -7864,7 +7877,7 @@ async function giftLook(g, signedOut) {
     +   '<div class="modal-meta">' + (isCollection(r) ? '<span>\u{1F4DA} <span data-no-i18n>' + recipeParts(r).length + '</span> recipes</span>'
           : (metaVal(r.prep) ? '<bdi data-no-i18n>⏱ ' + escH(r.prep) + '</bdi>' : '') + (metaVal(r.servings) ? '<bdi>\u{1F37D} <span dir="auto" data-no-i18n>' + escH(r.servings) + '</span></bdi>' : '')
           + '<span class="difficulty ' + escA(String(r.difficulty || '').toLowerCase()) + '">' + escH(r.difficulty) + '</span>') + '</div>'
-    +   (r.source ? '<div class="source-link" style="margin-bottom:8px;font-size:12px;"><bdi style="color:var(--muted);">Source:</bdi> <span dir="auto" data-no-i18n>' + sourceHtml(r.source) + '</span></div>' : '')
+    +   (r.source ? '<div class="source-link" style="margin-bottom:8px;font-size:12px;"><bdi style="color:var(--muted);">Source:</bdi> <span dir="auto" data-no-i18n>' + sourceHtml(r.source, '', { title: r.name }) + '</span></div>' : '')
     +   (r.notes ? '<div dir="auto" data-no-i18n style="background:var(--note-bg);border-inline-start:3px solid var(--note-border);padding:10px 14px;margin-bottom:14px;font-size:13px;line-height:1.6;">' + escH(r.notes) + '</div>' : '')
     +   linkedLinesHtml(r) + actions
     + '</div>';
@@ -11111,7 +11124,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.73';
+var APP_VERSION = 'v39.74';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -14248,6 +14261,11 @@ body.banner-shown .header {
 .help-clip:hover { border-color: var(--terracotta); }
 #playerVideo { display: block; margin: 0 auto; width: 100%; height: auto; max-width: 100%; background: #000; border-radius: 10px; }
 #playerNote { margin-top: 10px; font-size: 13px; line-height: 1.5; color: var(--ink); text-align: center; }
+#playerFrame { display: block; margin: 0 auto; width: 100%; max-width: 100%; border: 0; background: #000; border-radius: 10px; }
+#playerVideo[hidden], #playerFrame[hidden], #playerOutsideRow[hidden] { display: none; }
+#playerOutsideRow { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; justify-content: center; font-size: 13px; line-height: 1.5; color: var(--muted); text-align: center; }
+#playerOutside { color: var(--terracotta); font-weight: 600; text-decoration: underline; min-height: 32px; display: inline-flex; align-items: center; }
+.src-play { color: var(--terracotta); font-size: 10px; margin-inline-end: 4px; }
 .help-icon-btn {
   background: rgba(255,255,255,0.15);
   border: 1px solid rgba(255,255,255,0.3);
@@ -14649,7 +14667,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.73</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.74</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14737,7 +14755,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.73</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.74</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -14778,6 +14796,8 @@ body.banner-shown .header {
               <!-- v37.88 — the farm visitors: on by default, on this device; Tony chooses what they say, who comes and how often. -->
               <label class="drop-item" id="farmToggleItem" title="Now and then a cartoon farm animal strolls across the screen. Tap it and it answers back. On this device." style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" id="farmToggle" checked onchange="farmSetEnabled(this.checked)" style="width:18px;height:18px;flex:none;accent-color:var(--terracotta);"> 🐑 Farm guests?</label>
               <button class="drop-item" id="farmOwnerItem" style="display:none;" title="What the animals say, which of them may visit and how often — for everyone, in every copy." onclick="closeDrop('settingsDrop');openFarmSettings()">🐄 The farm visitors…</button>
+              <!-- v39.74 — Tony: "a checkbox in settings, called 'use external players only'": where a recipe's video plays, on this device. -->
+              <label class="drop-item" id="playerExternalItem" title="Tick it and a recipe’s video source (YouTube, Instagram, Facebook, TikTok…) opens in its own app or site instead of playing inside this app. On this device." style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" id="playerExternalToggle" onchange="playerExternalSet(this.checked)" style="width:18px;height:18px;flex:none;accent-color:var(--terracotta);"> 🎬 Use external players only</label>
             </div>
           </div>
           <!-- v38.83 — Tony: "Add a new 'Accessibility' menu item under settings and place under it both the already existing
@@ -15992,7 +16012,9 @@ body.banner-shown .header {
       <button class="modal-close" onclick="closeM('playerOverlay')" style="position:relative;top:auto;right:auto;flex:none;">✕</button>
     </div>
     <video id="playerVideo" controls playsinline preload="metadata" aria-labelledby="playerTitle"></video>
+    <iframe id="playerFrame" hidden aria-labelledby="playerTitle" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin" sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-presentation allow-forms"></iframe>
     <div id="playerNote" aria-live="polite" hidden></div>
+    <div id="playerOutsideRow" hidden><span>If the clip does not play here, open it outside the app.</span> <a id="playerOutside" target="_blank" rel="noopener noreferrer">↗ Open outside the app</a></div>
   </div>
 </div>
 
@@ -18354,6 +18376,8 @@ window.i18nTemplatesOf = i18nTemplatesOf; window.i18nTemplateCovers = i18nTempla
 // translating a string nobody sees. A `{1}` makes it a shape, matched the same
 // way a built toast is.
 var I18N_EXTRA = [
+  // v39.74 — a recipe's source in the player (the ▶ link's tooltip is looked up in code)
+  'Plays here, inside the app',
   // v39.72 — the in-app player
   '\u{1F3AC} The app in one minute',
   'The clip needs an internet connection. Try again when you are online.',
@@ -23074,7 +23098,7 @@ function collectionSectionsHtml(r) {
     var srcLine = p.source
       ? '<div style="font-size:11.5px;margin-top:3px;word-break:break-all;">'
         + '<span style="color:var(--muted);">Source: </span>'
-        + '<span dir="auto" data-no-i18n' + (sourceUrlIn(p.source) ? '' : ' style="color:var(--muted);"') + '>' + sourceHtml(p.source) + '</span>'
+        + '<span dir="auto" data-no-i18n' + (sourceUrlIn(p.source) ? '' : ' style="color:var(--muted);"') + '>' + sourceHtml(p.source, '', { title: p.name || r.name }) + '</span>'
         + '</div>'
       : '';
     // A clip IS its link. Drawing two empty columns headed Ingredients and
@@ -23721,7 +23745,7 @@ function drawView(){
           : `<bdi>🍽 <span dir="auto" data-no-i18n>${escH(r.servings)}</span> servings</bdi>`}
         <span class="difficulty ${escA(String(r.difficulty||'').toLowerCase())}">${escH(r.difficulty)}</span>`}
       </div>
-      <div class="source-link" style="margin-bottom:8px;font-size:12px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;"><bdi style="color:var(--muted);font-weight:500;flex-shrink:0;">Source:</bdi><span id="srcDisplay-${r.id}">${r.source ? `<span dir="auto" data-no-i18n style="word-break:break-word;">${sourceHtml(r.source)}</span>` : `<span style="color:var(--muted);font-style:italic;">Not specified</span>`}</span><button onclick="editSource(${r.id})" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--muted);padding:2px 6px;border-radius:4px;border:1px solid var(--border);font-family:'DM Sans','Heebo',sans-serif;flex-shrink:0;" title="Edit source">✏️</button></div><div id="srcEdit-${r.id}" style="display:none;margin-bottom:8px;"><div style="display:flex;gap:6px;align-items:center;"><input id="srcInput-${r.id}" type="text" value="${escA(r.source||'')}" placeholder="URL or 'AI generated' or leave blank" onkeydown="if(event.key==='Enter')saveSource(${r.id});if(event.key==='Escape')cancelSource(${r.id});" style="flex:1;padding:6px 10px;border-radius:7px;border:1.5px solid var(--terracotta);font-size:12px;font-family:'DM Sans','Heebo',sans-serif;color:var(--ink);"><button onclick="saveSource(${r.id})" style="padding:6px 12px;border-radius:7px;border:none;background:var(--terracotta-fill);color:white;font-size:12px;cursor:pointer;font-family:'DM Sans','Heebo',sans-serif;font-weight:500;flex-shrink:0;">Save</button><button onclick="cancelSource(${r.id})" style="padding:6px 10px;border-radius:7px;border:1px solid var(--border);background:var(--card-bg);color:var(--muted);font-size:12px;cursor:pointer;font-family:'DM Sans','Heebo',sans-serif;flex-shrink:0;">✕</button></div></div>
+      <div class="source-link" style="margin-bottom:8px;font-size:12px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;"><bdi style="color:var(--muted);font-weight:500;flex-shrink:0;">Source:</bdi><span id="srcDisplay-${r.id}">${r.source ? `<span dir="auto" data-no-i18n style="word-break:break-word;">${sourceHtml(r.source, '', { title: r.name })}</span>` : `<span style="color:var(--muted);font-style:italic;">Not specified</span>`}</span><button onclick="editSource(${r.id})" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--muted);padding:2px 6px;border-radius:4px;border:1px solid var(--border);font-family:'DM Sans','Heebo',sans-serif;flex-shrink:0;" title="Edit source">✏️</button></div><div id="srcEdit-${r.id}" style="display:none;margin-bottom:8px;"><div style="display:flex;gap:6px;align-items:center;"><input id="srcInput-${r.id}" type="text" value="${escA(r.source||'')}" placeholder="URL or 'AI generated' or leave blank" onkeydown="if(event.key==='Enter')saveSource(${r.id});if(event.key==='Escape')cancelSource(${r.id});" style="flex:1;padding:6px 10px;border-radius:7px;border:1.5px solid var(--terracotta);font-size:12px;font-family:'DM Sans','Heebo',sans-serif;color:var(--ink);"><button onclick="saveSource(${r.id})" style="padding:6px 12px;border-radius:7px;border:none;background:var(--terracotta-fill);color:white;font-size:12px;cursor:pointer;font-family:'DM Sans','Heebo',sans-serif;font-weight:500;flex-shrink:0;">Save</button><button onclick="cancelSource(${r.id})" style="padding:6px 10px;border-radius:7px;border:1px solid var(--border);background:var(--card-bg);color:var(--muted);font-size:12px;cursor:pointer;font-family:'DM Sans','Heebo',sans-serif;flex-shrink:0;">✕</button></div></div>
       <div id="nutrition-${r.id}" class="nutrition-panel" data-folded="1"${isCollection(r) ? ' style="display:none;"' : ''}>
         ${r.nutrition
           ? `<button type="button" class="nutrition-head" aria-expanded="${nutritionFoldsHere() ? 'false' : 'true'}" aria-controls="nutritionBody-${r.id}" onclick="toggleNutrition(${r.id})">
@@ -26979,11 +27003,18 @@ function sourceUrlIn(src) {
   var m = String(src == null ? '' : src).match(/https?:\/\/[^\s<>"'\u201C\u201D]+/i);
   return m ? m[0].replace(/[).,;:!?\]]+$/, '') : '';     // a sentence's own full stop is not the address's
 }
-function sourceHtml(src, style) {
+// v39.74 — `play` ({ title }) is given by the recipe views: a tap on the link then goes to sourcePlay, which plays what
+// the in-app player can play and lets every other link open as a link does. The ▶ before it says so beforehand. The
+// e-mailed recipe and the suggestions pass no `play`: their link is a plain link.
+function sourceHtml(src, style, play) {
   var s = String(src == null ? '' : src), u = sourceUrlIn(s);
   if (!u) return escH(s);
-  var i = s.indexOf(u);
-  return escH(s.slice(0, i)) + '<a href="' + escA(u) + '" target="_blank" rel="noopener noreferrer" style="' + escA(style || 'color:var(--terracotta);') + '">'
+  var i = s.indexOf(u), here = !!play && !playerExternalOnly() && !!playerSource(u);
+  return escH(s.slice(0, i)) + (here ? '<span class="src-play" aria-hidden="true">\u25B6</span>' : '')
+    + '<a href="' + escA(u) + '" target="_blank" rel="noopener noreferrer"'
+    + (play ? ' onclick="return sourcePlay(event,this)" data-title="' + escA(play.title || '') + '"' : '')
+    + (here ? ' title="' + escA(i18nPhrase('Plays here, inside the app')) + '"' : '')
+    + ' style="' + escA(style || 'color:var(--terracotta);') + '">'
     + escH(u) + '</a>' + escH(s.slice(i + u.length));
 }
 window.sourceUrlIn = sourceUrlIn; window.sourceHtml = sourceHtml;
@@ -35957,6 +35988,7 @@ var HELP_SYSTEM_PROMPT = [
   "- Something not working at all: ⚙️ → 🔧 Troubleshooting → 🧪 Self Test, then 📋 Copy report (or Send to admin)",
   "",
   "- 🎬 THE ONE-MINUTE CLIP (v39.72): the ? button → 💬 Ask About the App → 🎬 Watch the one-minute clip plays a short film of what the app does, in a window inside the app (✕ closes it and stops it). It plays in Hebrew when the app is in Hebrew and in English in every other language. It needs an internet connection.",
+  "- ▶ A RECIPE'S VIDEO PLAYS INSIDE THE APP (v39.74): in a recipe (or a recipe inside a collection, or a linked kitchen's recipe), a Source link with a small ▶ before it is a video the app can play: tap the link and it plays in a window inside the app — a YouTube video (Shorts too), Vimeo, an Instagram post or reel, a Facebook video or reel, a TikTok video, or a link straight to a video or sound file. ✕ closes the window and stops the video. Under the video, ↗ Open outside the app opens it in its own app or site — use it if the video does not play here (a private video, or one whose owner does not allow playing it elsewhere). A source that is an ordinary web page (a recipe site) has no ▶ and opens in the browser as before; so do short links that hide where they lead (fb.watch, vm.tiktok.com). TO ALWAYS OPEN VIDEOS OUTSIDE THE APP: ⚙️ Settings → 🎨 How it looks → tick 🎬 Use external players only (on this device; untick to play inside the app again). When a video plays inside the app, the device loads it from the site that hosts it, as when opening it there; the app sends that site nothing about you or your recipes (🔒 What leaves this device lists it).",
   "",
   "=== TIPS ===",
   "- The app works fully offline for reading recipes — photos and all",
@@ -36040,40 +36072,109 @@ function tourClip(lang) {
   return { lang: l, src: PLAYER_TOUR + l + '.mp4', poster: PLAYER_TOUR + l + '.jpg' };
 }
 function playerSay(text) { var n = document.getElementById('playerNote'); if (!n) return; n.textContent = text || ''; n.hidden = !text; }
+var PLAYER_TITLE = '\u{1F3AC} The app in one minute';   // the window's name while nothing plays (a window needs one)
+// v39.74 — what of a recipe's source the player can play. A video on YouTube, Vimeo, Instagram, Facebook or TikTok plays
+// in that site's own embedded player (a frame: { embed }); a link straight to a video or sound file plays in the
+// <video> ({ src }). Anything else — a recipe's web page — is read, not played: null. (Most sites refuse to be shown
+// inside another page and the app cannot know beforehand, so a page keeps opening in the browser.) Short links that hide
+// what they lead to (fb.watch, vm.tiktok.com, a Facebook share link) are null too: nothing here can say what is behind
+// them, and a frame that shows an error is worse than the link.
+function playerSource(url) {
+  var u; try { u = new URL(String(url == null ? '' : url).trim()); } catch (e) { return null; }
+  if (u.protocol !== 'https:' && u.protocol !== 'http:') return null;
+  var h = u.hostname.toLowerCase().replace(/^(www|m|mobile|web)\./, ''), p = u.pathname, q = u.searchParams, m, id;
+  var out = function(kind, name, embed, aspect) { return { kind: kind, name: name, embed: embed, aspect: aspect || '16 / 9', outside: u.href }; };
+  if (h === 'youtu.be' || h === 'youtube.com' || h === 'music.youtube.com' || h === 'youtube-nocookie.com') {
+    id = h === 'youtu.be' ? (p.match(/^\/([\w-]+)/) || [])[1] : (p === '/watch' ? q.get('v') : (p.match(/^\/(?:shorts|live|embed|v)\/([\w-]+)/) || [])[1]);
+    if (!/^[\w-]{6,20}$/.test(id || '')) return null;
+    var tm = String(q.get('t') || q.get('start') || '').match(/^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s?)?$/), secs = tm ? (+tm[1] || 0) * 3600 + (+tm[2] || 0) * 60 + (+tm[3] || 0) : 0;
+    // youtube-nocookie: YouTube's own "privacy-enhanced" player — it sets no cookie until the video is played
+    return out('youtube', 'YouTube', 'https://www.youtube-nocookie.com/embed/' + id + '?autoplay=1&playsinline=1&rel=0' + (secs ? '&start=' + secs : ''), /^\/shorts\//.test(p) ? '9 / 16' : '16 / 9');
+  }
+  if (h === 'vimeo.com' || h === 'player.vimeo.com') {
+    m = p.match(/^\/(?:video\/)?(\d{5,})(?:\/([0-9a-f]{6,}))?\/?$/);          // an unlisted video carries its key after the number
+    return m ? out('vimeo', 'Vimeo', 'https://player.vimeo.com/video/' + m[1] + '?autoplay=1' + (m[2] ? '&h=' + m[2] : '')) : null;
+  }
+  if (h === 'instagram.com' || h === 'instagr.am') {
+    m = p.match(/^\/(?:[\w.]+\/)?(p|reel|reels|tv)\/([\w-]{5,})/);
+    return m ? out('instagram', 'Instagram', 'https://www.instagram.com/' + (m[1] === 'reels' ? 'reel' : m[1]) + '/' + m[2] + '/embed/', '9 / 16') : null;
+  }
+  if (h === 'facebook.com' || h === 'fb.com') {
+    var isVideo = (p === '/watch' || p === '/watch/' || p === '/video.php') ? /^\d+$/.test(q.get('v') || '') : /^\/(?:reel\/\d+|[^/]+\/videos\/(?:[^/]+\/)?\d+)/.test(p);
+    return isVideo ? out('facebook', 'Facebook', 'https://www.facebook.com/plugins/video.php?href=' + encodeURIComponent(u.href) + '&show_text=false', /^\/reel\//.test(p) ? '9 / 16' : '16 / 9') : null;
+  }
+  if (h === 'tiktok.com') {
+    m = p.match(/^\/@[^/]+\/video\/(\d{8,})/) || p.match(/^\/(?:embed(?:\/v2)?|player\/v1)\/(\d{8,})/);
+    return m ? out('tiktok', 'TikTok', 'https://www.tiktok.com/embed/v2/' + m[1], '9 / 16') : null;
+  }
+  if (u.protocol === 'https:' && /\.(mp4|m4v|webm|mov|ogv|mp3|m4a|ogg|oga|wav)$/i.test(p)) return { kind: 'file', name: '', src: u.href, aspect: '16 / 9', outside: u.href };
+  return null;
+}
+// A tap on a source link in a recipe. Plays it here — unless this device says "external players only", the link is not
+// something the player plays, or the person asked for a new tab themselves: then the link opens as any link does.
+function sourcePlay(ev, a) {
+  if (ev && (ev.ctrlKey || ev.metaKey || ev.shiftKey || ev.altKey || ev.button > 0)) return true;
+  var s = playerExternalOnly() ? null : playerSource(a && a.getAttribute && a.getAttribute('href'));
+  if (!s) return true;
+  var name = (a.getAttribute('data-title') || s.name || '').trim();
+  if (!openPlayer({ title: '\u{1F3AC} ' + name, titleIsData: true, src: s.src, embed: s.embed, aspect: s.aspect, outside: s.outside, kind: s.kind })) return true;
+  if (ev && ev.preventDefault) ev.preventDefault();
+  return false;
+}
+// o: { title, titleIsData, aspect, outside } and EITHER src (+ poster): a video or sound file, played by the <video> —
+// OR embed: the address of a video site's own player, shown in the frame.
 function openPlayer(o) {
   o = o || {};
-  var v = document.getElementById('playerVideo'), ov = document.getElementById('playerOverlay');
-  if (!v || !ov || !o.src) return false;
+  var ov = document.getElementById('playerOverlay');
+  if (!ov || !document.getElementById('playerVideo') || !document.getElementById('playerFrame') || !(o.src || o.embed)) return false;
+  playerStop();                                    // one thing at a time: whatever played before lets go first
+  var v = document.getElementById('playerVideo'), f = document.getElementById('playerFrame'), box = o.embed ? f : v;
   var a = String(o.aspect || '16 / 9').split('/'), ratio = (parseFloat(a[0]) || 16) / (parseFloat(a[1]) || 9);
-  document.getElementById('playerTitle').textContent = o.title || '';
-  playerSay('');
-  v.style.aspectRatio = a[0].trim() + ' / ' + (a[1] || '9').trim();
-  v.style.width = 'min(100%, calc((90vh - 150px) * ' + ratio.toFixed(4) + '))';   // the whole picture on the screen, whatever its shape
-  if (o.poster) v.setAttribute('poster', o.poster); else v.removeAttribute('poster');
-  v.onerror = function() {
-    if (!v.getAttribute('src')) return;   // let go of on purpose (playerStop)
-    playerSay(navigator.onLine === false ? 'The clip needs an internet connection. Try again when you are online.' : 'The clip could not be played here.');
-    syncLog('error', 'The player could not play a clip', { src: String(o.src).slice(0, 120), online: navigator.onLine !== false, code: v.error && v.error.code });
-  };
-  v.setAttribute('src', o.src);
+  var t = document.getElementById('playerTitle'), row = document.getElementById('playerOutsideRow'), out = document.getElementById('playerOutside');
+  t.textContent = o.title || PLAYER_TITLE;
+  if (o.titleIsData) { t.setAttribute('data-no-i18n', ''); t.setAttribute('dir', 'auto'); }   // a recipe's name is the person's own words, never a phrase
+  v.hidden = !!o.embed; f.hidden = !o.embed;
+  box.style.aspectRatio = a[0].trim() + ' / ' + (a[1] || '9').trim();
+  box.style.width = 'min(100%, calc((90vh - ' + (o.outside ? 210 : 150) + 'px) * ' + ratio.toFixed(4) + '))';   // the whole picture on the screen, whatever its shape
+  ov.firstElementChild.style.maxWidth = (o.outside && ratio > 1) ? '860px' : '560px';   // a wide film gets a wider window on a computer; anything else, the window's usual width
+  if (row && out) { row.hidden = !o.outside; if (o.outside) out.setAttribute('href', o.outside); else out.removeAttribute('href'); }
+  if (o.embed) {
+    // a frame shows the browser's own error page when offline, so say it in the app's words instead
+    if (navigator.onLine === false) playerSay('The clip needs an internet connection. Try again when you are online.');
+    else f.setAttribute('src', o.embed);
+  } else {
+    if (o.poster) v.setAttribute('poster', o.poster); else v.removeAttribute('poster');
+    v.onerror = function() {
+      if (!v.getAttribute('src')) return;   // let go of on purpose (playerStop)
+      playerSay(navigator.onLine === false ? 'The clip needs an internet connection. Try again when you are online.' : 'The clip could not be played here.');
+      syncLog('error', 'The player could not play a clip', { src: String(o.src).slice(0, 120), online: navigator.onLine !== false, code: v.error && v.error.code });
+    };
+    v.setAttribute('src', o.src);
+  }
   ov.classList.add('open');
-  if (typeof insightCount === 'function') insightCount('player');
+  if (typeof insightCount === 'function') insightCount(o.outside ? 'player-source' : 'player');
   // It was opened by a tap, so it may start by itself; where the browser says no, the ▶ on the picture is one tap away.
-  try { var p = v.play(); if (p && p.catch) p.catch(function() {}); } catch (e) {}
+  if (!o.embed) try { var p = v.play(); if (p && p.catch) p.catch(function() {}); } catch (e) {}
   return true;
 }
 function playerStop() {
-  var v = document.getElementById('playerVideo'); if (!v) return;
+  var v = document.getElementById('playerVideo'), f = document.getElementById('playerFrame'); if (!v) return;
   try { v.pause(); } catch (e) {}
   v.removeAttribute('src'); v.removeAttribute('poster');
   try { v.load(); } catch (e) {}
+  // A frame goes on playing after its address is taken away, so the frame itself is replaced by an empty one.
+  if (f && f.getAttribute('src')) { var n = f.cloneNode(false); n.removeAttribute('src'); n.hidden = true; f.parentNode.replaceChild(n, f); }
+  var t = document.getElementById('playerTitle'), row = document.getElementById('playerOutsideRow'), out = document.getElementById('playerOutside');
+  if (t) { t.removeAttribute('data-no-i18n'); t.removeAttribute('dir'); t.textContent = PLAYER_TITLE; }
+  if (row) row.hidden = true; if (out) out.removeAttribute('href');
   playerSay('');
 }
 function openTourClip() {
   var c = tourClip();
-  return openPlayer({ title: '\u{1F3AC} The app in one minute', src: c.src, poster: c.poster, aspect: '1 / 1' });
+  return openPlayer({ title: PLAYER_TITLE, src: c.src, poster: c.poster, aspect: '1 / 1' });
 }
 window.inviteClipLink = inviteClipLink; window.tourClip = tourClip; window.openPlayer = openPlayer; window.playerStop = playerStop; window.openTourClip = openTourClip;
+window.playerSource = playerSource; window.sourcePlay = sourcePlay;
 
 function askHelpQ(q) { document.getElementById('helpInput').value = (_i18nLang !== 'en' && _i18nDict && _i18nDict[q]) || q; askHelp(); }
 
@@ -38957,6 +39058,9 @@ function privacyEntries() {
     // v39.46 — a search in every language the recipes are in (Privacy Statement 1.14)
     { who: 'The kitchen dictionary (the app\u2019s own server)', when: 'only when you search and your recipes are in more than one language', on: true,
       sends: 'The word you searched for and the languages your recipes are in, to find how they write it. Each word and its translations are kept for everyone, without who searched; a word new to the dictionary goes to the AI (Anthropic) once.' },
+    // v39.74 — a recipe's video played inside the app (Privacy Statement 1.16)
+    { who: 'Video sites (YouTube, Vimeo, Instagram, Facebook, TikTok)', when: 'only when you play a recipe\u2019s video inside the app', on: !playerExternalOnly(),
+      sends: 'Nothing about you or your recipes. Your device loads the video from the site that hosts it, so that site sees its internet address and may set its own cookies, as when you open the video there. \u2699\uFE0F \u2192 \u{1F3A8} How it looks \u2192 \u201CUse external players only\u201D stops this.' },
     { who: 'Photo libraries (Pixabay, Pexels, Unsplash, Wikimedia Commons)', when: 'only when you search for a photo', on: true,
       sends: 'The search words, never your recipes. Your device then loads the pictures it shows from them, so they see its internet address, as any website does.' },
     { who: 'Public relay services', when: 'only when a page cannot be fetched any other way', on: true,

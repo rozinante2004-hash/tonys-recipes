@@ -147,6 +147,9 @@ async function windowsFit(page) {
     ['⚙️ Settings', "toggleDrop('settingsDrop')", '#settingsDrop', "closeDrop('settingsDrop')"],
     ['Help', 'openHelp()', '#helpOverlay', "document.getElementById('helpOverlay').classList.remove('open')"],
     ['the player', 'openTourClip()', '#playerOverlay', "closeM('playerOverlay')"],   // v39.72
+    // v39.74 — a recipe's source in the player: a tall clip (a reel) and a wide film, each with its "open outside" row (a stand-in address: nothing is fetched)
+    ['the player, a tall clip from a video site', "openPlayer({ title: '\u{1F3AC} Cook One\u2019s shakshuka with a rather long name', titleIsData: true, embed: 'about:blank#fit', aspect: '9 / 16', outside: 'https://example.com/v/1' })", '#playerOverlay', "closeM('playerOverlay')"],
+    ['the player, a wide film from a video site', "openPlayer({ title: '\u{1F3AC} Cook One\u2019s soup', titleIsData: true, embed: 'about:blank#fit', aspect: '16 / 9', outside: 'https://example.com/v/2' })", '#playerOverlay', "closeM('playerOverlay')"],
     ['👥 Family Access', 'openAccessControl()', '#accessOverlay', "document.getElementById('accessOverlay').classList.remove('open')"],
     ['📤 Share', 'toggleShare(9000)', '#shareRecipeOverlay', "document.getElementById('shareRecipeOverlay').classList.remove('open')"],
     ['a question', "askConfirm({ icon: '🔑', title: 'Reset their password?', message: 'Sends someone.with.a.long.address@example.com an e-mail.', okLabel: 'Send the e-mail' })", '#askOverlay', "document.getElementById('askOverlay').remove()"],

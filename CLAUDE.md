@@ -18,8 +18,9 @@ where.
 - The family's copy (`main`, https://rozinante2004-hash.github.io/tonys-recipes/ — it forwards to the community app)
   and the community app (`beta`, https://mykitchennotes.community, Firebase project my-kitchen-notes-beta) run
   **v39.72 + Worker v106** (released 14 Nov 2026, 00:39 Israel time, on 64d974a; the jobs are listed near the top
-  of `docs/history/2026-11.md`). **v39.73 is on Test** (the clip's link in the invitations, `clip.html`; Help: an
-  import brings no photo; the clips open on the logo) and waits for Tony's yes. The test copy (https://tonys-recipes-test.pages.dev, its own database and rules)
+  of `docs/history/2026-11.md`). **v39.73 and v39.74 are on Test** (v39.73: the clip's link in the
+  invitations, `clip.html`; Help: an import brings no photo; the clips open on the logo. v39.74: a recipe's video
+  source plays inside the app, ⚙️ "Use external players only", Privacy Statement 1.16) and wait for Tony's yes. The test copy (https://tonys-recipes-test.pages.dev, its own database and rules)
   follows `test`.
 - **The beta has had testers since Sunday 25 Oct 2026** and is **by invitation only**: the owner invites with
   ⚙️ → 👑 → ✉️ Invite testers (the congratulatory wording of v39.60); a tester's share button asks the owner for an
@@ -31,7 +32,7 @@ where.
   `docs/history/2026-11.md`, and update "Live now" here.
 - The rules were last published on 10 Nov 2026 (deploy-rules on 99558ae, success). A push to `test` that changes
   them publishes to the test project only; a release publishes to the family's and the beta's.
-- The Self Tests: **473 pass, 0 fail, 7 skipped** (the network ones) on v39.73, locally.
+- The Self Tests: **474 pass, 0 fail, 7 skipped** (the network ones) on v39.74, locally.
 
 **The audit of 10 Nov 2026 (`AUDIT-2026-11-10.md`) — Tony's answers of 11 Nov, and where each item is.** In the
 order of work; update this list as items land. Each change: Self Tests + knock-outs, the local checks, Help and
@@ -78,7 +79,10 @@ to `test`; releases only on his yes.
   from 🎬 Watch the one-minute clip in 💬 Ask About the App (Hebrew for a Hebrew interface, English otherwise; the
   files are in `media/`). **v39.73 on Test:** `clip.html`, a public page that plays the clip without the app, linked
   from the testers' invitations in the invitation's language; both files now open on the logo (a chat shows the
-  first frame). Still to come, on his word: other sources in the player (YouTube, a recipe's source clip).
+  first frame). **v39.74 on Test:** a recipe's video source plays in the player by default (YouTube, Vimeo,
+  Instagram, Facebook, TikTok, video files — `playerSource`); ⚙️ → 🎨 How it looks → 🎬 Use external players only
+  turns it off; a recipe's web page still opens in the browser. **Not verified from here: that each site's own
+  player really plays** (the video sites are not reachable) — Tony tries one of each on Test.
 - **Not doing** (Tony: no): U7 collapsing the help suggestions; F3 dropping `.doc`; the page's own photo for an
   import (copyright — *Decisions*).
 - **Still open from earlier audits, Tony's side:** restrict the community app's browser key in two stages (APIs
@@ -459,6 +463,7 @@ Look at the screenshots — that is what it is for. Not in CI (about 10 minutes)
 | **A local photo fix must reach the CLOUD.** | The cloud wins on every load — `loadFromFirestore` replaces `recipes` with the cloud copies and the local-photo net only fires when the cloud gives nothing. A rescue that only fixes memory is undone by the next reload, which is why Tony's photos "came back wrong" twice. `runPhotoRescue` awaits `pushLocalPhotosToCloud`; `healCloudPhotos` repairs a cloud already gone wrong. |
 | **Never take a web page's own photo (Tony, 11 Nov 2026).** | "If I save the page's photo, without giving credit to the owner of the photo (I probably won't know it) wouldn't it constitute as theft? I could be sued for it." A recipe's photo comes from the person (their own picture or a link they choose) or from the photo search (Pixabay, Pexels, Unsplash, Wikimedia Commons), which keeps the photographer's credit and licence (`photoCredit`). An import — a page's data (`image` from the Worker's `recipes`, v106), Open Graph, the AI's answer — never sets `r.photo`. |
 | **The app's owner is "מנהל האפליקציה" in Hebrew (Tony, 11 Nov 2026).** | "All should be referred to as "מנהל האפליקציה". Although I am indeed the App's owner, in this capacity I should be referred to as the App's manager." Never בעל/ת האפליקציה, הבעלים של האפליקציה, לבעלי האפליקציה, כלי הבעלים. A household's owner stays הבעלים (or "מנהל/ת משק הבית", his wording in three phrases — "The manager is indeed the admin in this case"). The translation prompt's rule 7a says so (v39.70); `tools/he-plural-overrides.json` carries every hand-set phrase into the central write. |
+| **A recipe's video source plays inside the app by default; "Use external players only" turns it off (Tony, 14 Nov 2026).** | "Please allow all sources in recipes to be played in the in-app player by default. However, let it be overwritten, if desired, by a checkbox in settings, called 'use external players only'." Played: what `playerSource` knows (a video site's own embedded player in a sandboxed frame, or a video file). **Not played: a recipe's web page** — sites refuse framing and the app cannot tell beforehand, so a page stays a link; nor short links that hide their target. Never add a host to `frame-src` without adding it to `playerSource`, the privacy panel and the Privacy Statement's row (1.16). The player always offers ↗ Open outside the app: the app cannot see whether a framed video played. |
 | **The one-minute clip: Hebrew for a Hebrew interface, English for every other language (Tony, 13 Nov 2026).** | "The Hebrew clip should be linked if the interface language is Hebrew. For all other languages link the English version. No point in linking both for everyone. Link it in the '💬 Ask About the App' modal." `tourClip()`. The clips play from the app's own site (`media/`), inside the app's player — no video site; "if installing the app is mandatory for the clip to be viewable, then it cannot be used as a marketing tool", so a link for people without the app must play in a plain browser. The service worker must keep leaving `media/` alone (a cached video cannot be seeked on an iPhone). |
 | **Sharing produces a file, not a public link.** | Publishing family recipes to a public endpoint is Tony's decision to make, not a share button's. |
 | **Declined:** 3.8 nutrition per-serving; 4.4 filter counts; 4.8 header touch targets. | Asked for and declined. Don't re-propose without reason. **5.6 (CI) was accepted in Aug 2026**; 3.1 (meal planner) is not declined but low priority — Tony cooks once a week. |

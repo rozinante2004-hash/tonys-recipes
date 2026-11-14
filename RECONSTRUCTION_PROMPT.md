@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v39.73` — app. **Worker: v106**, deployed separately and versioned separately
+**Current version:** `v39.74` — app. **Worker: v106**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -837,9 +837,36 @@ invitation-only (unless adding to the tester's household)."
   app's own site — `media-src 'self'`; the service worker does not touch `media/`, so the browser streams and seeks;
   `tools/build.js` refuses a copy without the four files. `tourClip(lang)`: **Hebrew when the interface is Hebrew,
   English for every other language** (Tony: "No point in linking both for everyone"). `openTourClip()` is the button
-  **🎬 Watch the one-minute clip** at the top of 💬 Ask About the App (`#helpClipBtn`). Meant to grow (Tony: "other
-  sources as well, like youtube and other clips from the source field") — not yet. How the clips are made:
+  **🎬 Watch the one-minute clip** at the top of 💬 Ask About the App (`#helpClipBtn`). It grew in v39.74 (next
+  point). How the clips are made:
   `docs/promo-clip.md`. Self Test `player_plays_the_clip`; `tests/phone-fit.js` opens it on the phone sizes.
+- **A recipe's source in the player (v39.74).** Tony: "Please allow all sources in recipes to be played in the in-app
+  player by default. However, let it be overwritten, if desired, by a checkbox in settings, called 'use external
+  players only'." `playerSource(url)` says what plays and how: YouTube (watch / youtu.be / Shorts / live, start time
+  kept) → `https://www.youtube-nocookie.com/embed/<id>?autoplay=1&playsinline=1&rel=0[&start=n]`; Vimeo →
+  `https://player.vimeo.com/video/<id>?autoplay=1`; Instagram `/p|reel|reels|tv/<code>` →
+  `https://www.instagram.com/<p|reel|tv>/<code>/embed/`; Facebook `/videos/<id>`, `watch?v=`, `/reel/<id>`,
+  `video.php?v=` → `https://www.facebook.com/plugins/video.php?href=<the address>&show_text=false`; TikTok
+  `/@user/video/<id>` → `https://www.tiktok.com/embed/v2/<id>`; an https link ending in a video or sound extension →
+  the `<video>`. Shorts, reels and TikTok are 9 / 16, the rest 16 / 9. **Anything else returns null and stays an
+  ordinary link** — above all a recipe's web page (sites refuse to be framed; the app cannot tell beforehand), and
+  short links that hide their target (fb.watch, vm.tiktok.com, Facebook share links). The window gained
+  `<iframe id="playerFrame" sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox
+  allow-presentation allow-forms" allowfullscreen allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+  referrerpolicy="strict-origin-when-cross-origin">` and a row under the picture: "If the clip does not play here,
+  open it outside the app." + **↗ Open outside the app** (`#playerOutside`). `openPlayer({ title, titleIsData,
+  aspect, outside, src | embed })`: the title of a source is the recipe's name with `data-no-i18n`; offline, an embed
+  is not loaded and the note says the clip needs a connection; `playerStop()` replaces the frame by an empty clone
+  (removing `src` does not stop a frame) and restores the window's own title. `sourceHtml(src, style, play)` — the
+  recipe view (`drawView`), `collectionSectionsHtml`, `openLinkedRecipeObj` and `giftLook` pass `{ title }`: the link
+  gets `onclick="return sourcePlay(event,this)"`, and, when playable and the setting is off, a `.src-play` ▶ and the
+  tooltip "Plays here, inside the app"; `sourcePlay` leaves Ctrl/⌘/Shift/Alt/middle clicks alone. The e-mailed
+  recipe's link stays plain. **The setting:** ⚙️ → 🎨 How it looks → 🎬 Use external players only (a checkbox,
+  `mkn_player_external` = '1' on this device, default off; `playerExternalOnly()`, `playerExternalSet()`,
+  refreshed by `accessRefreshSettings`). CSP: `frame-src` + the five players' sites, `media-src` + `https:`. Privacy:
+  an entry "Video sites (…)" in What leaves this device (on = the setting is off) and Privacy Statement **1.16**
+  (14 Nov 2026), a row in all 11 pages. Self Test `player_plays_a_recipes_source`; `tests/phone-fit.js` opens a tall
+  and a wide framed video.
 - **The clip's public page and the invitation's link (v39.73).** `clip.html` at the site's root plays the clip for
   someone who has no app and no account (Tony: "if installing the app is mandatory for the clip to be viewable, then
   it cannot be used as a marketing tool"): the icon, the name, one `<video controls playsinline preload="none">`, two
