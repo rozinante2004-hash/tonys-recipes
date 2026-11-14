@@ -21385,7 +21385,7 @@ window.SELF_TESTS = [
         try{ if(keepPref==null) localStorage.removeItem(PLAYER_EXTERNAL_KEY); else localStorage.setItem(PLAYER_EXTERNAL_KEY, keepPref); }catch(e){}
       }
     } },
-  { id:'scale_dynamic', group:'Features', name:'Dynamic: change the servings or any one amount and every other amount, the servings and the Method follow (v39.76)',
+  { id:'scale_dynamic', group:'Features', name:'Dynamic: change the servings or any one amount and every other amount, the servings and the Method follow — as it is typed (v39.76, v39.78)',
     test: async()=>{
       // Tony, 14 Nov 2026: "Please reduce the scaling ingredients options from 0.5 -6 to 0.5-4 and add, at the end of the line a
       // new button called "Dynamic". Selecting this option will open up both the servings and amount of ingredients to changes
@@ -21395,7 +21395,9 @@ window.SELF_TESTS = [
       try{ prevUnitPref=localStorage.getItem(VIEW_UNIT_KEY); localStorage.removeItem(VIEW_UNIT_KEY); }catch(e){}
       var $$=function(sel){ return document.querySelector('#viewModal '+sel); };
       var box=function(i){ return $$('.dyn-amt[data-dyn="ing-'+i+'"]'); };
-      var type=function(el, text){ el.value=text; el.dispatchEvent(new Event('change', { bubbles:true })); };
+      // a keystroke (the box still in hand), and typing-then-leaving
+      var key=function(el, text){ el.value=text; el.dispatchEvent(new Event('input', { bubbles:true })); };
+      var type=function(el, text){ key(el, text); el.dispatchEvent(new Event('change', { bubbles:true })); };
       var amounts=function(){ return Array.prototype.map.call(document.querySelectorAll('#viewModal .ingredients-list li'), function(li){ var i=li.querySelector('.dyn-amt'), r=li.querySelector('.dyn-rest'); return i ? i.value+(r?r.textContent:'') : li.querySelector('.ing-amount').textContent; }); };
       var steps=function(){ return Array.prototype.map.call(document.querySelectorAll('#viewModal .steps-list .step-text'), function(x){ return x.textContent; }).join(' / '); };
       try{
@@ -21422,6 +21424,32 @@ window.SELF_TESTS = [
         if(amounts().join(' | ')!=='500 g | 150 g | 3 | 1/2 tsp | 2-3 tbsp | a pinch') throw new Error('opening the boxes changed the amounts: '+amounts().join(' | '));
         if(!$$('.dyn-hint') || !$$('.serv-input.dyn-open') || $$('.serv-input').value!=='4') throw new Error('the servings box or the line that says what to do is missing');
         if(box(0).getAttribute('aria-label')!=='flour' || box(0).getAttribute('inputmode')!=='decimal') throw new Error('a box does not say which ingredient it is, or asks for letters');
+        // v39.78 — Tony: "The values in Dynamic should be updated as I type." Key by key, the box still in hand: the others
+        // move at once, and nothing is redrawn — the same boxes, the place kept, the Method's timer and marks untouched.
+        var flour=box(0), sugar=box(1), timer=$$('.cook-timer-btn'), step0=$$('.steps-list li[data-line="step-0"]');
+        if(!timer || !step0) throw new Error('the stand-in recipe has no timed step to watch');
+        step0.classList.add('ticked');
+        flour.focus();
+        key(flour, '3');
+        if(viewMult!==1 || sugar.value!=='150') throw new Error('3 of 500 g is no recipe (a 167th): the others should wait, got ×'+viewMult+', sugar '+sugar.value);
+        key(flour, '30');
+        if(Math.abs(viewMult-0.06)>1e-9 || sugar.value!=='9') throw new Error('typing does not move the others until the box is left: ×'+viewMult+', sugar '+sugar.value);
+        key(flour, '300');
+        if(Math.abs(viewMult-0.6)>1e-9 || amounts().join(' | ')!=='300 g | 90 g | 1.75 | 0.3 tsp | 1.25-1.75 tbsp | a pinch') throw new Error('as typed, after 300: '+amounts().join(' | '));
+        if($$('.serv-input').value!=='2.4' || steps().indexOf('300 g flour with 90 g sugar')===-1 || steps().indexOf('1.75 eggs')===-1) throw new Error('as typed, the servings or the Method did not follow: '+$$('.serv-input').value+' / '+steps());
+        if(box(0)!==flour || box(1)!==sugar) throw new Error('typing redrew the boxes: on a phone that closes the keyboard, and a tap into the next box lands on nothing');
+        if(document.activeElement!==flour || flour.value!=='300') throw new Error('typing lost the place in the box');
+        if($$('.cook-timer-btn')!==timer || $$('.steps-list li[data-line="step-0"]')!==step0 || !step0.classList.contains('ticked')) throw new Error('typing replaced a step’s timer, or lost its tick');
+        if(!$$('.scale-warning') || $$('.scale-warning').textContent.indexOf('eggs')===-1) throw new Error('1.75 eggs, and no word that eggs cannot be split');
+        if(!$$('.serv-reset') || $$('.serv-reset').hidden) throw new Error('no way back to the recipe as written appeared');
+        // half-typed is not a number: the others wait, the box keeps what is in it — and gives it up when left
+        key(flour, '30x');
+        if(Math.abs(viewMult-0.6)>1e-9 || sugar.value!=='90' || flour.value!=='30x') throw new Error('a half-typed amount moved the recipe, or was taken out of the box mid-word');
+        flour.dispatchEvent(new Event('change', { bubbles:true }));
+        if(box(0)!==flour || flour.value!=='300') throw new Error('leaving the box with junk in it did not put the amount back: '+flour.value);
+        key(box(2), '2'); if($$('.scale-warning')) throw new Error('two whole eggs, and the note about splitting eggs is still there');
+        key(flour, '500'); if(viewMult!==1 || !$$('.serv-reset').hidden) throw new Error('back at the recipe as written, “reset” is still offered');
+        step0.classList.remove('ticked');
         // one amount changed: everything moves by the same share — the other amounts, the servings, the Method
         type(box(0), '300'); await wait(30);
         if(Math.abs(viewMult-0.6)>1e-9) throw new Error('300 of 500 is ×0.6, got '+viewMult);
@@ -21469,7 +21497,8 @@ window.SELF_TESTS = [
         if(Math.abs(viewMult-2)>1e-6) throw new Error('twice the imperial amount is not ×2: '+viewMult);
         // Help knows it, with the new range of the buttons
         var k=String(HELP_SYSTEM_PROMPT);
-        if(!/DYNAMIC SCALING \(v39\.76\)/.test(k) || !/×0\.5–×4/.test(k) || /×0\.5–×6/.test(k)) throw new Error('Help does not know Dynamic, or still offers ×6');
+        if(!/DYNAMIC SCALING \(v39\.76/.test(k) || !/×0\.5–×4/.test(k) || /×0\.5–×6/.test(k)) throw new Error('Help does not know Dynamic, or still offers ×6');
+        if(!/AS YOU TYPE every other amount/.test(k) || /then tap outside the box \(or press Enter/.test(k)) throw new Error('Help still says the others move only when the box is left');
       } finally {
         try{ localStorage.removeItem('scale_'+testId); localStorage.removeItem('scale_dyn_'+testId); }catch(e){}
         try{ if(prevUnitPref==null) localStorage.removeItem(VIEW_UNIT_KEY); else localStorage.setItem(VIEW_UNIT_KEY, prevUnitPref); }catch(e){}

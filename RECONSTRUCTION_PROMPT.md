@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v39.77` — app. **Worker: v106**, deployed separately and versioned separately
+**Current version:** `v39.78` — app. **Worker: v106**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -2765,10 +2765,17 @@ deliberately incapable of reaching any function that writes data.
   a text box that takes any number, and `ingredientLinesHtml` draws each amount that begins with a number
   (`dynBase(cv) !== null`, on the amount AFTER unit conversion and BEFORE scaling) as `<input class="dyn-amt"
   inputmode="decimal" data-dyn="<line key>" data-base="<its own number>" aria-label="<the ingredient>">` followed by
-  the rest of the amount as words (`.dyn-rest`: the unit, or "-3 tbsp" of a range). On `change` (leaving the box,
-  Enter) `dynAmountChanged` sets `viewMult = dynParse(typed) / base` through `setMult(m, { key, text })`; the
-  `viewDynAnchor` it leaves makes the box typed in show exactly what was typed, while every other value is the usual
-  `scaleAmt` + `fmtAmt` rounding. `dynParse`: 300, 1.5, 1,5, 3/4, 1 1/2, ½, 1½ — NaN otherwise; a value ≤ 0, junk or
+  the rest of the amount as words (`.dyn-rest`: the unit, or "-3 tbsp" of a range). **As it is typed (v39.78; Tony:
+  "The values in Dynamic should be updated as I type.")**: `oninput="dynLive(this)"` — when the box holds a number
+  whose share is between ×0.01 and ×100, `viewMult = dynParse(typed) / base`, `viewDynAnchor = { key, text }`, the
+  scale is saved, and `dynRefresh(this)` updates IN PLACE (the view is never redrawn while typing — a redraw replaces
+  the box in hand and closes a phone's keyboard): every other `.dyn-amt` (from its `data-cv`, the amount after unit
+  conversion and before scaling) and `.dyn-rest`, the servings box (`data-dyn="servings"`, `data-base`), the
+  `.serv-reset` button's `hidden`, the ⚠️ note under each ingredient list (`dynRefreshWarnings` with `awkNoteHtml`),
+  and the words of each step (`dynRefreshSteps`: `stepLinesHtml` again into a detached list, then only the nodes
+  before a step's timer `<br>` are swapped — ticks, marks and ⏱ buttons stay). On `change` (`dynSettle`) a box that
+  does not hold such a number gets the recipe's own number back. The `viewDynAnchor` makes the box typed in show
+  exactly what was typed, while every other value is the usual `scaleAmt` + `fmtAmt` rounding. `dynParse`: 300, 1.5, 1,5, 3/4, 1 1/2, ½, 1½ — NaN otherwise; a value ≤ 0, junk or
   a share outside 0.01–100 just redraws. `dynNumber` shows the servings (whole, or one decimal). A tap in a box stops
   at the box (`event.stopPropagation()`), so it does not mark the line. A multiple turns Dynamic off; Dynamic again
   turns it off and keeps the scale. A line `.dyn-hint` under the row says what to do. The recipe is never changed.

@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.77 -->
+<!-- Tony's Recipes Collection v39.78 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -11134,7 +11134,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.77';
+var APP_VERSION = 'v39.78';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -13070,6 +13070,7 @@ body:has(.modal-overlay.open) #pwaIosBanner, body:has(#askOverlay) #pwaIosBanner
 .dyn-amt:focus-visible, .serv-input.dyn-open:focus-visible { outline: 3px solid var(--focus-ring, var(--terracotta)); outline-offset: 1px; }
 .dyn-rest { margin-inline-start: 5px; }
 .serv-input.dyn-open { border-color: var(--terracotta); width: 66px; font-size: 16px; }
+.serv-reset[hidden] { display: none; }
 .dyn-hint { font-size: 12.5px; color: var(--muted); margin: 2px 0 12px; line-height: 1.45; }
 .ticked .dyn-amt { opacity: 0.55; }
 .steps-list { list-style: none; }
@@ -14688,7 +14689,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.77</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.78</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14776,7 +14777,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.77</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.78</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -22907,17 +22908,88 @@ function dynNumber(n) {
 function dynAmountHtml(key, cv, sc, name) {
   var m = String(sc).match(/^([\d./]+)([\s\S]*)$/) || ['', String(sc), ''];
   var shown = (viewDynAnchor && viewDynAnchor.key === key) ? viewDynAnchor.text : m[1];
-  return '<input class="dyn-amt" type="text" inputmode="decimal" autocomplete="off" data-dyn="' + escA(key) + '" data-base="' + dynBase(cv) + '" value="' + escA(shown) + '"'
-    + ' aria-label="' + escA(name) + '" onclick="event.stopPropagation()" onkeydown="if(event.key===\'Enter\'){event.preventDefault();this.blur();}" onchange="dynAmountChanged(this)">'
+  return '<input class="dyn-amt" type="text" inputmode="decimal" autocomplete="off" data-dyn="' + escA(key) + '" data-base="' + dynBase(cv) + '" data-cv="' + escA(cv) + '" value="' + escA(shown) + '"'
+    + ' aria-label="' + escA(name) + '" onclick="event.stopPropagation()" onkeydown="if(event.key===\'Enter\'){event.preventDefault();this.blur();}" oninput="dynLive(this)" onchange="dynSettle(this)">'
     + (m[2] ? '<span class="dyn-rest">' + escH(m[2]) + '</span>' : '');
 }
-// A new amount typed: the whole recipe moves by the same share. Junk, zero or a share beyond reason puts the box back.
-function dynAmountChanged(el) {
+// ─── …AS YOU TYPE (v39.78) ────────────────────────────────────────────────────
+// Tony, 14 Nov 2026, on v39.76 (which moved the others only when the box was left): "The values in Dynamic should be
+// updated as I type." So every keystroke that makes a number moves the recipe — and it must do so WITHOUT redrawing the
+// view: a redraw replaces the box being typed in, and on a phone that closes the keyboard (and a tap from one box into
+// the next landed on a box that had just been replaced). dynRefresh changes, in place, only what a scale changes: the
+// other boxes and the words beside them, the servings, "reset to …", the ⚠️ note, and the Method's text — leaving the
+// box in hand, the ticks, the marker and any running timer as they are.
+// A keystroke: true when what is in the box is a number the recipe can follow; false ("", "1/", "abc") — the others wait.
+function dynLive(el) {
+  if (!viewDynamic || !el) return false;
   var v = dynParse(el.value), base = parseFloat(el.getAttribute('data-base')), m = v / base;
-  if (!(v > 0) || !(base > 0) || !(m >= 0.01) || !(m <= 100)) { drawView(); return false; }
-  if (typeof insightCount === 'function') insightCount('scale-dynamic', 'scale-dynamic:' + viewId);
-  setMult(m, { key: el.getAttribute('data-dyn'), text: String(el.value).trim() });
+  if (!(v > 0) || !(base > 0) || !(m >= 0.01) || !(m <= 100)) return false;
+  viewMult = m;
+  viewDynAnchor = { key: el.getAttribute('data-dyn'), text: String(el.value).trim() };
+  try { if (viewId != null) localStorage.setItem('scale_' + viewId, String(m)); } catch(e) {}
+  dynRefresh(el);
   return true;
+}
+// The box is left (or Enter): whatever is in it that is not a number goes back to what the recipe shows.
+function dynSettle(el) {
+  if (!viewDynamic || !el) return false;
+  if (dynLive(el)) { if (typeof insightCount === 'function') insightCount('scale-dynamic', 'scale-dynamic:' + viewId); return true; }
+  viewDynAnchor = null;
+  dynRefresh(null);
+  return false;
+}
+// Everything a scale shows, brought up to viewMult where it stands — the box in hand (`inHand`) keeps its own text.
+function dynRefresh(inHand) {
+  var modal = document.getElementById('viewModal'); if (!modal) return;
+  var r = recipes.find(function(x){ return x.id === viewId; });
+  Array.prototype.forEach.call(modal.querySelectorAll('.dyn-amt'), function(inp) {
+    var sc = scaleAmt(inp.getAttribute('data-cv'), viewMult), mm = String(sc).match(/^([\d./]+)([\s\S]*)$/) || ['', String(sc), ''];
+    if (inp !== inHand) inp.value = mm[1];
+    var rest = inp.parentNode ? inp.parentNode.querySelector('.dyn-rest') : null;
+    if (rest) rest.textContent = mm[2];            // the far end of a range follows its near end, in the line in hand too
+  });
+  var sv = modal.querySelector('.serv-input.dyn-open'), base = r ? parseServings(r.servings) : null;
+  if (sv && sv !== inHand && base !== null) sv.value = dynNumber(base * viewMult);
+  var reset = modal.querySelector('.serv-reset'); if (reset) reset.hidden = (viewMult === 1);
+  dynRefreshWarnings(modal);
+  dynRefreshSteps(r, modal);
+}
+// "⚠️ eggs can't be split": the same note the view draws, kept true to the amounts as they stand now.
+function awkNoteHtml(awk) {
+  return (awk && awk.length)
+    ? '<div class="scale-warning" dir="auto">⚠️ ' + escH(awk.slice(0,3).join(', '))
+      + (awk.length > 3 ? ' and ' + (awk.length - 3) + ' more' : '')
+      + ' can\'t be split — round up or down, or pick a serving count that divides evenly.</div>'
+    : '';
+}
+function dynRefreshWarnings(modal) {
+  Array.prototype.forEach.call(modal.querySelectorAll('.recipe-col-ings'), function(col) {
+    var ul = col.querySelector('.ingredients-list'); if (!ul) return;
+    var awk = [];
+    Array.prototype.forEach.call(ul.querySelectorAll('.dyn-amt'), function(inp) {
+      var name = inp.getAttribute('aria-label') || '';
+      if (awkwardCount(name, scaleAmt(inp.getAttribute('data-cv'), viewMult))) awk.push(name);
+    });
+    var old = col.querySelector('.scale-warning'), html = awkNoteHtml(awk);
+    if (!html) { if (old) old.parentNode.removeChild(old); return; }
+    if (old) old.outerHTML = html; else ul.insertAdjacentHTML('afterend', html);
+  });
+}
+// The Method's words again, at the scale as it stands — each step's text only: its tick, its mark and its ⏱ stay.
+function dynRefreshSteps(r, modal) {
+  if (!r) return;
+  var html = isCollection(r)
+    ? recipeParts(r).map(function(p, pi) { return stepLinesHtml(p.steps, 'step-p' + pi, 'p' + pi + '-', p.ingredients, rlPrep(p.links, '')); }).join('')
+    : stepLinesHtml(r.steps, 'step', '', r.ingredients, rlPrep(r.links, ''));
+  var fresh = document.createElement('ol'); fresh.innerHTML = html;
+  var timersFrom = function(span) { var t = span.querySelector('.cook-timer-btn'); return (t && t.previousSibling && t.previousSibling.nodeName === 'BR') ? t.previousSibling : null; };
+  Array.prototype.forEach.call(fresh.querySelectorAll('li[data-line]'), function(li) {
+    var a = li.querySelector('.step-text'), live = modal.querySelector('.steps-list li[data-line="' + li.getAttribute('data-line') + '"]'), b = live ? live.querySelector('.step-text') : null;
+    if (!a || !b) return;
+    var stopA = timersFrom(a), stopB = timersFrom(b);
+    while (b.firstChild && b.firstChild !== stopB) b.removeChild(b.firstChild);
+    while (a.firstChild && a.firstChild !== stopA) b.insertBefore(a.firstChild, stopB);
+  });
 }
 function dynRemember() { try { if (viewId != null) { if (viewDynamic) localStorage.setItem('scale_dyn_' + viewId, '1'); else localStorage.removeItem('scale_dyn_' + viewId); } } catch(e) {} }
 // The Dynamic button: opens the boxes at whatever scale the recipe is shown in; again, and they close (the scale stays).
@@ -22932,7 +23004,7 @@ function toggleDynamic(on) {
 // ×0.5 … ×4: that multiple, and the boxes closed — the row is one choice.
 function multPreset(m) { viewDynamic = false; dynRemember(); setMult(m); }
 window.dynBase = dynBase; window.dynParse = dynParse; window.dynNumber = dynNumber; window.dynAmountHtml = dynAmountHtml;
-window.dynAmountChanged = dynAmountChanged; window.toggleDynamic = toggleDynamic; window.multPreset = multPreset;
+window.dynLive = dynLive; window.dynSettle = dynSettle; window.dynRefresh = dynRefresh; window.awkNoteHtml = awkNoteHtml; window.toggleDynamic = toggleDynamic; window.multPreset = multPreset;
 // The step number counts REAL steps only — a heading takes no number, so
 // "Brine option #1" sitting between steps 3 and 4 must not make the next one 5.
 function stepLinesHtml(lines, pfx, timerPfx, ings, lk) {
@@ -23166,11 +23238,7 @@ function collectionSectionsHtml(r) {
     var ings  = ingredientLinesHtml(p.ingredients, 'ing-p' + pi, awk, lk);
     var steps = stepLinesHtml(p.steps, 'step-p' + pi, 'p' + pi + '-', p.ingredients, lk);
 
-    var awkNote = awk.length
-      ? '<div class="scale-warning" dir="auto">⚠️ ' + escH(awk.slice(0,3).join(', '))
-        + (awk.length > 3 ? ' and ' + (awk.length - 3) + ' more' : '')
-        + ' can\'t be split — round up or down, or pick a serving count that divides evenly.</div>'
-      : '';
+    var awkNote = awkNoteHtml(awk);
 
     // v39.47 — each piece in an element of its own: the by-line, the servings and the time are the recipe's words
     // (marked as data, shown as the open recipe shows them: 🍽 4, ⏱ 20 min), the meal type and the level are the
@@ -23812,11 +23880,7 @@ function drawView(){
   var _awkward = [], lkR = rlPrep(r.links, '');   // v39.53 — its links to other recipes
   const ings = ingredientLinesHtml(r.ingredients, 'ing', _awkward, lkR);
   // 3.3 — don't pretend "1.5 eggs" is a measurement; say what to do about it.
-  const awkwardNote = _awkward.length
-    ? `<div class="scale-warning" dir="auto">⚠️ ${escH(_awkward.slice(0,3).join(', '))}`
-      + `${_awkward.length>3 ? ' and '+(_awkward.length-3)+' more' : ''}`
-      + ` can't be split — round up or down, or pick a serving count that divides evenly.</div>`
-    : '';
+  const awkwardNote = awkNoteHtml(_awkward);
   requestWakeLock();
   document.getElementById('viewModal').innerHTML=`
     <div style="position:sticky;top:60px;display:flex;justify-content:flex-end;padding:0 8px;z-index:20;pointer-events:none;">
@@ -23880,11 +23944,11 @@ function drawView(){
         return `<div class="servings-row">
           <span class="control-label" style="margin:0;">Make it for</span>
           <button class="serv-step" onclick="nudgeServings(-1)" aria-label="One fewer serving">−</button>
-          <input class="serv-input${viewDynamic?' dyn-open':''}" ${viewDynamic ? 'type="text" inputmode="decimal" autocomplete="off"' : 'type="number" min="1" max="200"'} value="${escA(shown)}"
-                 onchange="servingsInputChanged(this)" aria-label="Target servings">
+          <input class="serv-input${viewDynamic?' dyn-open':''}" ${viewDynamic ? 'type="text" inputmode="decimal" autocomplete="off" data-dyn="servings" data-base="' + base + '" oninput="dynLive(this)" onkeydown="if(event.key===\'Enter\'){event.preventDefault();this.blur();}"' : 'type="number" min="1" max="200"'} value="${escA(shown)}"
+                 onchange="${viewDynamic ? 'dynSettle(this)' : 'servingsInputChanged(this)'}" aria-label="Target servings">
           <button class="serv-step" onclick="nudgeServings(1)" aria-label="One more serving">+</button>
           <span class="control-label" style="margin:0;">servings</span>
-          ${viewMult !== 1 ? `<button class="serv-reset" onclick="setMult(1)">reset to ${base}</button>` : ''}
+          ${(viewMult !== 1 || viewDynamic) ? `<button class="serv-reset"${viewMult === 1 ? ' hidden' : ''} onclick="setMult(1)">reset to ${base}</button>` : ''}
           ${exact ? `<span class="serv-note">≈ rounded</span>` : ''}
         </div>`;
       })()}
@@ -24037,13 +24101,7 @@ function nudgeServings(delta){
   setServings(Math.round(cur) + delta);
 }
 function servingsInputChanged(el){
-  if (viewDynamic) {   // v39.76 — Dynamic: any number of servings (2.5), exactly as typed, and everything follows
-    var r0 = recipes.find(function(x){ return x.id===viewId; }), b0 = r0 ? parseServings(r0.servings) : null, d = dynParse(el.value);
-    if (b0 === null || !(d > 0) || !(d / b0 >= 0.01) || !(d / b0 <= 100)) { drawView(); return; }
-    if (typeof insightCount === 'function') insightCount('scale', 'scale:' + viewId);
-    setMult(d / b0, { key: 'servings', text: String(el.value).trim() });
-    return;
-  }
+  if (viewDynamic) { dynSettle(el); return; }   // v39.78 — in Dynamic the box moves the recipe as it is typed in (dynLive)
   var v = parseInt(el.value, 10);
   if (isNaN(v) || v < 1) { drawView(); return; }   // reject junk, restore the real value
   setServings(v);
@@ -35916,7 +35974,7 @@ var HELP_SYSTEM_PROMPT = [
   "=== VIEWING A RECIPE ===",
   "- Tap any recipe card to open it",
   "- Scale ingredients: use the ×0.5–×4 multiplier buttons (×0.5 halves a recipe), or Dynamic (next line)",
-  "- DYNAMIC SCALING (v39.76): in a recipe, the last button of the Scale ingredients row is Dynamic. Tap it and the number of servings and every ingredient's amount become boxes you can type in. Type a new number in ANY one of them — say you only have 300 g of flour where the recipe asks for 500 g, or you want it for 5 people — then tap outside the box (or press Enter / Done): every other amount, the servings, and the amounts mentioned in the Method all change by the same share, so the recipe keeps its proportions. The box you typed in keeps exactly what you typed; the others are rounded to what a cook can measure. An amount with no number (a pinch, to taste) stays as words. Amounts are typed in the units shown (Metric / Imperial). Tapping ×0.5–×4 goes back to that multiple and closes the boxes; tapping Dynamic again closes them and keeps the scale; 'reset to …' beside the servings returns to the recipe as written. Nothing is changed in the recipe itself — it is only how it is shown on this device, and it is remembered per recipe, like any scale. What you send to Bring! follows it too.",
+  "- DYNAMIC SCALING (v39.76, as you type since v39.78): in a recipe, the last button of the Scale ingredients row is Dynamic. Tap it and the number of servings and every ingredient's amount become boxes you can type in. Type a new number in ANY one of them — say you only have 300 g of flour where the recipe asks for 500 g, or you want it for 5 people — and AS YOU TYPE every other amount, the servings, and the amounts mentioned in the Method all change by the same share, so the recipe keeps its proportions (v39.78; nothing to press — you can go straight from one box to the next). The box you typed in keeps exactly what you typed; the others are rounded to what a cook can measure. An amount with no number (a pinch, to taste) stays as words. Amounts are typed in the units shown (Metric / Imperial). Tapping ×0.5–×4 goes back to that multiple and closes the boxes; tapping Dynamic again closes them and keeps the scale; 'reset to …' beside the servings returns to the recipe as written. Nothing is changed in the recipe itself — it is only how it is shown on this device, and it is remembered per recipe, like any scale. What you send to Bring! follows it too.",
   "- Metric / Imperial (in the recipe) shows its amounts the other way, on this device; ⚙️ → 🎨 How it looks → 📏 Units sets it for every recipe. The recipe itself is not changed",
   "- Hebrew recipes: method steps are right-aligned with step numbers on the right",
   "- Tap the photo to change it: upload one from the device, or 🔍 search the web — the free photo libraries Pexels, Unsplash and Pixabay, then Wikimedia Commons; 🔄 See more shows the next library at once. Where a photo's licence asks for it, the photographer's credit is kept with it and shown under the photo",
