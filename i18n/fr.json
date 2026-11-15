@@ -1,7 +1,7 @@
 {
  "lang": "fr",
  "updatedAt": 1794723554958,
- "count": 2875,
+ "count": 2878,
  "strings": {
   "\"Add to Home Screen\"": "Ajouter à l'écran d'accueil",
   "\"Open Bring!\"": "Ouvrir Bring!",
@@ -858,6 +858,7 @@
   "One fewer serving": "Une portion de moins",
   "One more serving": "Une portion de plus",
   "One tap — then share recipes from Facebook, Instagram or any app.": "Un appui — puis partagez des recettes depuis Facebook, Instagram ou n'importe quelle appli.",
+  "Only if someone sent you a link to their own kitchen.": "Seulement si quelqu’un vous a envoyé un lien vers sa propre cuisine.",
   "Only members can become the owner. Invite someone first; once they have joined, you can hand {1} over.": "Seuls les membres peuvent devenir propriétaire. Invitez d'abord quelqu'un ; une fois qu'il a rejoint, vous pourrez lui confier {1}.",
   "Only the app’s owner can open this.": "Seul le propriétaire de l'app peut ouvrir ceci.",
   "Only the app’s owner can send invitations.": "Seul le propriétaire de l'app peut envoyer des invitations.",
@@ -1660,6 +1661,7 @@
   "You own {1}, and other people are in {2}. Why this is needed: a collection always has an owner — the one person who can add and remove people, rename it, and decide what happens to it. If your account went while you are its owner, the others would be left with recipes nobody can manage, and no way to invite anyone new. So, either: • Hand {3} over to someone in it (⚙️ → 🏠 My household → 👥 Family Access → 👑 Hand over…). Everything stays, for everyone; they become the owner. • Or delete {4} (same place, 🗑 Delete this household…) — its recipes go, for everyone. Then come back here to delete your account.": "Vous êtes propriétaire de {1}, et d'autres personnes sont dans {2}. Pourquoi c'est nécessaire : une collection a toujours un propriétaire — la seule personne qui peut ajouter et retirer des membres, la renommer, et décider de son sort. Si votre compte disparaissait pendant que vous en êtes propriétaire, les autres se retrouveraient avec des recettes que personne ne peut gérer, et aucun moyen d'inviter quelqu'un de nouveau. Donc, soit : • Transférez {3} à quelqu'un dedans (⚙️ → 🏠 Mon foyer → 👥 Accès famille → 👑 Transférer…). Tout reste, pour tout le monde ; cette personne devient propriétaire. • Ou supprimez {4} (au même endroit, 🗑 Supprimer ce foyer…) — ses recettes disparaissent, pour tout le monde. Puis revenez ici pour supprimer votre compte.",
   "You read this kitchen’s recipes": "Vous lisez les recettes de cette cuisine",
   "You see each other’s recipes, read-only.": "Vous voyez les recettes de l'autre, en lecture seule.",
+  "You were invited to test the app — welcome! 🎉 Your invitation is already recognised, so all that is left is to start your own recipe collection.": "Vous avez été invité à tester l’application — bienvenue ! 🎉 Votre invitation est déjà reconnue : il ne reste plus qu’à créer votre propre collection de recettes.",
   "You will no longer see its recipes. Someone in it can invite you back.": "Vous ne verrez plus ses recettes. Quelqu'un du foyer peut vous réinviter.",
   "You wrote on {1}:": "Vous avez écrit le {1} :",
   "You wrote:": "Vous avez écrit :",
@@ -2734,6 +2736,7 @@
   "🔗 Import from URL": "🔗 Importer depuis une URL",
   "🔗 Invitation link…": "🔗 Lien d'invitation…",
   "🔗 Invite someone to my kitchen": "🔗 Inviter quelqu'un dans ma cuisine",
+  "🔗 Join someone else’s kitchen (I have their link)": "🔗 Rejoindre la cuisine de quelqu’un d’autre (j’ai son lien)",
   "🔗 Join with an invitation…": "🔗 Rejoindre avec une invitation…",
   "🔗 Link to a recipe": "🔗 Lier à une recette",
   "🔗 Linked to “{1}”": "🔗 Lié à « {1} »",

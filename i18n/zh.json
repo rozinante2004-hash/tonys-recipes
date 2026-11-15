@@ -1,7 +1,7 @@
 {
  "lang": "zh",
  "updatedAt": 1794723554958,
- "count": 2879,
+ "count": 2882,
  "strings": {
   "\"Add to Home Screen\"": "添加到主屏幕",
   "\"Open Bring!\"": "打开 Bring!",
@@ -858,6 +858,7 @@
   "One fewer serving": "减少一份",
   "One more serving": "增加一份",
   "One tap — then share recipes from Facebook, Instagram or any app.": "轻点一下——即可从 Facebook、Instagram 或任意应用分享食谱。",
+  "Only if someone sent you a link to their own kitchen.": "仅当有人把他自己厨房的链接发给你时。",
   "Only members can become the owner. Invite someone first; once they have joined, you can hand {1} over.": "只有成员才能成为所有者。先邀请对方加入，等他们加入后，你就可以把{1}交给他们。",
   "Only the app’s owner can open this.": "只有 App 所有者能打开此项。",
   "Only the app’s owner can send invitations.": "只有应用所有者可以发送邀请。",
@@ -1660,6 +1661,7 @@
   "You own {1}, and other people are in {2}. Why this is needed: a collection always has an owner — the one person who can add and remove people, rename it, and decide what happens to it. If your account went while you are its owner, the others would be left with recipes nobody can manage, and no way to invite anyone new. So, either: • Hand {3} over to someone in it (⚙️ → 🏠 My household → 👥 Family Access → 👑 Hand over…). Everything stays, for everyone; they become the owner. • Or delete {4} (same place, 🗑 Delete this household…) — its recipes go, for everyone. Then come back here to delete your account.": "你拥有 {1}，其他人在 {2} 中。为什么需要这样做：一个集合总要有一个拥有者——即唯一能添加和移除成员、重命名、决定其去留的人。如果你的账户在你还是拥有者时注销，其他人就会留下一堆没人能管理的食谱，也无法邀请新成员。所以，你可以：• 把 {3} 交给其中的某个人（⚙️ → 🏠 我的家庭 → 👥 家庭访问 → 👑 移交…）。一切都会保留，对所有人都是；对方将成为拥有者。• 或者删除 {4}（同一位置，🗑 删除此家庭…）——其食谱会对所有人消失。之后再回来删除你的账户。",
   "You read this kitchen’s recipes": "你可以查看这个厨房的食谱",
   "You see each other’s recipes, read-only.": "你们可以互相查看对方的食谱，但不能修改。",
+  "You were invited to test the app — welcome! 🎉 Your invitation is already recognised, so all that is left is to start your own recipe collection.": "你受邀测试这款应用——欢迎!🎉 你的邀请已被识别,只需创建你自己的食谱合集即可。",
   "You will no longer see its recipes. Someone in it can invite you back.": "你将不再看到其中的食谱。组内的人可以再次邀请你。",
   "You wrote on {1}:": "你在 {1} 写道：",
   "You wrote:": "你写道：",
@@ -2737,6 +2739,7 @@
   "🔗 Import from URL": "🔗 从链接导入",
   "🔗 Invitation link…": "🔗 邀请链接…",
   "🔗 Invite someone to my kitchen": "🔗 邀请他人加入我的厨房",
+  "🔗 Join someone else’s kitchen (I have their link)": "🔗 加入别人的厨房(我有对方的链接)",
   "🔗 Join with an invitation…": "🔗 通过邀请加入…",
   "🔗 Link to a recipe": "🔗 链接到菜谱",
   "🔗 Linked to “{1}”": "🔗 已链接到“{1}”",

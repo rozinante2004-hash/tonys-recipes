@@ -1,7 +1,7 @@
 {
  "lang": "ja",
  "updatedAt": 1794723554958,
- "count": 3180,
+ "count": 3183,
  "strings": {
   "\"Add to Home Screen\"": "ホーム画面に追加",
   "\"One item away\" filter ({1}f.{2})": "「あと1品」フィルター（{1}f.{2}）",
@@ -1014,6 +1014,7 @@
   "One recipe can be pulled from the cloud without a reload ({1} §{2}, v{3})": "リロードせずにクラウドから1件のレシピを取得できます（{1} §{2}, v{3}）",
   "One tap — then share recipes from Facebook, Instagram or any app.": "ワンタップで、Facebook、Instagram、どんなアプリからでもレシピを共有。",
   "Only changed recipes are written": "変更されたレシピのみ書き込みます",
+  "Only if someone sent you a link to their own kitchen.": "誰かが自分のキッチンへのリンクを送ってくれた場合だけです。",
   "Only members can become the owner. Invite someone first; once they have joined, you can hand {1} over.": "オーナーになれるのはメンバーだけです。まず招待して、相手が参加したら{1}を引き継げます。",
   "Only the app’s owner can open this.": "アプリのオーナーだけが開けます。",
   "Only the app’s owner can send invitations.": "招待を送れるのは、このアプリのオーナーだけです。",
@@ -1933,6 +1934,7 @@
   "You own {1}, and other people are in {2}. Why this is needed: a collection always has an owner — the one person who can add and remove people, rename it, and decide what happens to it. If your account went while you are its owner, the others would be left with recipes nobody can manage, and no way to invite anyone new. So, either: • Hand {3} over to someone in it (⚙️ → 🏠 My household → 👥 Family Access → 👑 Hand over…). Everything stays, for everyone; they become the owner. • Or delete {4} (same place, 🗑 Delete this household…) — its recipes go, for everyone. Then come back here to delete your account.": "{1}はあなたが所有していて、他の人は{2}に入っています。これが必要な理由：コレクションには必ずオーナーが必要です — 人を追加・削除したり、名前を変更したり、今後の扱いを決められるのはオーナーだけです。あなたがオーナーのままアカウントがなくなると、残された人たちは誰も管理できないレシピを抱え、新しい人を招待する方法もなくなってしまいます。そこで、どちらかを選んでください： • {3}を中の誰かに譲る（⚙️ → 🏠 マイ世帯 → 👥 ファミリーアクセス → 👑 譲渡する…）。レシピは全員の手元に残り、その人がオーナーになります。 • または{4}を削除する（同じ場所の 🗑 この世帯を削除…）— そのレシピは全員分が消えます。その後、ここに戻ってアカウントを削除してください。",
   "You read this kitchen’s recipes": "このキッチンのレシピを閲覧できます",
   "You see each other’s recipes, read-only.": "お互いのレシピが見えます（閲覧のみ）",
+  "You were invited to test the app — welcome! 🎉 Your invitation is already recognised, so all that is left is to start your own recipe collection.": "アプリのテストに招待されました。ようこそ!🎉 招待はすでに確認されているので、あとは自分のレシピコレクションを始めるだけです。",
   "You will no longer see its recipes. Someone in it can invite you back.": "そのレシピは表示されなくなります。世帯の誰かがあなたを招待し直すことができます。",
   "You wrote on {1}:": "{1}に書いたメッセージ：",
   "You wrote:": "書いたメッセージ：",
@@ -3038,6 +3040,7 @@
   "🔗 Import from URL": "🔗 URLからインポート",
   "🔗 Invitation link…": "🔗 招待リンク…",
   "🔗 Invite someone to my kitchen": "🔗 自分のキッチンに招待する",
+  "🔗 Join someone else’s kitchen (I have their link)": "🔗 ほかの人のキッチンに参加する(リンクを持っています)",
   "🔗 Join with an invitation…": "🔗 招待で参加…",
   "🔗 Link to a recipe": "🔗 レシピにリンク",
   "🔗 Linked to “{1}”": "🔗 「{1}」にリンク済み",
