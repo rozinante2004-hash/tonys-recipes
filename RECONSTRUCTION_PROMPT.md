@@ -2634,7 +2634,8 @@ lines accept `amount — name` / `amount - name` separators. Editing preserves `
   `collapseCollectionIfThin` is the shared one-part rule and takes the remaining part's
   NAME.
 - **Every AI call is bounded and failures are classified (v36.1).** `aiTimeoutMs(maxTokens)`
-  → a finite `AbortSignal.timeout` on the fetch, capped at 180s; before this there was no
+  → a finite `AbortSignal.timeout` on the fetch: 30s + 25ms a token (`AI_MS_PER_TOKEN`, v39.82 — an answer at 40
+  tokens a second still arrives), capped at 180s; before this there was no
   signal at all and a stalled connection hung the app forever. `aiRetryable(e)` retries
   **only** 408/409/425/5xx and bare network errors — **never a 4xx, never an abort/timeout,
   never a rate limit**. Retrying what cannot succeed is what turned a permanent failure into

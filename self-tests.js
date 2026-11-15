@@ -20346,6 +20346,19 @@ window.SELF_TESTS = [
       }
     } },
 
+  { id:'ai_budget_fits_one_recipe', group:'Import/Export', name:'One recipe\'s AI answer has time to arrive (v39.82, reports #61)',
+    test: async()=>{
+      // A recipe pasted by hand was stopped at 51 s: its ~2,600-token answer was given time for 125 tokens a second.
+      // Every budget below the cap must allow the first word in 30 s and then 40 tokens a second.
+      [1500, 2000, 2625, 4000, 6000].forEach(function(t){
+        var need = Math.min(180000, 30000 + t * 25), got = aiTimeoutMs(t);
+        if(got < need) throw new Error(t + ' tokens get ' + Math.round(got/1000) + ' s, need ' + Math.round(need/1000) + ' s');
+      });
+      // The free-hand import of an ordinary 1,800-character recipe asks for this many tokens:
+      var ask = multiRecipeMaxTokens('x'.repeat(1800));
+      if(aiTimeoutMs(ask) < 90000) throw new Error('a pasted recipe (' + ask + ' tokens) gets only ' + Math.round(aiTimeoutMs(ask)/1000) + ' s');
+    } },
+
   { id:'ai_call_is_bounded', group:'Import/Export', name:'An AI call cannot wait forever, and a 400 is not retried (v36.1)',
     test: async()=>{
       // v36.0's fetch had no AbortSignal, so a stalled connection hung the app

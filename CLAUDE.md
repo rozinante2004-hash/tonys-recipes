@@ -21,7 +21,8 @@ where.
   the app frame its own privacy statement and terms again (empty windows on the beta since v39.63), and three Self
   Test faults from Tony's iPhone report; v39.80, the "Recent:" row, went out at 00:58 on 4b17e8b; the jobs are listed
   near the top of `docs/history/2026-11.md`; Worker v107 on 15 Nov: the page, video and photo fetches require a
-  sign-in). Nothing waits on Test. The test copy (https://tonys-recipes-test.pages.dev, its own database and rules)
+  sign-in). **v39.82 waits on Test** (an ordinary recipe's AI answer is given
+  time to arrive — kitchen-reports #61). The test copy (https://tonys-recipes-test.pages.dev, its own database and rules)
   follows `test`.
 - **The beta has had testers since Sunday 25 Oct 2026** and is **by invitation only**: the owner invites with
   ⚙️ → 👑 → ✉️ Invite testers (the congratulatory wording of v39.60); a tester's share button asks the owner for an

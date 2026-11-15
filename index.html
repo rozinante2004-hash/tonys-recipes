@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.81 -->
+<!-- Tony's Recipes Collection v39.82 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -11134,7 +11134,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.81';
+var APP_VERSION = 'v39.82';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -14700,7 +14700,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.81</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.82</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14788,7 +14788,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.81</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.82</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -26320,8 +26320,14 @@ async function aiCall(prompt, maxTokens=2000, tools=null, model=null, system=nul
 // the spinner turning forever, and the retry loop below then did it four more
 // times behind the same spinner. That is what "got stuck, possibly in a loop"
 // was: not a loop in the code, a loop you could not see the end of.
+//
+// v39.82 — the time per token assumes the answer arrives at 40 tokens a second, not 125 (kitchen-reports #61: a
+// recipe pasted by hand on an iPhone, an ordinary ~2,600-token answer, was stopped at 51 s on the beta). A full
+// recipe in JSON is that long, and a busy hour runs well under 125 tokens a second. 30 s for the first word + 25 ms
+// a token: 2,000 tokens → 80 s, 2,600 → 95 s; the 180 s cap is unchanged.
+var AI_MS_PER_TOKEN = 25;
 function aiTimeoutMs(maxTokens) {
-  return Math.min(180000, 30000 + (maxTokens || 2000) * 8);
+  return Math.min(180000, 30000 + (maxTokens || 2000) * AI_MS_PER_TOKEN);
 }
 // Which failures are worth another attempt. Retrying a 400 cannot succeed — it
 // only turns an instant, explainable failure into half a minute of silence, and
@@ -26352,7 +26358,7 @@ function aiRetryable(e) {
   }
   return true;                                   // a bare network failure — worth one more go
 }
-window.aiTimeoutMs = aiTimeoutMs; window.aiRetryable = aiRetryable;
+window.aiTimeoutMs = aiTimeoutMs; window.AI_MS_PER_TOKEN = AI_MS_PER_TOKEN; window.aiRetryable = aiRetryable;
 // v37.70 — the Worker's word about the household's allowance, said to a person
 // without its machine prefix ("AI_ALLOWANCE: …"); the code stays on the error.
 function aiAllowanceError(msg) {
