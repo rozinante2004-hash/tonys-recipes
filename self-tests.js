@@ -21282,6 +21282,35 @@ window.SELF_TESTS = [
         recipes=saved; if(q) q.value=qv; sortMode=prev; sortPaint(prev); renderGrid();
       }
     } },
+  { id:'pull_hint_translates_once', group:'UI', name:'↓ Pull to refresh: the hint is in the reader\u2019s language, written once per change of words — not on every finger movement, so the translation is never switched off (v39.84)',
+    test: async()=>{
+      // The test copy's log (v39.79, Hebrew, an iPhone, 14 Nov 2026): "A translation kept rewriting itself and was
+      // switched off for one label (he) — "↻ Release to refresh" → "↻ שחררו לרענון"".
+      var prevDict=i18nCurrentDict(), prevLang=i18nLang(), realLog=window.syncLog, errs=[], el=null, writes=0, mo=null;
+      var tick=function(ms){ return new Promise(function(r){ setTimeout(r, ms); }); };
+      try{
+        window.syncLog=function(kind, msg){ if(kind==='error') errs.push(String(msg)); try{ return realLog.apply(this, arguments); }catch(e){} };
+        i18nInstall('he', { '↻ Release to refresh':'↻ שחררו לרענון', '↓ Pull to refresh':'↓ משכו לרענון' });
+        i18nStartObserver();
+        el=pullHintEl();
+        mo=new MutationObserver(function(list){ writes+=list.length; }); mo.observe(el, { childList:true, characterData:true, subtree:true });
+        // a long pull: forty finger movements in well under a second, the hint turning to "release" half-way
+        for(var i=0;i<40;i++){ showPullHint(10+i*3, i>=20); await tick(4); }
+        await tick(300);
+        if(el.textContent!=='↻ שחררו לרענון') throw new Error('the hint is not in the reader\u2019s language: '+el.textContent);
+        if(errs.some(function(m){ return /kept rewriting itself/.test(m); })) throw new Error('the translation was switched off: '+errs.join(' | '));
+        if(writes>4) throw new Error('the hint was rewritten '+writes+' times for two changes of words');
+        if(!el.hasAttribute('data-no-i18n')) throw new Error('the translator still works on the hint as well');
+        if(I18N_EXTRA.indexOf('↻ Release to refresh')<0 || I18N_EXTRA.indexOf('↓ Pull to refresh')<0) throw new Error('the hint\u2019s words are not among the phrases to translate');
+        // another language: the hint follows at once
+        i18nInstall('en', null); showPullHint(60, true);
+        if(el.textContent!=='↻ Release to refresh') throw new Error('back in English the hint says: '+el.textContent);
+        return 'forty movements: '+writes+' writes, in Hebrew, nothing switched off; English again at once';
+      } finally {
+        if(mo) mo.disconnect(); window.syncLog=realLog;
+        try{ i18nRevertAll(); }catch(e){} i18nInstall(prevLang, prevDict); hidePullHint();
+      }
+    } },
   { id:'recent_row_on_top', group:'Features', name:'"Recent:" — the recipes opened last fill the top row of the list, in a box with its title; the rest follow in the order chosen, without them (v39.80); a Self Test run leaves the list as it was, and a recipe no longer here gives its place up (v39.83)',
     test: async()=>{
       // Tony, 15 Nov 2026: "In the list of recipes, I would like to see in the top row the recent recipes accessed. The rest

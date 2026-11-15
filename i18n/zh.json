@@ -1,7 +1,7 @@
 {
  "lang": "zh",
  "updatedAt": 1794697157087,
- "count": 2878,
+ "count": 2879,
  "strings": {
   "\"Add to Home Screen\"": "添加到主屏幕",
   "\"Open Bring!\"": "打开 Bring!",
@@ -2058,6 +2058,7 @@
   "← Back": "← 返回",
   "↑ Contents": "↑ 目录",
   "↑ drag this to the bookmarks bar": "↑ 把它拖到书签栏",
+  "↓ Pull to refresh": "↓ 下拉以刷新",
   "↗ Open outside the app": "↗ 在应用外打开",
   "↩ Reply": "↩ 回复",
   "↩ Restore": "↩ 恢复",

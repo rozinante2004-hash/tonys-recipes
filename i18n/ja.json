@@ -1,7 +1,7 @@
 {
  "lang": "ja",
  "updatedAt": 1794697157087,
- "count": 3179,
+ "count": 3180,
  "strings": {
   "\"Add to Home Screen\"": "ホーム画面に追加",
   "\"One item away\" filter ({1}f.{2})": "「あと1品」フィルター（{1}f.{2}）",
@@ -2359,6 +2359,7 @@
   "← Back": "← 戻る",
   "↑ Contents": "↑ 目次",
   "↑ drag this to the bookmarks bar": "↑ ブックマークバーへドラッグ",
+  "↓ Pull to refresh": "↓ 引っ張って更新",
   "↗ Open outside the app": "↗ アプリの外で開く",
   "↩ Reply": "↩ 返信",
   "↩ Restore": "↩ 元に戻す",

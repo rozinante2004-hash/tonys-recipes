@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.83 -->
+<!-- Tony's Recipes Collection v39.84 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -11146,7 +11146,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.83';
+var APP_VERSION = 'v39.84';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -14712,7 +14712,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.83</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.84</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14800,7 +14800,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.83</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.84</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -18427,6 +18427,8 @@ window.i18nTemplatesOf = i18nTemplatesOf; window.i18nTemplateCovers = i18nTempla
 // translating a string nobody sees. A `{1}` makes it a shape, matched the same
 // way a built toast is.
 var I18N_EXTRA = [
+  // v39.84 — the pull-to-refresh hint, translated in code (showPullHint)
+  '↓ Pull to refresh', '↻ Release to refresh',
   // v39.80 — the title of the top row of recipes opened last
   'Recent:',
   // v39.74 — a recipe's source in the player (the ▶ link's tooltip is looked up in code)
@@ -22732,6 +22734,7 @@ function pullHintEl() {
   if (!el) {
     el = document.createElement('div');
     el.id = 'pullHint';
+    el.setAttribute('data-no-i18n', '');   // v39.84 — translated by showPullHint itself
     el.style.cssText = 'position:fixed;top:var(--top-safe, 0px);left:50%;transform:translateX(-50%);z-index:999;'
       + 'background:var(--card-bg);color:var(--heading);border:1px solid var(--border);'
       + 'border-top:none;border-radius:0 0 12px 12px;padding:6px 16px;font-size:13px;'
@@ -22740,9 +22743,15 @@ function pullHintEl() {
   }
   return el;
 }
+// v39.84 — the test copy's log (Hebrew, iPhone, 14 Nov 2026): "A translation kept rewriting itself and was switched off
+// for one label (he) — "↻ Release to refresh" → "↻ שחררו לרענון"". The hint was written in English on EVERY finger
+// movement, the translator put the Hebrew back each time, and past twenty rewrites a second the breaker (v36.52) left
+// the label alone — in English — for the rest of the visit. Now it is written in the reader's language, here, and only
+// when its words change (pull → release, or another language); the translator leaves it be (data-no-i18n).
 function showPullHint(dy, armed) {
   var el = pullHintEl();
-  el.textContent = armed ? '↻ Release to refresh' : '↓ Pull to refresh';
+  var key = armed ? '↻ Release to refresh' : '↓ Pull to refresh', mark = key + '|' + _i18nLang;
+  if (el._pullMark !== mark) { el.textContent = i18nPhrase(key); el._pullMark = mark; }
   el.style.display = 'block';
   el.style.opacity = Math.min(1, dy / PULL_TRIGGER);
 }

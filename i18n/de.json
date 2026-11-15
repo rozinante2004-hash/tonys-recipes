@@ -1,7 +1,7 @@
 {
  "lang": "de",
  "updatedAt": 1794697157087,
- "count": 2873,
+ "count": 2874,
  "strings": {
   "\"Add to Home Screen\"": "Zum Home-Bildschirm hinzufügen",
   "\"Open Bring!\"": "Bring! öffnen",
@@ -2058,6 +2058,7 @@
   "← Back": "← Zurück",
   "↑ Contents": "↑ Inhalt",
   "↑ drag this to the bookmarks bar": "↑ Diesen Link in die Lesezeichenleiste ziehen",
+  "↓ Pull to refresh": "↓ Ziehen zum Aktualisieren",
   "↗ Open outside the app": "↗ Außerhalb der App öffnen",
   "↩ Reply": "↩ Antworten",
   "↩ Restore": "↩ Wiederherstellen",

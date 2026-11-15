@@ -1,7 +1,7 @@
 {
  "lang": "hu",
  "updatedAt": 1794697157087,
- "count": 2650,
+ "count": 2652,
  "strings": {
   "\"Add to Home Screen\"": "Hozzáadás a kezdőképernyőhöz",
   "\"Open Bring!\"": "Bring! megnyitása",
@@ -1879,6 +1879,7 @@
   "← Back": "← Vissza",
   "↑ Contents": "↑ Tartalom",
   "↑ drag this to the bookmarks bar": "↑ húzd ezt a könyvjelzősávba",
+  "↓ Pull to refresh": "↓ Húzd le a frissítéshez",
   "↗ Open outside the app": "↗ Megnyitás az alkalmazáson kívül",
   "↩ Reply": "↩ Válasz",
   "↩ Restore": "↩ Visszaállítás",
@@ -1892,6 +1893,7 @@
   "↻ Again": "↻ Újra",
   "↻ Refresh": "↻ Frissítés",
   "↻ Refreshed \"{1}\" from the cloud": "↻ „{1}” frissítve a felhőből",
+  "↻ Release to refresh": "↻ Engedd el a frissítéshez",
   "↻ Update now": "↻ Frissítés most",
   "⇅ Imp/Exp ▾": "⇅ Imp/Exp ▾",
   "⇅ Sort": "⇅ Rendezés",

@@ -1,7 +1,7 @@
 {
  "lang": "it",
  "updatedAt": 1794697157087,
- "count": 2779,
+ "count": 2781,
  "strings": {
   "\"Add to Home Screen\"": "Aggiungi a Home",
   "\"Open Bring!\"": "Apri Bring!",
@@ -1981,6 +1981,7 @@
   "← Back": "← Indietro",
   "↑ Contents": "↑ Indice",
   "↑ drag this to the bookmarks bar": "↑ trascina qui nella barra dei preferiti",
+  "↓ Pull to refresh": "↓ Trascina per aggiornare",
   "↗ Open outside the app": "↗ Apri fuori dall’app",
   "↩ Reply": "↩ Rispondi",
   "↩ Restore": "↩ Ripristina",
@@ -1995,6 +1996,7 @@
   "↻ Again": "↻ Riprova",
   "↻ Refresh": "↻ Aggiorna",
   "↻ Refreshed \"{1}\" from the cloud": "↻ \"{1}\" aggiornato dal cloud",
+  "↻ Release to refresh": "↻ Rilascia per aggiornare",
   "↻ Replace ingredients & method": "↻ Sostituisci ingredienti e procedimento",
   "↻ Take the other device’s version": "↻ Usa la versione dell'altro dispositivo",
   "↻ Update now": "↻ Aggiorna ora",

@@ -1,7 +1,7 @@
 {
  "lang": "ar",
  "updatedAt": 1794697157087,
- "count": 2876,
+ "count": 2877,
  "strings": {
   "\"Add to Home Screen\"": "إضافة إلى الشاشة الرئيسية",
   "\"Open Bring!\"": "فتح Bring!",
@@ -2058,6 +2058,7 @@
   "← Back": "← رجوع",
   "↑ Contents": "↑ المحتويات",
   "↑ drag this to the bookmarks bar": "↑ اسحب هذا إلى شريط المفضلة",
+  "↓ Pull to refresh": "↓ اسحب للتحديث",
   "↗ Open outside the app": "↗ فتح خارج التطبيق",
   "↩ Reply": "↩ رد",
   "↩ Restore": "↩ استرجاع",

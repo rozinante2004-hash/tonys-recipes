@@ -1,7 +1,7 @@
 {
  "lang": "pt",
  "updatedAt": 1794697157087,
- "count": 2637,
+ "count": 2639,
  "strings": {
   "\"Add to Home Screen\"": "Adicionar à tela inicial",
   "\"Open Bring!\"": "Abrir Bring!",
@@ -1869,6 +1869,7 @@
   "← Back": "← Voltar",
   "↑ Contents": "↑ Índice",
   "↑ drag this to the bookmarks bar": "↑ arraste isto para a barra de favoritos",
+  "↓ Pull to refresh": "↓ Puxa para atualizar",
   "↗ Open outside the app": "↗ Abrir fora da app",
   "↩ Reply": "↩ Responder",
   "↩ Restore": "↩ Restaurar",
@@ -1882,6 +1883,7 @@
   "↻ Again": "↻ De novo",
   "↻ Refresh": "↻ Atualizar",
   "↻ Refreshed \"{1}\" from the cloud": "↻ \"{1}\" atualizado da nuvem",
+  "↻ Release to refresh": "↻ Solta para atualizar",
   "↻ Update now": "↻ Atualizar agora",
   "⇅ Imp/Exp ▾": "⇅ Imp/Exp ▾",
   "⇅ Sort": "⇅ Ordenar",
