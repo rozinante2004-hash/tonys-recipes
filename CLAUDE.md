@@ -17,13 +17,10 @@ where.
 **Live now**
 - The family's copy (`main`, https://rozinante2004-hash.github.io/tonys-recipes/ — it forwards to the community app)
   and the community app (`beta`, https://mykitchennotes.community, Firebase project my-kitchen-notes-beta) run
-  **v39.84 + Worker v107** (released 15 Nov 2026, 08:18 Israel time, on e07e195 — v39.82: an ordinary recipe's AI
-  answer is given time to arrive (the other session's, kitchen-reports #61); v39.83: a Self Test run keeps the
-  "Recent:" row's list; v39.84: the pull-to-refresh hint keeps its translation; Worker v107 since 15 Nov 06:12: the
-  page, video and photo fetches require a sign-in; the jobs are listed near the top of `docs/history/2026-11.md`).
-  **v39.85 and v39.86 wait on Test** (the welcome for a tester the owner invited: only "Start my own recipe
-  collection", in Tony's words — "You were invited to the closed Beta app — welcome! Your details are already in the
-  system…"). The test copy
+  **v39.86 + Worker v107** (released 15 Nov 2026, 22:39 Israel time, on 5e58b52 — v39.85–v39.86: the welcome for a
+  tester the owner invited offers only "Start my own recipe collection", in Tony's words; before it, v39.82–v39.84 at
+  08:18 on e07e195; Worker v107 since 15 Nov 06:12: the page, video and photo fetches require a sign-in; the jobs are
+  listed near the top of `docs/history/2026-11.md`). Nothing waits on Test. The test copy
   (https://tonys-recipes-test.pages.dev, its own database and rules) follows `test`.
 - **The beta has had testers since Sunday 25 Oct 2026** and is **by invitation only**: the owner invites with
   ⚙️ → 👑 → ✉️ Invite testers (the congratulatory wording of v39.60); a tester's share button asks the owner for an
