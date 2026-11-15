@@ -21282,7 +21282,7 @@ window.SELF_TESTS = [
         recipes=saved; if(q) q.value=qv; sortMode=prev; sortPaint(prev); renderGrid();
       }
     } },
-  { id:'recent_row_on_top', group:'Features', name:'"Recent:" — the recipes opened last fill the top row of the list, in a box with its title; the rest follow in the order chosen, without them (v39.80)',
+  { id:'recent_row_on_top', group:'Features', name:'"Recent:" — the recipes opened last fill the top row of the list, in a box with its title; the rest follow in the order chosen, without them (v39.80); a Self Test run leaves the list as it was, and a recipe no longer here gives its place up (v39.83)',
     test: async()=>{
       // Tony, 15 Nov 2026: "In the list of recipes, I would like to see in the top row the recent recipes accessed. The rest
       // should be sorted normally. Give it a small "Recent:" title too, to make it clear and a square around the recipes in
@@ -21341,6 +21341,18 @@ window.SELF_TESTS = [
         sortMode='recent'; renderGrid();
         if(g.querySelector('.recent-row')) throw new Error('a Recent row while the whole list is in the 🕐 Recently viewed order');
         sortMode='added';
+        // v39.83 — Tony's phone after a Self Test run: one recipe in the row, the other places taken by test recipes
+        // long gone. Opening a recipe now drops the ones no longer here…
+        localStorage.setItem('recent_views', JSON.stringify([123456789, 889004, 987654321]));
+        openView(889006); await wait(40); closeM('viewOverlay'); await wait(30);
+        var kept=JSON.parse(localStorage.getItem('recent_views')||'[]');
+        if(kept.join(',')!=='889006,889004') throw new Error('recipes no longer here kept their places: '+kept.join(','));
+        // …and a Self Test run puts the list aside and back (the run's own tests open recipes of their own)
+        var wasList=localStorage.getItem('recent_views'), held=selfTestRecentKeep();
+        localStorage.setItem('recent_views', JSON.stringify([888001, 888002]));
+        selfTestRecentPutBack(held);
+        if(localStorage.getItem('recent_views')!==wasList) throw new Error('the recipes opened last were not put back after a run: '+localStorage.getItem('recent_views'));
+        if(String(_selfTestPark).indexOf('selfTestRecentKeep()')<0 || String(_selfTestUnpark).indexOf('selfTestRecentPutBack(')<0) throw new Error('the Self Test run does not keep the recipes opened last');
         // nothing opened yet on this device: no row, every recipe in the list
         localStorage.removeItem('recent_views'); renderGrid();
         if(g.querySelector('.recent-row') || names(':scope > .recipe-card').length!==10) throw new Error('a Recent row with nothing opened, or recipes missing');

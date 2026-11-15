@@ -22,7 +22,8 @@ where.
   Test faults from Tony's iPhone report; v39.80, the "Recent:" row, went out at 00:58 on 4b17e8b; the jobs are listed
   near the top of `docs/history/2026-11.md`; Worker v107 on 15 Nov: the page, video and photo fetches require a
   sign-in). **v39.82 waits on Test** (an ordinary recipe's AI answer is given
-  time to arrive — kitchen-reports #61). The test copy (https://tonys-recipes-test.pages.dev, its own database and rules)
+  time to arrive — kitchen-reports #61), **and v39.83** (a Self Test run no longer fills the "Recent:" row's list with
+  its test recipes; a recipe no longer here gives its place up). The test copy (https://tonys-recipes-test.pages.dev, its own database and rules)
   follows `test`.
 - **The beta has had testers since Sunday 25 Oct 2026** and is **by invitation only**: the owner invites with
   ⚙️ → 👑 → ✉️ Invite testers (the congratulatory wording of v39.60); a tester's share button asks the owner for an
@@ -34,7 +35,7 @@ where.
   `docs/history/2026-11.md`, and update "Live now" here.
 - The rules were last published on 10 Nov 2026 (deploy-rules on 99558ae, success). A push to `test` that changes
   them publishes to the test project only; a release publishes to the family's and the beta's.
-- The Self Tests: **479 pass, 0 fail, 7 skipped** (the network ones) on v39.81, locally.
+- The Self Tests: **480 pass, 0 fail, 7 skipped** (the network ones) on v39.83, locally.
 
 **The audit of 10 Nov 2026 (`AUDIT-2026-11-10.md`) — Tony's answers of 11 Nov, and where each item is.** In the
 order of work; update this list as items land. Each change: Self Tests + knock-outs, the local checks, Help and

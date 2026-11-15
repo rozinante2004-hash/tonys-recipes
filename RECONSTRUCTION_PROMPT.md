@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v39.81` — app. **Worker: v107**, deployed separately and versioned separately
+**Current version:** `v39.83` — app. **Worker: v107**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -2445,7 +2445,8 @@ view. In the grid the box spans all columns (`grid-column: 1 / -1`) and is a gri
 row (`recentRowWanted(q)` false) while there is a search query, any filter (❤, Clips, Collections, No photo, 🕐 Recent,
 One item away, a meal type, a diet), the own kitchen unticked, or `sortMode === 'recent'`. `recentRowRefresh()` (on
 closing the recipe view, and 250 ms after a resize) redraws the grid only when the ids the row would hold differ from
-its `data-ids`. Each card is built by one function (`cardHtml` / `itemHtml` in `renderGrid`) for the box and the
+its `data-ids`. (v39.83) `openView` drops ids of recipes no longer in `recipes` as it records one; a Self Test run
+keeps `recent_views` aside (`selfTestRecentKeep` in `_selfTestPark`, `selfTestRecentPutBack` in `_selfTestUnpark`). Each card is built by one function (`cardHtml` / `itemHtml` in `renderGrid`) for the box and the
 rest.
 **Grid** (`#recipeGrid`): a `list` or `grid` view (`setView`). The choice is remembered in
 `tonys_view_mode`; desktop defaults to `list`, **phones default to `grid`** so the layout

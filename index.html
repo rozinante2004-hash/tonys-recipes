@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.82 -->
+<!-- Tony's Recipes Collection v39.83 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -2922,6 +2922,15 @@ window.selfTestUpdateGroupHeader = selfTestUpdateGroupHeader;
 // nothing, so a CI profile with a translated interface would have tested the
 // translated app with English expectations — the failure the app's own Self
 // Test fixed for Tony in v36.32, never fixed for CI. One function, two callers.
+// v39.83 — the recipes opened last on this device (recent_views — the "Recent:" row, 🕐 Recently viewed). Every test
+// that opens a recipe of its own wrote its made-up recipe into that list, and only eight are kept: after Tony's run on
+// 15 Nov his "Recent:" row held one recipe — the other seven places were test recipes long gone. Kept for the run.
+function selfTestRecentKeep() { try { return localStorage.getItem('recent_views'); } catch(e) { return null; } }
+function selfTestRecentPutBack(was) {
+  try { if (was == null) localStorage.removeItem('recent_views'); else localStorage.setItem('recent_views', was); } catch(e) {}
+  try { if (typeof recentRowRefresh === 'function') recentRowRefresh(); } catch(e) {}
+}
+window.selfTestRecentKeep = selfTestRecentKeep; window.selfTestRecentPutBack = selfTestRecentPutBack;
 async function _selfTestPark() {
   // v36.32 — THE SUITE RUNS IN ENGLISH. Two hundred and fifty of these tests
   // find a button by the words on it, and after v36.31 those words can be in
@@ -2965,6 +2974,8 @@ async function _selfTestPark() {
   // through the real call path must not add pretend dollars to Tony's total.
   var _spendWas = null;
   try { _spendWas = localStorage.getItem(AI_SPEND_KEY); } catch(e) {}
+  // …and the recipes opened last (v39.83): a test's made-up recipe must not take a real one's place in "Recent:".
+  var _recentWas = selfTestRecentKeep();
   var _realDb = window._fbDb;
   _selfTestHeldWrites = 0;
   if (_realDb) window._fbDb = _selfTestNoCloudWrites(_realDb);
@@ -3017,7 +3028,7 @@ async function _selfTestPark() {
     ? { scan: Object.assign({}, _waScan), harvest: Object.assign({}, _waHarvest) } : null;
   return { langWas: _langWas, waWas: _waWas, dictWas: _dictWas, unitWas: _unitWas, cloudWas: _cloudWas,
            backupWas: _backupWas, spendWas: _spendWas, realDb: _realDb, featuresWas: _featuresWas, hidWas: _hidWas,
-           recipesWas: _recipesWas, extMarks: _extMarks, extFolderWas: _extFolderWas, signInWas: _signInWas };
+           recipesWas: _recipesWas, extMarks: _extMarks, extFolderWas: _extFolderWas, signInWas: _signInWas, recentWas: _recentWas };
 }
 function _selfTestSignInBack(s) {
   if (!s) return;
@@ -3073,6 +3084,7 @@ function _selfTestUnpark(p) {
   } catch(e) {}
   try { if (p.spendWas === null) localStorage.removeItem(AI_SPEND_KEY); else localStorage.setItem(AI_SPEND_KEY, p.spendWas); } catch(e) {}
   try { if (p.unitWas !== null) localStorage.setItem(VIEW_UNIT_KEY, p.unitWas); } catch(e) {}
+  if ('recentWas' in p) selfTestRecentPutBack(p.recentWas);   // v39.83 — the recipes opened last, as they were
   // v36.67 — a toast a test raised is the test's, not Tony's. One with an
   // "↩ Undo" button (a collection test's "1 recipe now in 'Winter soups'")
   // outlived the run on his phone, offering to undo something done to test
@@ -11134,7 +11146,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.82';
+var APP_VERSION = 'v39.83';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -14700,7 +14712,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.82</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.83</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14788,7 +14800,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.82</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.83</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -22761,9 +22773,12 @@ function openView(id){
   try { viewUnit = localStorage.getItem(VIEW_UNIT_KEY)==='imperial' ? 'imperial' : 'metric'; }
   catch(e){ viewUnit='metric'; }
   // Track recently viewed
+  // v39.83 — a recipe that is no longer here (deleted, or a test's) gives its place up, so the eight are real ones.
   try {
     var recent = JSON.parse(localStorage.getItem('recent_views')||'[]');
-    recent = recent.filter(function(x){ return x!==id; });
+    if (!Array.isArray(recent)) recent = [];
+    var here = {}; recipes.forEach(function(r){ here[r.id] = 1; });
+    recent = recent.filter(function(x){ return x!==id && here[x]; });
     recent.unshift(id);
     if(recent.length>8) recent=recent.slice(0,8);
     localStorage.setItem('recent_views', JSON.stringify(recent));
