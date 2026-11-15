@@ -17,10 +17,11 @@ where.
 **Live now**
 - The family's copy (`main`, https://rozinante2004-hash.github.io/tonys-recipes/ — it forwards to the community app)
   and the community app (`beta`, https://mykitchennotes.community, Firebase project my-kitchen-notes-beta) run
-  **v39.81 + Worker v106** (released 15 Nov 2026, 01:38 Israel time, on afdbbe4 — the Cloudflare copies' headers let
+  **v39.81 + Worker v107** (released 15 Nov 2026, 01:38 Israel time, on afdbbe4 — the Cloudflare copies' headers let
   the app frame its own privacy statement and terms again (empty windows on the beta since v39.63), and three Self
   Test faults from Tony's iPhone report; v39.80, the "Recent:" row, went out at 00:58 on 4b17e8b; the jobs are listed
-  near the top of `docs/history/2026-11.md`). Nothing waits on Test. The test copy (https://tonys-recipes-test.pages.dev, its own database and rules)
+  near the top of `docs/history/2026-11.md`; Worker v107 on 15 Nov: the page, video and photo fetches require a
+  sign-in). Nothing waits on Test. The test copy (https://tonys-recipes-test.pages.dev, its own database and rules)
   follows `test`.
 - **The beta has had testers since Sunday 25 Oct 2026** and is **by invitation only**: the owner invites with
   ⚙️ → 👑 → ✉️ Invite testers (the congratulatory wording of v39.60); a tester's share button asks the owner for an
@@ -42,7 +43,8 @@ to `test`; releases only on his yes.
 2. **U1(a) — the nutrition box folded on phones: done, v39.64 on Test** (one line, "Nutrition per 100g · 245 kcal ▸",
    a tap opens the four values; a computer always shows them; screenshots sent to Tony).
 3. **S1 — a verified sign-in for the page, video and photo fetches: v39.65 + Worker v105, released in v39.72 —
-   STEP 2 STILL TO DO.** The app
+   STEP 2 DONE: Worker v107 (15 Nov 2026, Tony: "please go ahead") requires it; the way back is the Worker variable
+   `SIGNED_FETCH = accept`. The history below is how it was staged.** The app
    sends the sign-in (`workerBodySigned`; a video file a ticket, `videoFileTicket`); the Worker checks any token sent
    (`signedCaller`, the address confirmed) but still serves a call with none (`SIGNED_FETCH_DEFAULT = 'accept'`),
    because the apps released before v39.65 send none. **Step 2 — the release is out (14 Nov, 00:39):**

@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v39.81` — app. **Worker: v106**, deployed separately and versioned separately
+**Current version:** `v39.81` — app. **Worker: v107**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -811,9 +811,10 @@ invitation-only (unless adding to the tester's household)."
   `?action=video-file`; asked only when health says `signedFetch`). The Worker's `signedCaller`: a token that is
   there must verify (signature, a served project, not expired) with `email_verified`; refusals carry `signIn: true`
   (and `unconfirmed`), and `workerErrorText` turns them into "Sign in first…", "Confirm your e-mail address first…",
-  "Your sign-in could not be checked…", "The video's sign-in has run out…". STAGED: `SIGNED_FETCH_DEFAULT` is
-  'accept' (a call with no token is still served, for the apps released before v39.65); the next Worker sets
-  'require' (or the variable `SIGNED_FETCH=require`). `health` → `signedFetch: { version, required }`.
+  "Your sign-in could not be checked…", "The video's sign-in has run out…". `SIGNED_FETCH_DEFAULT` is 'require'
+  since Worker v107 (it was 'accept' in v105–v106, while the apps released before v39.65 sent no token): a call with
+  no token is refused; the Worker variable `SIGNED_FETCH=accept` serves such calls again (the way back, no code
+  change). `health` → `signedFetch: { version, required }`.
 - **Hebrew in the plural (v39.66, audit U6).** The interface's Hebrew addresses the reader in the plural (Tony's
   choice). `i18nPrompt` tells the AI so for Hebrew only (rule 7a). `tools/he-address-form.mjs` rewrites existing
   phrases from reviewed tables (slash forms anywhere; commands only at a clause's start; `שלך → שלכם` and the other

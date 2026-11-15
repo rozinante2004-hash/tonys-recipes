@@ -14,7 +14,14 @@
 // The invariant being defended: EVERY response, from every path, including
 // errors, refusals and the binary download, must carry CORS for an allowed
 // origin — and must never echo one that is not allowed.
-import worker from '../cloudflare-worker.js';
+import realWorker from '../cloudflare-worker.js';
+// v107 — a call without a sign-in is refused by default now (SIGNED_FETCH_DEFAULT 'require'). The older tests below are
+// about other things (addresses, videos, photos…), so they run as v105–v106 did — such calls served — unless a test
+// names SIGNED_FETCH itself or asks for the default (__defaultSignedFetch), as the sign-in tests do.
+const worker = Object.assign({}, realWorker, { fetch: (req, env, ctx) => {
+  if (env && !('SIGNED_FETCH' in env) && !env.__defaultSignedFetch) env.SIGNED_FETCH = 'accept';
+  return realWorker.fetch(req, env, ctx);
+} });
 import { createRequire } from 'module';
 
 // The Worker samples its KV counters with Math.random, so the write-count
@@ -2579,8 +2586,9 @@ console.log('\nv105: a sign-in for the page, video and photo fetches');
     const sig = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', kp.privateKey, new TextEncoder().encode(head + '.' + body));
     return head + '.' + body + '.' + Buffer.from(sig).toString('base64url');
   }
-  const base = { __testKeys: { kS: Object.assign({ kid: 'kS' }, pub) }, GEMINI_API_KEY: 'g-test' };
-  const accept = Object.assign({}, base), require_ = Object.assign({ SIGNED_FETCH: 'require' }, base);
+  const base = { __testKeys: { kS: Object.assign({ kid: 'kS' }, pub) }, GEMINI_API_KEY: 'g-test', __defaultSignedFetch: true };
+  // v107 — 'require' is the default now; 'accept' (the variable, the way back) is what v105–v106 did by default.
+  const accept = Object.assign({ SIGNED_FETCH: 'accept' }, base), require_ = Object.assign({ SIGNED_FETCH: 'require' }, base);
   const call = async (body, env) => { const r = await worker.fetch(post(body), env); let d = null; try { d = await r.json(); } catch (e) {} return { status: r.status, d }; };
   const video = async (env, ticket) => {
     _ipN++;
@@ -2615,6 +2623,17 @@ console.log('\nv105: a sign-in for the page, video and photo fetches');
   expect('v105 require: with a good sign-in — served', r.status === 400 && /Invalid URL/.test(r.d.error), JSON.stringify(r));
   r = await call({ action: 'health' }, require_);
   expect('v105 require: health stays open', r.status === 200 && r.d.ok === true, JSON.stringify(r).slice(0, 200));
+  // v107 — no variable at all: required (the default), and the variable 'accept' still turns it back
+  h = await call({ action: 'health' }, base);
+  expect('v107: with no variable, health says the sign-in is required', h.d && h.d.signedFetch && h.d.signedFetch.required === true, JSON.stringify(h.d && h.d.signedFetch));
+  for (const a of ['fetch-url', 'photo-search', 'video-recipe']) {
+    r = await call({ action: a, url: 'not-a-page' }, base);
+    expect('v107: ' + a + ' without a sign-in, no variable — refused, told to sign in', r.status === 401 && r.d.signIn === true && /sign in first/.test(r.d.error), JSON.stringify(r));
+  }
+  r = await call({ action: 'fetch-url', url: 'not-a-page', idToken: good }, base);
+  expect('v107: with a good sign-in, no variable — served', r.status === 400 && /Invalid URL/.test(r.d.error), JSON.stringify(r));
+  const v0 = await video(base, '');
+  expect('v107: a video file without a ticket, no variable — refused', v0.status === 401 && v0.d.signIn === true, JSON.stringify(v0));
 
   // The video file: its sign-in is a ticket in the address (the body is the video).
   r = await call({ action: 'video-ticket' }, accept);

@@ -1,4 +1,12 @@
-// Tony's Recipes — Cloudflare Worker v106
+// Tony's Recipes — Cloudflare Worker v107
+// v107: THE PAGE, VIDEO AND PHOTO FETCHES REQUIRE A SIGN-IN (the audit of 10 Nov 2026, item S1, step 2; Tony, 15 Nov:
+//   "Can you run The Worker change now instead of waiting for Sunday evening? If so, please go ahead."). The app that
+//   sends the sign-in (v39.65) went out with v39.72 on 14 Nov; SIGNED_FETCH_DEFAULT is now 'require', so a call to
+//   fetch-url, facebook-fetch, instagram-fetch, fb-probe, video-from-url, video-recipe, photo-fetch or photo-search
+//   with NO token is refused (401, signIn: true, "sign in first … Signed in already? Reload the app: an older version
+//   did not send it.") and a video file needs its ticket. A stranger with the public app key gets nothing from them.
+//   THE WAY BACK, without a code change: the Worker variable SIGNED_FETCH = 'accept' (Cloudflare → the Worker →
+//   Settings → Variables) serves calls without a token again, at once. health says signedFetch.required: true.
 // v106: A PAGE'S OWN RECIPE DATA (the audit of 10 Nov 2026, item C2; Tony, 11 Nov: "Yes"). fetch-url also returns
 //   `recipes`: the schema.org Recipe objects the page publishes in <script type="application/ld+json"> (what Google
 //   reads for its recipe cards) — @graph, ItemList and mainEntity followed; HowToStep / HowToSection; ISO durations
@@ -501,11 +509,11 @@
 //   AI_MAX_TOKENS   – the longest answer one call may ask for (32000; the
 //                     app's largest, reading several recipes at once, asks 8000).
 
-const WORKER_VERSION = 'v106';
+const WORKER_VERSION = 'v107';
 // v105 (audit S1) — the actions that take a sign-in, and whether a call without one is still served (see the top).
 const SIGNED_ACTIONS = new Set(['fetch-url', 'facebook-fetch', 'instagram-fetch', 'fb-probe', 'video-from-url',
   'video-recipe', 'photo-fetch', 'photo-search', 'video-ticket']);
-const SIGNED_FETCH_DEFAULT = 'accept';   // → 'require' once the app that sends the sign-in (v39.65) is released
+const SIGNED_FETCH_DEFAULT = 'require';  // v107 — was 'accept' (v105–v106) until the app that sends the sign-in (v39.65) was out; the variable SIGNED_FETCH = 'accept' is the way back
 const VIDEO_TICKET_SECONDS = 300;
 const VIDEO_MAX_MB_DEFAULT = 50;
 const GEMINI_API = 'https://generativelanguage.googleapis.com';
@@ -4497,4 +4505,4 @@ export default {
   }
 };
 
-// ── END OF WORKER v106 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
+// ── END OF WORKER v107 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
