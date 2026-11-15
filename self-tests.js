@@ -5826,7 +5826,7 @@ window.SELF_TESTS = [
       }
     }},
 
-  { id:'welcome_invited_tester', group:'UI', name:'👋 The welcome for a tester the owner invited: their invitation is recognised, "Start my own recipe collection" is the highlighted one, and the other says it is for someone else\u2019s kitchen (v39.85)',
+  { id:'welcome_invited_tester', group:'UI', name:'👋 The welcome for a tester the owner invited: their details are in the system, and "Start my own recipe collection" is all they are offered — nothing about joining someone\u2019s kitchen (v39.85, v39.86)',
     test: async()=>{
       // Tony, 15 Nov 2026: "new testers that are getting the invitation to start my kitchen notes in their mail [find that]
       // "I have an invitation link" is confusing to them. They click it although they do not need to."
@@ -5843,18 +5843,18 @@ window.SELF_TESTS = [
         window.testerInvited=async function(){ return true; };
         var got=await householdWelcome({ uid:'u', email:'dana@example.com', emailVerified:true });
         if(got!=='H-NEW' || named!=='Dana\u2019s kitchen') throw new Error('starting her own collection did not go on as before');
-        var own=shown.ch[0], join=shown.ch[1];
-        if(shown.msg.indexOf(HH_WELCOME.invited)!==0 || !/already recognised/.test(HH_WELCOME.invited)) throw new Error('the welcome does not say the invitation is already recognised: '+shown.msg.slice(0,80));
-        if(!own || own.value!=='own' || own.primary!==true) throw new Error('"Start my own recipe collection" is not the first, highlighted choice');
-        if(!join || join.value!=='join' || /I have an invitation link/.test(join.label) || !/someone else\u2019s kitchen/.test(join.label) || !/their own kitchen/.test(join.hint||''))
-          throw new Error('the other choice still reads as theirs: '+(join && join.label)+' / '+(join && join.hint));
-        if(I18N_EXTRA.indexOf(join.label)<0 || I18N_EXTRA.indexOf(join.hint)<0) throw new Error('the new words are not among the phrases to translate');
+        var own=shown.ch[0];
+        // v39.86 — Tony: "I think users should see only what is relevant for them." — and his words
+        if(shown.msg.indexOf(HH_WELCOME.invited)!==0 || !/^You were invited to the closed Beta app \u2014 welcome!\nYour details are already in the system, so all that is left is to start your own recipe collection\.$/.test(HH_WELCOME.invited))
+          throw new Error('the welcome is not in Tony\u2019s words: '+JSON.stringify(shown.msg.slice(0,120)));
+        if(!own || own.value!=='own' || own.primary!==true) throw new Error('"Start my own recipe collection" is not the highlighted choice');
+        if(shown.ch.length!==1 || shown.ch.some(function(c){ return c.value==='join'; })) throw new Error('an invited tester is still offered: '+shown.ch.map(function(c){ return c.label; }).join(' | '));
         // anyone else: the welcome as before
         window.testerInvited=async function(){ return false; }; shown=null;
         await householdWelcome({ uid:'u', email:'pat@example.com', emailVerified:true });
         if(shown.msg.indexOf(HH_WELCOME.invited)!==-1 || shown.ch[1].label!=='\u{1F517} I have an invitation link' || shown.ch[0].primary) throw new Error('someone not invited by the owner sees the tester\u2019s welcome');
         _hhJustFounded=false;
-        return 'invited: recognised, "start my own" highlighted, the other for someone else\u2019s kitchen; anyone else: as before';
+        return 'invited: Tony\u2019s words, "start my own" alone and highlighted; anyone else: as before';
       } finally {
         window.askChoice=real.choice; window.askPrompt=real.prompt; window.householdMayFound=real.may; window.testerInvited=real.inv;
         window.isAppOwner=real.owner; window.householdFound=real.found; window.signOutNow=real.out; window.toast=real.toast; _hhJustFounded=false;

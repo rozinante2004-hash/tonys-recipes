@@ -1,7 +1,7 @@
 {
  "lang": "hu",
  "updatedAt": 1794723554958,
- "count": 2655,
+ "count": 2653,
  "strings": {
   "\"Add to Home Screen\"": "Hozzáadás a kezdőképernyőhöz",
   "\"Open Bring!\"": "Bring! megnyitása",
@@ -787,7 +787,6 @@
   "One cookbook for your household: invite family and friends by e-mail or with a link, and everyone sees and adds the same recipes.": "Egy szakácskönyv a háztartásodnak: hívj meg családtagokat és barátokat e-mailben vagy linkkel, és mindenki ugyanazokat a recepteket látja és adhatja hozzá.",
   "One fewer serving": "Eggyel kevesebb adag",
   "One more serving": "Eggyel több adag",
-  "Only if someone sent you a link to their own kitchen.": "Csak ha valaki elküldte neked a saját konyhája linkjét.",
   "Only members can become the owner. Invite someone first; once they have joined, you can hand {1} over.": "Csak tagok lehetnek tulajdonosok. Először hívj meg valakit; miután csatlakozott, átadhatod neki {1}.",
   "Only the app’s owner can open this.": "Csak az alkalmazás tulajdonosa nyithatja meg ezt.",
   "Only the app’s owner can send invitations.": "Csak az alkalmazás tulajdonosa küldhet meghívókat.",
@@ -1520,7 +1519,7 @@
   "You own {1}, and other people are in {2}. Why this is needed: a collection always has an owner — the one person who can add and remove people, rename it, and decide what happens to it. If your account went while you are its owner, the others would be left with recipes nobody can manage, and no way to invite anyone new. So, either: • Hand {3} over to someone in it (⚙️ → 🏠 My household → 👥 Family Access → 👑 Hand over…). Everything stays, for everyone; they become the owner. • Or delete {4} (same place, 🗑 Delete this household…) — its recipes go, for everyone. Then come back here to delete your account.": "{1} a tiéd, és mások is tagjai itt: {2}. Miért van erre szükség: egy gyűjteménynek mindig van tulajdonosa — az az egy ember, aki hozzáadhat és eltávolíthat embereket, átnevezheti, és eldöntheti, mi történjen vele. Ha a fiókod megszűnne, amíg te vagy a tulajdonos, a többiek olyan receptekkel maradnának, amiket senki sem kezelhetne, és senkit sem hívhatnának meg újra. Szóval, vagy: • Add át {3} valakinek, aki tagja (⚙️ → 🏠 Háztartásom → 👥 Családi hozzáférés → 👑 Átadás…). Minden megmarad, mindenkinek; ő lesz a tulajdonos. • Vagy töröld {4} (ugyanitt, 🗑 Háztartás törlése…) — a receptjei mindenkinél eltűnnek. Utána gyere vissza ide, és töröld a fiókodat.",
   "You read this kitchen’s recipes": "Ennek a konyhának csak a receptjeit olvashatod",
   "You see each other’s recipes, read-only.": "Látjátok egymás receptjeit, csak olvasható módban.",
-  "You were invited to test the app — welcome! 🎉 Your invitation is already recognised, so all that is left is to start your own recipe collection.": "Meghívtak, hogy kipróbáld az alkalmazást – üdvözlünk! 🎉 A meghívásodat már felismertük, így csak a saját receptgyűjteményedet kell elindítanod.",
+  "You were invited to the closed Beta app — welcome!\nYour details are already in the system, so all that is left is to start your own recipe collection.": "Meghívtak az alkalmazás zárt bétájába – üdvözlünk!\nAz adataid már a rendszerben vannak, így csak a saját receptgyűjteményedet kell elindítanod.",
   "You will no longer see its recipes. Someone in it can invite you back.": "Többé nem fogod látni a receptjeit. Egy tagja visszahívhat.",
   "You wrote on {1}:": "Ezt írtad ide: {1}:",
   "You wrote:": "Ezt írtad:",
@@ -2516,7 +2515,6 @@
   "🔗 Import from URL": "🔗 Importálás URL-ből",
   "🔗 Invitation link…": "🔗 Meghívólink…",
   "🔗 Invite someone to my kitchen": "🔗 Meghívás a konyhámba",
-  "🔗 Join someone else’s kitchen (I have their link)": "🔗 Csatlakozás valaki más konyhájához (megvan a linkje)",
   "🔗 Join with an invitation…": "🔗 Csatlakozás meghívóval…",
   "🔗 Link to a recipe": "🔗 Link egy recepthez",
   "🔗 Linked to “{1}”": "🔗 Összekötve ezzel: „{1}”",

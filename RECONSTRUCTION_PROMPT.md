@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v39.85` — app. **Worker: v107**, deployed separately and versioned separately
+**Current version:** `v39.86` — app. **Worker: v107**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -753,11 +753,12 @@ Each item names the function or key to look for; `docs/history/2026-10.md` has t
 - **The welcome (v38.47, `householdWelcome`):** short and friendly; every button says what it does (🏠 Start my own
   recipe collection / 🔗 I have an invitation link / 📬 Someone added my e-mail — let me confirm it); Cancel is
   "👋 Not now — sign me out" (`askChoice` `opts.cancelLabel`, `opts.noBackdrop`); `user.reload()` first. Never "go to
-  My Kitchen Notes" from inside it (`householdElsewhereUrl` is '' there). **A tester the owner invited (v39.85;
-  `testerInvited`, not the owner):** the message is `HH_WELCOME.invited` (the invitation is already recognised),
-  "🏠 Start my own recipe collection" first with `primary: true`, and the join button reads "🔗 Join someone else's
-  kitchen (I have their link)" with the hint "Only if someone sent you a link to their own kitchen." (testers who got
-  the invitation e-mail took "I have an invitation link" for theirs).
+  My Kitchen Notes" from inside it (`householdElsewhereUrl` is '' there). **A tester the owner invited (v39.85–v39.86;
+  `testerInvited`, not the owner):** only "🏠 Start my own recipe collection" (`primary: true`) and the Cancel; the
+  message is `HH_WELCOME.invited`, Tony's words: "You were invited to the closed Beta app — welcome!\nYour details are
+  already in the system, so all that is left is to start your own recipe collection." (Tony: "users should see only
+  what is relevant for them"; testers who got the invitation e-mail took "I have an invitation link" for theirs. A
+  kitchen joiner's `?join=` link joins them in `householdEnter` before any welcome.)
 - **The app's own name from the first frame (v38.61):** `tools/build.js` writes brandName into `<title>`, both
   logos (`data-no-i18n`) and description + og:type/title/description/url/image for every copy with a brandName (a
   WhatsApp/Gmail preview of the invitation runs no script). The sign-in screen comes first in the page (v38.62:

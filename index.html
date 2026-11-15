@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.85 -->
+<!-- Tony's Recipes Collection v39.86 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -9444,8 +9444,10 @@ var HH_WELCOME = {
   elsewhere: 'This kitchen is invitation-only \u2014 a bit like grandma\u2019s. \u{1F642} Got an invitation link? Come right in. If not, My Kitchen Notes gives you a kitchen of your own: free, and the very same app.',
   closed: 'New kitchens open by invitation for now. \u{1F511} Got an invitation link? Come right in \u2014 if not, ask whoever told you about the app to send you one.',
   tester: 'Invited to test the app? Sign in with the address the invitation came to \u2014 you are signed in as {1}.',
-  // v39.85 — signed in with the address the owner invited (testerInvited): their invitation needs nothing more
-  invited: 'You were invited to test the app \u2014 welcome! \u{1F389} Your invitation is already recognised, so all that is left is to start your own recipe collection.',
+  // v39.85 — signed in with the address the owner invited (testerInvited): their invitation needs nothing more.
+  // v39.86 — Tony's words: "you were invited to the closed Beta app - welcome! Your details are already in the system,
+  // so all that is left is to start your own recipe collection."
+  invited: 'You were invited to the closed Beta app \u2014 welcome!\nYour details are already in the system, so all that is left is to start your own recipe collection.',
   confirm: 'Joining someone\u2019s collection by your e-mail? Confirm it first \u2014 we sent a link to {1} (peek in spam if it\u2019s shy).'
 };
 async function householdWelcome(user) {
@@ -9470,11 +9472,13 @@ async function householdWelcome(user) {
     // e-mail says "invited", so "an invitation link" read as theirs — but it is for joining a kitchen someone else
     // runs. For someone the owner invited (signed in with that address), the welcome says the invitation is already
     // recognised, "Start my own recipe collection" is the highlighted one, and the other says what it is for.
+    // v39.86 — Tony: "I think users should see only what is relevant for them." A tester's invitation is to the app,
+    // so they are offered their own collection and nothing else (a link to someone's kitchen, opened, joins them
+    // before this box is ever shown — householdEnter — and a place kept for their address is claimed there too).
     var invitedTester = false;
     if (mayFound && !(typeof isAppOwner === 'function' && isAppOwner())) { try { invitedTester = await testerInvited(user || window._fbUser); } catch (e) {} }
     var choices = invitedTester ? [
-      { value: 'own',  label: '\u{1F3E0} Start my own recipe collection', primary: true },
-      { value: 'join', label: '\u{1F517} Join someone else\u2019s kitchen (I have their link)', hint: 'Only if someone sent you a link to their own kitchen.' }
+      { value: 'own',  label: '\u{1F3E0} Start my own recipe collection', primary: true }
     ] : mayFound ? [
       { value: 'own',  label: '\u{1F3E0} Start my own recipe collection' },
       { value: 'join', label: '\u{1F517} I have an invitation link' }
@@ -11158,7 +11162,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.85';
+var APP_VERSION = 'v39.86';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -14724,7 +14728,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.85</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.86</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14812,7 +14816,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.85</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.86</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -18439,8 +18443,6 @@ window.i18nTemplatesOf = i18nTemplatesOf; window.i18nTemplateCovers = i18nTempla
 // translating a string nobody sees. A `{1}` makes it a shape, matched the same
 // way a built toast is.
 var I18N_EXTRA = [
-  // v39.85 — the welcome for an invited tester (its message is in HH_WELCOME)
-  '\u{1F517} Join someone else\u2019s kitchen (I have their link)', 'Only if someone sent you a link to their own kitchen.',
   // v39.84 — the pull-to-refresh hint, translated in code (showPullHint)
   '↓ Pull to refresh', '↻ Release to refresh',
   // v39.80 — the title of the top row of recipes opened last
