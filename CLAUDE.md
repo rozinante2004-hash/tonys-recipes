@@ -17,15 +17,11 @@ where.
 **Live now**
 - The family's copy (`main`, https://rozinante2004-hash.github.io/tonys-recipes/ — it forwards to the community app)
   and the community app (`beta`, https://mykitchennotes.community, Firebase project my-kitchen-notes-beta) run
-  **v39.81 + Worker v107** (released 15 Nov 2026, 01:38 Israel time, on afdbbe4 — the Cloudflare copies' headers let
-  the app frame its own privacy statement and terms again (empty windows on the beta since v39.63), and three Self
-  Test faults from Tony's iPhone report; v39.80, the "Recent:" row, went out at 00:58 on 4b17e8b; the jobs are listed
-  near the top of `docs/history/2026-11.md`; Worker v107 on 15 Nov: the page, video and photo fetches require a
-  sign-in). **v39.82 waits on Test** (an ordinary recipe's AI answer is given
-  time to arrive — kitchen-reports #61), **v39.83** (a Self Test run no longer fills the "Recent:" row's list with
-  its test recipes; a recipe no longer here gives its place up) **and v39.84** (the pull-to-refresh hint keeps its
-  translation). The test copy (https://tonys-recipes-test.pages.dev, its own database and rules)
-  follows `test`.
+  **v39.84 + Worker v107** (released 15 Nov 2026, 08:18 Israel time, on e07e195 — v39.82: an ordinary recipe's AI
+  answer is given time to arrive (the other session's, kitchen-reports #61); v39.83: a Self Test run keeps the
+  "Recent:" row's list; v39.84: the pull-to-refresh hint keeps its translation; Worker v107 since 15 Nov 06:12: the
+  page, video and photo fetches require a sign-in; the jobs are listed near the top of `docs/history/2026-11.md`).
+  Nothing waits on Test. The test copy (https://tonys-recipes-test.pages.dev, its own database and rules) follows `test`.
 - **The beta has had testers since Sunday 25 Oct 2026** and is **by invitation only**: the owner invites with
   ⚙️ → 👑 → ✉️ Invite testers (the congratulatory wording of v39.60); a tester's share button asks the owner for an
   invitation for someone else (v39.61: 📊 Households → ✉️ Beta invitation requests, with a red dot while one waits,
