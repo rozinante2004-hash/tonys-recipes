@@ -158,3 +158,29 @@ first clip's version 4 — then the video.
   same sources as files. The Morgana version stays at the first link, unchanged.
 - **Open:** Tony's look at the sketch (drawings, 86 s, drawn phone or real screens); then the video (1080 × 1080, the
   logo first).
+
+## Real screens, clean sound, the pause (16 Nov 2026)
+Tony, on the Bella sketch: "I think that we should add a small pause between "not a witch" and "probably". Apart for it,
+the sketch looks good. 86 seconds are fine. Please use the apps real screens. Please note that in the sketch there were
+audio glitches between the sceens."
+- **The glitches** were in the recordings: most of ElevenLabs' takes (asked with `previous_text`/`next_text`) end with a
+  short loud burst after a silence (the next scene's opening, or a breath, cut off), and some start abruptly. `clean.py`
+  cuts each take at the first quiet 40 ms after its last letter, fades its end (15 ms) and its start (6 ms), and writes
+  `voice/clean/`. The page also no longer starts the narration scene by scene with the tune fed by timers: the whole
+  sound (Bella, the tune, the effects) is made first as one recording — while the page opens — and plays in one piece,
+  the pictures and captions following its clock; "Music and sound effects" switches between that and Bella alone. The
+  video's soundtrack is the same recording.
+- **The pause:** 0.6 s of silence added in the quiet between "Not a witch." and "Probably." (about 1 s in all); the wink,
+  the sparkle and the bloop wait for "Probably" as before. The clip is now **86.6 s**.
+- **The app's real screens** (`wshots.js`, the app served locally with a stand-in signed-in owner, Firebase refused):
+  "The Witch's Kitchen" (`MKN-W1TC-HK1T`, made up) with her recipes — Eye of Newt Salad, Toadstool Tart, Dragon Pepper
+  Chili, then, as the clip adds them, Moonlight Elixir, Midnight Brew, Bubbling Bat Broth, Pumpkin Spell Pie, Scroll of
+  Sweet Dreams, Nightshade Tea (mint, not nightshade) and French onion soup. Their photos are **drawn** (`photos.js`, in
+  the clip's style; no one's photo). The phone shows, each from its word, with a tap where the finger goes: + Add Recipe ▾
+  → 📷 Scan recipe → the Scan a Recipe window → the recipe; 🔗 Import from URL with the link → ✍️ Paste free-hand text with
+  the text → the recipe; the video's link → the recipe; (the chat and the share sheet stay drawn — they are the phone's,
+  not the app's) → the shared recipe; 📁 Files ▾ → 📁 From File → the recipe; ✏️ Fill in manually → the form as the name
+  and three ingredients go in → Save Recipe → the recipe; at the end the collection on the phone and on a computer, the
+  soup ringed. Links are on `.example` addresses.
+- **The sketch:** https://claude.ai/artifact/Kg1LcVUQWirSF991tHcTLy (version 2), sources as its files.
+- **Open:** Tony's look; then the video (1080 × 1080, the logo first).
