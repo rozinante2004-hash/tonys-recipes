@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.88 -->
+<!-- Tony's Recipes Collection v39.89 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -2941,8 +2941,10 @@ window.selfTestUpdateGroupHeader = selfTestUpdateGroupHeader;
 // that opens a recipe of its own wrote its made-up recipe into that list, and only eight are kept: after Tony's run on
 // 15 Nov his "Recent:" row held one recipe — the other seven places were test recipes long gone. Kept for the run.
 function selfTestRecentKeep() { try { return localStorage.getItem('recent_views'); } catch(e) { return null; } }
+var _selfTestRecentAt = null;   // v39.89 — and when each was opened
 function selfTestRecentPutBack(was) {
   try { if (was == null) localStorage.removeItem('recent_views'); else localStorage.setItem('recent_views', was); } catch(e) {}
+  try { if (_selfTestRecentAt !== undefined && _selfTestRecentAt !== null) localStorage.setItem('recent_views_at', _selfTestRecentAt); } catch(e) {}
   try { if (typeof recentRowRefresh === 'function') recentRowRefresh(); } catch(e) {}
 }
 window.selfTestRecentKeep = selfTestRecentKeep; window.selfTestRecentPutBack = selfTestRecentPutBack;
@@ -2991,6 +2993,7 @@ async function _selfTestPark() {
   try { _spendWas = localStorage.getItem(AI_SPEND_KEY); } catch(e) {}
   // …and the recipes opened last (v39.83): a test's made-up recipe must not take a real one's place in "Recent:".
   var _recentWas = selfTestRecentKeep();
+  try { _selfTestRecentAt = localStorage.getItem('recent_views_at'); } catch(e) { _selfTestRecentAt = null; }
   // …and the order Tony chose on 📊 Households (v39.88): a test that sorts must not change it.
   var _mgSortWas = null;
   try { _mgSortWas = localStorage.getItem('mkn_manage_sort'); } catch(e) {}
@@ -8412,6 +8415,7 @@ async function householdUse(hid, role) {
   hhNoteSeen();                                                  // v37.58
   legalNoteOnMembership().catch(function(){});                   // v37.83
   if (!_selfTestRunning) setTimeout(function(){ hhReport({ afterSync: true }).catch(function(){}); }, 6000);   // v37.71 (v39.88: after the first sync)
+  if (!_selfTestRunning && typeof recentCloudStart === 'function') setTimeout(function(){ if (!_selfTestRunning) recentCloudStart(); }, 2500);   // v39.89
   if (!_selfTestRunning && typeof insightsStart === 'function') setTimeout(insightsStart, 3000);   // v38.15
   if (!_selfTestRunning && typeof testerWelcomeMaybe === 'function') setTimeout(function(){ testerWelcomeMaybe().catch(function(){}); }, 4000);   // v38.15
   if (!_selfTestRunning && typeof surveyMaybe === 'function') setTimeout(function(){ surveyMaybe().catch(function(){}); }, 9000);   // v38.18 — only once Tony opens it
@@ -9101,7 +9105,7 @@ async function accountDelete(opts) {
     // which household it last opened (homes/<uid>) and its settings (users/<uid>/prefs: the
     // terms it agreed to, the offers it was shown, display choices). Gone with it now.
     var ownRefs = [hhDb().collection('homes').doc(user.uid)];
-    ['legal', 'offers', 'ui'].forEach(function(p){ ownRefs.push(hhDb().collection('users').doc(user.uid).collection('prefs').doc(p)); });
+    ['legal', 'offers', 'ui', 'recent'].forEach(function(p){ ownRefs.push(hhDb().collection('users').doc(user.uid).collection('prefs').doc(p)); });   // v39.89: + the recipes opened last
     for (var o = 0; o < ownRefs.length; o++) { try { await ownRefs[o].delete(); } catch(e) {} }
     syncLog('auth', 'Deleting the account: its collections and places are done', user.email);
     progressStep(2, 'Your sign-in…');
@@ -11211,7 +11215,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.88';
+var APP_VERSION = 'v39.89';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -14777,7 +14781,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.88</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.89</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14865,7 +14869,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.88</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.89</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -22454,6 +22458,10 @@ function recentRowCols(g) {             // how many recipes one row of the list 
   try { if (matchMedia('(max-width: 700px)').matches) return getMobileCols(); } catch(e) {}
   return Math.max(1, Math.floor((((g && g.clientWidth) || window.innerWidth) + 16) / (220 + 16)));   // the desktop grid: 220 px columns, 16 px apart
 }
+// v39.89 — Tony, 16 Nov 2026: "The "Recent:" frame on the PC and on mobile holds different recipes … display the same
+// recipes on mobile and PC", and: "the number of recipes shown is not a set count, but rather the number of recipes which
+// can be displayed in a single row" (three on his phone, seven on his wide computer screen). The list is the same on all
+// the person's devices (recentCloud…, below); each screen shows as many of it, from the newest, as its row holds.
 function recentRowIds(q, g) {           // the ids for the row, newest first; [] when there is no row
   if (!recentRowWanted(q)) return [];
   var ids = []; try { ids = JSON.parse(localStorage.getItem('recent_views') || '[]'); } catch(e) {}
@@ -22461,6 +22469,106 @@ function recentRowIds(q, g) {           // the ids for the row, newest first; []
   var have = {}; recipes.forEach(function(r){ have[r.id] = 1; });
   return ids.filter(function(id){ return have[id]; }).slice(0, Math.max(1, recentRowCols(g)));
 }
+// ─── RECENT: THE SAME ON EVERY DEVICE (v39.89) ───────────────────────────────
+// Each device keeps recent_views (the ids, newest first, twelve — a wide screen's row holds seven or more) and recent_views_at (when each was opened). The person's
+// own record in the cloud — users/<uid>/prefs/recent, one entry per household: { <hid>: { list: [{ id, at }], at } }
+// (firestore.rules: their own settings, read by nobody else, deleted with the account) — holds the latest of all their
+// devices. Opening a recipe writes it, 1.5 s later and once; the record is listened to, so a recipe opened on the phone
+// is first in the computer's row at once. The two are merged by time: the newest opening of each recipe wins.
+var RECENT_KEEP = 12, RECENT_AT_KEY = 'recent_views_at';
+var _recentCloud = { key: '', list: null, unsub: null, timer: 0, sent: '' };
+function recentLocal() {
+  var ids = [], at = {};
+  try { ids = JSON.parse(localStorage.getItem('recent_views') || '[]'); } catch(e) {}
+  try { at = JSON.parse(localStorage.getItem(RECENT_AT_KEY) || '{}') || {}; } catch(e) {}
+  if (!Array.isArray(ids)) ids = [];
+  // (opened before v39.89: no time kept — older than any timed one, in the order they were in)
+  return ids.map(function(id, i){ return { id: id, at: +at[String(id)] || (RECENT_KEEP - i) }; });
+}
+function recentNoteOpened(id) {
+  var at = {};
+  try { at = JSON.parse(localStorage.getItem(RECENT_AT_KEY) || '{}') || {}; } catch(e) {}
+  var keep = {}, ids = [];
+  try { ids = JSON.parse(localStorage.getItem('recent_views') || '[]'); } catch(e) {}
+  (Array.isArray(ids) ? ids : []).forEach(function(x){ if (at[String(x)]) keep[String(x)] = at[String(x)]; });
+  keep[String(id)] = Date.now();
+  try { localStorage.setItem(RECENT_AT_KEY, JSON.stringify(keep)); } catch(e) {}
+}
+function recentMerge(a, b) {
+  var by = {};
+  (a || []).concat(b || []).forEach(function(e){
+    if (!e || e.id == null || e.id === '') return;
+    var k = String(e.id), t = +e.at || 0;
+    if (!by[k] || t > by[k].at) by[k] = { id: e.id, at: t };
+  });
+  return Object.keys(by).map(function(k){ return by[k]; }).sort(function(x, y){ return y.at - x.at; }).slice(0, RECENT_KEEP);
+}
+function recentSig(list) { return JSON.stringify((list || []).map(function(e){ return [String(e.id), +e.at || 0]; })); }
+function recentStoreLocal(list) {
+  var at = {};
+  list.forEach(function(e){ at[String(e.id)] = e.at; });
+  try { localStorage.setItem('recent_views', JSON.stringify(list.map(function(e){ return e.id; })));
+        localStorage.setItem(RECENT_AT_KEY, JSON.stringify(at)); } catch(e) {}
+}
+function recentCloudRef() {
+  if (!window._fbUser || !_fbUser.uid || !_household || !_household.hid || typeof hhDb !== 'function' || !hhDb()) return null;
+  return hhDb().collection('users').doc(_fbUser.uid).collection('prefs').doc('recent');
+}
+// What the cloud holds for this household, merged into this device's; the row drawn again if that changed it.
+function recentCloudTake(entry) {
+  var list = entry && Array.isArray(entry.list) ? entry.list.filter(function(e){ return e && e.id != null && e.id !== ''; }) : [];
+  _recentCloud.list = list;
+  var mine = recentLocal(), merged = recentMerge(mine, list);
+  if (recentSig(merged) !== recentSig(mine)) {
+    recentStoreLocal(merged);
+    try { if (typeof recentRowRefresh === 'function') recentRowRefresh(); } catch(e) {}
+  }
+  return recentSig(merged) !== recentSig(recentMerge(list, []));   // true: this device knows of openings the cloud does not
+}
+function recentCloudStart() {
+  var ref = recentCloudRef(); if (!ref || typeof ref.onSnapshot !== 'function') return false;
+  var key = _fbUser.uid + '/' + _household.hid, hid = _household.hid;
+  if (_recentCloud.unsub && _recentCloud.key === key) return true;
+  recentCloudStop();
+  _recentCloud.key = key; _recentCloud.list = null; _recentCloud.sent = '';
+  try {
+    _recentCloud.unsub = ref.onSnapshot(function(snap){
+      if (_recentCloud.key !== key) return;
+      var d = (snap && snap.exists && typeof snap.data === 'function' && snap.data()) || {};
+      if (recentCloudTake(d[hid])) recentCloudSoon();   // a device that opened recipes the cloud does not know of yet
+    }, function(e){
+      if (typeof hhRulesBehind === 'function' && hhRulesBehind(e, 'The recipes opened on your other devices appear in "Recent:" once the new database rules are published')) return;
+      syncLog('error', 'Could not read the recipes opened on your other devices', String(e && e.message).slice(0, 160));
+    });
+  } catch(e) { return false; }
+  return true;
+}
+function recentCloudStop() {
+  if (_recentCloud.unsub) { try { _recentCloud.unsub(); } catch(e) {} }
+  clearTimeout(_recentCloud.timer);
+  _recentCloud.unsub = null; _recentCloud.key = ''; _recentCloud.list = null; _recentCloud.sent = '';
+}
+function recentCloudSoon() {
+  if (!recentCloudRef()) return;
+  clearTimeout(_recentCloud.timer);
+  _recentCloud.timer = setTimeout(function(){ recentCloudPush().catch(function(){}); }, 1500);
+}
+async function recentCloudPush() {
+  var ref = recentCloudRef(); if (!ref) return false;
+  var hid = _household.hid, list = recentMerge(recentLocal(), _recentCloud.list || []), sig = recentSig(list);
+  if (!list.length || sig === _recentCloud.sent || (_recentCloud.list && sig === recentSig(recentMerge(_recentCloud.list, [])))) return false;
+  var doc = {}; doc[hid] = { list: list.map(function(e){ return { id: e.id, at: e.at }; }), at: Date.now() };
+  try { await ref.set(doc, { merge: true }); }
+  catch(e) {
+    if (typeof hhRulesBehind === 'function' && hhRulesBehind(e, 'The recipes opened on your other devices appear in "Recent:" once the new database rules are published')) return false;
+    syncLog('error', 'Could not save which recipes you opened last', String(e && e.message).slice(0, 160));
+    return false;
+  }
+  _recentCloud.sent = sig; _recentCloud.list = list;
+  return true;
+}
+window.recentMerge = recentMerge; window.recentCloudTake = recentCloudTake; window.recentCloudPush = recentCloudPush;
+window.recentCloudStart = recentCloudStart; window.recentCloudStop = recentCloudStop; window.recentLocal = recentLocal;
 function recentRowOf(list, q, g) {      // the recipes of the row, from the list being drawn
   var byId = {}; list.forEach(function(r){ byId[r.id] = r; });
   return recentRowIds(q, g).map(function(id){ return byId[id]; }).filter(Boolean);
@@ -22854,9 +22962,11 @@ function openView(id){
     var here = {}; recipes.forEach(function(r){ here[r.id] = 1; });
     recent = recent.filter(function(x){ return x!==id && here[x]; });
     recent.unshift(id);
-    if(recent.length>8) recent=recent.slice(0,8);
+    if(recent.length>12) recent=recent.slice(0,12);   // v39.89 — twelve (was eight): a wide screen's row
     localStorage.setItem('recent_views', JSON.stringify(recent));
+    recentNoteOpened(id);   // v39.89 — when, so every device of this person shows the same
   } catch(e){}
+  if (!_selfTestRunning && typeof recentCloudSoon === 'function') recentCloudSoon();
   loadLineMark(id);   // "never lose the line I'm on" — restored per recipe
   drawView();
   trapFocus('viewOverlay');   // 5c.1b — the dialog takes focus, and gives it back on close
@@ -33950,6 +34060,7 @@ async function signOut() {
 // v37.96 — the same without asking (a newcomer the family's copy cannot take).
 function signOutNow() {
   if (typeof linkLiveStop === 'function') linkLiveStop();   // v38.49
+  if (typeof recentCloudStop === 'function') recentCloudStop();   // v39.89
   try { document.documentElement.removeAttribute('data-mkn-member'); } catch(e) {}   // v37.98
   try { _fbReplies.list = []; _fbReplies.loaded = false; _fbReplies.uid = ''; pathDots({ replies: 0 });   // v38.00
         var fd = document.querySelector('#feedbackFab .fab-dot'); if (fd) fd.remove(); } catch(e) {}
@@ -36290,7 +36401,7 @@ var HELP_SYSTEM_PROMPT = [
   "- 🐄 The farm visitors speak more slowly, and the child and the female a little higher (v39.36)",
   "- 🐄 The farm visitors speak with the voice chosen for everyone: a child or a female is never a man's voice on a device that has another, Microsoft Edge's own child voice speaks for the child, and the owner's farm window says which voice speaks for each choice on that device (v39.35)",
   "- 🕐 Recently Viewed: a 'Recent' chip appears in the filter bar after you open any recipe — shows your last 8 viewed",
-  "- RECENT: (v39.80): the top row of the recipe list shows, in a box titled \"Recent:\", the recipes opened last on this device (newest first) — as many as fit in one row (in the List view, three). The rest of the list follows in the order chosen with ⇅ Sort, without those. The row is not shown while searching, while a filter is on, or when sorted by 🕐 Recently viewed (then the whole list is in that order). Only your own kitchen's recipes.",
+  "- RECENT: (v39.80): the top row of the recipe list shows, in a box titled \"Recent:\", the recipes you opened last (newest first), as many as fit in one row of that screen (three on a phone, more on a wide computer screen — in the List view, three) — opened on ANY of your devices (v39.89): open a recipe on the phone and it is first in \"Recent:\" on the computer too, at once; every device shows the same recipes, from the newest, as many as its row holds. Each person's own: nobody else in the household sees what you opened (it is kept in your own settings; the privacy statement says so). The rest of the list follows in the order chosen with ⇅ Sort, without those. The row is not shown while searching, while a filter is on, or when sorted by 🕐 Recently viewed (then the whole list is in that order). Only your own kitchen's recipes.",
   "- ⇅ Sort: the recipes start newest first (🆕 Recently added — the button says 🆕 Newest; v39.41). Click the button next to Grid/List to sort by Recently viewed, A–Z, Prep time, Difficulty, Most cooked, or 📋 Saved order (the order they are kept in); each time the app is opened it starts newest first again",
   "- 🍳 COOKED!: open a recipe and tap 🍳 Cooked! — 'How did it go?' asks for a rating (stars) and a Note for next time (e.g. too salty — halve the soy next time): ✅ Save, or Just log it — no note. The recipe then shows 🍳 Cooked N times · last <date> and its average rating, and 📓 Cooking log (N) lists the notes and ratings (✕ removes one). Recipes cooked 3+ times show a 🔥 badge; ⇅ Sort → 🔥 Most cooked. ☑ Select → 🍳 Cooked marks several at once (v39.43)",
   "- 📸 Auto-fetch missing photos: ··· More → 🧹 Tidy up → 📸 Auto-fetch missing photos — AI translates Hebrew names to English and finds a matching photo (Pexels, Unsplash, Pixabay or Wikimedia Commons) for every recipe that has none; a library that asks for a pause (\"too many searches\") is waited for and asked again. Afterwards ⚙️ → 💾 Backups and photos → ↩︎ Undo last auto-fetch takes away the photos it added and puts back what was there before (shown only after a run)",
@@ -39520,7 +39631,8 @@ function privacyEntries() {
       on: signedIn,
       sends: 'Your household\u2019s recipes and photos, and who is in it'
            + (featureOn('whatsapp') ? ', and the WhatsApp chats you chose to connect' : '')
-           + ', so every device of yours and of your family has them. Only the people in your household can read them.' },
+           + ', so every device of yours and of your family has them. Only the people in your household can read them.'
+           + ' And which recipes you opened last, so “Recent:” is the same on all your devices — for you alone.' },   // v39.89
     { who: 'Google Sign-in', when: signedIn ? 'always, while signed in' : 'only when you sign in', on: true,
       sends: 'Your e-mail address, so the app knows who you are. Nothing else.' },
     { who: 'Anthropic (Claude, the AI)', when: 'only when you use an AI feature', on: true,

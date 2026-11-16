@@ -21,7 +21,10 @@ where.
   household, the sort kept, a phone's columns by the sort, the recipe count as the badge counts it; v39.87, a shared
   link fetched with the sign-in, went out the same morning at 11:01 on 1355d4e; Worker v107 since 15 Nov 06:12: the
   page, video and photo fetches require a sign-in; the jobs are listed near the top of `docs/history/2026-11.md`).
-  Nothing waits on Test. The test copy (https://tonys-recipes-test.pages.dev, its own database and rules) follows `test`.
+  **v39.89 waits on Test** ("Recent:" the recipes opened last on any of the person's devices, the same on phone and
+  computer, as many as each screen's row holds; new rule `users/<uid>/prefs/recent`; Privacy Statement 1.17) — its
+  release needs Tony's yes.
+  The test copy (https://tonys-recipes-test.pages.dev, its own database and rules) follows `test`.
 - **The beta has had testers since Sunday 25 Oct 2026** and is **by invitation only**: the owner invites with
   ⚙️ → 👑 → ✉️ Invite testers (the congratulatory wording of v39.60); a tester's share button asks the owner for an
   invitation for someone else (v39.61: 📊 Households → ✉️ Beta invitation requests, with a red dot while one waits,
@@ -32,7 +35,7 @@ where.
   `docs/history/2026-11.md`, and update "Live now" here.
 - The rules were last published on 10 Nov 2026 (deploy-rules on 99558ae, success). A push to `test` that changes
   them publishes to the test project only; a release publishes to the family's and the beta's.
-- The Self Tests: **485 pass, 0 fail, 7 skipped** (the network ones) on v39.88, locally.
+- The Self Tests: **486 pass, 0 fail, 7 skipped** (the network ones) on v39.89, locally.
 
 **The audit of 10 Nov 2026 (`AUDIT-2026-11-10.md`) — Tony's answers of 11 Nov, and where each item is.** In the
 order of work; update this list as items land. Each change: Self Tests + knock-outs, the local checks, Help and
@@ -75,6 +78,8 @@ to `test`; releases only on his yes.
     three of them real lost writes, now logged); CI fails when more than 25 sit around a write.
 13. **H4 — keep the screen walk: done** (Tony: "Sure. Let's do that."): `tests/screen-walk.js`, in the repo since
     v39.63, passes or fails since v39.70 (*How to verify*).
+- **The instructional clip "How to add a recipe" (16 Nov 2026): `docs/instructional-clip.md`** — Tony's witch-and-cat
+  idea, three script options (A, B, C) and ten questions sent; waiting for his choice and answers.
 - **The promotional clip (12–13 Nov 2026): `docs/promo-clip.md`** — both clips are made and approved (English: Jon;
   Hebrew: Nimrod), with how they are made and Tony's decisions. **The in-app player (v39.72, live)** plays them
   from 🎬 Watch the one-minute clip in 💬 Ask About the App (Hebrew for a Hebrew interface, English otherwise; the
@@ -474,6 +479,7 @@ Look at the screenshots — that is what it is for. Not in CI (about 10 minutes)
 | **A recipe's video source plays inside the app by default; "Use external players only" turns it off (Tony, 14 Nov 2026).** | "Please allow all sources in recipes to be played in the in-app player by default. However, let it be overwritten, if desired, by a checkbox in settings, called 'use external players only'." Played: what `playerSource` knows (a video site's own embedded player in a sandboxed frame, or a video file). **Not played: a recipe's web page** — sites refuse framing and the app cannot tell beforehand, so a page stays a link; nor short links that hide their target. Never add a host to `frame-src` without adding it to `playerSource`, the privacy panel and the Privacy Statement's row (1.16). The player always offers ↗ Open outside the app: the app cannot see whether a framed video played. |
 | **Every clip opens on the logo — the frame a chat shows before it plays (Tony, 16 Nov 2026).** | "Please make a note to have all future clips to also open on the logo (the frame WhatsApp shows before playing)." WhatsApp (and most chats) show a video's first frame until it is played; a clip that fades in from nothing shows a blank square. Any new or remade clip, in any language, starts on the app's logo, large and sharp (`icons/icon-512.png`), from its very first frame — how it is done for the two clips of 14 Nov: `docs/promo-clip.md`, *The first frame is the logo*. Check the first frame (`ffmpeg -i <file> -frames:v 1 first.png`) before sending a clip. |
 | **📊 Households: one line per household; the sort kept on the device; a phone shows Household, Owner and the sort's two columns (Tony, 16 Nov 2026).** | His five points (`docs/history/2026-11.md`, v39.88). A tap opens one line (every value); a tap on it opens the details; ⊞ Expand all. The pairs beyond his two examples are `PHONE_COLS` in manage.js. The Recipes number is the top bar badge's (`recipeHonourCount`, collections' recipes each counted), never the entries. |
+| **"Recent:" is the person's own, the same on all their devices, as many as the row holds (Tony, 16 Nov 2026).** | "display the same recipes on mobile and PC"; "the number of recipes shown is not a set count, but rather the number of recipes which can be displayed in a single row" (three on his phone, seven on his wide screen). Kept in `users/<uid>/prefs/recent` (theirs alone — never another household member's view), merged by time, listened to live. |
 | **The one-minute clip: Hebrew for a Hebrew interface, English for every other language (Tony, 13 Nov 2026).** | "The Hebrew clip should be linked if the interface language is Hebrew. For all other languages link the English version. No point in linking both for everyone. Link it in the '💬 Ask About the App' modal." `tourClip()`. The clips play from the app's own site (`media/`), inside the app's player — no video site; "if installing the app is mandatory for the clip to be viewable, then it cannot be used as a marketing tool", so a link for people without the app must play in a plain browser. The service worker must keep leaving `media/` alone (a cached video cannot be seeked on an iPhone). |
 | **Sharing produces a file, not a public link.** | Publishing family recipes to a public endpoint is Tony's decision to make, not a share button's. |
 | **Declined:** 3.8 nutrition per-serving; 4.4 filter counts; 4.8 header touch targets. | Asked for and declined. Don't re-propose without reason. **5.6 (CI) was accepted in Aug 2026**; 3.1 (meal planner) is not declined but low priority — Tony cooks once a week. |

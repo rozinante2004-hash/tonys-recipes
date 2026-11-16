@@ -21552,9 +21552,9 @@ window.SELF_TESTS = [
       var N=function(i){ return 'ST recent '+i; };
       var names=function(sel){ return Array.prototype.map.call(g.querySelectorAll(sel), function(el){ var b=el.querySelector('.card-open'); return b?b.textContent:'?'; }); };
       try{
-        recipes=[1,2,3,4,5,6,7,8,9,10].map(function(i){ return normalizeRecipe({ id:889000+i, name:N(i), servings:'2', ingredients:[{a:'1',n:'x'}], steps:['y'] }); });
-        // opened last: 5, then 2, one no longer there, 7, 1, 9, 3, 10
-        localStorage.setItem('recent_views', JSON.stringify([889005, 889002, 123456789, 889007, 889001, 889009, 889003, 889010]));
+        recipes=[1,2,3,4,5,6,7,8,9,10,11,12,13,14].map(function(i){ return normalizeRecipe({ id:889000+i, name:N(i), servings:'2', ingredients:[{a:'1',n:'x'}], steps:['y'] }); });
+        // opened last: 5, then 2, one no longer there, 7, 1, 9, 3, 10, 12, 14, 11, 13 (v39.89: enough for a wide screen's row)
+        localStorage.setItem('recent_views', JSON.stringify([889005, 889002, 123456789, 889007, 889001, 889009, 889003, 889010, 889012, 889014, 889011, 889013]));
         if(si) si.value=''; showFavOnly=false; sortMode='added'; viewMode='grid';
         renderGrid();
         var box=g.querySelector(':scope > .recent-row');
@@ -21562,8 +21562,10 @@ window.SELF_TESTS = [
         if(g.firstElementChild!==box) throw new Error('the Recent row is not the first thing in the list');
         var title=box.firstElementChild;
         if(!title || !title.classList.contains('recent-title') || title.textContent!==i18nPhrase('Recent:')) throw new Error('the box has no "Recent:" title above its recipes');
-        var cols=recentRowCols(g), opened=[5,2,7,1,9,3,10].map(N), want=opened.slice(0, cols);
-        if(cols<1 || cols>=opened.length) throw new Error('this screen holds '+cols+' recipes to a row — the test needs fewer than seven');
+        // v39.89 — Tony: "the number of recipes shown is not a set count, but rather the number of recipes which can be
+        // displayed in a single row"
+        var cols=recentRowCols(g), opened=[5,2,7,1,9,3,10,12,14,11,13].map(N), want=opened.slice(0, cols);
+        if(cols<1 || cols>=opened.length) throw new Error('this screen holds '+cols+' recipes to a row — the test needs fewer than eleven');
         var inBox=names(':scope > .recent-row > .recipe-card');
         if(inBox.join('|')!==want.join('|')) throw new Error('the Recent row holds '+inBox.join(', ')+' — wanted '+want.join(', ')+' ('+cols+' to a row)');
         // one row: every card in it at the same height
@@ -21573,8 +21575,10 @@ window.SELF_TESTS = [
         var cs=getComputedStyle(box);
         if(!(parseFloat(cs.borderTopWidth)>=1) || cs.borderTopStyle!=='solid' || cs.borderTopColor===cs.backgroundColor || !(parseFloat(cs.borderBottomWidth)>=1)) throw new Error('no square round the Recent row');
         if(Math.abs(box.getBoundingClientRect().width-g.getBoundingClientRect().width)>2) throw new Error('the Recent box is not as wide as the list');
+        var firstRest=g.querySelector(':scope > .recipe-card');
+        if(firstRest && firstRest.getBoundingClientRect().top < box.getBoundingClientRect().bottom-1) throw new Error('a recipe of the rest sits beside the Recent box, not below it');
         // the rest: newest first (the order chosen), without the ones in the box — nothing twice, nothing lost
-        var rest=names(':scope > .recipe-card'), wantRest=[10,9,8,7,6,5,4,3,2,1].map(N).filter(function(n){ return want.indexOf(n)<0; });
+        var rest=names(':scope > .recipe-card'), wantRest=[14,13,12,11,10,9,8,7,6,5,4,3,2,1].map(N).filter(function(n){ return want.indexOf(n)<0; });
         if(rest.join('|')!==wantRest.join('|')) throw new Error('the rest of the list: '+rest.join(', ')+' — wanted '+wantRest.join(', '));
         // another order: the rest follows it
         sortMode='alpha'; renderGrid();
@@ -21583,7 +21587,7 @@ window.SELF_TESTS = [
         sortMode='added';
         // the List view: three in the box
         viewMode='list'; renderGrid();
-        if(names(':scope > .recent-row > .recipe-list-item').join('|')!==opened.slice(0,3).join('|') || names(':scope > .recipe-list-item').length!==7) throw new Error('the List view: '+names(':scope > .recent-row > .recipe-list-item').join(', '));
+        if(names(':scope > .recent-row > .recipe-list-item').join('|')!==opened.slice(0,3).join('|') || names(':scope > .recipe-list-item').length!==11) throw new Error('the List view: '+names(':scope > .recent-row > .recipe-list-item').join(', '));
         viewMode='grid'; renderGrid();
         // nothing redrawn for nothing
         if(recentRowRefresh()) throw new Error('the list was redrawn although the Recent row had not changed');
@@ -21614,13 +21618,83 @@ window.SELF_TESTS = [
         if(String(_selfTestPark).indexOf('selfTestRecentKeep()')<0 || String(_selfTestUnpark).indexOf('selfTestRecentPutBack(')<0) throw new Error('the Self Test run does not keep the recipes opened last');
         // nothing opened yet on this device: no row, every recipe in the list
         localStorage.removeItem('recent_views'); renderGrid();
-        if(g.querySelector('.recent-row') || names(':scope > .recipe-card').length!==10) throw new Error('a Recent row with nothing opened, or recipes missing');
+        if(g.querySelector('.recent-row') || names(':scope > .recipe-card').length!==14) throw new Error('a Recent row with nothing opened, or recipes missing');
         var k=String(HELP_SYSTEM_PROMPT||'');
-        if(!/RECENT: \(v39\.80\)/.test(k) || !/titled "Recent:"/.test(k)) throw new Error('Help does not know the Recent row');
+        if(!/RECENT: \(v39\.80\)/.test(k) || !/titled "Recent:"/.test(k) || !/ANY of your devices \(v39\.89\)/.test(k)) throw new Error('Help does not know the Recent row');
         if(I18N_EXTRA.indexOf('Recent:')<0) throw new Error('"Recent:" is not among the phrases to translate');
         return 'top row: '+want.join(', ')+' ('+cols+' to a row) in a box titled Recent:; the rest newest first / A–Z without them; three in the List view; a closed recipe goes first; no row while searching, filtered or in recent order';
       } finally {
         try{ if(keepRecent==null) localStorage.removeItem('recent_views'); else localStorage.setItem('recent_views', keepRecent); }catch(e){}
+        recipes=keepR; sortMode=keepSort; viewMode=keepView; showFavOnly=keepFav; if(si) si.value=keepQ;
+        try{ if(document.getElementById('viewOverlay').classList.contains('open')) closeM('viewOverlay'); }catch(e){}
+        renderGrid();
+      }
+    } },
+  { id:'recent_same_on_every_device', group:'Features', name:'"Recent:" — the recipes opened last on ANY of the person’s devices, the same on phone and computer (as many as each screen’s row holds): kept in their own settings in the cloud, merged by time, another device’s opening shown at once (v39.89)',
+    test: async()=>{
+      // Tony, 16 Nov 2026: "The "Recent:" frame on the PC and on mobile holds different recipes … display the same recipes
+      // on mobile and PC" — as many as the row holds ("on my PC's wide screen it shows 7")
+      var keepR=recipes, keepSort=sortMode, keepView=viewMode, si=document.getElementById('searchInput'), keepQ=si?si.value:'';
+      var keepFav=showFavOnly, g=document.getElementById('recipeGrid'), keepRV=null, keepAt=null;
+      try{ keepRV=localStorage.getItem('recent_views'); keepAt=localStorage.getItem('recent_views_at'); }catch(e){}
+      var real={ db:window._fbDb, user:window._fbUser, hh:window._household };
+      var N=function(i){ return 'ST everywhere '+i; }, ID=function(i){ return 887000+i; };
+      var row=function(){ return Array.prototype.map.call(g.querySelectorAll(':scope > .recent-row > .recipe-card .card-open'), function(b){ return b.textContent; }); };
+      var fits=function(list){ return list.map(N).slice(0, recentRowCols(g)).join('|'); };   // as many as this screen's row holds
+      // the cloud: the person's own settings document, listened to
+      var PATH='users/uE/prefs/recent', store={}, listeners=[], writes=[];
+      var snapOf=function(){ var d=store[PATH]; return { exists:!!d, data:function(){ return d ? JSON.parse(JSON.stringify(d)) : undefined; } }; };
+      var fire=function(){ listeners.slice().forEach(function(l){ l(snapOf()); }); };
+      var docAt=function(path){ return {
+        onSnapshot:function(ok){ listeners.push(ok); setTimeout(function(){ ok(snapOf()); }, 0); return function(){ listeners=listeners.filter(function(x){ return x!==ok; }); }; },
+        set:async function(data, opts){ var d=JSON.parse(JSON.stringify(data)); writes.push({ path:path, data:d, merge:!!(opts&&opts.merge) });
+          store[path]=Object.assign({}, (opts&&opts.merge&&store[path])||{}, d); setTimeout(fire, 0); } }; };
+      var fakeDb={ collection:function(c){ return { doc:function(u){ return { collection:function(c2){ return { doc:function(p){ return docAt(c+'/'+u+'/'+c2+'/'+p); } }; } }; } }; } };
+      try{
+        recentCloudStop();
+        recipes=[1,2,3,4,5,6,7,8].map(function(i){ return normalizeRecipe({ id:ID(i), name:N(i), servings:'2', ingredients:[{a:'1',n:'x'}], steps:['y'] }); });
+        window._fbDb=fakeDb; window._fbUser={ uid:'uE', email:'e@example.com' }; window._household={ hid:'hE', role:'owner', name:'E', links:[] };
+        if(si) si.value=''; showFavOnly=false; sortMode='added'; viewMode='grid';
+        // this device: 1 and 2, opened before v39.89 (no time kept); the other device: 5, 6, 7 — and a recipe gone since
+        localStorage.setItem('recent_views', JSON.stringify([ID(1), ID(2)])); localStorage.removeItem('recent_views_at');
+        var now=Date.now();
+        store[PATH]={ hE:{ list:[{ id:ID(5), at:now-1000 }, { id:886999, at:now-1500 }, { id:ID(6), at:now-2000 }, { id:ID(7), at:now-3000 }], at:now }, hOther:{ list:[{ id:1, at:1 }], at:1 } };
+        renderGrid();
+        if(recentCloudStart()!==true) throw new Error('the record in the cloud is not listened to');
+        await wait(30);
+        if(row().join('|')!==fits([5,6,7,1,2])) throw new Error('the other device’s recipes are not in "Recent:" here: '+row().join(', '));
+        var rv=JSON.parse(localStorage.getItem('recent_views')||'[]');
+        if(rv.slice(0,6).join(',')!==[ID(5),886999,ID(6),ID(7),ID(1),ID(2)].join(',')) throw new Error('merged by time: '+rv.join(','));
+        // this device knew of 1 and 2: they go up too, beside the other device's (and another household's entry untouched)
+        await wait(1700);
+        var w=writes[writes.length-1];
+        if(!w || w.path!==PATH || !w.merge || !w.data.hE || w.data.hOther) throw new Error('what was written: '+JSON.stringify(w));
+        if(w.data.hE.list.map(function(e){ return e.id; }).join(',')!==[ID(5),886999,ID(6),ID(7),ID(1),ID(2)].join(',')) throw new Error('the merged list was not written: '+JSON.stringify(w.data.hE.list));
+        if(!store[PATH].hOther) throw new Error('another household’s entry was lost');
+        var nw=writes.length; await wait(60);
+        if(writes.length!==nw) throw new Error('written again and again (the two devices would echo each other)');
+        // opened here: first here, and written for the others
+        if(String(openView).indexOf('recentCloudSoon()')<0 || String(openView).indexOf('recentNoteOpened(id)')<0) throw new Error('opening a recipe does not tell the other devices');
+        openView(ID(3)); await wait(40); closeM('viewOverlay'); await wait(40);
+        if(row().join('|')!==fits([3,5,6,7,1,2])) throw new Error('the recipe opened here is not first: '+row().join(', '));
+        if(await recentCloudPush()!==true) throw new Error('the recipe opened here was not written');
+        if(store[PATH].hE.list[0].id!==ID(3) || !(store[PATH].hE.list[0].at>=now)) throw new Error('written: '+JSON.stringify(store[PATH].hE.list[0]));
+        if(await recentCloudPush()!==false) throw new Error('written twice with nothing new');
+        // opened on the other device: first here at once, without anything done here
+        store[PATH].hE.list=[{ id:ID(8), at:Date.now()+5 }].concat(store[PATH].hE.list); store[PATH].hE.at=Date.now()+5; fire(); await wait(30);
+        if(row().join('|')!==fits([8,3,5,6,7,1,2])) throw new Error('the other device’s opening did not show here at once: '+row().join(', '));
+        // as many as the row holds (seven here: a wide screen shows seven, a phone three — the same list, from the newest)
+        if(row().length!==Math.min(7, recentRowCols(g))) throw new Error('the row holds '+row().length+' on a screen of '+recentRowCols(g)+' to a row');
+        // signed out: no longer listened to
+        recentCloudStop();
+        if(listeners.length) throw new Error('still listening after signing out');
+        if(String(signOutNow).indexOf('recentCloudStop')<0) throw new Error('signing out does not stop it');
+        return 'merged by time with the other device’s; written once (merge, this household only); opened here goes up; opened there shows here at once; '+recentRowCols(g)+' to a row: '+row().join(', ');
+      } finally {
+        recentCloudStop();
+        window._fbDb=real.db; window._fbUser=real.user; window._household=real.hh;
+        try{ if(keepRV==null) localStorage.removeItem('recent_views'); else localStorage.setItem('recent_views', keepRV);
+             if(keepAt==null) localStorage.removeItem('recent_views_at'); else localStorage.setItem('recent_views_at', keepAt); }catch(e){}
         recipes=keepR; sortMode=keepSort; viewMode=keepView; showFavOnly=keepFav; if(si) si.value=keepQ;
         try{ if(document.getElementById('viewOverlay').classList.contains('open')) closeM('viewOverlay'); }catch(e){}
         renderGrid();

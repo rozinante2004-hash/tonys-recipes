@@ -604,6 +604,13 @@ await check('an app admin writes one',              setDoc(doc(alice, 'i18n/he')
 await check('a household owner who is not an app admin cannot', setDoc(doc(carol, 'i18n/he'), { strings: {} }), false);
 await check('my own settings',                      setDoc(doc(bob, 'users/bob/prefs/ui'), { theme: 'dark' }), true);
 await check('not someone else\'s',                  getDoc(doc(carol, 'users/bob/prefs/ui')), false);
+// v39.89 — the recipes opened last ("Recent:" the same on every device): one's own, nobody else's
+await check('the recipes I opened last',             setDoc(doc(bob, 'users/bob/prefs/recent'), { H1: { list: [{ id: 5, at: 1 }], at: 1 } }), true);
+await check('…read back on my other device',         getDoc(doc(bob, 'users/bob/prefs/recent')), true);
+await check('…never by someone else',                getDoc(doc(carol, 'users/bob/prefs/recent')), false);
+await check('…nor written by them',                  setDoc(doc(carol, 'users/bob/prefs/recent'), { H1: { list: [], at: 1 } }), false);
+await check('…and deleted with my account',          deleteDoc(doc(bob, 'users/bob/prefs/recent')), true);
+await check('a setting by any other name is still refused', setDoc(doc(bob, 'users/bob/prefs/anything'), { a: 1 }), false);
 
 // v37.96 — the family's copy by invitation only (Tony's choice after the security audit).
 console.log('New households by invitation only');

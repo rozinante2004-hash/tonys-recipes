@@ -808,9 +808,11 @@ service cloud.firestore {
     match /users/{userId}/{document=**} {
       allow read, delete: if request.auth != null && request.auth.uid == userId;
     }
+    // v39.89 — and `prefs/recent`: the recipes the person opened last, one entry per household ({ <hid>: { list, at } }),
+    // so "Recent:" is the same on all their devices. Theirs alone, like the rest of this folder.
     match /users/{userId}/prefs/{pref} {
       allow create, update: if request.auth != null && request.auth.uid == userId
-        && pref in ['legal', 'offers', 'ui']
+        && pref in ['legal', 'offers', 'ui', 'recent']
         && request.resource.data.keys().size() <= 40;
     }
   }

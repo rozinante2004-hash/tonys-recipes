@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v39.88` — app. **Worker: v107**, deployed separately and versioned separately
+**Current version:** `v39.89` — app. **Worker: v107**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -2013,7 +2013,7 @@ must be checked against the empty string, because most character-class predicate
   twice as hard. Reads still accept `hp` for documents written by older versions; writes never
   emit it
 - `tonys_nextId_v1` → the next integer id (`NEXTID_KEY`)
-- `recent_views` → array of recently viewed recipe ids (max 8, most‑recent first)
+- `recent_views` → array of recently viewed recipe ids (max 8, most‑recent first); `recent_views_at` → { id: when opened } (v39.89)
 - `scale_<id>` → remembered serving multiplier per recipe
 - `tonys_view_mode` → `'grid'` | `'list'` — remembered grid/list toggle (phones default to `grid`)
 - `tonys_mobile_cols` → `1`–`5`, recipe cubes per row on phone‑width screens (Settings → Grid Layout; default `3`, drives the `--mobile-cols` CSS variable)
@@ -2474,6 +2474,21 @@ closing the recipe view, and 250 ms after a resize) redraws the grid only when t
 its `data-ids`. (v39.83) `openView` drops ids of recipes no longer in `recipes` as it records one; a Self Test run
 keeps `recent_views` aside (`selfTestRecentKeep` in `_selfTestPark`, `selfTestRecentPutBack` in `_selfTestUnpark`). Each card is built by one function (`cardHtml` / `itemHtml` in `renderGrid`) for the box and the
 rest.
+**(v39.89) The same list on every device** (Tony: "display the same recipes on mobile and PC", and "the number of
+recipes shown is not a set count, but rather the number of recipes which can be displayed in a single row"). The row is
+drawn as above (as many as one row holds); only the list behind it is shared. Each device keeps `recent_views` (now
+twelve, `RECENT_KEEP`, for wide screens) and `recent_views_at` ({id: ms}, `recentNoteOpened(id)` in `openView`; entries
+from before have no time: `RECENT_KEEP - index`, older than any timed one). The person's own record
+is `users/<uid>/prefs/recent` = `{ <hid>: { list: [{ id, at }], at } }` (firestore.rules: `prefs/recent` allowed beside
+legal/offers/ui — theirs alone; deleted with the account). `recentCloudStart()` (2.5 s after the household opens,
+not during a Self Test run) listens to it: `recentCloudTake(entry)` merges by time (`recentMerge`: per id the newest
+`at`, newest first, eight), stores, and `recentRowRefresh()`; it asks for a write when this device knows of openings
+the cloud does not. `openView` → `recentCloudSoon()` (1.5 s, once) → `recentCloudPush()`: `set({ <hid>: … }, { merge:
+true })`, nothing written when unchanged (`_recentCloud.sent`) — two devices do not echo each other. `signOutNow` →
+`recentCloudStop()`. A refused read or write before the rules are published goes to `hhRulesBehind`. Privacy
+Statement **1.17** (all 11 pages, re-keyed): "the recipes you opened last (only you see them, on all your devices)" in
+Your content; What leaves this device, Firebase: "And which recipes you opened last, so “Recent:” is the same on all
+your devices — for you alone." A Self Test run also keeps `recent_views_at` (`_selfTestRecentAt`).
 **Grid** (`#recipeGrid`): a `list` or `grid` view (`setView`). The choice is remembered in
 `tonys_view_mode`; desktop defaults to `list`, **phones default to `grid`** so the layout
 resembles the desktop cube grid. Cards show photo or emoji tile, a category **pill badge**
