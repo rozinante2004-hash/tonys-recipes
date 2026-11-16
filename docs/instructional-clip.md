@@ -146,3 +146,15 @@ first clip's version 4 — then the video.
   changes, then C major.
 - **Open:** Tony's look at the sketch; whether 84 s is acceptable (a faster take, or shorter lines, would bring it
   nearer 70); Maya or Bella if Morgana does not convince; then the video (1080 × 1080, the logo first).
+
+## The voice is Bella (16 Nov 2026)
+- Tony, after the Morgana sketch: "Morgana is not working. I have added a new voice instead - Tashi." Tashi ("Tashi –
+  Expressive Hindi Kids Narrator", `YIXhzp6l2M0ddzOGIbJ3`) said the same two lines as the others; then: "Please rebuild
+  the sketch with Bella."
+- **Bella** (`hbB2qXyS2GMyyZIZyhAH`) recorded the same eleven scenes the same way: 76.5 s of speech, **86 s** in all
+  (scenes start at 0, 9.5, 17.9, 28.1, 32.9, 39.0, 45.4, 54.6, 65.2, 73.2, 77.6 s). Nothing else changed: the pictures
+  still wait for the words, now timed from her recording.
+- **The sketch with Bella:** a new private artifact, "Witch Clip Sketch" (https://claude.ai/artifact/Kg1LcVUQWirSF991tHcTLy),
+  same sources as files. The Morgana version stays at the first link, unchanged.
+- **Open:** Tony's look at the sketch (drawings, 86 s, drawn phone or real screens); then the video (1080 × 1080, the
+  logo first).
