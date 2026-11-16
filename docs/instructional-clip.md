@@ -314,3 +314,26 @@ narration). The app's own words are the app's Hebrew (he.json); the recipes' ste
 - **11 the end screen:** the standing words (above).
 - **Tony on the third jar:** "just use 'לא נצנצים'. it will do the job" — the jar reads **לא נצנצים** (was my
   "בטוח לא נצנצים", from the English "Definitely not glitter").
+
+## The Hebrew sketch (16 Nov 2026)
+Tony: "It looks good. Please go ahead." (the slides' text) — "Can we use the ElevenLabs' latest model for them, like we did
+for Bella?" — "Let's go with Danit. However, she pronounces 'לא מכשפה' like a question (elevated pitch?). Can we make it
+more deadpan instead? also, please prolong the pause between 'לא מכשפה' and 'כנראה'".
+- **The voice: Danit** ("Danit - Natural Israeli Hebrew", `s0T0DT6EAPeX57MQpn3I`), chosen over Zina (`Tbj9UQjXon5RB9MPEyc2`)
+  — the only two Hebrew women's voices Tony found. **`eleven_v3`**, the whole narration in one take (`recvx.py`, seed 2:
+  the take that pauses most where the text has punctuation), cut into scenes with the timings fitted to the pauses
+  heard (`splitx.py`). What she is given (`hesay.py`): the approved text with vowel marks on the words a voice could
+  read as a man's (אַתְּ, לָךְ, שֶׁלָּךְ, בִּשְׁבִילֵךְ, מָצָאת, רָאִית); the captions are the text as approved.
+- **Scene 10 on its own** (`rec10he.py`, seven takes): "אז, [deadpan] לא מכשפה. [deadpan] כנראה." — a full stop after
+  מכשפה (an ellipsis lifts it). `pitch10he.py` measures the end of each piece; take **a2**: "לא מכשפה" falls 33% at its
+  end, "כנראה" 10% (the one-take version rose). `pick10he.py` times the three words from the pieces heard and makes the
+  pauses **0.5 s after "אז"** and **1.6 s before "כנראה"**. Level matched to the rest (−18.3 LUFS, `gain.json`).
+- **Pictures:** the app's Hebrew screens (`node wshots.js shots-he he`: the interface in Hebrew, "המטבח של המכשפה", the
+  approved recipe names and texts; the Method box's hint stays English in the app — her method is typed in instead,
+  and the gap is a separate task); the drawn words in Hebrew (`node wbuild.js he`): the jars in Gveret Levin
+  handwriting (עין טריטון · פלפל דרקון · לא נצנצים), "אפצ'י!", the website "פינת הקלחת" / "שיקוי חצות" / "שמרו מתכון",
+  "🔗 קישור לסרטון", the chat "צ'אט המכשפות" / "חברה" / "נסי את זה!" / "שיתוף", "מגילה-עתיקה.pdf", "פססט…",
+  "מרק בצל צרפתי", the end screen's standing words. Stage `dir="rtl" lang="he"`, Frank Ruhl Libre / Heebo; the app's
+  name and address stay left to right; Tony's "אז.." keeps its sentence in one caption.
+- **86.4 s.** Scenes 6 and 10 hold a little longer at Danit's pace. The sketch: https://claude.ai/artifact/YARKcw3QdciZxdn2Z4QeH5
+- **Open:** Tony's look; then the Hebrew video (1080 × 1080, the logo first).
