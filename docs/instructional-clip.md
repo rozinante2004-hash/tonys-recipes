@@ -255,3 +255,23 @@ The app's screens, in Hebrew: "המטבח של המכשפה" — סלט עין �
 "תה בלדונה" with "1 קנקן מים לאור ירח", "3 עלי נענע", "לחישה של דבש".
 Choices put to Tony: מכשפים (the usual plural) or מכשפות (as the witch on screen); בלדונה for nightshade; "לחצו" for a
 tap on a phone (and "הקליקו" for the click in the browser).
+
+## The Hebrew text, second draft: one woman (16 Nov 2026)
+Tony: "For starters, I would like to make this text refer to a single female and not use the plural form. Could you
+please rephrase accordingly? Start with אז.. נניח שאת מכשפה." (His opening kept exactly as he wrote it.) "Let's worry
+about the voice later."
+1. אז.. נניח שאת מכשפה. הלילה את רוצה לרקוח שיקוי חדש לגמרי. בעיה קטנה: אין לך מתכון טוב.
+2. את פותחת את ספר הלחשים של סבתא רבה שלך, ומצלמת את הדף. סריקת מתכון מקלידה אותו בשבילך.
+3. מצאת מתכון באתר המכשפות האהוב עלייך? ייבאי אותו מהקישור, הדביקי את הטקסט שלו, או הקליקי על "שמרו מתכון" בדפדפן.
+4. ראית אותו בסרטון? גם הקישור שלו עובד.
+5. חברה שלחה לך אותו בצ'אט? לחצי על שיתוף, ואז על My Kitchen Notes.
+6. מגילה עתיקה במחשב? הוסיפי אותה מקובץ.
+7. וכשחברה מכשפה לוחשת לך את הסוד שלה מעל כוס תה בלדונה, מלאי אותו ידנית. היא לעולם לא תדע.
+8. ועכשיו, נניח שאת לא באמת מכשפה. את פשוט רוצה מרק בצל צרפתי טוב. החליפי כובע, ועשי בדיוק אותו דבר.
+9. כל מתכון נוחת באוסף שלך, מסודר ושלם, בטלפון ובמחשב.
+10. אז, לא מכשפה... כנראה.
+11. My Kitchen Notes. כל המתכונים שלך, במקום אחד, לתמיד.
+- Scene 2 lost its opening "אז" (scene 1 now starts with one). The app's own button names stay as the app writes them
+  ("שמרו מתכון"). The closing line and the end screen's "כל המתכונים שלכם" become "שלך" to match — Tony to confirm.
+- For the recording: unpointed Hebrew lets a voice read לך / שלך / בשבילך / ראית / מצאת as a man's; when it is recorded
+  those words get vowel marks in what the voice is given (not in the captions).
