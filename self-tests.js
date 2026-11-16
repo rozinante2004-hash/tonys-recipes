@@ -7907,6 +7907,45 @@ window.SELF_TESTS = [
       } finally { _waHarvest=saved; }
     } },
 
+  { id:'signed_fetch_waits_for_signin', group:'Features', name:'🔗 A link shared into the app is fetched with the sign-in: a fetch made before Firebase has said who is signed in waits for it (once, ten seconds at most); a page that could not be read is said in the log (v39.87)',
+    test: async()=>{
+      // Tony's log, 16 Nov 2026: "Initial sharing of a recipe with the app returned no recipe. However, clicking Fetch
+      // again did retrieve it successfully." The share is fetched as the app opens; Firebase answers a moment later.
+      var real={ who:window.fbSignedInUser, settled:window._fbAuthSettled, auth:window._fbAuth, gave:_workerSignInGaveUp, fetch:window.fetch, log:window.syncLog };
+      var logged=[];
+      try{
+        window._fbAuth=window._fbAuth || { currentUser:null };
+        // the app has just opened: Firebase is there but has not said who is signed in
+        window._fbAuthSettled=false; _workerSignInGaveUp=false;
+        var user=null; window.fbSignedInUser=function(){ return user; };
+        var t0=Date.now(), p=workerBodySigned({ action:'fetch-url', url:'https://x.example/r' });
+        setTimeout(function(){ user={ getIdToken:async function(){ return 'tok-123'; } }; window._fbAuthSettled=true; }, 400);
+        var body=JSON.parse(await p);
+        if(body.idToken!=='tok-123') throw new Error('the fetch went out before the sign-in arrived — without it: '+JSON.stringify(body).slice(0,120));
+        if(Date.now()-t0<350) throw new Error('the fetch did not wait for Firebase');
+        // signed out, and Firebase has said so: no waiting at all
+        user=null; t0=Date.now(); body=JSON.parse(await workerBodySigned({ action:'fetch-url', url:'https://x.example/r' }));
+        if(body.idToken || Date.now()-t0>200) throw new Error('signed out (known), yet it waited or sent a sign-in');
+        // Firebase never answers (offline): ten seconds once, then never again
+        window._fbAuthSettled=false; _workerSignInGaveUp=true; t0=Date.now();
+        await workerBodySigned({ action:'fetch-url', url:'https://x.example/r' });
+        if(Date.now()-t0>200) throw new Error('after giving up once it waited again');
+        // a page the server could not fetch: the import says why in the log
+        window._fbAuthSettled=true; user={ getIdToken:async function(){ return 'tok-123'; } };
+        window.syncLog=function(kind, msg, d){ logged.push([kind, msg, String(d||'')]); return true; };
+        window.fetch=async function(){ return new Response(JSON.stringify({ error:'SIGN_IN: sign in first', signIn:true }), { status:401, headers:{ 'Content-Type':'application/json' } }); };
+        openUrlImportModal('https://recipes.example/stew');
+        await runUrlImport();
+        var e=logged.filter(function(l){ return l[0]==='error' && l[1]==='URL import failed'; })[0];
+        if(!e || !/could not be read/.test(e[2]) || !/Sign in first/.test(e[2])) throw new Error('the failed fetch left no reason in the log: '+JSON.stringify(logged).slice(0,200));
+        return 'waited for the sign-in ('+'tok sent); signed out: at once; gave up once: no more waiting; the failure logged with its reason';
+      } finally {
+        window.fbSignedInUser=real.who; window._fbAuthSettled=real.settled; window._fbAuth=real.auth; _workerSignInGaveUp=real.gave;
+        window.fetch=real.fetch; window.syncLog=real.log;
+        try{ closeM('urlImportOverlay'); }catch(e){}
+      }
+    } },
+
   { id:'photo_search_translates', group:'Features', name:'The manual photo search sends English, not Hebrew (5g.4)',
     test: async()=>{
       if(typeof photoQueryForSearch!=='function') throw new Error('photoQueryForSearch not defined');

@@ -20,7 +20,9 @@ where.
   **v39.86 + Worker v107** (released 15 Nov 2026, 22:39 Israel time, on 5e58b52 — v39.85–v39.86: the welcome for a
   tester the owner invited offers only "Start my own recipe collection", in Tony's words; before it, v39.82–v39.84 at
   08:18 on e07e195; Worker v107 since 15 Nov 06:12: the page, video and photo fetches require a sign-in; the jobs are
-  listed near the top of `docs/history/2026-11.md`). Nothing waits on Test. The test copy
+  listed near the top of `docs/history/2026-11.md`). **v39.87 waits on Test** (a link shared into the app is fetched
+  with the sign-in even as the app opens — the first try was refused since Worker v107; a failed page fetch is
+  logged). The test copy
   (https://tonys-recipes-test.pages.dev, its own database and rules) follows `test`.
 - **The beta has had testers since Sunday 25 Oct 2026** and is **by invitation only**: the owner invites with
   ⚙️ → 👑 → ✉️ Invite testers (the congratulatory wording of v39.60); a tester's share button asks the owner for an
@@ -32,7 +34,7 @@ where.
   `docs/history/2026-11.md`, and update "Live now" here.
 - The rules were last published on 10 Nov 2026 (deploy-rules on 99558ae, success). A push to `test` that changes
   them publishes to the test project only; a release publishes to the family's and the beta's.
-- The Self Tests: **482 pass, 0 fail, 7 skipped** (the network ones) on v39.86, locally.
+- The Self Tests: **483 pass, 0 fail, 7 skipped** (the network ones) on v39.87, locally.
 
 **The audit of 10 Nov 2026 (`AUDIT-2026-11-10.md`) — Tony's answers of 11 Nov, and where each item is.** In the
 order of work; update this list as items land. Each change: Self Tests + knock-outs, the local checks, Help and

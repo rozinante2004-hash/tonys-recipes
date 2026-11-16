@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.86 -->
+<!-- Tony's Recipes Collection v39.87 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -2645,8 +2645,23 @@ function aiMeterOn() {
 // checks it: a valid Firebase sign-in of this copy, the address confirmed). A body field, never a header (the v31
 // lesson), so it is harmless to a Worker that does not read it. Signed out, or the token not to be had: the call
 // goes without one, and the Worker decides — it serves it until the sign-in is required, then says why it refuses.
+// v39.87 — Tony, 16 Nov 2026: "Initial sharing of a recipe with the app returned no recipe. However, clicking Fetch again
+// did retrieve it successfully. This is not the first time it happens." A link shared into the app is fetched AS THE APP
+// OPENS (handleShareTarget), and Firebase says who is signed in a moment later (about a second on his iPhone). The
+// fetch went first, with no sign-in — and since Worker v107 (15 Nov) such a fetch is refused; "Fetch again", seconds
+// later, had the sign-in. So, as aiPrepare already does for the AI: while Firebase is there but has not yet said who is
+// signed in, the fetch waits for it — up to ten seconds, and only once if it never answers (offline).
+var _workerSignInGaveUp = false;
+async function workerSignInSettled() {
+  if (window._fbAuthSettled || !window._fbAuth || _workerSignInGaveUp) return true;
+  for (var i = 0; i < 40 && !window._fbAuthSettled; i++) await new Promise(function(r){ setTimeout(r, 250); });
+  if (!window._fbAuthSettled) _workerSignInGaveUp = true;
+  return !!window._fbAuthSettled;
+}
+window.workerSignInSettled = workerSignInSettled;
 async function workerSignIn() {
   var u = (typeof fbSignedInUser === 'function') ? fbSignedInUser() : window._fbUser;
+  if (!u) { await workerSignInSettled(); u = (typeof fbSignedInUser === 'function') ? fbSignedInUser() : window._fbUser; }
   if (!u || typeof u.getIdToken !== 'function') return '';
   try { return (await u.getIdToken()) || ''; } catch(e) { return ''; }
 }
@@ -11162,7 +11177,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.86';
+var APP_VERSION = 'v39.87';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -14728,7 +14743,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.86</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.87</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14816,7 +14831,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.86</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.87</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -28217,6 +28232,8 @@ async function runUrlImportSteps() {
       showVideoRecipeFallback(url, videoPost, videoPost === 'youtube' ? _videoAiWhy
         : [fbWhy ? 'Why the link alone did not work: ' + fbWhy.slice(0, 300) : '', _fbVideoUrl ? _videoAiWhy : 'Facebook gave no address for its video.'].filter(Boolean).join(' ')); return;
     }
+    // v39.87 — said in the log too: Tony's first try of 16 Nov left no trace of why it failed
+    syncLog('error', 'URL import failed', 'the page could not be read: ' + attempts.join('; ').slice(0, 260));
     res.innerHTML = importFailureHtml(url, attempts);
     return;
   }
