@@ -1,7 +1,7 @@
 {
  "lang": "es",
- "updatedAt": 1794775251097,
- "count": 2875,
+ "updatedAt": 1794849026630,
+ "count": 2876,
  "strings": {
   "\"Add to Home Screen\"": "Añadir a pantalla de inicio",
   "\"Open Bring!\"": "Abrir Bring!",
@@ -1684,6 +1684,7 @@
   "Your email address, so the access rules can tell family from strangers. Nothing else.": "Tu dirección de correo, para que las reglas de acceso distingan a la familia de desconocidos. Nada más.",
   "Your household's identifier: give it to people you know so they can link their kitchen with yours. It shows no e-mail address.": "El identificador de tu hogar: dáselo a la gente que conoces para que vinculen su cocina con la tuya. No muestra ninguna dirección de e-mail.",
   "Your household’s identifier": "El identificador de tu hogar",
+  "Your household’s recipes and photos, and who is in it, and the WhatsApp chats you chose to connect, so every device of yours and of your family has them. Only the people in your household can read them.": "Las recetas y fotos de tu hogar, quién está en él, y los chats de WhatsApp que decidiste conectar, para que estén en todos tus dispositivos y los de tu familia. Solo las personas de tu hogar pueden verlos.",
   "Your household’s recipes and photos, and who is in it, and the WhatsApp chats you chose to connect, so every device of yours and of your family has them. Only the people in your household can read them. And which recipes you opened last, so “Recent:” is the same on all your devices — for you alone.": "Las recetas y fotos de tu hogar, quién está en él, y los chats de WhatsApp que decidiste conectar, para que estén en todos tus dispositivos y los de tu familia. Solo las personas de tu hogar pueden verlos. Y qué recetas abriste por última vez, para que «Recientes:» sea igual en todos tus dispositivos — solo para ti.",
   "Your household’s recipes are there for you to read and cook from; adding and changing them is for its owner and the people with Read + Write. What you changed is kept on this device only, not in the household’s recipes.{1}": "Las recetas de tu hogar están para que leas y cocines con ellas; añadirlas o modificarlas es cosa del propietario y de quienes tienen Lectura y escritura. Lo que cambiaste se guardó solo en este dispositivo, no en las recetas del hogar.{1}",
   "Your invitation": "Tu invitación",

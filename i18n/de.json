@@ -1,7 +1,7 @@
 {
  "lang": "de",
- "updatedAt": 1794775251097,
- "count": 2875,
+ "updatedAt": 1794849026630,
+ "count": 2876,
  "strings": {
   "\"Add to Home Screen\"": "Zum Home-Bildschirm hinzufügen",
   "\"Open Bring!\"": "Bring! öffnen",
@@ -1684,6 +1684,7 @@
   "Your email address, so the access rules can tell family from strangers. Nothing else.": "Deine E-Mail-Adresse, damit die Zugriffsregeln Familie von Fremden unterscheiden können. Sonst nichts.",
   "Your household's identifier: give it to people you know so they can link their kitchen with yours. It shows no e-mail address.": "Die Kennung deines Haushalts: gib sie Leuten, die du kennst, damit sie ihre Küche mit deiner verknüpfen können. Sie zeigt keine E-Mail-Adresse.",
   "Your household’s identifier": "Die Kennung deines Haushalts",
+  "Your household’s recipes and photos, and who is in it, and the WhatsApp chats you chose to connect, so every device of yours and of your family has them. Only the people in your household can read them.": "Die Rezepte und Fotos deines Haushalts, wer dabei ist, und die WhatsApp-Chats, die du verknüpft hast, damit jedes Gerät von dir und deiner Familie sie hat. Nur Mitglieder deines Haushalts können sie lesen.",
   "Your household’s recipes and photos, and who is in it, and the WhatsApp chats you chose to connect, so every device of yours and of your family has them. Only the people in your household can read them. And which recipes you opened last, so “Recent:” is the same on all your devices — for you alone.": "Die Rezepte und Fotos deines Haushalts, wer dabei ist, und die WhatsApp-Chats, die du verknüpft hast, damit jedes Gerät von dir und deiner Familie sie hat. Nur Mitglieder deines Haushalts können sie lesen. Und welche Rezepte du zuletzt geöffnet hast, damit „Zuletzt angesehen:“ auf all deinen Geräten gleich ist — nur für dich.",
   "Your household’s recipes are there for you to read and cook from; adding and changing them is for its owner and the people with Read + Write. What you changed is kept on this device only, not in the household’s recipes.{1}": "Die Rezepte deines Haushalts sind zum Lesen und Nachkochen da; Hinzufügen und Ändern ist Sache des Besitzers und der Personen mit Lesen + Schreiben. Was du geändert hast, bleibt nur auf diesem Gerät, nicht in den Rezepten des Haushalts.{1}",
   "Your invitation": "Deine Einladung",

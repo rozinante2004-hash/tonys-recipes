@@ -1,7 +1,7 @@
 {
  "lang": "pt",
- "updatedAt": 1794775251097,
- "count": 2640,
+ "updatedAt": 1794849026630,
+ "count": 2641,
  "strings": {
   "\"Add to Home Screen\"": "Adicionar à tela inicial",
   "\"Open Bring!\"": "Abrir Bring!",
@@ -1534,6 +1534,7 @@
   "Your e-mail address, so the app knows who you are. Nothing else.": "Seu e-mail, para o app saber quem você é. Só isso.",
   "Your household's identifier: give it to people you know so they can link their kitchen with yours. It shows no e-mail address.": "O identificador da sua casa: dê-o a pessoas que você conhece para que possam vincular a cozinha delas à sua. Ele não mostra nenhum e-mail.",
   "Your household’s identifier": "O identificador da sua casa",
+  "Your household’s recipes and photos, and who is in it, and the WhatsApp chats you chose to connect, so every device of yours and of your family has them. Only the people in your household can read them.": "As receitas e fotos da sua casa, quem faz parte dela, e as conversas do WhatsApp que você escolheu conectar, para que todos os seus dispositivos e os da sua família os tenham. Só as pessoas da sua casa podem lê-los.",
   "Your household’s recipes and photos, and who is in it, and the WhatsApp chats you chose to connect, so every device of yours and of your family has them. Only the people in your household can read them. And which recipes you opened last, so “Recent:” is the same on all your devices — for you alone.": "As receitas e fotos da sua casa, quem faz parte dela, e as conversas do WhatsApp que você escolheu conectar, para que todos os seus dispositivos e os da sua família os tenham. Só as pessoas da sua casa podem lê-los. E quais receitas você abriu por último, para que “Recentes:” seja igual em todos os seus dispositivos — só para você.",
   "Your household’s recipes are there for you to read and cook from; adding and changing them is for its owner and the people with Read + Write. What you changed is kept on this device only, not in the household’s recipes.{1}": "As receitas da sua família estão aí para você ler e cozinhar; adicionar e alterar receitas é tarefa do dono e de quem tem Leitura e escrita. O que você alterou fica só neste aparelho, não nas receitas da família.{1}",
   "Your invitation": "Seu convite",

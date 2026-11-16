@@ -1,7 +1,7 @@
 {
  "lang": "hu",
- "updatedAt": 1794775251097,
- "count": 2653,
+ "updatedAt": 1794849026630,
+ "count": 2654,
  "strings": {
   "\"Add to Home Screen\"": "Hozzáadás a kezdőképernyőhöz",
   "\"Open Bring!\"": "Bring! megnyitása",
@@ -1541,6 +1541,7 @@
   "Your e-mail address, so the app knows who you are. Nothing else.": "Az e-mail címed, hogy az app tudja, ki vagy. Semmi más.",
   "Your household's identifier: give it to people you know so they can link their kitchen with yours. It shows no e-mail address.": "A háztartásod azonosítója: add meg olyanoknak, akikben megbízol, hogy összekapcsolhassák a konyhájukat a tiéddel. E-mail címet nem mutat.",
   "Your household’s identifier": "A háztartásod azonosítója",
+  "Your household’s recipes and photos, and who is in it, and the WhatsApp chats you chose to connect, so every device of yours and of your family has them. Only the people in your household can read them.": "A háztartásod receptjei és fotói, a tagjai, és a WhatsApp beszélgetések, amiket összekapcsoltál — hogy minden eszközödön és a családodéin is megjelenjenek. Csak a háztartásod tagjai olvashatják.",
   "Your household’s recipes and photos, and who is in it, and the WhatsApp chats you chose to connect, so every device of yours and of your family has them. Only the people in your household can read them. And which recipes you opened last, so “Recent:” is the same on all your devices — for you alone.": "A háztartásod receptjei és fotói, a tagjai, és a WhatsApp beszélgetések, amiket összekapcsoltál — hogy minden eszközödön és a családodéin is megjelenjenek. Csak a háztartásod tagjai olvashatják. És hogy mely recepteket nyitottad meg legutóbb, hogy a „Legutóbbiak:” minden eszközödön ugyanaz legyen — csak neked.",
   "Your household’s recipes are there for you to read and cook from; adding and changing them is for its owner and the people with Read + Write. What you changed is kept on this device only, not in the household’s recipes.{1}": "A háztartásod receptjei arra valók, hogy olvasd és főzz belőlük; a hozzáadás és módosítás a tulajdonosé és az Olvasás + írás jogosultságú tagoké. Amit módosítottál, csak ezen az eszközön marad meg, nem kerül be a háztartás receptjei közé.{1}",
   "Your invitation": "A meghívásod",
