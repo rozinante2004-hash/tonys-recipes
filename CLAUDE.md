@@ -17,13 +17,11 @@ where.
 **Live now**
 - The family's copy (`main`, https://rozinante2004-hash.github.io/tonys-recipes/ — it forwards to the community app)
   and the community app (`beta`, https://mykitchennotes.community, Firebase project my-kitchen-notes-beta) run
-  **v39.87 + Worker v107** (released 16 Nov 2026, 11:01 Israel time, on 1355d4e — a link shared into the app is
-  fetched with the sign-in even as the app opens, and a failed page fetch is logged; v39.85–v39.86, the invited
-  tester's welcome, went out on 15 Nov at 22:39 on 5e58b52; Worker v107 since 15 Nov 06:12: the page, video and photo
-  fetches require a sign-in; the jobs are listed near the top of `docs/history/2026-11.md`). **v39.88 waits on Test**
-  (📊 Households one line per household, the sort kept, a phone's columns by the sort, the recipe count as the badge
-  counts it — Tony: "Once done and green, please move it also to Beta and Family").
-  The test copy (https://tonys-recipes-test.pages.dev, its own database and rules) follows `test`.
+  **v39.88 + Worker v107** (released 16 Nov 2026, 15:55 Israel time, on b826d69 — 📊 Households one line per
+  household, the sort kept, a phone's columns by the sort, the recipe count as the badge counts it; v39.87, a shared
+  link fetched with the sign-in, went out the same morning at 11:01 on 1355d4e; Worker v107 since 15 Nov 06:12: the
+  page, video and photo fetches require a sign-in; the jobs are listed near the top of `docs/history/2026-11.md`).
+  Nothing waits on Test. The test copy (https://tonys-recipes-test.pages.dev, its own database and rules) follows `test`.
 - **The beta has had testers since Sunday 25 Oct 2026** and is **by invitation only**: the owner invites with
   ⚙️ → 👑 → ✉️ Invite testers (the congratulatory wording of v39.60); a tester's share button asks the owner for an
   invitation for someone else (v39.61: 📊 Households → ✉️ Beta invitation requests, with a red dot while one waits,
