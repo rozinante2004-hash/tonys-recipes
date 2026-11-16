@@ -184,3 +184,18 @@ audio glitches between the sceens."
   soup ringed. Links are on `.example` addresses.
 - **The sketch:** https://claude.ai/artifact/Kg1LcVUQWirSF991tHcTLy (version 2), sources as its files.
 - **Open:** Tony's look; then the video (1080 × 1080, the logo first).
+
+## "So, not a witch… Probably." (16 Nov 2026)
+Tony: "The pause has made a big improvement. However, I'm still not happy with the 'not a witch... Probably' sentence.
+Let's try changing it to 'So, not a witch... Probably'. When saying 'probably', it sounds like there is going to be
+another word coming after it. It should sound final. A 1-word sentence. I'd like to 'hear' the period at the end."
+- Scene 10's text is now "So, not a witch... Probably." (the caption shows "So, not a witch…" then "Probably.").
+- Fifteen takes by Bella (`rec10.py`, `rec10b.py`): the whole line with nothing after it; the line followed by "That's
+  all I'm saying." (so "Probably." is a sentence that ends before another one starts) and then cut after "Probably."
+  (`pick10.py`); different seeds and steadiness; and two in ElevenLabs' newer model (`eleven_v3`) asked for a deadpan
+  "Probably.". `pitch.py` measures how the pitch of "Probably" moves: every take ends its last syllable on a level
+  ~190–200 Hz; the one that falls most (−16% from the first syllable) is the one followed by a further sentence.
+- **In the sketch now: take A** (that one), with the same clean edges and ~1 s before "Probably" (0.3 s added to her own
+  pause). Tony has the four best to hear (A, B, C as they would sound in the clip; D the newer model's deadpan) —
+  `listen10/probably-A…D.mp3` in the session; he picks, or asks for another way.
+- The sketch: https://claude.ai/artifact/Kg1LcVUQWirSF991tHcTLy (version 3), **86.2 s**.
