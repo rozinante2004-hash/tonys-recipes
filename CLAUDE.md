@@ -17,14 +17,12 @@ where.
 **Live now**
 - The family's copy (`main`, https://rozinante2004-hash.github.io/tonys-recipes/ — it forwards to the community app)
   and the community app (`beta`, https://mykitchennotes.community, Firebase project my-kitchen-notes-beta) run
-  **v39.88 + Worker v107** (released 16 Nov 2026, 15:55 Israel time, on b826d69 — 📊 Households one line per
-  household, the sort kept, a phone's columns by the sort, the recipe count as the badge counts it; v39.87, a shared
-  link fetched with the sign-in, went out the same morning at 11:01 on 1355d4e; Worker v107 since 15 Nov 06:12: the
-  page, video and photo fetches require a sign-in; the jobs are listed near the top of `docs/history/2026-11.md`).
-  **v39.89 waits on Test** ("Recent:" the recipes opened last on any of the person's devices, the same on phone and
-  computer, as many as each screen's row holds; new rule `users/<uid>/prefs/recent`; Privacy Statement 1.17) — its
-  release needs Tony's yes.
-  The test copy (https://tonys-recipes-test.pages.dev, its own database and rules) follows `test`.
+  **v39.89 + Worker v107** (released 16 Nov 2026, 19:09 Israel time, on 7282293 — "Recent:" the same list on every
+  device of a person, each screen as many as its row holds; the rule `users/<uid>/prefs/recent`, published; Privacy
+  Statement 1.17; v39.88, 📊 Households one line per household and the recipe count as the badge counts it, went out
+  the same afternoon at 15:55 on b826d69; Worker v107 since 15 Nov 06:12: the page, video and photo fetches require a
+  sign-in; the jobs are listed near the top of `docs/history/2026-11.md`). Nothing waits on Test. The test copy
+  (https://tonys-recipes-test.pages.dev, its own database and rules) follows `test`.
 - **The beta has had testers since Sunday 25 Oct 2026** and is **by invitation only**: the owner invites with
   ⚙️ → 👑 → ✉️ Invite testers (the congratulatory wording of v39.60); a tester's share button asks the owner for an
   invitation for someone else (v39.61: 📊 Households → ✉️ Beta invitation requests, with a red dot while one waits,
