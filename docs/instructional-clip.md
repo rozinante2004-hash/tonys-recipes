@@ -102,3 +102,27 @@ English, Nimrod in Hebrew), square 1080 × 1080, a caption for every sentence, n
     your recipes, in one place, for good." spoken; "All your recipes. One place. For good." on the screen.)
 
 Still open: which script — A, B or C (or a mix) — to take on with every way in.
+
+## Script A, version 2 — Tony's choice (16 Nov 2026), with every way in
+Tony: "I like the A & C scripts most. they are all good. However, for now I will select A. Please rewrite it taking my
+answers into account." — every way in; a woman's voice (he picks from his ElevenLabs voices); the witch's face under the
+brim, nothing that says an age; the straw sun hat; the soup drawn; square; the last clip's closing line. About 165 spoken
+words: some 63 seconds of speech, about 70 seconds in all (under his 90).
+
+| # | Narration (a woman's voice) | Caption / button shown | Picture |
+|---|---|---|---|
+| 0 | — | — | The logo, large, alone (the first frame); a chime; it shrinks onto a potion bottle's label. Candles flicker on: a stone basement, a green cauldron bubbling, jars ("Eye of newt", "Dragon pepper", "Definitely not glitter"), the cat on a pile of books. |
+| 1 | Let's say you're a witch. Tonight you want to brew a brand-new potion. Small problem: you don't have a good recipe. | — | The witch (pointy hat, face under the brim, long sleeves) stirs; the cauldron burps a question-mark of smoke; the cat ducks. |
+| 2 | So you open your great-grandmother's spellbook and take a photo of the page. Scan recipe types it out for you. | 📷 Scan recipe (camera/photo) | The huge book thumps open; the cat sneezes in the dust; the phone's flash; "Moonlight Elixir" appears in the app, ingredients and steps. (Its menu shows 📸 Take a photo now, 🖼️ Choose from gallery, 🎬 A video.) |
+| 3 | Found one on your favourite witchy website? Import it from its link, paste its text, or click Save-recipe in your browser. | 🔗 Import from URL · ✍️ Paste free-hand text · 🧩 Save-recipe | A laptop balanced on the cauldron's rim, "Cauldron Corner" on screen; the cat bats at the pointer; three quick taps. |
+| 4 | Saw it in a video? Its link works too. | 🎬 a video's link → 🔗 Import from URL | A crystal ball playing a little potion video; the link flies into the app; the recipe is written out. |
+| 5 | A friend sent it in a chat? Tap Share, then My Kitchen Notes. | Share → Save to My Kitchen Notes | A phone with a chat bubble holding a link; Share; the app's icon in the share menu. |
+| 6 | An ancient scroll on your computer? Add it From File. | 📁 Files & backup → From File | A scroll unrolls into a document icon (Word, PDF); the cat chases its end. |
+| 7 | And when a witch friend whispers her secret over nightshade tea, fill it in by hand. She'll never know. | ✏️ Fill in manually | A second witch (also under her brim) whispering behind her hand; the form fills in; the cat "takes notes" with its paw. |
+| 8 | Now, let's say you're not really a witch. You just want a good French onion soup. Change hats, and do exactly the same. | — | Purple smoke: the pointy hat flies off, a straw sun hat lands; the basement becomes a sunny everyday kitchen, the cauldron a soup pot; a fast montage of the same ways in, with the soup (drawn). |
+| 9 | Every recipe lands in your collection, tidy and complete, on your phone and your computer. | — | The soup in the recipe list on a phone and a computer, side by side. |
+| 10 | Not a witch. Probably. | — | The cat walks in front of the soup, stops, turns slowly to us — and winks. A sparkle at its tail's white tip; the soup bubbles once, by itself. |
+| 11 | My Kitchen Notes. All your recipes, in one place, for good. | All your recipes. One place. For good. · mykitchennotes.community · By invitation only. For now | The end screen, as in the first clip. |
+
+**Next:** Tony's voices (a sample line by each, as for Jon), then the sketch — the pictures moving to the recorded words, as the
+first clip's version 4 — then the video.
