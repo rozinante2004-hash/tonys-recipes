@@ -199,3 +199,22 @@ another word coming after it. It should sound final. A 1-word sentence. I'd like
   pause). Tony has the four best to hear (A, B, C as they would sound in the clip; D the newer model's deadpan) —
   `listen10/probably-A…D.mp3` in the session; he picks, or asks for another way.
 - The sketch: https://claude.ai/artifact/Kg1LcVUQWirSF991tHcTLy (version 3), **86.2 s**.
+
+## The newer model throughout; a pause after "So," (16 Nov 2026)
+Tony: "The last option indeed sounds best. However, we also need to add a pause between 'so' and 'not a witch'. I am
+also a bit concerned about the difference between the last sentence and the rest of the clip. The difference is
+noticeable. Perhaps we should use the same newer model for the entire clip?"
+- **The whole narration in `eleven_v3`, in one take** (`recv3.py`: all eleven scenes as paragraphs of one request, so
+  Bella sounds the same from start to end; seed 2 chosen — its pauses match the punctuation best, 75.4 s read).
+  **Scene 10 stays take D** (the one Tony chose: "So, not a witch... [deadpan] Probably.", the same model).
+- The newer model's own word timings run early (up to ~0.5 s at a pause; `v3check.py`), so `split3.py` moves every gap
+  after a punctuation mark onto the pause actually heard there, spreads the letters between to match, and cuts the take
+  into scenes in the pauses between them (`voice3/`). ElevenLabs' exact word-timing service (forced alignment) and its
+  transcription are not allowed for the session's key (permissions `forced_alignment`, `speech_to_text`).
+- **The pause after "So,":** 0.35 s added in her 40 ms breath there (`clean.py`, GAPS). Take D keeps its own ~1 s before
+  "Probably".
+- **One level:** the one take was 3.5 dB louder than the earlier takes and take D 5 dB quieter than the take around it;
+  all brought to −18.3 LUFS, the level the music and effects were balanced against (`voice3/gain.json`).
+- She reads faster in this model: the clip is **80.8 s**; scenes 4, 5, 6, 7 and 10 hold 0.4–0.9 s longer after her last
+  word, so the recipe that arrives is seen and the cat's wink ends before the end screen.
+- The sketch: https://claude.ai/artifact/Kg1LcVUQWirSF991tHcTLy (version 4).
