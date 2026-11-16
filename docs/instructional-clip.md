@@ -312,3 +312,5 @@ narration). The app's own words are the app's Hebrew (he.json); the recipes' ste
 - **9 the collection:** "המטבח של המכשפה" — מרק בצל צרפתי, תה בלדונה, מגילת חלומות מתוקים, פאי דלעת מכושף, מרק עטלפים
   מבעבע, שיקוי חצות, שיקוי אור ירח, צ'ילי פלפל דרקון, טארט זבוביות, סלט עין טריטון.
 - **11 the end screen:** the standing words (above).
+- **Tony on the third jar:** "just use 'לא נצנצים'. it will do the job" — the jar reads **לא נצנצים** (was my
+  "בטוח לא נצנצים", from the English "Definitely not glitter").
