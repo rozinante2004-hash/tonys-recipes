@@ -218,3 +218,12 @@ noticeable. Perhaps we should use the same newer model for the entire clip?"
 - She reads faster in this model: the clip is **80.8 s**; scenes 4, 5, 6, 7 and 10 hold 0.4–0.9 s longer after her last
   word, so the recipe that arrives is seen and the cat's wink ends before the end screen.
 - The sketch: https://claude.ai/artifact/Kg1LcVUQWirSF991tHcTLy (version 4).
+
+## The English video (16 Nov 2026)
+Tony, on version 4 of the sketch: "Sounds great. Go ahead".
+- `my-kitchen-notes-add-a-recipe-en.mp4`: 1080 × 1080, 30 frames a second, H.264 + AAC, **80.8 s**, 9.4 MB — sent to
+  Tony in the session. Made as the first clip was (`render.js`: each frame set by the clip's clock with
+  `__clip.seek(t)`, every picture decoded first; the sound from `__clip.soundtrack()`), then the sound brought to
+  −15.9 LUFS (the first clip's English video is −15.3) so the two play at about the same loudness.
+- **The first frame is the logo** (checked), as every clip's must be.
+- Not yet in the app or on the site; the Hebrew version waits for Tony's Hebrew script (he fixes the jokes).
