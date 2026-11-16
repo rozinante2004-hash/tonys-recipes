@@ -337,3 +337,22 @@ more deadpan instead? also, please prolong the pause between 'לא מכשפה' a
   name and address stay left to right; Tony's "אז.." keeps its sentence in one caption.
 - **86.4 s.** Scenes 6 and 10 hold a little longer at Danit's pace. The sketch: https://claude.ai/artifact/YARKcw3QdciZxdn2Z4QeH5
 - **Open:** Tony's look; then the Hebrew video (1080 × 1080, the logo first).
+
+## Tony's five changes to the Hebrew sketch (16 Nov 2026)
+Tony: "I've watched the clip. It looks nice. Some changes ... 1. When writing in Hebrew 'שמרו מתכון' it actually reads as
+'שימרו מתכון' 2. The correct term is 'סבתא רבתה' and not 'סבתא רבה'. 3. 'מלאי' is pronounced as Mul-E. 4. At the end, I
+could not hear the 'My' in 'My kitchen notes' towards the end scene. I've listened to it twice and it is indeed missing.
+5. When providing me with a sketch or a clip to watch, please add controls, so I could pause or stop it, and to drag the
+timeline back and forth."
+1. Danit now says **שִׁמְרוּ** (the voice's text has the vowel marks; caption and button stay "שמרו מתכון", as the app).
+2. **"סבתא רבתה"** in the caption and the narration (his word; the voice gets "רַבָּתָה").
+3. **מַלְּאִי** — vowel marks in the voice's text.
+4. The **"My"** was lost where Danit's one take was cut between scenes 10 and 11 (the boundary fell inside "My Kitchen
+   Notes"). Scene 11 recorded again on its own; so were scenes 2, 3 and 7 for 1–3 (`recscene.py`, two takes each, the one
+   closest to the one take's pace chosen; `scenefix.py` fits their timings like `splitx.py`). Their level matched to the
+   rest (each about −18 LUFS). Scenes 1, 4, 5, 6, 8, 9 stay from the one take; scene 10 is the deadpan take a2.
+5. **Controls** on the sketch page (both languages): ▶ Play / ❚❚ Pause / ▶ Resume, ■ Stop, a timeline to drag with the
+   time shown; "⏳ Getting ready…" while the sound is made. Tested in a browser (`ctltest.js`): play, pause, drag while
+   paused and while playing, resume, stop. A standing rule for every sketch or clip page (CLAUDE.md, Decisions).
+- The Hebrew sketch is **84.0 s** (version 3 of https://claude.ai/artifact/YARKcw3QdciZxdn2Z4QeH5); the English sketch has
+  the same controls (version 5 of https://claude.ai/artifact/Kg1LcVUQWirSF991tHcTLy; its video is unchanged).
