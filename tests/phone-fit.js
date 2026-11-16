@@ -98,9 +98,12 @@ async function households(page) {
   });
   await page.waitForTimeout(300);
   const res = {};
-  for (const step of ['households', 'details', 'feedback', 'errors', 'use', 'survey']) {
+  // v39.88 — one line per household; 'line' opens one (every value under it), 'all' opens every one
+  for (const step of ['households', 'line', 'all', 'details', 'feedback', 'errors', 'use', 'survey']) {
     await page.evaluate(step => {
-      if (step === 'details') mknManage.show('beta:hA'); else if (step !== 'households') mknManage.tabTo(step);
+      if (step === 'line') mknManage.lineTap('beta:hA');
+      else if (step === 'all') mknManage.expandAll(true);
+      else if (step === 'details') mknManage.show('beta:hA'); else if (step !== 'households') mknManage.tabTo(step);
     }, step);
     await page.waitForTimeout(200);
     res[step] = await page.evaluate(() => {

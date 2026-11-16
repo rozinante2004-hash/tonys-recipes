@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.87 -->
+<!-- Tony's Recipes Collection v39.88 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -2991,6 +2991,9 @@ async function _selfTestPark() {
   try { _spendWas = localStorage.getItem(AI_SPEND_KEY); } catch(e) {}
   // …and the recipes opened last (v39.83): a test's made-up recipe must not take a real one's place in "Recent:".
   var _recentWas = selfTestRecentKeep();
+  // …and the order Tony chose on 📊 Households (v39.88): a test that sorts must not change it.
+  var _mgSortWas = null;
+  try { _mgSortWas = localStorage.getItem('mkn_manage_sort'); } catch(e) {}
   var _realDb = window._fbDb;
   _selfTestHeldWrites = 0;
   if (_realDb) window._fbDb = _selfTestNoCloudWrites(_realDb);
@@ -3043,7 +3046,8 @@ async function _selfTestPark() {
     ? { scan: Object.assign({}, _waScan), harvest: Object.assign({}, _waHarvest) } : null;
   return { langWas: _langWas, waWas: _waWas, dictWas: _dictWas, unitWas: _unitWas, cloudWas: _cloudWas,
            backupWas: _backupWas, spendWas: _spendWas, realDb: _realDb, featuresWas: _featuresWas, hidWas: _hidWas,
-           recipesWas: _recipesWas, extMarks: _extMarks, extFolderWas: _extFolderWas, signInWas: _signInWas, recentWas: _recentWas };
+           recipesWas: _recipesWas, extMarks: _extMarks, extFolderWas: _extFolderWas, signInWas: _signInWas, recentWas: _recentWas,
+           mgSortWas: _mgSortWas };
 }
 function _selfTestSignInBack(s) {
   if (!s) return;
@@ -3100,6 +3104,10 @@ function _selfTestUnpark(p) {
   try { if (p.spendWas === null) localStorage.removeItem(AI_SPEND_KEY); else localStorage.setItem(AI_SPEND_KEY, p.spendWas); } catch(e) {}
   try { if (p.unitWas !== null) localStorage.setItem(VIEW_UNIT_KEY, p.unitWas); } catch(e) {}
   if ('recentWas' in p) selfTestRecentPutBack(p.recentWas);   // v39.83 — the recipes opened last, as they were
+  if ('mgSortWas' in p) {   // v39.88 — 📊 Households' order, as he chose it
+    try { if (p.mgSortWas === null) localStorage.removeItem('mkn_manage_sort'); else localStorage.setItem('mkn_manage_sort', p.mgSortWas); } catch(e) {}
+    try { if (window.mknManage && mknManage._sortBack) mknManage._sortBack(); } catch(e) {}
+  }
   // v36.67 — a toast a test raised is the test's, not Tony's. One with an
   // "↩ Undo" button (a collection test's "1 recipe now in 'Winter soups'")
   // outlived the run on his phone, offering to undo something done to test
@@ -5574,15 +5582,36 @@ window.hhNoteSeen = hhNoteSeen;
 // `gone` (its owner deletes it; `how: 'account'` — with their account) keeps
 // it listed, marked; `left` — a member deleting their account (Worker v63).
 var HH_REPORT_KEY = 'mkn_hh_report_';
+// v39.88 — Tony, 16 Nov: "Tony's Kitchen Notes (MKN-J5DM-F9BX) is specifying 76 recipes, whereas this account actually
+// has 141 ones … Test's Kitchen notes is also not updated." The report sent `recipes.length` — the entries, a collection
+// counted once (76) — while the badge on the app's top bar counts every recipe in a collection (recipeHonourCount: 141).
+// It now sends the badge's number; and once a day became: once a day, or sooner (an hour after the last) when that
+// number changed — checked as the app opens (after the first sync) and after each sync with the cloud.
+function hhRecipeCount() {
+  return (typeof recipes !== 'undefined' && Array.isArray(recipes) && typeof recipeHonourCount === 'function') ? recipeHonourCount(recipes) : 0;
+}
+function hhReportDue(hid) {
+  var k = HH_REPORT_KEY + hid, last = 0, n0 = null;
+  try { last = +localStorage.getItem(k) || 0; n0 = localStorage.getItem(k + '_n'); } catch(e) { return false; }
+  var since = Date.now() - last, n = hhRecipeCount();
+  if (since >= 20 * 3600e3) return true;
+  return n > 0 && since >= 3600e3 && n0 !== String(n);   // (no number kept yet: the older versions' count, sent again)
+}
+function hhReportSoon() {
+  if (_selfTestRunning || !_household || typeof hhReport !== 'function') return;
+  setTimeout(function(){ if (!_selfTestRunning) hhReport().catch(function(){}); }, 4000);
+}
 async function hhReport(opts) {
   opts = opts || {};
   var hid = opts.hid || (_household && _household.hid);
   if (!hid || !window._fbUser || !hhDb() || !_fbUser.getIdToken) return false;
-  if (_workerHealth === null && typeof checkWorkerHealth === 'function') { try { await checkWorkerHealth(); } catch(e) {} }
-  if (!(_workerHealth && _workerHealth.reports)) return false;
   var k = HH_REPORT_KEY + hid, once = !opts.gone && !opts.left;
   if (once && (!_household || _household.hid !== hid)) return false;
-  if (once && !opts.now) { try { if (Date.now() - (+localStorage.getItem(k) || 0) < 20 * 3600e3) return false; } catch(e) { return false; } }
+  // v39.88 — as the app opens, the count waits for the first sync (up to 30 s): this device's list may be older.
+  if (once && opts.afterSync) { for (var w = 0; w < 60 && !_lastSyncOkAt && !_selfTestRunning; w++) await wait(500); }
+  if (once && !opts.now && !hhReportDue(hid)) return false;
+  if (_workerHealth === null && typeof checkWorkerHealth === 'function') { try { await checkWorkerHealth(); } catch(e) {} }
+  if (!(_workerHealth && _workerHealth.reports)) return false;
   var report = null;
   if (once) {
     var members = [];
@@ -5595,16 +5624,21 @@ async function hhReport(opts) {
       members: members, links: hhLinks().map(function(l){ return { hid: l.hid, name: l.name || '', code: l.code || '' }; }) };
     // v38.30 — how big the collection is (a number; Worker v76 keeps it). Not sent while still empty
     // on this device: that may only mean the household's recipes have not arrived yet.
-    if (typeof recipes !== 'undefined' && Array.isArray(recipes) && recipes.length) report.recipes = recipes.length;
+    // v39.88 — the badge's number: every recipe in a collection counted (hhRecipeCount).
+    var nRec = hhRecipeCount();
+    if (nRec) report.recipes = nRec;
   }
   var r = await fetch(WORKER_ENDPOINT, { method: 'POST', headers: workerHeaders(),
     body: workerBody({ action: 'household-report', hid: hid, gone: !!opts.gone, how: opts.how || '', left: !!opts.left, report: report,
       idToken: await _fbUser.getIdToken() }), signal: AbortSignal.timeout(15000) });
   if (!r.ok) return false;
-  try { if (once) localStorage.setItem(k, String(Date.now())); else localStorage.removeItem(k); } catch(e) {}
+  try {
+    if (once) { localStorage.setItem(k, String(Date.now())); if (report && report.recipes) localStorage.setItem(k + '_n', String(report.recipes)); }
+    else { localStorage.removeItem(k); localStorage.removeItem(k + '_n'); }
+  } catch(e) {}
   return true;
 }
-window.hhReport = hhReport;
+window.hhReport = hhReport; window.hhReportDue = hhReportDue; window.hhRecipeCount = hhRecipeCount;
 function hhSetAppRequests(v) { return hhRef().update({ appRequests: !!v }); }
 window.hhNewCode = hhNewCode; window.hhEnsureCode = hhEnsureCode; window.openMyIdentifier = openMyIdentifier;
 window.toggleAppRequests = toggleAppRequests; window.hhSetAppRequests = hhSetAppRequests; window.hhRenderAppRequests = hhRenderAppRequests;
@@ -8377,7 +8411,7 @@ async function householdUse(hid, role) {
   await hhLoadLinks();                                           // v37.53
   hhNoteSeen();                                                  // v37.58
   legalNoteOnMembership().catch(function(){});                   // v37.83
-  if (!_selfTestRunning) setTimeout(function(){ hhReport().catch(function(){}); }, 6000);   // v37.71
+  if (!_selfTestRunning) setTimeout(function(){ hhReport({ afterSync: true }).catch(function(){}); }, 6000);   // v37.71 (v39.88: after the first sync)
   if (!_selfTestRunning && typeof insightsStart === 'function') setTimeout(insightsStart, 3000);   // v38.15
   if (!_selfTestRunning && typeof testerWelcomeMaybe === 'function') setTimeout(function(){ testerWelcomeMaybe().catch(function(){}); }, 4000);   // v38.15
   if (!_selfTestRunning && typeof surveyMaybe === 'function') setTimeout(function(){ surveyMaybe().catch(function(){}); }, 9000);   // v38.18 — only once Tony opens it
@@ -11177,7 +11211,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.87';
+var APP_VERSION = 'v39.88';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -14743,7 +14777,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.87</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.88</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14831,7 +14865,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.87</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.88</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -31222,6 +31256,7 @@ function parseCloudRecipeDocs(docs, opts) {
   if (partial) list.forEach(function(r){ clearRecipeConflict(r.id); }); else clearAllRecipeConflicts();
   if (!partial) syncLog('load', 'Read ' + list.length + ' recipe(s) from the cloud',
           { docs: docs.length, unreadable: Object.keys(_cloudUnreadable).length });
+  if (typeof hhReportSoon === 'function') hhReportSoon();   // v39.88 — the console's count, if it changed
   saveCloudBase();   // v29.2 — a full read is exactly when the base is authoritative
   setTimeout(function(){ try { exampleTwinsRemove(); } catch(e) {} }, 2500);   // v38.50 — once the list has settled
   return list;
@@ -31357,6 +31392,7 @@ async function incrementalCloudLoad(meta, offlineQueued, db) {
   setCloudSyncMark({ at: Math.max(mark.at || 0, _cloudSyncedMax), fullAt: mark.fullAt,
     absent: Object.keys(absent).filter(function(i){ return cloudIds[i] && !got[i]; }) });   // v38.71 — while still listed
   syncLog('load', 'Read ' + list.length + ' changed recipe(s) from the cloud, ' + gone.length + ' gone', { reads: reads, recovered: recovered });
+  if ((list.length || gone.length) && typeof hhReportSoon === 'function') hhReportSoon();   // v39.88
   return { changed: list.length, gone: gone.length, reads: reads, recovered: recovered };
 }
 window.incrementalCloudLoad = incrementalCloudLoad;
@@ -36328,7 +36364,7 @@ var HELP_SYSTEM_PROMPT = [
   "",
   "=== FOR THE APP'S OWNER ===",
   "- ⚙️ → 👑 App owner is shown only to the app's owner: 📊 Households, 🩺 Server allowances, 📲 Phone alerts (which alerts also ring on the phone in the Pushover app, each on or off, and a test — among them the recipe e-mails: Resend refusing or not answering, a quota at 70% or used up), ✉️ Invite testers, 💳 Payments, 🚀 Deployments (a link to every console the app runs on: My Kitchen Notes itself — its site, builds, Firebase project, database, accounts, domain and the mail to contact@ —; the test copy; GitHub's jobs, secrets and the testers' reports; the server and its database; Resend, which sends the recipe e-mails and the invitations; Pushover, the phone alerts; Anthropic; the photo sources; Google Cloud — YouTube and the Gmail API —; and the browser extension's stores), 🔑 Check the app's key, 🔐 Two-step sign-in for the owner, 🧑‍🍳 Preview the first-visit setup (every page of it, nothing recorded), 📧 Gmail Setup, 🛒 Bring!",
-  "- 📊 Households (the owner's): every household — in the family app and My Kitchen Notes, every copy's — with its owner, members, 📚 Recipes (how many it keeps, counted by its own app once a day; rest the mouse on the number for when), AI this month against its AI cap, AI in the two months before (e.g. 'AI in Sep · Oct' in November), links, who shared the app, last active. Click a heading (on a phone: Sort by) to sort — by Recipes for the biggest collections first; ⬇ CSV has the recipe counts too. 📈 Use adds every household up, month by month, in sections side by side (one under the other on a phone; one column when there are many months), with how big the collections are. Click a row for its details: the AI allowance, the members, the Extras, and What they use — two narrow tables side by side (one under the other on a phone), a column for each month, in sections (how often, signing in, recipes added and from where, the farm, devices and settings, then every feature and how many times). In The farm, 'Taps on a visitor (each one)' counts every tap and 'Visits with a farm visitor tapped' counts a visit once, however many taps. Extras: 📧 E-mail recipes from their own Gmail makes that household's ✉️ Email send from each member's own Gmail (Google asks each once) instead of the app's 📨 Send — best left off. If the page says this device's sign-in was made without the code from your authenticator app (or with a password): sign out (at the top, beside the sync status) and sign in again with Google — the app asks for the 6-digit code; the owner's tools need both. 🔑 Reset password, beside the owner and beside each member (in the details), e-mails that person a link to choose a new password — for someone who wrote to you that they can't sign in; you never see their password, and the app doesn't say whether the address has an account. For a household of another copy, the button opens that copy, which sends it after you sign in there.",
+  "- 📊 Households (the owner's): every household — in the family app and My Kitchen Notes, every copy's — with its owner, members, 📚 Recipes (how many it keeps — each recipe in a collection counted, the same number as the badge on that household's top bar; counted by its own app once a day, and again within the hour when the number changes; rest the mouse on the number for when), AI this month against its AI cap, AI in the two months before (e.g. 'AI in Sep · Oct' in November), links, who shared the app, last active. One line per household (v39.88): tap or click a line to open it under itself with every value in full (the identifier, 🔑 Reset password, the AI bar…), tap the opened line (or 📋 All its details) for its details; ⊞ Expand all / ⊟ Collapse all opens or closes every line. On a phone a line shows Household, Owner and the two columns the sort is about — AI spent this month: AI this month and AI cap; Last active: Recipes and Last active; Recipes: Recipes and Last active; Members: Members and Recipes; Household or Owner (A–Z): Members and Last active; Copy: Copy and Last active; Linked with: Linked with and Members; Shared the app: Shared the app and Last active; AI cap: AI this month and AI cap. Sort with Sort by (or a column's heading on a computer) — by Recipes for the biggest collections first; the order chosen stays on that device until changed, through restarts and updates. ⬇ CSV has the recipe counts too. 📈 Use adds every household up, month by month, in sections side by side (one under the other on a phone; one column when there are many months), with how big the collections are. The details: the AI allowance, the members, the Extras, and What they use — two narrow tables side by side (one under the other on a phone), a column for each month, in sections (how often, signing in, recipes added and from where, the farm, devices and settings, then every feature and how many times). In The farm, 'Taps on a visitor (each one)' counts every tap and 'Visits with a farm visitor tapped' counts a visit once, however many taps. Extras: 📧 E-mail recipes from their own Gmail makes that household's ✉️ Email send from each member's own Gmail (Google asks each once) instead of the app's 📨 Send — best left off. If the page says this device's sign-in was made without the code from your authenticator app (or with a password): sign out (at the top, beside the sync status) and sign in again with Google — the app asks for the 6-digit code; the owner's tools need both. 🔑 Reset password, beside the owner and beside each member (in the details), e-mails that person a link to choose a new password — for someone who wrote to you that they can't sign in; you never see their password, and the app doesn't say whether the address has an account. For a household of another copy, the button opens that copy, which sends it after you sign in there.",
   "- 📊 Households → ✉️ Beta invitation requests (the owner's; v39.61): every request for an invitation, apart from 💬 Feedback — a tester's for someone else (who asked, the person's name, a word about them, the invitation's language) and someone's own, from a sent recipe's link. ✉️ Invite opens ✉️ Invite testers with the address and the language filled in — you see it and press Send (a request from another copy opens that copy's app, where its invitations belong); once sent, the request is done. 🙅 Not now sets it aside (under All; ↩︎ Back to waiting); 🗑 removes it. An address invited before says so. The tab counts the waiting ones, and while one waits a red dot marks the way to it — ⚙️ → 👑 App owner → 📊 Households — as for testers' notes (v39.62); the owner also hears of each by e-mail (and a phone alert: 'Someone asks for an invitation'). In the test copy the tab and the dot are that copy's own requests.",
   "- 📊 Households → 💬 Feedback and ⚠️ Errors (the owner's): tick several (or Select all shown), then 👀 Seen (n), ✅ Done (n) or 🗑 Delete selected (n) for all of them at once. 👀 Seen = read, off the ⚙️ red dot, still under 'Not done yet'; ✅ Done = also off that list (still under All). Deleting several asks once and sends one alert",
   "- ✉️ Invite testers: the tester invitation in English or עברית, with this copy's link; the wording can be changed (this device keeps it; 'The original words' brings it back). Paste the addresses; 📨 Send sends each person their own e-mail from the app's address (contact@…), by the app's own e-mail service — no Google window — and their replies come to that address; up to 40 a day; the owner's sign-in as his other tools need it (with Google, and the authenticator's code once that is on). a small 📧 Backup: send with Gmail below the buttons sends them from the owner's Gmail instead (Google asks for permission the first time, and may say it has not verified the app: Advanced, then continue). Also ✉️ Mail app, 💬 WhatsApp and 📋 Copy",

@@ -20,7 +20,33 @@
             picked: {},   // v38.16 — the notes ticked for 📋 Copy reports (v38.88: and 🗑 Delete selected)
             errPicked: {},   // v38.88 — the error reports ticked for 🗑 Delete selected
             survey: null, surveyError: '',   // v38.18 — 📝 the end-of-beta question
-            invFilter: 'open', invited: {} };   // v39.61 — ✉️ Beta invitation requests: which shown; the addresses invited before
+            invFilter: 'open', invited: {},   // v39.61 — ✉️ Beta invitation requests: which shown; the addresses invited before
+            lines: {}, allLines: false };   // v39.88 — the households' lines opened (one at a time), or all of them
+  // v39.88 — Tony, 16 Nov: "Make the sorting persistent. The sorting order selected should keep until I change it, no
+  // matter if the app was restarted or updated." Kept on this device (as Hide deleted), read back when the page loads.
+  var SORT_KEY = 'mkn_manage_sort';
+  var SORT_KEYS = ['name', 'copy', 'owner', 'members', 'recipes', 'month', 'cap', 'links', 'referred', 'seen'];
+  function sortSaved() {
+    try { var p = String(localStorage.getItem(SORT_KEY) || '').split(':'); if (SORT_KEYS.indexOf(p[0]) !== -1) return { sort: p[0], dir: +p[1] < 0 ? -1 : 1 }; }
+    catch (e) {}
+    return null;
+  }
+  function sortKeep() { try { localStorage.setItem(SORT_KEY, S.sort + ':' + S.dir); } catch (e) {} }
+  (function () { var k = sortSaved(); if (k) { S.sort = k.sort; S.dir = k.dir; } })();
+  // v39.88 — Tony: "On mobile, the presented values will depend on the sorting selected from the drop-down menu, with
+  // only the relevant information displayed, apart for a short list of fields which should be presented for all sorting
+  // options selected (Household & Owner). i.e for "AI spent this month", it will show Household, Owner, AI this month &
+  // cap. "Last active" will show Household, Owner, Last active & Recipes. etc." — the two columns beside those two.
+  var PHONE_COLS = { month: ['month', 'cap'], seen: ['seen', 'recipes'], name: ['members', 'seen'], owner: ['members', 'seen'],
+                     members: ['members', 'recipes'], recipes: ['recipes', 'seen'], copy: ['copy', 'seen'], cap: ['cap', 'month'],
+                     links: ['links', 'members'], referred: ['referred', 'seen'] };
+  var PHONE_MQ = '(max-width:700px)';
+  function phoneNow() { try { return !!(window.matchMedia && window.matchMedia(PHONE_MQ).matches); } catch (e) { return false; } }
+  // A phone turned on its side (or a window made narrower) draws the lines again with its own columns.
+  try {
+    var _mq = window.matchMedia && window.matchMedia(PHONE_MQ), _mqDo = function () { if (document.getElementById('manageOverlay') && S.tab === 'households' && !S.loading) render(); };
+    if (_mq) { if (_mq.addEventListener) _mq.addEventListener('change', _mqDo); else if (_mq.addListener) _mq.addListener(_mqDo); }
+  } catch (e) {}
   function esc(v) { return escH(String(v == null ? '' : v)); }
   function money(v) { return '$' + (Number(v) || 0).toFixed(2); }
   // v67 — a copy may have its own allowance (the family's: $10, no first-month extra).
@@ -848,8 +874,65 @@
       + '<div class="mg-bar"><div style="width:' + pct + '%;background:' + tone + ';"></div></div>';
   }
   function th(key, label) {
-    return '<th><button type="button" class="mg-sort" onclick="mknManage.sortBy(\'' + key + '\')">' + label
+    return '<th' + (key === 'name' || key === 'owner' ? ' class="mg-k' + key + '"' : ' data-col="' + key + '"')
+      + (S.sort === key ? ' aria-sort="' + (S.dir < 0 ? 'descending' : 'ascending') + '"' : '') + '><button type="button" class="mg-sort" onclick="mknManage.sortBy(\'' + key + '\')">' + label
       + (S.sort === key ? (S.dir < 0 ? ' ▾' : ' ▴') : '') + '</button></th>';
+  }
+  // v39.88 — Tony: "Present it as a compressed table of 1 line per household … Clicking a line will expand only that
+  // line to present all values currently displayed. A click on this one will open the full description currently
+  // triggered by clicking it. There should also be an "expend/collapse" all toggle button."
+  function lineOpen(k) { return S.allLines || !!S.lines[k]; }
+  function nameOf(r) { return r.name || (r.anonymised ? '(name removed after six months)' : '(no name)'); }
+  function monthTone(r) {
+    if (r.cap == null) return '';
+    var pct = r.cap > 0 ? r.month / r.cap * 100 : 100;
+    return pct >= 100 ? 'var(--danger)' : pct >= 80 ? '#C98A14' : '';
+  }
+  function beforeText(r) { return r.months.length ? r.months.slice(1).reverse().map(function (m) { return money(m.usd); }).join(' · ') : '—'; }
+  function linksText(r) { return r.links.length ? r.links.map(function (l) { return l.name || l.code; }).join(', ') : '—'; }
+  function one(v, cls) { return '<div class="mg-1l' + (cls ? ' ' + cls : '') + '">' + v + '</div>'; }
+  function lineHtml(r, multi) {
+    var open = lineOpen(r.key), tone = monthTone(r);
+    return '<tr class="mg-row' + (open ? ' mg-x' : '') + (S.open === r.key ? ' mg-open' : '') + (r.deleted ? ' mg-deleted' : '') + (r.movedOld ? ' mg-movedold' : '')
+      + '" tabindex="0" aria-expanded="' + open + '" data-key="' + escA(r.key) + '" onclick="mknManage.lineTap(' + jsA(r.key) + ')"'
+      + ' onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();mknManage.lineTap(' + jsA(r.key) + ');}">'
+      // (the name in a box of its own direction: a Hebrew name is cut at its end, not its beginning)
+      + '<td class="mg-kname"><div class="mg-ncell"><span class="mg-chev" aria-hidden="true">' + (open ? '▾' : '▸') + '</span>'
+          + (r.deleted ? '<span class="mg-mark" aria-hidden="true">\u{1F5D1}</span>' : r.movedOld ? '<span class="mg-mark" aria-hidden="true">\u{1F4E6}</span>' : '')
+          + '<div class="mg-1l mg-wide" dir="auto"><span class="mg-name">' + esc(nameOf(r)) + '</span></div></div></td>'
+      + (multi ? '<td data-col="copy" data-label="Copy">' + one('<span class="mg-copy">' + esc(r.copy) + '</span>') + '</td>' : '')
+      + '<td class="mg-kowner mg-email" data-label="Owner">' + one(esc(r.owner || '—'), 'mg-wide') + '</td>'
+      + '<td class="mg-c" data-col="members" data-label="Members">' + r.members.length + '</td>'
+      + '<td class="mg-c" data-col="recipes" data-label="Recipes"' + (r.recipesN && r.reportAt ? ' title="' + escA('Counted by their app ' + ago(r.reportAt)) + '"' : '') + '>'
+      + (r.recipesN ? Number(r.recipesN).toLocaleString() : '—') + '</td>'   // v39.17
+      + '<td data-col="month" data-label="AI this month">' + one('<span class="mg-num"' + (tone ? ' style="color:' + tone + ';font-weight:700;"' : '') + '>' + money(r.month) + '</span>') + '</td>'
+      + '<td class="mg-c" data-col="cap" data-label="AI cap"' + (r.capSet ? ' title="Set for this household"' : '') + '>' + one(r.cap == null ? '—' : money(r.cap)) + '</td>'
+      + '<td class="mg-muted" data-col="before" data-label="AI before">' + one(beforeText(r)) + '</td>'
+      + '<td data-col="links" data-label="Linked with">' + one(esc(linksText(r)), 'mg-wide') + '</td>'
+      + '<td class="mg-c" data-col="referred" data-label="Shared the app">' + (r.referred || '—') + '</td>'
+      + '<td data-col="seen" data-label="Last active" title="' + escA(ago(r.lastSeen)) + '">' + one(ago(r.lastSeen).replace(/ ago$/, '')) + '</td></tr>';
+  }
+  // The line opened: every value of the line, in full, under it; a tap on it (or its button) opens the details as before.
+  function lineMoreHtml(r, multi, span, beforeLabel) {
+    function item(label, v) { return '<div class="mg-xi"><span class="mg-xl">' + label + '</span><span class="mg-xv">' + v + '</span></div>'; }
+    return '<tr class="mg-more' + (r.deleted ? ' mg-deleted' : '') + '" data-key="' + escA(r.key) + '" onclick="mknManage.show(' + jsA(r.key) + ')"><td colspan="' + span + '">'
+      + '<div class="mg-xtop"><span class="mg-name" dir="auto">' + esc(nameOf(r)) + '</span> <span class="mg-muted mg-code">' + esc(r.code || '—') + '</span></div>'
+      + (r.deleted ? '<div class="mg-gone">\u{1F5D1} ' + esc(deletedText(r.deleted)) + '</div>' : '')
+      + (r.movedOld ? '<div class="mg-muted">\u{1F4E6} Moved to the beta \u2014 the old copy, kept until it is cleared</div>' : '')
+      + (r.left && r.left.length ? '<div class="mg-muted">' + r.left.length + ' left (deleted their account)</div>' : '')
+      + '<div class="mg-xgrid">'
+      + (multi ? item('Copy', '<span class="mg-copy">' + esc(r.copy) + '</span>') : '')
+      + item('Owner', '<span class="mg-email">' + esc(r.owner || '—') + '</span>' + (r.owner && !r.deleted ? ' <button type="button" class="mg-btn mg-pwbtn" title="E-mails them a link to choose a new password themselves \u2014 you never see it" onclick="event.stopPropagation();mknManage.resetPw(' + jsA(r.key) + ',' + jsA(r.owner) + ')">\u{1F511} Reset password</button>' : ''))
+      + item('Members', String(r.members.length))
+      + item('Recipes', r.recipesN ? Number(r.recipesN).toLocaleString() + (r.reportAt ? ' <span class="mg-muted">(counted ' + ago(r.reportAt) + ')</span>' : '') : '—')
+      + item('AI this month', '<div class="mg-xbar">' + barHtml(r) + '</div>')
+      + item('AI cap', r.cap == null ? '—' : money(r.cap) + (r.capSet ? ' ✎' : ''))
+      + item(esc(beforeLabel), beforeText(r))
+      + item('Linked with', esc(linksText(r)))
+      + item('Shared the app', String(r.referred || '—'))
+      + item('Last active', ago(r.lastSeen))
+      + '</div><div class="mg-xfoot"><button type="button" class="mg-btn" onclick="event.stopPropagation();mknManage.show(' + jsA(r.key) + ')">'
+      + (S.open === r.key ? '✕ Close its details' : '📋 All its details') + '</button></div></td></tr>';
   }
   function render() {
     var ov = document.getElementById('manageOverlay');
@@ -916,37 +999,26 @@
     var list = sorted();
     var months = (S.meter && S.meter.months) || [];
     // v38.84 — Tony's iPhone: ten columns at least 900 px wide, four of them on the screen, addresses broken letter by letter.
-    // On a phone each household is a card (the stylesheet's @media below), every cell with its label, and the headers'
-    // sorting is a menu above them. A computer keeps the table.
+    // v39.88 — one line per household (Tony: "a compressed table of 1 line per household"); on a phone, Household, Owner
+    // and the two columns the sort is about (PHONE_COLS). A tap opens the line; ⊞ Expand all opens every one.
     var sortOpts = [['month:-1', 'AI spent this month'], ['seen:-1', 'Last active'], ['name:1', 'Household (A–Z)'], ['members:-1', 'Members'], ['recipes:-1', 'Recipes']]
       .concat(multi ? [['copy:1', 'Copy']] : []).concat([['owner:1', 'Owner (A–Z)'], ['links:-1', 'Linked with'], ['referred:-1', 'Shared the app'], ['cap:-1', 'AI cap']]);
     var sortNow = S.sort + ':' + S.dir;
-    var sortBar = '<div class="mg-sortbar"><label>Sort by <select onchange="mknManage.sortTo(this.value)">'
+    var sortBar = '<div class="mg-sortbar"><label>Sort by <select id="mgSortBy" onchange="mknManage.sortTo(this.value)">'
       + (sortOpts.some(function (o) { return o[0] === sortNow; }) ? '' : '<option value="' + escA(sortNow) + '" selected>—</option>')
       + sortOpts.map(function (o) { return '<option value="' + o[0] + '"' + (o[0] === sortNow ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('')
-      + '</select></label></div>';
-    var table = sortBar + '<div class="mg-scroll mg-hhwrap"><table class="mg-table mg-hh"><thead><tr>'
+      + '</select></label>'
+      + '<button type="button" class="mg-btn mg-xall" id="mgExpandAll" aria-pressed="' + S.allLines + '" onclick="mknManage.expandAll(' + !S.allLines + ')">'
+      + (S.allLines ? '⊟ Collapse all' : '⊞ Expand all') + '</button></div>';
+    var cols = multi ? 11 : 10, phoneSet = PHONE_COLS[S.sort] ? S.sort : 'month';
+    var beforeLabel = months.length ? 'AI in ' + months.slice(1).map(mon).reverse().join(' · ') : 'AI before';   // v39.17
+    var span = phoneNow() ? 2 + PHONE_COLS[phoneSet].length : cols;
+    var table = sortBar + '<div class="mg-scroll mg-hhwrap"><table class="mg-table mg-hh mg-s-' + phoneSet + '"><thead><tr>'
       + th('name', 'Household') + (multi ? th('copy', 'Copy') : '') + th('owner', 'Owner') + th('members', 'Members') + th('recipes', 'Recipes') + th('month', 'AI this month')
-      + th('cap', 'AI cap') + '<th>' + (months.length ? 'AI in ' + months.slice(1).map(mon).reverse().join(' · ') : 'AI before') + '</th>'   // v39.17 — Tony: "What happens … when we reach November?" (the two months before this one)
+      + th('cap', 'AI cap') + '<th data-col="before"><span class="mg-thx">' + esc(beforeLabel) + '</span></th>'
       + th('links', 'Linked with') + th('referred', 'Shared the app') + th('seen', 'Last active') + '</tr></thead><tbody>'
-      + (list.length ? list.map(function (r) {
-          return '<tr class="mg-row' + (S.open === r.key ? ' mg-open' : '') + (r.deleted ? ' mg-deleted' : '') + (r.movedOld ? ' mg-movedold' : '') + '" onclick="mknManage.show(' + jsA(r.key) + ')">'
-            + '<td><div class="mg-name" dir="auto">' + esc(r.name || (r.anonymised ? '(name removed after six months)' : '(no name)')) + '</div><div class="mg-muted mg-code">' + esc(r.code || '—') + '</div>'
-            + (r.deleted ? '<div class="mg-gone">\u{1F5D1} ' + esc(deletedText(r.deleted)) + '</div>' : '')
-            + (r.movedOld ? '<div class="mg-muted">\u{1F4E6} Moved to the beta \u2014 the old copy, kept until it is cleared</div>' : '')
-            + (r.left && r.left.length ? '<div class="mg-muted">' + r.left.length + ' left (deleted their account)</div>' : '') + '</td>'
-            + (multi ? '<td data-label="Copy"><span class="mg-copy">' + esc(r.copy) + '</span></td>' : '')
-            + '<td class="mg-email" data-label="Owner"><div>' + esc(r.owner || '—') + (r.owner && !r.deleted ? '<div>' + '<button type="button" class="mg-btn mg-pwbtn" title="E-mails them a link to choose a new password themselves \u2014 you never see it" onclick="event.stopPropagation();mknManage.resetPw(' + jsA(r.key) + ',' + jsA(r.owner) + ')">\u{1F511} Reset password</button>' + '</div>' : '') + '</div></td>'   // v39.22 — one block, so on a phone's card the button sits under the address
-            + '<td class="mg-c" data-label="Members">' + r.members.length + '</td>'
-            + '<td class="mg-c" data-label="Recipes"' + (r.recipesN && r.reportAt ? ' title="' + escA('Counted by their app ' + ago(r.reportAt)) + '"' : '') + '>'
-            + (r.recipesN ? Number(r.recipesN).toLocaleString() : '—') + '</td>'   // v39.17
-            + '<td data-label="AI this month"><div>' + barHtml(r) + '</div></td>'
-            + '<td class="mg-c" data-label="AI cap">' + (r.cap == null ? '—' : money(r.cap) + (r.capSet ? ' ✎' : '')) + '</td>'
-            + '<td class="mg-muted" data-label="AI before">' + (r.months.length ? r.months.slice(1).reverse().map(function (m) { return money(m.usd); }).join(' · ') : '—') + '</td>'
-            + '<td data-label="Linked with">' + (r.links.length ? r.links.map(function (l) { return esc(l.name || l.code); }).join(', ') : '—') + '</td>'
-            + '<td class="mg-c" data-label="Shared the app">' + (r.referred || '—') + '</td>'
-            + '<td data-label="Last active">' + ago(r.lastSeen) + '</td></tr>';
-        }).join('') : '<tr><td colspan="' + (multi ? 11 : 10) + '" class="mg-empty">No household matches.</td></tr>')
+      + (list.length ? list.map(function (r) { return lineHtml(r, multi) + (lineOpen(r.key) ? lineMoreHtml(r, multi, span, beforeLabel) : ''); }).join('')
+          : '<tr><td colspan="' + span + '" class="mg-empty">No household matches.</td></tr>')
       + '</tbody></table></div>';
     body.innerHTML = head + table + panelHtml();
   }
@@ -1077,27 +1149,40 @@
     + '.mg-noterms{color:var(--danger);}.mg-li{padding:3px 0;}.mg-caprow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}'
     + '.mg-caprow input{width:90px;padding:7px 8px;border:1px solid var(--border);border-radius:8px;background:var(--card-bg);color:var(--ink);}'
     + '.mg-tabs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;border-bottom:1px solid var(--border);}'
-    + '.mg-sortbar{display:none;margin:4px 0 10px;font-size:13px;color:var(--muted);}'
+    + '.mg-sortbar{margin:4px 0 10px;font-size:13px;color:var(--muted);}'
     + '.mg-sortbar select{margin-inline-start:6px;padding:6px 8px;border:1px solid var(--border);border-radius:8px;background:var(--card-bg);color:var(--ink);font-size:14px;}'
-    // v38.84 — Tony's iPhone: the tabs ran off the screen and took the whole page sideways with them; the table was ten
-    // squeezed columns. On a phone: tabs on two lines if they must, the search box as wide as there is room for, and
-    // each household a card (its cells one under the other, each with its label).
+    // v38.84 — Tony's iPhone: the tabs ran off the screen and took the whole page sideways with them. On a phone: tabs
+    // on two lines if they must, the search box as wide as there is room for.
+    // v39.88 — the households: one line each (Tony), on a phone as well — Household, Owner and the sort's own two columns.
+    + '.mg-sortbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;}'
+    + '.mg-xall{min-height:32px;padding:4px 12px;font-size:13px;}'
+    + '.mg-table.mg-hh td{padding:7px 8px;vertical-align:middle;}.mg-table.mg-hh .mg-sort{padding:9px 8px;}'
+    + '.mg-1l{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}.mg-1l.mg-wide{max-width:200px;}'
+    + '.mg-ncell{display:flex;align-items:baseline;min-width:0;}.mg-ncell .mg-1l{flex:1 1 auto;min-width:0;}.mg-mark{flex:none;margin-inline-end:4px;}'
+    + '.mg-chev{display:inline-block;flex:none;width:1.1em;color:var(--muted);font-size:11px;}'
+    + '.mg-thx{display:block;padding:9px 10px;font-weight:600;color:var(--heading);}'
+    + '.mg-row.mg-x{background:var(--note-bg);}.mg-row.mg-x td{border-bottom-color:transparent;}'
+    + '.mg-more{cursor:pointer;}.mg-more>td{background:var(--note-bg);padding:4px 12px 12px 30px !important;}'
+    + '.mg-xtop{margin-bottom:4px;}.mg-xtop .mg-name{word-break:break-word;}'
+    + '.mg-xgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:4px 18px;margin-top:6px;}'
+    + '.mg-xi{display:flex;gap:10px;align-items:baseline;min-width:0;}.mg-xl{flex:0 0 104px;color:var(--muted);font-size:12px;}'
+    + '.mg-xv{flex:1;min-width:0;overflow-wrap:anywhere;}.mg-xv .mg-email{word-break:normal;}.mg-xbar .mg-bar{max-width:160px;min-width:60px;}'
+    + '.mg-xfoot{margin-top:8px;}.mg-xfoot .mg-btn{min-height:30px;padding:4px 12px;font-size:13px;}'
+    + '.mg-more.mg-deleted{opacity:.75;}.mg-more.mg-deleted .mg-name{text-decoration:line-through;}'
+    + '.mg-row:focus-visible{outline:3px solid var(--terracotta);outline-offset:-3px;}'
     + '@media (max-width:700px){'
     +   '.mg-tab{padding:7px 10px;}'
     +   '.mg-top>div:first-child{min-width:0;}.mg-tools{width:100%;}.mg-tools input{flex:1;min-width:0;}.mg-tools .mg-hidegone input{flex:none;}'
-    +   '.mg-sortbar{display:block;}'
-    +   '.mg-scroll.mg-hhwrap{overflow:visible;border:none;background:none;}'
-    +   '.mg-table.mg-hh{min-width:0;}.mg-table.mg-hh thead{display:none;}'
-    +   '.mg-table.mg-hh,.mg-table.mg-hh tbody,.mg-table.mg-hh tr,.mg-table.mg-hh td{display:block;width:auto;}'
-    +   '.mg-table.mg-hh tr{border:1px solid var(--border);border-radius:10px;background:var(--card-bg);padding:10px 12px;margin-bottom:10px;}'
-    +   '.mg-table.mg-hh tr.mg-open{outline:2px solid var(--terracotta-fill);outline-offset:-1px;}'
-    +   '.mg-table.mg-hh td{border:none;padding:2px 0;text-align:start;}'
-    +   '.mg-table.mg-hh td[data-label]{display:flex;gap:10px;align-items:baseline;}'
-    +   '.mg-table.mg-hh td[data-label]::before{content:attr(data-label);flex:0 0 104px;color:var(--muted);font-size:12px;}'
-    +   '.mg-table.mg-hh td[data-label]>div{min-width:0;flex:1;}'
-    +   '.mg-table.mg-hh .mg-email{word-break:normal;overflow-wrap:anywhere;}'
-    +   '.mg-table.mg-hh td:first-child{padding-bottom:6px;}'
-    +   '.mg-table.mg-hh .mg-bar{min-width:0;}'
+    +   '.mg-table.mg-hh{min-width:0;table-layout:fixed;font-size:12.5px;}'
+    +   '.mg-table.mg-hh th .mg-sort{padding:8px 6px;white-space:normal;line-height:1.2;}'
+    +   '.mg-table.mg-hh td{padding:8px 6px;}'
+    +   '.mg-table.mg-hh .mg-kname{width:33%;}.mg-table.mg-hh .mg-kowner{width:29%;}'
+    +   '.mg-1l.mg-wide{max-width:none;}'
+    +   '.mg-table.mg-hh .mg-email{word-break:normal;}'
+    +   '.mg-more>td{padding:4px 10px 12px 10px !important;}'
+    +   '.mg-hh [data-col]{display:none;}'
+    +   Object.keys(PHONE_COLS).map(function (k) { return PHONE_COLS[k].map(function (c) { return '.mg-hh.mg-s-' + k + ' [data-col="' + c + '"]'; }).join(','); }).join(',')
+    +   '{display:table-cell;}'
     + '}'
     + '.mg-tab{all:unset;cursor:pointer;padding:8px 14px;font-weight:600;color:var(--muted);border-bottom:3px solid transparent;border-radius:8px 8px 0 0;transition:background .12s ease,color .12s ease;}'
     + '.mg-tab:hover{background:var(--note-bg);color:var(--heading);}.mg-tab:active{background:var(--border);}'
@@ -1458,9 +1543,21 @@
     },
     search: function (v) { S.q = v; render(); var s = document.getElementById('mgSearch'); if (s) { s.focus(); s.setSelectionRange(v.length, v.length); } },
     hideGone: function (on) { S.hideGone = !!on; try { localStorage.setItem(GONE_KEY, on ? '1' : '0'); } catch (e) {} render(); },
-    sortBy: function (k) { if (S.sort === k) S.dir = -S.dir; else { S.sort = k; S.dir = (k === 'name' || k === 'owner') ? 1 : -1; } render(); },
+    sortBy: function (k) { if (S.sort === k) S.dir = -S.dir; else { S.sort = k; S.dir = (k === 'name' || k === 'owner') ? 1 : -1; } sortKeep(); render(); },
     // v38.84 — the phone's "Sort by" menu: a key and its direction at once ('month:-1')
-    sortTo: function (v) { var p = String(v || '').split(':'); if (!p[0]) return; S.sort = p[0]; S.dir = +p[1] < 0 ? -1 : 1; render(); },
+    sortTo: function (v) { var p = String(v || '').split(':'); if (SORT_KEYS.indexOf(p[0]) === -1) return; S.sort = p[0]; S.dir = +p[1] < 0 ? -1 : 1; sortKeep(); render(); },
+    // v39.88 — a tap on a line opens it (and closes the one open before); a tap on the open line opens its details.
+    lineTap: function (k) {
+      if (!k) return;
+      if (lineOpen(k)) return mknManage.show(k);
+      S.lines = {}; S.lines[k] = true; render();
+      var tr = document.querySelector('#manageOverlay .mg-row[data-key="' + String(k).replace(/["\\]/g, '') + '"]');
+      if (tr && tr.focus) { try { tr.focus({ preventScroll: true }); } catch (e) {} }
+    },
+    expandAll: function (on) { S.allLines = !!on; S.lines = {}; render(); },
+    _sortKey: SORT_KEY, _phoneCols: PHONE_COLS,
+    // after a Self Test run: the sort as kept on this device, every line closed
+    _sortBack: function () { var k = sortSaved(); S.sort = k ? k.sort : 'month'; S.dir = k ? k.dir : -1; S.lines = {}; S.allLines = false; },
     show: function (hid) { S.open = (hid && S.open !== hid) ? hid : null; render();
       if (S.open) { var p = document.querySelector('#manageOverlay .mg-panel'); if (p && p.scrollIntoView) p.scrollIntoView({ behavior: 'smooth', block: 'start' }); } },
     setExtra: async function (name, on) {

@@ -1914,6 +1914,7 @@ window.SELF_TESTS = [
         };
         var n=await openManagement();
         if(n!==2) throw new Error('households read: '+n);
+        mknManage.expandAll(true);   // v39.88 — one line each; every value in full once a line is opened
         var ov=document.getElementById('manageOverlay'), t=ov.textContent;
         ['Kitchen A','MKN-AAAA-2222','a@example.com','$1.70','of $2.00','Kitchen B'].forEach(function(w){ if(t.indexOf(w)===-1) throw new Error('the table does not show '+w); });
         // v37.70 — links to the other copies' Households pages (never to this one).
@@ -2152,7 +2153,7 @@ window.SELF_TESTS = [
         var rep=sent.filter(function(b){ return b.action==='household-report'; })[0];
         if(!rep || rep.hid!=='hA' || rep.idToken!=='tok' || rep.report.members.length!==2 || rep.report.links[0].hid!=='hB' || rep.report.code!=='MKN-AAAA-2222'
           // v38.30 — how many recipes, as a number; never what they are
-          || (rep.report.recipes!==undefined && rep.report.recipes!==recipes.length)
+          || (rep.report.recipes!==undefined && rep.report.recipes!==recipeHonourCount(recipes))   // v39.88 — the badge's number
           || recipes.some(function(r){ return r && r.name && String(r.name).length>3 && JSON.stringify(rep.report).indexOf(String(r.name))!==-1; }))
           throw new Error('what was reported: '+JSON.stringify(rep));
         if(await hhReport()!==false) throw new Error('reported twice in a day');
@@ -2169,6 +2170,7 @@ window.SELF_TESTS = [
         if(dRows.length!==2) throw new Error('the deleted households are not marked: '+dRows.length);
         var trs=document.querySelectorAll('#manageOverlay .mg-row');
         if(!trs[trs.length-1].classList.contains('mg-deleted') || !trs[trs.length-2].classList.contains('mg-deleted')) throw new Error('the deleted ones are not last');
+        mknManage.expandAll(true);   // v39.88 — who deleted it is said in the opened line
         var tt=document.getElementById('manageOverlay').textContent;
         if(!/Deleted with its owner\u2019s account \(d@example\.com\)/.test(tt) || !/Deleted by its owner \(l@example\.com\)/.test(tt) || !/2 deleted/.test(tt)) throw new Error('who deleted them is not said');
         if(!/1 left \(deleted their account\)/.test(tt)) throw new Error('a member who deleted their account is not mentioned');
@@ -2186,7 +2188,8 @@ window.SELF_TESTS = [
         mknManage.show(null); mknManage.sortBy('month');
         // v39.22 — Tony: "a button, next to each of the households (for Admin) to reset the password"
         var pwBtn=function(name){ var tr=Array.prototype.filter.call(document.querySelectorAll('#manageOverlay .mg-row'), function(t){ return t.querySelector('.mg-name').textContent===name; })[0];
-          return tr && tr.querySelector('.mg-pwbtn'); };
+          var more=tr && tr.nextElementSibling;   // v39.88 — in the line opened under it
+          return more && more.classList.contains('mg-more') && more.querySelector('.mg-pwbtn'); };
         if(!pwBtn('Beta Kitchen') || pwBtn('Gone Kitchen')) throw new Error('🔑 Reset password: missing beside a household, or offered for a deleted one');
         var realOpen=window.open, realReset=window.ownerSendPasswordReset, opened=[], resetFor=[];
         try{
@@ -2261,8 +2264,161 @@ window.SELF_TESTS = [
       } finally { tabBack();
         window._fbDb=real.db; window._fbUser=real.user; window.isAppOwner=real.owner; window.fetch=real.fetch; window.toast=real.toast; window.showServiceError=real.err; _workerHealth=real.h; window._household=real.hh;
         delete window._allCopiesOverride;
-        try{ if(keptRep) localStorage.setItem(HH_REPORT_KEY+'hA', keptRep); else localStorage.removeItem(HH_REPORT_KEY+'hA'); }catch(e){}
+        try{ if(keptRep) localStorage.setItem(HH_REPORT_KEY+'hA', keptRep); else localStorage.removeItem(HH_REPORT_KEY+'hA');  localStorage.removeItem(HH_REPORT_KEY+'hA_n'); }catch(e){}
         if(window.mknManage){ mknManage.search(''); mknManage.close(); }
+      }
+    } },
+
+  { id:'household_report_counts_like_the_badge', group:'Sharing', name:'📊 A household reports how many recipes it has as its badge counts them (each recipe in a collection), and again within the hour when that number changes (v39.88)',
+    test: async()=>{
+      // Tony, 16 Nov: "Tony's Kitchen Notes (MKN-J5DM-F9BX) is specifying 76 recipes, whereas this account actually has 141 ones"
+      var real={ db:window._fbDb, user:window._fbUser, fetch:window.fetch, h:_workerHealth, hh:window._household, rec:recipes };
+      var K=HH_REPORT_KEY+'hN', kept=[null,null], sent=[];
+      try{ kept=[localStorage.getItem(K), localStorage.getItem(K+'_n')]; }catch(e){}
+      function snap(list){ return { size:list.length, forEach:function(fn){ list.forEach(fn); } }; }
+      try{
+        window._fbDb={ collection:function(){ return { doc:function(){ return { collection:function(){ return { get:async function(){
+          return snap([{ id:'uN', data:function(){ return { uid:'uN', email:'n@example.com', role:'owner' }; } }]); } }; } }; } }; } };
+        window._fbUser={ uid:'uN', email:'n@example.com', getIdToken:async function(){ return 'tok'; } };
+        window._household={ hid:'hN', role:'owner', name:'Kitchen N', code:'MKN-NNNN-2222', links:[] };
+        _workerHealth={ ok:true, metering:{ version:1, db:true }, reports:true };
+        window.fetch=async function(u, init){
+          var b=JSON.parse(init.body);
+          if(b.action==='household-report'){ sent.push(b); return new Response('{"ok":true}', { status:200 }); }
+          return real.fetch.apply(window, arguments);
+        };
+        try{ localStorage.removeItem(K); localStorage.removeItem(K+'_n'); }catch(e){}
+        // two recipes and a collection of three: 5, as the badge says — not 3 entries
+        recipes=[ { id:1, name:'One' }, { id:2, name:'Two' }, { id:3, name:'Soups', parts:[{ uid:'a', name:'A' }, { uid:'b', name:'B' }, { uid:'c', name:'C' }] } ];
+        if(hhRecipeCount()!==5 || recipeHonourCount(recipes)!==5) throw new Error('counted '+hhRecipeCount()+', the badge '+recipeHonourCount(recipes));
+        if(await hhReport()!==true || sent.length!==1 || sent[0].report.recipes!==5)
+          throw new Error('the number reported: '+JSON.stringify(sent.map(function(b){ return b.report && b.report.recipes; })));
+        if(localStorage.getItem(K+'_n')!=='5') throw new Error('the number sent is not kept');
+        if(await hhReport()!==false || sent.length!==1) throw new Error('sent again with nothing changed');
+        recipes.push({ id:4, name:'Four' });
+        if(await hhReport()!==false || sent.length!==1) throw new Error('sent again within the hour');
+        localStorage.setItem(K, String(Date.now()-61*60e3));
+        if(await hhReport()!==true || sent.length!==2 || sent[1].report.recipes!==6) throw new Error('a changed number, an hour later, was not sent: '+sent.length);
+        localStorage.setItem(K, String(Date.now()-2*3600e3));
+        if(await hhReport()!==false || sent.length!==2) throw new Error('sent with nothing changed before the day was over');
+        localStorage.setItem(K, String(Date.now()-21*3600e3));
+        if(await hhReport()!==true || sent.length!==3) throw new Error('the daily report did not go');
+        // a device whose last report came from an older version (no number kept): sent again after the hour
+        localStorage.removeItem(K+'_n'); localStorage.setItem(K, String(Date.now()-2*3600e3));
+        if(await hhReport()!==true || sent.length!==4 || sent[3].report.recipes!==6) throw new Error('the older version’s count was not replaced');
+        recipes.push({ id:TEST_ID_MIN+5, name:'a test recipe' });
+        if(hhRecipeCount()!==6) throw new Error('a test’s recipe was counted');
+        if(await hhReport({ gone:true })!==true || localStorage.getItem(K+'_n')!==null) throw new Error('a household deleted keeps its number on the device');
+      } finally {
+        window._fbDb=real.db; window._fbUser=real.user; window.fetch=real.fetch; _workerHealth=real.h; window._household=real.hh; recipes=real.rec;
+        try{ if(kept[0]===null) localStorage.removeItem(K); else localStorage.setItem(K, kept[0]);
+             if(kept[1]===null) localStorage.removeItem(K+'_n'); else localStorage.setItem(K+'_n', kept[1]); }catch(e){}
+      }
+    } },
+
+  { id:'management_lines', group:'Sharing', name:'📊 Households: one line each; a tap opens that line with every value, a second tap its details; ⊞ Expand all; the sort kept on the device; a phone shows Household, Owner and the sort’s own two columns (v39.88)',
+    test: async()=>{
+      var tabBack=await _onHouseholdsTab();
+      var now=Date.now(), month=new Date().toISOString().slice(0,7);
+      var docs={ hA:{ name:'Kitchen A', code:'MKN-AAAA-2222', ownerUid:'uA', createdAt:now-90*864e5 },
+                 hB:{ name:'Kitchen B with a rather long name that would never fit on one line of a phone', code:'MKN-BBBB-3333', ownerUid:'uB', createdAt:now-5*864e5 },
+                 hC:{ name:'Kitchen C', code:'MKN-CCCC-4444', ownerUid:'uC', createdAt:now-9*864e5 } };
+      var mem=[ ['hA',{ uid:'uA', email:'a.very.long.address.of.someone@example.com', role:'owner', lastSeen:now-2*864e5 }],
+                ['hB',{ uid:'uB', email:'b@example.com', role:'owner', lastSeen:now-3600e3 }],
+                ['hC',{ uid:'uC', email:'c@example.com', role:'owner', lastSeen:now-9*864e5 }] ];
+      function snap(list){ return { size:list.length, forEach:function(fn){ list.forEach(fn); } }; }
+      function d(id, data, parentHid){ return { id:id, data:function(){ return data; }, ref:{ parent:{ parent:{ id:parentHid } } } }; }
+      var fakeDb={ collection:function(c){ return { get:async function(){ return c==='households' ? snap(Object.keys(docs).map(function(k){ return d(k, docs[k]); })) : snap([]); } }; },
+        collectionGroup:function(c){ return { get:async function(){ return c==='members' ? snap(mem.map(function(m){ return d(m[1].uid, m[1], m[0]); })) : snap([]); } }; } };
+      var real={ db:window._fbDb, user:window._fbUser, owner:window.isAppOwner, fetch:window.fetch, toast:window.toast, err:window.showServiceError, h:_workerHealth };
+      var SK='mkn_manage_sort', sortWas=null;
+      try{ sortWas=localStorage.getItem(SK); localStorage.removeItem(SK); }catch(e){}
+      try{
+        window._fbDb=fakeDb; window._fbUser={ uid:'uT', email:'owner@example.com', getIdToken:async function(){ return 'tok'; } };
+        window.isAppOwner=function(){ return true; }; window.toast=function(){}; window.showServiceError=function(m){ throw new Error('error shown: '+m); };
+        _workerHealth={ ok:true, metering:{ version:1, db:true } };
+        window.fetch=async function(u, init){
+          var b=JSON.parse(init.body);
+          if(b.action==='meter-admin' && b.op==='list') return new Response(JSON.stringify({ project:'p', capped:true, month:month, months:[month,'2026-09','2026-08'], defaults:{ cap:2, firstMonth:4 },
+            households:[ { hid:'hA', name:'Kitchen A', cap:null, capNow:2, months:[{ month:month, usd:1.7, calls:12 }] }, { hid:'hB', capNow:2, months:[{ month:month, usd:0.2, calls:2 }] },
+                         { hid:'hC', capNow:2, months:[] } ] }), { status:200 });
+          return real.fetch.apply(window, arguments);
+        };
+        if(window.mknManage){ mknManage._state.q=''; mknManage._state.hideGone=false; mknManage._sortBack(); }
+        if(await openManagement()!==3) throw new Error('the households were not read');
+        var ov=document.getElementById('manageOverlay');
+        function rows(){ return Array.prototype.slice.call(ov.querySelectorAll('.mg-row')); }
+        function mores(){ return ov.querySelectorAll('.mg-more'); }
+        function rowOf(name){ return rows().filter(function(tr){ return tr.querySelector('.mg-name').textContent.indexOf(name)===0; })[0]; }
+        // 1. One line each, none opened.
+        if(rows().length!==3 || mores().length) throw new Error('lines: '+rows().length+', opened: '+mores().length);
+        var tall=rows().filter(function(tr){ return tr.getBoundingClientRect().height>52; });
+        if(tall.length) throw new Error('a household takes more than one line: '+Math.round(tall[0].getBoundingClientRect().height)+' px');
+        if(/MKN-AAAA-2222|of \$2\.00|Reset password/.test(ov.querySelector('table.mg-hh tbody').textContent)) throw new Error('the closed lines show what belongs in an opened one');
+        // 2. A tap opens that line, and only it — every value, in full.
+        rowOf('Kitchen A').click();
+        var m=mores(), rA=rowOf('Kitchen A');
+        if(m.length!==1 || rA.nextElementSibling!==m[0] || rA.getAttribute('aria-expanded')!=='true') throw new Error('the line did not open under itself');
+        ['MKN-AAAA-2222','a.very.long.address.of.someone@example.com','of $2.00','Reset password','Members','Recipes','Linked with','Shared the app','Last active','AI cap'].forEach(function(w){
+          if(m[0].textContent.indexOf(w)===-1) throw new Error('the opened line does not show '+w); });
+        if(ov.querySelector('.mg-panel')) throw new Error('the first tap opened the details');
+        rowOf('Kitchen B').click();
+        m=mores();
+        if(m.length!==1 || m[0].previousElementSibling!==rowOf('Kitchen B')) throw new Error('a tap on another line did not move the opened line there');
+        // 3. A tap on the opened line: its details, as a tap did before.
+        rowOf('Kitchen B').click();
+        if(!ov.querySelector('.mg-panel') || mknManage._state.open!=='hB') throw new Error('the second tap did not open its details');
+        mknManage.show(null);
+        // 4. ⊞ Expand all / ⊟ Collapse all.
+        var xb=document.getElementById('mgExpandAll');
+        if(!xb || !/Expand all/.test(xb.textContent)) throw new Error('no ⊞ Expand all');
+        xb.click();
+        if(mores().length!==3 || !/Collapse all/.test(document.getElementById('mgExpandAll').textContent)) throw new Error('Expand all opened '+mores().length);
+        rowOf('Kitchen C').click();
+        if(mknManage._state.open!=='hC') throw new Error('with every line open, a tap does not open the details');
+        mknManage.show(null);
+        document.getElementById('mgExpandAll').click();
+        if(mores().length) throw new Error('Collapse all left '+mores().length+' open');
+        // 5. The sort is kept on this device, and read back when the page is loaded again.
+        var sel=document.getElementById('mgSortBy');
+        if(!sel) throw new Error('no Sort by');
+        sel.value='seen:-1'; sel.dispatchEvent(new Event('change'));
+        if(localStorage.getItem(SK)!=='seen:-1') throw new Error('the sort is not kept: '+localStorage.getItem(SK));
+        mknManage._state.sort='month'; mknManage._state.dir=-1;
+        mknManage._sortBack();   // what the page does as it is loaded (the app restarted or updated)
+        if(mknManage._state.sort!=='seen' || mknManage._state.dir!==-1) throw new Error('the kept sort is not read back');
+        mknManage.close(); await openManagement(); ov=document.getElementById('manageOverlay');
+        if(document.getElementById('mgSortBy').value!=='seen:-1') throw new Error('the page opened again with another sort: '+document.getElementById('mgSortBy').value);
+        if(rows()[0].querySelector('.mg-name').textContent.indexOf('Kitchen B')!==0) throw new Error('not sorted by Last active');
+        mknManage.sortBy('name');
+        if(localStorage.getItem(SK)!=='name:1') throw new Error('a column header’s sort is not kept');
+        // 6. A phone: Household, Owner and the two columns the sort is about.
+        var pc=mknManage._phoneCols;
+        if(!pc || pc.month.join()!=='month,cap' || pc.seen.join()!=='seen,recipes') throw new Error('the phone’s columns: '+JSON.stringify(pc));
+        var phone=window.matchMedia('(max-width:700px)').matches;
+        [['month:-1',['Household','Owner','AI this month','AI cap']], ['seen:-1',['Household','Owner','Recipes','Last active']]].forEach(function(c){
+          mknManage.sortTo(c[0]);
+          var tb=ov.querySelector('table.mg-hh');
+          if(!tb.classList.contains('mg-s-'+c[0].split(':')[0])) throw new Error('the table does not say its sort');
+          var shown=Array.prototype.filter.call(tb.querySelectorAll('thead th'), function(th){ return getComputedStyle(th).display!=='none'; })
+            .map(function(th){ return th.textContent.replace(/[▾▴]/g,'').trim(); });
+          if(phone ? shown.join('|')!==c[1].join('|') : shown.length<10) throw new Error((phone ? 'a phone' : 'a computer')+' shows: '+shown.join(', '));
+          rows().forEach(function(tr){
+            var vis=Array.prototype.filter.call(tr.children, function(td){ return getComputedStyle(td).display!=='none'; }).length;
+            if(vis!==shown.length) throw new Error('a line’s cells do not match the headers: '+vis+' / '+shown.length);
+          });
+        });
+        // the rule itself, on any screen: on a phone the stylesheet shows only those
+        var rules=[];
+        Array.prototype.forEach.call(document.getElementById('mgCss').sheet.cssRules, function(r){
+          if(r.media && /max-width:\s*700px/.test(r.media.mediaText)) Array.prototype.forEach.call(r.cssRules, function(x){ rules.push(x.cssText); }); });
+        if(!rules.some(function(t){ return /\.mg-hh \[data-col\]\s*\{\s*display:\s*none/.test(t); })
+           || !rules.some(function(t){ return t.indexOf('.mg-hh.mg-s-seen [data-col="recipes"]')!==-1 && /display:\s*table-cell/.test(t); }))
+          throw new Error('a phone would not show only its four columns');
+      } finally { tabBack();
+        window._fbDb=real.db; window._fbUser=real.user; window.isAppOwner=real.owner; window.fetch=real.fetch; window.toast=real.toast; window.showServiceError=real.err; _workerHealth=real.h;
+        try{ if(sortWas===null) localStorage.removeItem(SK); else localStorage.setItem(SK, sortWas); }catch(e){}
+        if(window.mknManage){ mknManage._sortBack(); mknManage.close(); }
       }
     } },
 

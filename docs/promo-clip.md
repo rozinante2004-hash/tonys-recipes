@@ -127,6 +127,7 @@ can progress with it."
   Facebook, TikTok, video files), with ⚙️ "Use external players only" to turn it off. Details: `docs/history/2026-11.md`.
 
 ## The first frame is the logo (14 Nov 2026)
+**The rule for every clip from now on** (Tony, 16 Nov 2026: "Please make a note to have all future clips to also open on the logo (the frame WhatsApp shows before playing)."): any new or remade clip, in any language, opens on the logo from its very first frame, as below; look at that frame before sending it.
 Tony, with a WhatsApp screenshot of the two files he had sent: "when sending the clips, there is nothing but a blank
 square before starting playback. I would like them to present our logo instead of a blank square." A chat shows a
 video's first frame; scene 1 used to fade in from nothing, so that frame was the empty background over the caption.

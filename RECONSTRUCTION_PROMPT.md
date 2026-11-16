@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v39.87` — app. **Worker: v107**, deployed separately and versioned separately
+**Current version:** `v39.88` — app. **Worker: v107**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -265,7 +265,24 @@ hidden / refuses / silent / privacy text.
     owner, members (role, last opened, terms agreed), **Recipes** (v39.17: how many it keeps — the number its
     own app sends in the daily report, `report.recipes`; the cell's tooltip says when; sortable, in the CSV with the
     date counted, and in the details for every household), AI this month against its AI cap, "AI in <the two
-    months before>", links, referrals, last active; search, sort, CSV. The Worker's `list` sends each listed copy's
+    months before>", links, referrals, last active; search, sort, CSV.
+    **v39.88 — one line per household** (Tony: "a compressed table of 1 line per household"): `lineHtml` (every cell
+    one line, `.mg-1l` with an ellipsis; the name in a `dir="auto"` box so a Hebrew name is cut at its end; no ✎,
+    "3 days" without "ago"); a tap (`mknManage.lineTap(key)`, Enter/Space too) opens THAT line (`S.lines`, one at a
+    time) — `lineMoreHtml`: a row under it, colspan = the columns shown, every value in full (identifier, the
+    deleted/moved/left notes, 🔑 Reset password, Recipes "counted …", the AI bar); a tap on an opened line, or its
+    📋 All its details, is `show(key)` (the details panel, as a tap was before). ⊞ Expand all / ⊟ Collapse all
+    (`expandAll(on)`, `S.allLines`, `#mgExpandAll`). **The sort is kept** in `localStorage['mkn_manage_sort']`
+    ('month:-1'; `sortKeep()` in `sortBy`/`sortTo`, `sortSaved()` read as manage.js loads; only keys in `SORT_KEYS`);
+    a Self Test run keeps it (`_selfTestPark`/`_selfTestUnpark` → `mknManage._sortBack()`). **On a phone (≤700 px)**
+    the table stays a table (`table-layout:fixed`): Household and Owner always, plus `PHONE_COLS[S.sort]` — month:
+    month, cap; seen: recipes, seen; recipes: recipes, seen; members: members, recipes; name/owner: members, seen;
+    copy: copy, seen; links: links, members; referred: referred, seen; cap: month, cap — by `data-col` on every
+    th/td, the table's class `mg-s-<sort>` and CSS built from `PHONE_COLS` (`.mg-hh [data-col]{display:none}` then
+    those `{display:table-cell}`); `matchMedia('(max-width:700px)')` redraws on a change (the opened line's colspan).
+    Sort by (`#mgSortBy`) shows on every screen now. **The count** (v39.88): `report.recipes` is
+    `hhRecipeCount()` = `recipeHonourCount(recipes)` — the top bar badge's number, every part of a collection counted
+    (it was `recipes.length`, the entries: Tony's beta household showed 76 for 141). The Worker's `list` sends each listed copy's
     daily reports with or without `all` (v100 — the test copy's own page had none, so no counts); the details'
     **What they use** is two narrow tables side by side (v39.18–v39.19; `.mg-usegrid`, one under the other below
     ~640 px): a column per month (newest first), the 📈 Use sections (`TREND_SECTIONS`, plain counts, no shares;
@@ -365,7 +382,9 @@ dashboard must also be added to `wrangler.jsonc` or the next deploy drops it.
   `metering`; `aiPrepare()` (health, household, fresh token) precedes every AI call.
 - **v61** one inbox for notes from every copy (`feedback-send`, table `feedback`); **v62**
   `household-report` (a member's app reports its household once a day: name, code, members, links —
-  never recipes; table `hh_reports`); **v63** deleted households kept and marked; **v64**
+  never recipes; table `hh_reports`; v39.88: also within the hour when its recipe count changed — `hhReportDue`, the
+  count sent kept in `mkn_hh_report_<hid>_n`; checked after the first sync as the app opens (`afterSync`, up to 30 s)
+  and after each cloud read, `hhReportSoon`); **v63** deleted households kept and marked; **v64**
   `notes-import`; **v65** terms per member in reports; **v66** no AI without a verified sign-in and
   membership on ANY copy; models must start `claude-sonnet-`/`claude-haiku-`, `max_tokens` ≤ 32000;
   Bring! direct routes 410; **v67** per-project caps; **v68** replies to notes (`note-reply`,
@@ -1080,8 +1099,9 @@ The same setting colour-corrects the recipe PHOTOS (v38.84): `filter:url(#mknCvd
 buttons). Phones' own filters are named in Help for the whole phone.
 
 **Phone layouts (v38.84):** 👥 Family Access rows wrap below 600 px (name first, buttons under, ✕ in the card's corner);
-the 👑 📊 Households table is cards below 700 px (cells with data-label) with a Sort-by menu; the tabs wrap. CI
-tests/phone-fit.js measures both at 390/360/1280 px.
+the 👑 📊 Households table is cards below 700 px (cells with data-label) with a Sort-by menu; the tabs wrap — v39.88:
+one line per household instead, Household, Owner and the sort's two columns on a phone (above). CI
+tests/phone-fit.js measures both at 390/360/1280 px (and v39.88: a line opened, every line opened).
 **Every window fits the phone's screen (v39.24).** Three causes of windows opening "too big, or to the side" and of
 tiny text in Chrome: (1) below ~375 px (an iPhone with Display Zoom is 320) the header's kitchen name (`.logo`,
 `white-space: nowrap`) made the page wider than the screen — Chrome showed everything smaller, Safari slid sideways and
