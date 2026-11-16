@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v39.89` — app. **Worker: v107**, deployed separately and versioned separately
+**Current version:** `v39.90` — app. **Worker: v107**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -591,7 +591,10 @@ under its plain path only (a `?url=` request goes network-first).
   not only by a harvest — a tester's phone never harvests; (2) an ask's message, its choices, hints and Cancel, and a
   tour step sit in dir="auto" (which `i18nSkip` treats as a recipe) and are translated as they are drawn by
   `i18nAsk` — whole, then paragraph by paragraph; never recorded as missing; (3) a TEXTAREA's placeholder is
-  translated, never its contents (multi-line examples carry `data-i18n-skip-attrs="placeholder"`); (4) the harvest
+  translated, never its contents (multi-line examples carry `data-i18n-skip-attrs="placeholder"`: a key makes every run of
+  white space one space, so the translator would put them on one line; the Method box's three-line example is
+  translated line by line in code instead — `stepsHintPhrases()` in I18N_EXTRA, `stepsHintPaint()` when the form opens
+  and in `i18nActivate`, v39.90); (4) the harvest
   draws the empty kitchen's first screen and the chats with other kitchens, and lists the welcome's paragraphs
   (`HH_WELCOME`), the tour (`TOUR_STEPS`), the badge's words and the example recipes' meal types; (5) the language
   offer (`firstRunLanguageOffer`, z 10100) comes above the sign-in screen and the kitchen rules, so both are in that
@@ -2549,7 +2552,9 @@ and Ctrl+K / ⌘K: the marked words → a searchable list of every recipe (own, 
 those whose words are still there (`rlKeepUsed`). name, emoji picker (first 14 of `EMOJIS`),
 photo upload (compressed via `compressPhotoToDataUrl`), category, difficulty, prep, servings, an
 **ingredient table** (`addIngRow`/`syncIngsTextarea`/`loadIngsTable` — amount + name rows kept in
-sync with a hidden textarea), a steps textarea (one step per line), diet tag buttons
+sync with a hidden textarea), a steps textarea (one step per line; its example "Boil the pasta / Mix eggs and
+cheese / Serve hot" in the interface language, each line a phrase, and the box at least `calc(4.5em + 22px)` high —
+class `method-box` — so all three lines show, v39.90), diet tag buttons
 (`renderDietButtons`/`getSelectedDiets`), source, notes, and an "is clip" checkbox. Ingredient
 lines accept `amount — name` / `amount - name` separators. Editing preserves `fav`, `bg`,
 `originalPhoto`, and clears stale `nutrition` when ingredients/steps change.

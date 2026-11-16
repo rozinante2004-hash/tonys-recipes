@@ -1,7 +1,7 @@
 {
  "lang": "es",
  "updatedAt": 1794849026630,
- "count": 2876,
+ "count": 2879,
  "strings": {
   "\"Add to Home Screen\"": "Añadir a pantalla de inicio",
   "\"Open Bring!\"": "Abrir Bring!",
@@ -181,6 +181,7 @@
   "Block": "Bloquear",
   "Blue instead of green and orange instead of red wherever a colour says something (all right / a problem / something new) — the colours a red–green colour-blind eye tells apart. On this device.": "Azul en vez de verde y naranja en vez de rojo allí donde un color significa algo (todo bien / un problema / algo nuevo) — los colores que un ojo con daltonismo rojo-verde distingue. En este dispositivo.",
   "Blue instead of green and orange instead of red wherever a colour says something (all right / a problem / something new), and recipe photos colour-corrected so red and green food can be told apart. On this device.": "Azul en vez de verde y naranja en vez de rojo donde un color signifique algo (todo bien / un problema / algo nuevo), y fotos de recetas con el color corregido para distinguir la comida roja de la verde. En este dispositivo.",
+  "Boil the pasta": "Hervir la pasta",
   "Bold": "Negrita",
   "Bold — the selected words of the ingredient you are in, or its word under the cursor (Ctrl+B)": "Negrita: las palabras seleccionadas del ingrediente en el que estás, o la palabra bajo el cursor (Ctrl+B)",
   "Bold — the selected words, or the word the cursor is in (Ctrl+B)": "Negrita: las palabras seleccionadas, o la palabra en la que está el cursor (Ctrl+B)",
@@ -719,6 +720,7 @@
   "Metric": "Métrico",
   "Mexican": "Mexicana",
   "Middle Eastern": "Oriente Medio",
+  "Mix eggs and cheese": "Mezclar los huevos y el queso",
   "Mix it": "Mézclalo",
   "More than $5": "Más de $5",
   "Moroccan": "Marroquí",
@@ -1143,6 +1145,7 @@
   "Sent by your household": "Enviado por tu hogar",
   "Sent {1} of {2}. {3} could not be written, so the cloud still holds the old copy for those and they may come back: {4}": "Se enviaron {1} de {2}. {3} no se pudieron guardar, así que la nube conserva la copia anterior de esas y podrían volver a aparecer: {4}",
   "Separate from the log above: this prints verbose tracing to the browser console while you watch, and stores nothing.": "Aparte del registro de arriba: esto muestra un seguimiento detallado en la consola del navegador mientras lo ves, y no guarda nada.",
+  "Serve hot": "Servir caliente",
   "Server allowances": "Cuotas del servidor",
   "Service Error": "Error del servicio",
   "Services powering Tony's Recipes Collection": "Servicios que hacen posible Tony's Recipes Collection",

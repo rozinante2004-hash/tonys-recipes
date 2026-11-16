@@ -1,7 +1,7 @@
 {
  "lang": "hu",
  "updatedAt": 1794849026630,
- "count": 2654,
+ "count": 2657,
  "strings": {
   "\"Add to Home Screen\"": "Hozzáadás a kezdőképernyőhöz",
   "\"Open Bring!\"": "Bring! megnyitása",
@@ -165,6 +165,7 @@
   "Between {1} and {2} minutes apart, picked at random, counted while the app is open.": "{1} és {2} perc között, véletlenszerűen, csak amíg az app nyitva van.",
   "Block": "Letiltás",
   "Blue instead of green and orange instead of red wherever a colour says something (all right / a problem / something new), and recipe photos colour-corrected so red and green food can be told apart. On this device.": "Kék a zöld helyett, és narancssárga a piros helyett, mindenhol, ahol egy szín jelent valamit (rendben / probléma / új dolog), és a recept fotók színkorrigálva, hogy a piros és zöld étel megkülönböztethető legyen. Ezen az eszközön.",
+  "Boil the pasta": "Főzd ki a tésztát",
   "Bold": "Félkövér",
   "Bold — the selected words of the ingredient you are in, or its word under the cursor (Ctrl+B)": "Félkövér — az ingrediens kijelölt szavai, amiben éppen vagy, vagy a kurzor alatti szó (Ctrl+B)",
   "Bold — the selected words, or the word the cursor is in (Ctrl+B)": "Félkövér — a kijelölt szavak, vagy a kurzor alatti szó (Ctrl+B)",
@@ -659,6 +660,7 @@
   "Metric": "Metrikus",
   "Mexican": "Mexikói",
   "Middle Eastern": "Közel-keleti",
+  "Mix eggs and cheese": "Keverd össze a tojást és a sajtot",
   "More than $5": "Több mint 5 USD",
   "Moroccan": "Marokkói",
   "Move this collection into a household?": "Átmozgatod ezt a gyűjteményt egy háztartásba?",
@@ -1051,6 +1053,7 @@
   "Sent by your household": "Elküldte a háztartásod",
   "Sent {1} of {2}. {3} could not be written, so the cloud still holds the old copy for those and they may come back: {4}": "{1}/{2} elküldve. {3} nem sikerült elmenteni, a felhőben megmaradt a régi példány, és előfordulhat, hogy visszatérnek: {4}",
   "Separate from the log above: this prints verbose tracing to the browser console while you watch, and stores nothing.": "Független a fenti naplótól: ez részletes nyomkövetést ír a böngésző konzoljára, miközben nézed, és semmit nem tárol.",
+  "Serve hot": "Tálald forrón",
   "Server allowances": "Szerverkeretek",
   "Service Error": "Szerverhiba",
   "Services powering this app": "Az appot működtető szolgáltatások",

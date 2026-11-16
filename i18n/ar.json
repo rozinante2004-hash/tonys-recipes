@@ -1,7 +1,7 @@
 {
  "lang": "ar",
  "updatedAt": 1794849026630,
- "count": 2879,
+ "count": 2882,
  "strings": {
   "\"Add to Home Screen\"": "إضافة إلى الشاشة الرئيسية",
   "\"Open Bring!\"": "فتح Bring!",
@@ -181,6 +181,7 @@
   "Block": "حظر",
   "Blue instead of green and orange instead of red wherever a colour says something (all right / a problem / something new) — the colours a red–green colour-blind eye tells apart. On this device.": "أزرق بدل الأخضر وبرتقالي بدل الأحمر أينما يعبّر لون عن شيء (كل شيء تمام / مشكلة / جديد) — ألوان يميّزها من يعاني من عمى الألوان الأحمر–الأخضر. على هذا الجهاز.",
   "Blue instead of green and orange instead of red wherever a colour says something (all right / a problem / something new), and recipe photos colour-corrected so red and green food can be told apart. On this device.": "أزرق بدلاً من أخضر وبرتقالي بدلاً من أحمر في كل مكان يعبّر فيه اللون عن شيء (كل شيء تمام / مشكلة / شيء جديد)، وصور الوصفات معدّلة الألوان حتى يمكن تمييز الطعام الأحمر عن الأخضر. على هذا الجهاز.",
+  "Boil the pasta": "اسلق المعكرونة",
   "Bold": "عريض",
   "Bold — the selected words of the ingredient you are in, or its word under the cursor (Ctrl+B)": "عريض — الكلمات المحددة في المكوّن الذي أنت فيه، أو الكلمة تحت المؤشر (Ctrl+B)",
   "Bold — the selected words, or the word the cursor is in (Ctrl+B)": "عريض — الكلمات المحددة، أو الكلمة التي فيها المؤشر (Ctrl+B)",
@@ -719,6 +720,7 @@
   "Metric": "متري",
   "Mexican": "مكسيكية",
   "Middle Eastern": "شرق أوسطية",
+  "Mix eggs and cheese": "اخلط البيض مع الجبن",
   "Mix it": "اخلطها",
   "More than $5": "أكثر من $5",
   "Moroccan": "مغربية",
@@ -1143,6 +1145,7 @@
   "Sent by your household": "أُرسلت من أفراد منزلك",
   "Sent {1} of {2}. {3} could not be written, so the cloud still holds the old copy for those and they may come back: {4}": "تم إرسال {1} من {2}. تعذّرت كتابة {3}، لذا لا تزال السحابة تحتفظ بالنسخة القديمة منها وقد تعود: {4}",
   "Separate from the log above: this prints verbose tracing to the browser console while you watch, and stores nothing.": "بمعزل عن السجل أعلاه: هذا يطبع تتبعًا تفصيليًا في وحدة تحكم المتصفح أثناء مشاهدتك، ولا يخزّن شيئًا.",
+  "Serve hot": "قدّمها ساخنة",
   "Server allowances": "حصص الخادم",
   "Service Error": "خطأ في الخدمة",
   "Services powering Tony's Recipes Collection": "الخدمات التي تشغّل مجموعة وصفات توني",

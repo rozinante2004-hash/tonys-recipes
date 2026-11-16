@@ -1,7 +1,7 @@
 {
  "lang": "ja",
  "updatedAt": 1794849026630,
- "count": 3182,
+ "count": 3185,
  "strings": {
   "\"Add to Home Screen\"": "ホーム画面に追加",
   "\"One item away\" filter ({1}f.{2})": "「あと1品」フィルター（{1}f.{2}）",
@@ -246,6 +246,7 @@
   "Block": "ブロック",
   "Blue instead of green and orange instead of red wherever a colour says something (all right / a problem / something new) — the colours a red–green colour-blind eye tells apart. On this device.": "色で意味を伝える場面すべてで、緑の代わりに青、赤の代わりにオレンジを使います（OK・問題あり・新着など）。赤緑色覚の人でも見分けやすい色です。この端末のみ。",
   "Blue instead of green and orange instead of red wherever a colour says something (all right / a problem / something new), and recipe photos colour-corrected so red and green food can be told apart. On this device.": "色が何かを意味する場面(問題なし/問題あり/新着)では、緑の代わりに青、赤の代わりにオレンジを使用します。レシピ写真も赤と緑の食材を見分けやすいよう色調整されます。この端末のみ。",
+  "Boil the pasta": "パスタをゆでる",
   "Bold": "太字",
   "Bold — the selected words of the ingredient you are in, or its word under the cursor (Ctrl+B)": "太字 — 選択した材料の単語、またはカーソルがある単語を太字にします（Ctrl+B）",
   "Bold — the selected words, or the word the cursor is in (Ctrl+B)": "太字 — 選択した単語、またはカーソルがある単語を太字にします（Ctrl+B）",
@@ -868,6 +869,7 @@
   "Metric keeps tsp/tbsp/cup, converts imperial": "メートル法では小さじ・大さじ・カップはそのまま、ヤード・ポンド法から変換",
   "Mexican": "メキシコ料理",
   "Middle Eastern": "中東料理",
+  "Mix eggs and cheese": "卵とチーズを混ぜる",
   "Mix it": "混ぜる",
   "Modals": "モーダル",
   "More than $5": "$5以上",
@@ -1346,6 +1348,7 @@
   "Sent by your household": "ご家族から送信されました",
   "Sent {1} of {2}. {3} could not be written, so the cloud still holds the old copy for those and they may come back: {4}": "{2}件中{1}件を送信しました。{3}件は書き込めなかったため、クラウド側には古いデータが残っています。復活することがあります：{4}",
   "Separate from the log above: this prints verbose tracing to the browser console while you watch, and stores nothing.": "上のログとは別に、これは見ている間ブラウザのコンソールに詳細なトレースを出力するだけで、何も保存しません。",
+  "Serve hot": "熱いうちに盛り付ける",
   "Server allowances": "サーバーの利用枠",
   "Service Error": "サービスエラー",
   "Services powering Tony's Recipes Collection": "Tony's Recipes Collectionを支えるサービス",

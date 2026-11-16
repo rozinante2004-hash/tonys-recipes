@@ -1,7 +1,7 @@
 {
  "lang": "fr",
  "updatedAt": 1794849026630,
- "count": 2877,
+ "count": 2880,
  "strings": {
   "\"Add to Home Screen\"": "Ajouter à l'écran d'accueil",
   "\"Open Bring!\"": "Ouvrir Bring!",
@@ -181,6 +181,7 @@
   "Block": "Bloquer",
   "Blue instead of green and orange instead of red wherever a colour says something (all right / a problem / something new) — the colours a red–green colour-blind eye tells apart. On this device.": "Bleu à la place du vert et orange à la place du rouge partout où une couleur a un sens (tout va bien / un problème / une nouveauté) — des couleurs qu'un œil daltonien rouge-vert distingue bien. Sur cet appareil.",
   "Blue instead of green and orange instead of red wherever a colour says something (all right / a problem / something new), and recipe photos colour-corrected so red and green food can be told apart. On this device.": "Bleu à la place du vert et orange à la place du rouge partout où une couleur a un sens (tout va bien / un problème / une nouveauté), et photos de recettes corrigées pour distinguer le rouge et le vert. Sur cet appareil.",
+  "Boil the pasta": "Faire cuire les pâtes",
   "Bold": "Gras",
   "Bold — the selected words of the ingredient you are in, or its word under the cursor (Ctrl+B)": "Gras — les mots sélectionnés de l'ingrédient où tu es, ou le mot sous le curseur (Ctrl+B)",
   "Bold — the selected words, or the word the cursor is in (Ctrl+B)": "Gras — les mots sélectionnés, ou le mot où se trouve le curseur (Ctrl+B)",
@@ -719,6 +720,7 @@
   "Metric": "Métrique",
   "Mexican": "Mexicain",
   "Middle Eastern": "Moyen-oriental",
+  "Mix eggs and cheese": "Mélanger les œufs et le fromage",
   "Mix it": "Mélanger",
   "More than $5": "Plus de 5 €",
   "Moroccan": "Marocain",
@@ -1143,6 +1145,7 @@
   "Sent by your household": "Envoyé par votre foyer",
   "Sent {1} of {2}. {3} could not be written, so the cloud still holds the old copy for those and they may come back: {4}": "{1} sur {2} envoyées. {3} n'ont pas pu être écrites, le cloud garde donc encore l'ancienne copie pour celles-ci et elles pourraient revenir : {4}",
   "Separate from the log above: this prints verbose tracing to the browser console while you watch, and stores nothing.": "Indépendant du journal ci-dessus : ceci affiche un traçage détaillé dans la console du navigateur en direct, sans rien enregistrer.",
+  "Serve hot": "Servir chaud",
   "Server allowances": "Quotas serveur",
   "Service Error": "Erreur de service",
   "Services powering Tony's Recipes Collection": "Services derrière Tony's Recipes Collection",

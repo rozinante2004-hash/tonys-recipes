@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.89 -->
+<!-- Tony's Recipes Collection v39.90 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -11215,7 +11215,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.89';
+var APP_VERSION = 'v39.90';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -13348,6 +13348,9 @@ li.line-sub-indent { padding-inline-start: 22px; }
 .form-input, .form-select, .form-textarea { width: 100%; padding: 8px 11px; border: 1.5px solid var(--border); border-radius: 7px; font-family: 'DM Sans', 'Heebo', sans-serif; font-size: 14px; color: var(--ink); background: white; outline: none; transition: border-color 0.15s; }
 .form-input:focus, .form-select:focus, .form-textarea:focus { border-color: var(--terracotta); }
 .form-textarea { resize: vertical; min-height: 72px; }
+/* v39.90 — the Method box shows its three-line example whole: at 72px the third line was cut, in Hebrew (taller
+   lines) by half. A class, not the id, so the wide editor's 120px below still wins. */
+.form-textarea.method-box { min-height: calc(4.5em + 22px); }
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 /* v36.30 — the Edit modal can use the whole window. The cap of 600px is right
    for reading a dialog and wrong for editing a recipe: at 1280px it left an
@@ -14781,7 +14784,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.89</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.90</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14869,7 +14872,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.89</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.90</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -15359,7 +15362,7 @@ body.banner-shown .header {
           <button type="button" class="step-tool-btn" onmousedown="event.preventDefault()" onclick="stepToolIndent(-1)" aria-label="Outdent this line, or the selected lines" title="Outdent this line, or the selected lines">&#8676;</button>
           <span style="font-size:11px;color:var(--muted);">acts on the line your cursor is in, or on every line you select · <b>B</b> or Ctrl+B: **bold** here is bold in the recipe</span>
         </div>
-        <textarea class="form-textarea" id="f-steps" dir="auto" data-i18n-skip-attrs="placeholder" onkeyup="rememberStepCaret()" onclick="rememberStepCaret()" onselect="rememberStepCaret()" onfocus="rememberStepCaret()" placeholder="Boil the pasta&#10;Mix eggs and cheese&#10;Serve hot"></textarea>
+        <textarea class="form-textarea method-box" id="f-steps" dir="auto" data-i18n-skip-attrs="placeholder" onkeyup="rememberStepCaret()" onclick="rememberStepCaret()" onselect="rememberStepCaret()" onfocus="rememberStepCaret()" placeholder="Boil the pasta&#10;Mix eggs and cheese&#10;Serve hot"></textarea>
       </div>
       <div class="form-group">
         <label class="form-label">Source</label>
@@ -18694,6 +18697,7 @@ var I18N_EXTRA = [
   ', and no outside analytics or trackers are used. While the app is being tested, this copy reports its own errors and counts how it is used (which features, how often, on what kind of device), to the app\u2019s own server. '
     + 'The sync log in ⚙️ → 🔧 Troubleshooting → Logging & debugging stays on this device, is never put into a backup, and leaves it only when you choose to send it to the app\u2019s admin.'
 ].concat(appFeaturePhrases(), contactPhrases(), surveyPhrases(),
+  stepsHintPhrases(),   // v39.90 — the Method box's example, one phrase per line (stepsHintPaint)
   // v38.90 — the welcome's paragraphs and the tour's steps (each drawn inside dir="auto", translated by i18nAsk)
   Object.keys(HH_WELCOME).map(function(k){ return HH_WELCOME[k]; }), TOUR_STEPS.map(function(st){ return st.text; }),
   setupPhrases(), ['\u{1F9ED} Show me around', 'I’ll look around by myself'],   // v38.95 — the wizard
@@ -20907,6 +20911,8 @@ function i18nActivate(lang, dict, changed) {
   var dsT = document.getElementById('dsText'), dsW = dsT && dsT.getAttribute('data-who');   // v38.90 — said again in it
   if (dsW && typeof setDriveStatus === 'function') { try { setDriveStatus(document.getElementById('driveStatus').className, dsT.getAttribute('data-text'), dsW); } catch(e) {} }
   i18nRenderBadge();
+  // v39.90 — the Method box's example: its lines are looked up in code (several lines are beyond the translator)
+  if (typeof stepsHintPaint === 'function') { try { stepsHintPaint(); } catch(e) {} }
   // Recipe cards are translated while they are BUILT (renderGrid), and the
   // observer leaves them alone, so a different language has to redraw them.
   if (was !== _i18nDict || changed) {
@@ -25685,6 +25691,23 @@ window.toggleEditWide = toggleEditWide;
 // inert on a phone, but the BUTTON would otherwise sit there hidden or stranded.
 window.addEventListener('resize', applyEditWide);
 
+// v39.90 — THE METHOD BOX'S EXAMPLE, IN THE READER'S LANGUAGE. Its hint is three lines ("Boil the pasta / Mix eggs
+// and cheese / Serve hot"), and the translator cannot carry a hint of several lines: a key is the English with every
+// run of white space made one space (i18nDeriveKey), so a translated hint would come back as one long line. That is
+// why the box has carried data-i18n-skip-attrs="placeholder" since v38.90 — and why a Hebrew (or any) interface showed
+// it in English (seen photographing the app in Hebrew, 16 Nov 2026). So each line is a phrase of its own, looked up
+// here and joined with line breaks, when the form opens and whenever the language changes (i18nActivate); the
+// translator still leaves the attribute alone. The lines are in I18N_EXTRA (stepsHintPhrases) for every language.
+function stepsHintPhrases() { return ['Boil the pasta', 'Mix eggs and cheese', 'Serve hot']; }
+function stepsHintPaint() {
+  var ta = document.getElementById('f-steps');
+  if (!ta) return '';
+  var want = stepsHintPhrases().map(function(s){ return i18nPhrase(s); }).join('\n');
+  if (ta.getAttribute('placeholder') !== want) ta.setAttribute('placeholder', want);
+  return want;
+}
+window.stepsHintPhrases = stepsHintPhrases; window.stepsHintPaint = stepsHintPaint;
+
 function openAddModal(id){
   editingId=id||null;
   // Any ordinary open clears the part target. editPart sets it AFTER calling
@@ -25715,6 +25738,7 @@ function openAddModal(id){
   loadIngsTable(r ? r.ingredients : []);
   renderDietButtons(r ? (r.diets || []) : []);
   document.getElementById('f-steps').value = r ? stepsToText(r.steps) : '';
+  stepsHintPaint();         // v39.90 — the Method box's example, in the reader's language, on its three lines
   if(document.getElementById('f-source'))document.getElementById('f-source').value=r?(r.source||''):'';
   if(document.getElementById('f-notes'))document.getElementById('f-notes').value=r?(r.notes||''):'';
   _editLinks = recipeLinksClean(r && r.links); _rlSel = null; rlEditDraw();   // v39.53

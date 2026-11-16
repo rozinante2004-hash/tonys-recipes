@@ -1,7 +1,7 @@
 {
  "lang": "zh",
  "updatedAt": 1794849026630,
- "count": 2881,
+ "count": 2884,
  "strings": {
   "\"Add to Home Screen\"": "添加到主屏幕",
   "\"Open Bring!\"": "打开 Bring!",
@@ -181,6 +181,7 @@
   "Block": "屏蔽",
   "Blue instead of green and orange instead of red wherever a colour says something (all right / a problem / something new) — the colours a red–green colour-blind eye tells apart. On this device.": "但凡颜色表示状态（正常／有问题／有新内容），一律蓝色代替绿色、橙色代替红色——红绿色盲也能分辨的颜色。仅限本设备。",
   "Blue instead of green and orange instead of red wherever a colour says something (all right / a problem / something new), and recipe photos colour-corrected so red and green food can be told apart. On this device.": "用蓝色代替绿色、橙色代替红色来表示状态（正常／有问题／新内容），并对菜谱照片进行颜色校正，以便区分红色和绿色的食物。仅限本设备。",
+  "Boil the pasta": "煮意面",
   "Bold": "粗体",
   "Bold — the selected words of the ingredient you are in, or its word under the cursor (Ctrl+B)": "粗体 — 加粗所在配料中选中的文字，或光标所在的词（Ctrl+B）",
   "Bold — the selected words, or the word the cursor is in (Ctrl+B)": "粗体 — 加粗选中的文字，或光标所在的词（Ctrl+B）",
@@ -719,6 +720,7 @@
   "Metric": "公制",
   "Mexican": "墨西哥风味",
   "Middle Eastern": "中东风味",
+  "Mix eggs and cheese": "把鸡蛋和奶酪拌匀",
   "Mix it": "搅拌",
   "More than $5": "5 美元以上",
   "Moroccan": "摩洛哥风味",
@@ -1143,6 +1145,7 @@
   "Sent by your household": "由你的家庭成员发送",
   "Sent {1} of {2}. {3} could not be written, so the cloud still holds the old copy for those and they may come back: {4}": "已发送 {2} 张中的 {1} 张。{3} 张写入失败，云端仍保留旧版本，它们可能会重新出现：{4}",
   "Separate from the log above: this prints verbose tracing to the browser console while you watch, and stores nothing.": "与上面的日志无关：这会在你查看时向浏览器控制台打印详细跟踪信息，不会存储任何内容。",
+  "Serve hot": "趁热上桌",
   "Server allowances": "服务器额度",
   "Service Error": "服务错误",
   "Services powering Tony's Recipes Collection": "为 Tony's Recipes Collection 提供支持的服务",

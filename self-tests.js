@@ -21541,6 +21541,44 @@ window.SELF_TESTS = [
         try{ i18nRevertAll(); }catch(e){} i18nInstall(prevLang, prevDict); hidePullHint();
       }
     } },
+  { id:'steps_hint_translates', group:'UI', name:'✏️ The Method box’s example is in the reader’s language and still on its three lines — when the form opens and when the language changes (v39.90)',
+    test: async()=>{
+      // Seen photographing the app in Hebrew (16 Nov 2026): the Method box said "Boil the pasta / Mix eggs and cheese /
+      // Serve hot" in English in every language — data-i18n-skip-attrs kept the translator off a hint of three lines.
+      var prevDict=i18nCurrentDict(), prevLang=i18nLang(), ov=document.getElementById('editOverlay'), ta=document.getElementById('f-steps');
+      var EN='Boil the pasta\nMix eggs and cheese\nServe hot', HE='מבשלים את הפסטה\nמערבבים ביצים וגבינה\nמגישים חם';
+      var tick=function(ms){ return new Promise(function(r){ setTimeout(r, ms); }); };
+      var says=function(){ return JSON.stringify(ta.getAttribute('placeholder')); };
+      try{
+        if(!ta) throw new Error('#f-steps missing');
+        if(typeof stepsHintPhrases!=='function' || stepsHintPhrases().join('\n')!==EN) throw new Error('the hint’s English lines are not '+JSON.stringify(EN));
+        stepsHintPhrases().forEach(function(p){ if(I18N_EXTRA.indexOf(p)<0) throw new Error('"'+p+'" is not among the phrases to translate'); });
+        i18nInstall('he', { 'Boil the pasta':'מבשלים את הפסטה', 'Mix eggs and cheese':'מערבבים ביצים וגבינה', 'Serve hot':'מגישים חם' });
+        ta.setAttribute('placeholder', EN);             // as the page has it before the form is first opened
+        openAddModal(null);                             // ✏️ Fill in manually
+        if(ta.getAttribute('placeholder')!==HE) throw new Error('opened in Hebrew, the hint says '+says());
+        // …and the box shows all three lines: at 72px the third was cut, in Hebrew (taller lines) by half
+        var v0=ta.value, h0=ta.style.height; ta.value=HE; ta.style.height='auto';
+        var sh=ta.scrollHeight, ch=ta.clientHeight; ta.value=v0; ta.style.height=h0;
+        if(sh>ch+1) throw new Error('the box shows '+ch+'px of a hint '+sh+'px tall: its third line is cut');
+        // the translator leaves it be: it would make the three lines one
+        i18nStartObserver(); i18nApply(ov); await tick(200);
+        if(ta.getAttribute('placeholder')!==HE) throw new Error('the translator rewrote the hint: '+says());
+        // the language changes while the form is open
+        i18nInstall('ru', { 'Boil the pasta':'Отварить пасту', 'Mix eggs and cheese':'Смешать яйца и сыр', 'Serve hot':'Подавать горячим' });
+        if(ta.getAttribute('placeholder')!=='Отварить пасту\nСмешать яйца и сыр\nПодавать горячим') throw new Error('after a change to Russian the hint says '+says());
+        // a language that lacks a line keeps that one line in English — still three lines
+        i18nInstall('he', { 'Boil the pasta':'מבשלים את הפסטה' });
+        if(ta.getAttribute('placeholder')!=='מבשלים את הפסטה\nMix eggs and cheese\nServe hot') throw new Error('with one line translated the hint says '+says());
+        i18nInstall('en', null);
+        if(ta.getAttribute('placeholder')!==EN) throw new Error('back in English the hint says '+says());
+        if(ta.value!=='') throw new Error('the hint reached the box’s contents: '+JSON.stringify(ta.value));
+        return 'Hebrew and Russian on three lines, left alone by the translator; a missing line stays English; English again at once';
+      } finally {
+        _editFormSnapshot=null; if(ov) ov.classList.remove('open');
+        try{ i18nRevertAll(); }catch(e){} i18nInstall(prevLang, prevDict);
+      }
+    } },
   { id:'recent_row_on_top', group:'Features', name:'"Recent:" — the recipes opened last fill the top row of the list, in a box with its title; the rest follow in the order chosen, without them (v39.80); a Self Test run leaves the list as it was, and a recipe no longer here gives its place up (v39.83)',
     test: async()=>{
       // Tony, 15 Nov 2026: "In the list of recipes, I would like to see in the top row the recent recipes accessed. The rest

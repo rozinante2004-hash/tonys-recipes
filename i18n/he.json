@@ -1,7 +1,7 @@
 {
  "lang": "he",
  "updatedAt": 1794849026630,
- "count": 3305,
+ "count": 3308,
  "strings": {
   "\"Add to Home Screen\"": "הוספה למסך הבית",
   "\"One item away\" filter ({1}f.{2})": "פילטר \"פריט אחד חסר\" ({1}f.{2})",
@@ -251,6 +251,7 @@
   "Block": "חסום",
   "Blue instead of green and orange instead of red wherever a colour says something (all right / a problem / something new) — the colours a red–green colour-blind eye tells apart. On this device.": "כחול במקום ירוק וכתום במקום אדום בכל מקום שצבע אומר משהו (הכול בסדר / יש בעיה / משהו חדש) — הצבעים שעין עם עיוורון צבעים אדום-ירוק מבדילה ביניהם. במכשיר הזה.",
   "Blue instead of green and orange instead of red wherever a colour says something (all right / a problem / something new), and recipe photos colour-corrected so red and green food can be told apart. On this device.": "כחול במקום ירוק וכתום במקום אדום בכל מקום שבו צבע אומר משהו (הכול בסדר / יש בעיה / משהו חדש), ותמונות המתכונים מתוקנות בצבע כדי שאפשר יהיה להבחין בין אוכל אדום לירוק. במכשיר הזה.",
+  "Boil the pasta": "מבשלים את הפסטה",
   "Bold": "מודגש",
   "Bold — the selected words of the ingredient you are in, or its word under the cursor (Ctrl+B)": "מודגש — המילים המסומנות של הרכיב שבו אתם נמצאים, או המילה שבה נמצא הסמן (Ctrl+B)",
   "Bold — the selected words, or the word the cursor is in (Ctrl+B)": "מודגש — המילים המסומנות, או המילה שבה נמצא הסמן (Ctrl+B)",
@@ -891,6 +892,7 @@
   "Metric keeps tsp/tbsp/cup, converts imperial": "המערכת המטרית שומרת על tsp/tbsp/cup, וממירה יחידות אימפריאליות",
   "Mexican": "מקסיקני",
   "Middle Eastern": "מזרח תיכוני",
+  "Mix eggs and cheese": "מערבבים ביצים וגבינה",
   "Mix it": "ערבב",
   "Modals": "חלונות קופצים",
   "More than $5": "יותר מ-5$",
@@ -1398,6 +1400,7 @@
   "Sent by your household": "נשלח על ידי בני הבית שלכם",
   "Sent {1} of {2}. {3} could not be written, so the cloud still holds the old copy for those and they may come back: {4}": "נשלחו {1} מתוך {2}. {3} לא ניתן היה לכתוב, כך שהענן עדיין מחזיק את הגרסה הישנה שלהם והם עלולים לחזור: {4}",
   "Separate from the log above: this prints verbose tracing to the browser console while you watch, and stores nothing.": "בנפרד מהלוג שלמעלה: זה מדפיס מעקב מפורט לקונסולת הדפדפן תוך כדי צפייה, ולא שומר כלום.",
+  "Serve hot": "מגישים חם",
   "Server allowances": "מכסות שרת",
   "Service Error": "שגיאת שירות",
   "Services powering Tony's Recipes Collection": "שירותים שמפעילים את Tony's Recipes Collection",

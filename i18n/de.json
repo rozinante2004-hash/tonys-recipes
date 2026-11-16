@@ -1,7 +1,7 @@
 {
  "lang": "de",
  "updatedAt": 1794849026630,
- "count": 2876,
+ "count": 2879,
  "strings": {
   "\"Add to Home Screen\"": "Zum Home-Bildschirm hinzufügen",
   "\"Open Bring!\"": "Bring! öffnen",
@@ -181,6 +181,7 @@
   "Block": "Blockieren",
   "Blue instead of green and orange instead of red wherever a colour says something (all right / a problem / something new) — the colours a red–green colour-blind eye tells apart. On this device.": "Blau statt Grün und Orange statt Rot, überall dort, wo eine Farbe etwas bedeutet (alles gut / ein Problem / etwas Neues) — Farben, die auch bei Rot-Grün-Schwäche zu unterscheiden sind. Auf diesem Gerät.",
   "Blue instead of green and orange instead of red wherever a colour says something (all right / a problem / something new), and recipe photos colour-corrected so red and green food can be told apart. On this device.": "Blau statt Grün und Orange statt Rot überall dort, wo eine Farbe etwas bedeutet (alles in Ordnung / ein Problem / etwas Neues), und Rezeptfotos farbkorrigiert, damit rotes und grünes Essen unterscheidbar ist. Auf diesem Gerät.",
+  "Boil the pasta": "Die Pasta kochen",
   "Bold": "Fett",
   "Bold — the selected words of the ingredient you are in, or its word under the cursor (Ctrl+B)": "Fett — die markierten Wörter der Zutat, in der du dich befindest, oder das Wort unter dem Cursor (Strg+B)",
   "Bold — the selected words, or the word the cursor is in (Ctrl+B)": "Fett — die markierten Wörter oder das Wort, in dem sich der Cursor befindet (Strg+B)",
@@ -719,6 +720,7 @@
   "Metric": "Metrisch",
   "Mexican": "Mexikanisch",
   "Middle Eastern": "Nahöstlich",
+  "Mix eggs and cheese": "Eier und Käse verrühren",
   "Mix it": "Mischen",
   "More than $5": "Mehr als $5",
   "Moroccan": "Marokkanisch",
@@ -1143,6 +1145,7 @@
   "Sent by your household": "Von deinem Haushalt gesendet",
   "Sent {1} of {2}. {3} could not be written, so the cloud still holds the old copy for those and they may come back: {4}": "{1} von {2} gesendet. {3} konnten nicht geschrieben werden, die Cloud behält also noch die alte Version — sie könnten wieder auftauchen: {4}",
   "Separate from the log above: this prints verbose tracing to the browser console while you watch, and stores nothing.": "Unabhängig vom Log oben: Das schreibt ausführliche Traces live in die Browser-Konsole und speichert nichts.",
+  "Serve hot": "Heiß servieren",
   "Server allowances": "Server-Kontingente",
   "Service Error": "Dienstfehler",
   "Services powering Tony's Recipes Collection": "Dienste hinter Tony's Recipes Collection",

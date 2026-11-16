@@ -1,7 +1,7 @@
 {
  "lang": "pt",
  "updatedAt": 1794849026630,
- "count": 2641,
+ "count": 2644,
  "strings": {
   "\"Add to Home Screen\"": "Adicionar à tela inicial",
   "\"Open Bring!\"": "Abrir Bring!",
@@ -162,6 +162,7 @@
   "Between {1} and {2} minutes apart, picked at random, counted while the app is open.": "Entre {1} e {2} minutos de intervalo, escolhidos aleatoriamente, contados enquanto o app está aberto.",
   "Block": "Bloquear",
   "Blue instead of green and orange instead of red wherever a colour says something (all right / a problem / something new), and recipe photos colour-corrected so red and green food can be told apart. On this device.": "Azul em vez de verde e laranja em vez de vermelho sempre que uma cor significa algo (tudo bem / um problema / algo novo), e fotos de receitas corrigidas para se conseguir distinguir comida vermelha de verde. Neste dispositivo.",
+  "Boil the pasta": "Cozinhar a massa",
   "Bold": "Negrito",
   "Bold — the selected words of the ingredient you are in, or its word under the cursor (Ctrl+B)": "Negrito — as palavras selecionadas do ingrediente em que estás, ou a palavra onde está o cursor (Ctrl+B)",
   "Bold — the selected words, or the word the cursor is in (Ctrl+B)": "Negrito — as palavras selecionadas, ou a palavra onde está o cursor (Ctrl+B)",
@@ -656,6 +657,7 @@
   "Metric": "Métrico",
   "Mexican": "Mexicana",
   "Middle Eastern": "Médio-Oriental",
+  "Mix eggs and cheese": "Misturar os ovos e o queijo",
   "More than $5": "Mais de $5",
   "Moroccan": "Marroquina",
   "Move this collection into a household?": "Mover esta coleção para uma família?",
@@ -1047,6 +1049,7 @@
   "Sent by your household": "Enviado pela sua família",
   "Sent {1} of {2}. {3} could not be written, so the cloud still holds the old copy for those and they may come back: {4}": "Enviados {1} de {2}. Não foi possível escrever {3}, por isso a nuvem ainda guarda a cópia antiga desses e eles podem voltar: {4}",
   "Separate from the log above: this prints verbose tracing to the browser console while you watch, and stores nothing.": "Separado do registo acima: isto imprime um rastreio detalhado na consola do navegador enquanto observa, e não guarda nada.",
+  "Serve hot": "Servir quente",
   "Server allowances": "Limites do servidor",
   "Service Error": "Erro do Serviço",
   "Services powering this app": "Serviços que alimentam esta app",
