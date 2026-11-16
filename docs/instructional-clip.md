@@ -275,3 +275,11 @@ about the voice later."
   ("שמרו מתכון"). The closing line and the end screen's "כל המתכונים שלכם" become "שלך" to match — Tony to confirm.
 - For the recording: unpointed Hebrew lets a voice read לך / שלך / בשבילך / ראית / מצאת as a man's; when it is recorded
   those words get vowel marks in what the voice is given (not in the captions).
+
+## The Hebrew narration is approved (16 Nov 2026)
+Tony: "This looks a lot better. Please add a pause between אז and לא מכשפה. Keep the wording of the end screen as in the
+previous clip. It should be kept for all future clips as well, unless I say otherwise. This text is approved."
+- **Approved:** the second draft above, as it stands; scene 10 gets a pause after "אז" when it is recorded (as the
+  English got one after "So,"), the caption stays "אז, לא מכשפה... כנראה." (with "…").
+- **The end screen keeps the first clip's words** — "כל המתכונים שלכם. במקום אחד. לתמיד." and "בהזמנה בלבד. בינתיים" —
+  while the narration's closing line says "שלך". A standing rule for all clips (CLAUDE.md, Decisions).

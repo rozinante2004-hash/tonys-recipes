@@ -126,6 +126,9 @@ can progress with it."
 - **v39.74 (on Test, 14 Nov 2026): a recipe's own video source plays in the same player** (YouTube, Vimeo, Instagram,
   Facebook, TikTok, video files), with ⚙️ "Use external players only" to turn it off. Details: `docs/history/2026-11.md`.
 
+## The end screen's words stay (16 Nov 2026)
+**For every clip from now on** (Tony: "Keep the wording of the end screen as in the previous clip. It should be kept for all future clips as well, unless I say otherwise."): English "All your recipes. One place. For good." and "By invitation only. For now"; Hebrew "כל המתכונים שלכם. במקום אחד. לתמיד." and "בהזמנה בלבד. בינתיים", with the logo, "My Kitchen Notes" and mykitchennotes.community.
+
 ## The first frame is the logo (14 Nov 2026)
 **The rule for every clip from now on** (Tony, 16 Nov 2026: "Please make a note to have all future clips to also open on the logo (the frame WhatsApp shows before playing)."): any new or remade clip, in any language, opens on the logo from its very first frame, as below; look at that frame before sending it.
 Tony, with a WhatsApp screenshot of the two files he had sent: "when sending the clips, there is nothing but a blank
