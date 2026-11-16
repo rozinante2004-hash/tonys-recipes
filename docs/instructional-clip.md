@@ -126,3 +126,23 @@ words: some 63 seconds of speech, about 70 seconds in all (under his 90).
 
 **Next:** Tony's voices (a sample line by each, as for Jon), then the sketch — the pictures moving to the recorded words, as the
 first clip's version 4 — then the video.
+
+## The voice and the sketch (16 Nov 2026)
+- **The voice: Morgana** ("Morgana - Unusual Narrator & Character", ElevenLabs `IXjM0arqqsKGKyzxvh9s`). Tony heard the opening
+  line and "Not a witch. Probably." in seven women's voices — Maya J (`0m9IEyVwDrXpg93kwWrc`), Morgana, Maven
+  (`OtHu0lbpdNTqJVqaxDtR`), Bella "Deep, Elegant and Intimidating" (`hbB2qXyS2GMyyZIZyhAH`), Elizabeth (`OrclV0uNEh95Z7MQyndH`),
+  Canny (`lYz97gZSO1IVncLkczs4`), Moriana (`ahuwlnygfGOZ2gufNQh7`): "I still can't decide between Maya, Morgana and Bella.
+  However, as we need to progress, let's create the sketch with Morgana." Recorded as the first clip was
+  (`eleven_multilingual_v2`, stability 0.5, similarity 0.75, `previous_text`/`next_text`, `/with-timestamps`): 74.7 s of
+  speech in eleven scenes; with 0.3 s before and 0.4 s after each scene and 2.2 s on the end screen, **84 s** in all.
+- **The sketch** is the private artifact "Witch Clip Sketch" (https://claude.ai/artifact/FGnkBjLy9N4vMG3pcLFv96). Its
+  sources are kept with it as files (`src/wtemplate.html.txt`, `src/wbuild.js.txt`, `src/frames.js.txt`, `src/rec.py.txt`,
+  `src/narr.json`); Morgana's audio is inside the built page. The engine is the first clip's (the same captions, the
+  pictures waiting for the words they illustrate, `__clip.seek(t)` and `__clip.soundtrack()` for a frame-exact video).
+  The drawings are SVG made in `wbuild.js`: the witch (`witch()`: face under the brim, poses stir / phone / write / idle /
+  cup; the pointy hat and the straw sun hat), the cat (`cat()`: sitting, walking, from the front; blinks, sneezes,
+  chases, winks), the lab, the kitchen, the cauldron, the soup pot and bowl. The phone on the right is drawn with the
+  app's real button names; the video may use the app's real screens instead. The tune is A minor until the hat
+  changes, then C major.
+- **Open:** Tony's look at the sketch; whether 84 s is acceptable (a faster take, or shorter lines, would bring it
+  nearer 70); Maya or Bella if Morgana does not convince; then the video (1080 × 1080, the logo first).
