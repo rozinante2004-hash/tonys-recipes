@@ -1,7 +1,7 @@
 {
  "lang": "ja",
- "updatedAt": 1794775251097,
- "count": 3181,
+ "updatedAt": 1794849026630,
+ "count": 3182,
  "strings": {
   "\"Add to Home Screen\"": "ホーム画面に追加",
   "\"One item away\" filter ({1}f.{2})": "「あと1品」フィルター（{1}f.{2}）",
@@ -1957,6 +1957,7 @@
   "Your email address, so the access rules can tell family from strangers. Nothing else.": "家族と第三者を区別するためのメールアドレスです。それ以外は使いません。",
   "Your household's identifier: give it to people you know so they can link their kitchen with yours. It shows no e-mail address.": "あなたの家族の識別コードです。知り合いに教えれば、キッチン同士をつなげられます。メールアドレスは表示されません。",
   "Your household’s identifier": "あなたの家族の識別コード",
+  "Your household’s recipes and photos, and who is in it, and the WhatsApp chats you chose to connect, so every device of yours and of your family has them. Only the people in your household can read them.": "家族のレシピや写真、メンバー、連携したWhatsAppのチャットなど。あなたと家族の全端末で共有され、家族以外の人は見られません。",
   "Your household’s recipes and photos, and who is in it, and the WhatsApp chats you chose to connect, so every device of yours and of your family has them. Only the people in your household can read them. And which recipes you opened last, so “Recent:” is the same on all your devices — for you alone.": "家族のレシピや写真、メンバー、連携したWhatsAppのチャットなど。あなたと家族の全端末で共有され、家族以外の人は見られません。また、最近開いたレシピも保存され、「最近見たもの：」がすべての端末で同じになります（あなただけに表示されます）。",
   "Your household’s recipes are there for you to read and cook from; adding and changing them is for its owner and the people with Read + Write. What you changed is kept on this device only, not in the household’s recipes.{1}": "家族のレシピは閲覧して料理に使うためのものです。追加や変更ができるのは、オーナーと「読み書き」権限を持つ人だけです。変更内容はこの端末にのみ保存され、家族のレシピには反映されません。{1}",
   "Your invitation": "あなたへの招待",
