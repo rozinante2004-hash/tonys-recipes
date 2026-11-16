@@ -283,3 +283,32 @@ previous clip. It should be kept for all future clips as well, unless I say othe
   English got one after "So,"), the caption stays "אז, לא מכשפה... כנראה." (with "…").
 - **The end screen keeps the first clip's words** — "כל המתכונים שלכם. במקום אחד. לתמיד." and "בהזמנה בלבד. בינתיים" —
   while the narration's closing line says "שלך". A standing rule for all clips (CLAUDE.md, Decisions).
+
+## The Hebrew slides' text, first draft (16 Nov 2026)
+Tony: "Let's address the slides' text next". Everything written in the pictures (the captions are the approved
+narration). The app's own words are the app's Hebrew (he.json); the recipes' steps in the usual Hebrew recipe form
+(מחממים, מוסיפים…).
+- **1 the lab:** jars "עין טריטון" · "פלפל דרקון" · "בטוח לא נצנצים".
+- **2 the spellbook:** the cat "אפצ'י!". The app: "+ הוספת מתכון ▾" → "📷 סריקת מתכון (מצלמה/תמונה)" → "📷 סרקו מתכון" →
+  "📸 צלמו עכשיו" → **שיקוי אור ירח**: 3 טיפות אור ירח · קורט פלפל דרקון · 1 כוס מי גשם, שנאספו ביום שלישי · 1 כפית דבש;
+  מחממים את מי הגשם, בלי להביא לרתיחה. / מוסיפים את אור הירח, טיפה אחר טיפה. / בוחשים נגד כיוון השעון עד שהשיקוי מזמזם.
+- **3 the website:** "פינת הקלחת", showing "שיקוי חצות", its button "📘 שמרו מתכון". The app: "🔗 ייבוא מכתובת URL" with
+  https://cauldron-corner.example/midnight-brew → "✍️ הדביקו טקסט חופשי" with the recipe's text → **שיקוי חצות**: 2 כוסות
+  ערפל · 1 קרן ירח, פרוסה דק · 1 כף אור כוכבים · 1 מקל קינמון; אוספים את הערפל לפני חצות. / מבשלים עם קרן הירח והקינמון.
+  / מפזרים אור כוכבים ומגישים.
+- **4 the video:** the chip "🔗 קישור לסרטון"; https://witchtube.example/bubbling-bat-broth → **מרק עטלפים מבעבע**: 1 ליטר
+  ציר ירקות · 2 כרישות · 200 גרם תרד · 12 קרקרים בצורת עטלף · 1 כף שמן זית; מאדים את הכרישות בשמן. / מוסיפים את הציר
+  ומבשלים 20 דקות. / מוסיפים את התרד וטוחנים עד שהמרק ירוק ובוהק. / מניחים את הקרקרים על המרק רגע לפני ההגשה.
+- **5 the chat:** "צ'אט המכשפות" — "חברה": "נסי את זה!" with cauldron-corner…/pumpkin-pie and "⤴ שיתוף"; the share sheet
+  "שיתוף" → "שמירה ל-My Kitchen Notes" → **פאי דלעת מכושף**: 1 בצק פאי · 500 גרם מחית דלעת · 2 ביצים · 150 מ"ל שמנת ·
+  100 גרם סוכר חום · 1 כפית קינמון; טורפים את המלית. / יוצקים אל הבצק. / אופים 50 דקות, עד שהמלית כמעט לא רוטטת.
+- **6 the scroll:** the file "מגילה-עתיקה.pdf". The app: "📁 קבצים וגיבוי ▾" → "📁 מקובץ" → **מגילת חלומות מתוקים**:
+  200 גרם קמח · 150 גרם חמאה · 3 ביצים · 4 כפות דבש · 1 כפית לבנדר מיובש; מקציפים את החמאה עם הדבש. / מוסיפים את
+  הביצים, ומקפלים פנימה את הקמח והלבנדר. / אופים בשכבות וממלאים בקרם דבש.
+- **7 the whisper:** "פססט…". The app: "✏️ מילוי ידני" → "הוספת מתכון": שם "תה בלדונה"; 1 קנקן — מים לאור ירח · 3 — עלי
+  נענע · לחישה של דבש; "שמרו מתכון" → **תה בלדונה**: יוצקים את המים על העלים. / מחכים לשלוש קריאות של ינשוף. /
+  מערבבים פנימה את הדבש.
+- **8 the twist:** the label "מרק בצל צרפתי".
+- **9 the collection:** "המטבח של המכשפה" — מרק בצל צרפתי, תה בלדונה, מגילת חלומות מתוקים, פאי דלעת מכושף, מרק עטלפים
+  מבעבע, שיקוי חצות, שיקוי אור ירח, צ'ילי פלפל דרקון, טארט זבוביות, סלט עין טריטון.
+- **11 the end screen:** the standing words (above).
