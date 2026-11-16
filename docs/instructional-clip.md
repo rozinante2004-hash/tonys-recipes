@@ -227,3 +227,31 @@ Tony, on version 4 of the sketch: "Sounds great. Go ahead".
   −15.9 LUFS (the first clip's English video is −15.3) so the two play at about the same loudness.
 - **The first frame is the logo** (checked), as every clip's must be.
 - Not yet in the app or on the site; the Hebrew version waits for Tony's Hebrew script (he fixes the jokes).
+
+## The Hebrew version — the text, first draft (16 Nov 2026)
+Tony: "We'll add them together, once the Hebrew version is ready as well. Let's start with the text of the Hebrew
+version." (Earlier: "Once we get to the Hebrew part, I will fix the jokes as needed.") **This is my draft for him to
+correct; whatever he sends back is used as he wrote it.** Plural address throughout (as in the first clip); the app's
+buttons by their Hebrew names in the app (he.json); "הקליקו" for a click, as he chose in the first clip; the closing
+line is the first clip's, his.
+1. נניח שאתם מכשפים. הלילה אתם רוצים לרקוח שיקוי חדש לגמרי. בעיה קטנה: אין לכם מתכון טוב.
+2. אז אתם פותחים את ספר הלחשים של סבתא רבה שלכם, ומצלמים את הדף. סריקת מתכון מקלידה אותו בשבילכם.
+3. מצאתם מתכון באתר המכשפות האהוב עליכם? ייבאו אותו מהקישור, הדביקו את הטקסט שלו, או הקליקו על "שמרו מתכון" בדפדפן.
+4. ראיתם אותו בסרטון? גם הקישור שלו עובד.
+5. חברה שלחה לכם אותו בצ'אט? לחצו על שיתוף, ואז על My Kitchen Notes.
+6. מגילה עתיקה במחשב? הוסיפו אותה מקובץ.
+7. וכשחברה מכשפה לוחשת לכם את הסוד שלה מעל כוס תה בלדונה, מלאו אותו ידנית. היא לעולם לא תדע.
+8. ועכשיו, נניח שאתם לא באמת מכשפים. אתם פשוט רוצים מרק בצל צרפתי טוב. החליפו כובע, ועשו בדיוק אותו דבר.
+9. כל מתכון נוחת באוסף שלכם, מסודר ושלם, בטלפון ובמחשב.
+10. אז, לא מכשפים... כנראה.
+11. My Kitchen Notes. כל המתכונים שלכם, במקום אחד, לתמיד.
+
+On screen (drawn): the jars עין טריטון · פלפל דרקון · בטוח לא נצנצים; the cat's "אפצ'י!"; the website "פינת הקלחת" with
+"שיקוי חצות" and its button "📘 שמרו מתכון"; the chip "🔗 קישור לסרטון"; the chat "צ'אט המכשפות", "חברה", "נסי את זה!",
+"⤴ שיתוף", the share sheet "שיתוף" / "שמירה ל-My Kitchen Notes"; the file "מגילה-עתיקה.pdf"; "פססט…"; the pill "מרק בצל
+צרפתי"; the end screen as the first clip's ("כל המתכונים שלכם. במקום אחד. לתמיד.", "בהזמנה בלבד. בינתיים").
+The app's screens, in Hebrew: "המטבח של המכשפה" — סלט עין טריטון, טארט זבוביות, צ'ילי פלפל דרקון, שיקוי אור ירח,
+שיקוי חצות, מרק עטלפים מבעבע, פאי דלעת מכושף, מגילת חלומות מתוקים, תה בלדונה, מרק בצל צרפתי; the form fills in
+"תה בלדונה" with "1 קנקן מים לאור ירח", "3 עלי נענע", "לחישה של דבש".
+Choices put to Tony: מכשפים (the usual plural) or מכשפות (as the witch on screen); בלדונה for nightshade; "לחצו" for a
+tap on a phone (and "הקליקו" for the click in the browser).
