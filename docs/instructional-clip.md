@@ -421,6 +421,7 @@ create a videos library with a TOC for all the clips."
   still: the first frame, the logo); Hebrew for a Hebrew interface, English for every other language, as the first
   clip. **+ Add Recipe ▾ → 🎬 How to add a recipe**, the menu's last item, set apart by a line; and the same button
   **under a Help answer about adding a recipe** (in 💬 Ask About the App, and in that answer's 🔍 Details). Not beside the
-  one-minute clip at the top of Help.
+  one-minute clip at the top of Help. **v39.92:** also on the "Add your first recipe" screen a new collection starts on,
+  after the four ways in (asked; Tony: "Yes please").
 - **The future videos library:** the app's clips are one list in the code (`APP_CLIPS`: the one-minute clip and this
   one, each with its file name and title) — the table of contents Tony means can be built from it once there are enough.

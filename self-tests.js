@@ -21781,7 +21781,7 @@ window.SELF_TESTS = [
       }
     } },
 
-  { id:'player_how_to_add_a_recipe', group:'Features', name:'🎬 How to add a recipe: the last item of + Add Recipe ▾, and under a Help answer about adding a recipe — Hebrew for a Hebrew app, English otherwise (v39.91)',
+  { id:'player_how_to_add_a_recipe', group:'Features', name:'🎬 How to add a recipe: the last item of + Add Recipe ▾, on the “Add your first recipe” screen, and under a Help answer about adding a recipe — Hebrew for a Hebrew app, English otherwise (v39.91, v39.92)',
     test: async()=>{
       // Tony, 17 Nov 2026: "I'm fine with the bottom of the “+ Add Recipe ▾” menu. It makes sense. However, stacking
       // the in the same place as the other clip, under About, will make it crowded. I think it would be better to link it
@@ -21806,6 +21806,17 @@ window.SELF_TESTS = [
         if(v.style.aspectRatio.replace(/\s/g,'')!=='1/1') throw new Error('the square clip is not shown square: '+v.style.aspectRatio);
         if(!played) throw new Error('the clip was not started');
         closeM('playerOverlay'); if(v.getAttribute('src')) throw new Error('a closed player still holds the clip');
+        // 1b. the screen a new collection starts on (v39.92 — Tony: "Yes please"), after the ways in
+        var box=document.createElement('div'); box.innerHTML=firstRunEmptyHtml(); document.body.appendChild(box);
+        try{
+          var fb=box.querySelector('#firstRunClipBtn');
+          if(!fb) throw new Error('“Add your first recipe” has no 🎬 How to add a recipe');
+          var typeIt=Array.prototype.filter.call(box.querySelectorAll('button'), function(x){ return /openAddModal/.test(x.getAttribute('onclick')||''); })[0];
+          if(!typeIt || !(typeIt.compareDocumentPosition(fb)&Node.DOCUMENT_POSITION_FOLLOWING)) throw new Error('the clip is not after the ways to add a recipe');
+          _i18nLang='fr'; fb.click();
+          if(!ov.classList.contains('open') || v.getAttribute('src')!=='media/my-kitchen-notes-add-a-recipe-en.mp4') throw new Error('in French the first screen played '+v.getAttribute('src'));
+          closeM('playerOverlay');
+        } finally { box.remove(); }
         // 2. Help: the assistant is told when to mark an answer; a marked answer gets the button, without the mark
         _i18nLang='en';
         if(HELP_SYSTEM_PROMPT.indexOf('[CLIP:ADD-RECIPE]')<0) throw new Error('the help assistant is not told to mark an answer about adding a recipe');

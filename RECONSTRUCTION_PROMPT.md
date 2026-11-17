@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v39.91` — app. **Worker: v107**, deployed separately and versioned separately
+**Current version:** `v39.92` — app. **Worker: v107**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -885,7 +885,9 @@ invitation-only (unless adding to the tester's household)."
   `helpClipStrip` takes out; failing the mark, `helpAboutAdding` looks for + Add Recipe ▾ or one of its four items by
   name — English, and as the menu reads in this language — standing alone ("Add recipes" to a collection is not it).
   `tools/build.js` refuses a copy without the four files. Tony's next step for clips: a videos library with a table of
-  contents, built from `APP_CLIPS`, once there are enough. Self Test `player_how_to_add_a_recipe`.
+  contents, built from `APP_CLIPS`, once there are enough. **v39.92:** the "Add your first recipe" screen
+  (`firstRunEmptyHtml`) has the same button (`#firstRunClipBtn`) after ✏️ Type it in (Tony: "Yes please"). Self Test
+  `player_how_to_add_a_recipe`.
 - **A recipe's source in the player (v39.74).** Tony: "Please allow all sources in recipes to be played in the in-app
   player by default. However, let it be overwritten, if desired, by a checkbox in settings, called 'use external
   players only'." `playerSource(url)` says what plays and how: YouTube (watch / youtu.be / Shorts / live, start time

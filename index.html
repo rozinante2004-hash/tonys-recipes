@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.91 -->
+<!-- Tony's Recipes Collection v39.92 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -9608,6 +9608,8 @@ function firstRunEmptyHtml() {
     + '<button ' + b + ' onclick="openFreehandModal()">✍️ Paste the text</button>'
     + '<button ' + b + ' onclick="openCameraImport()">\u{1F4F7} From a photo</button>'
     + '<button ' + b + ' onclick="openAddModal(null)">✏️ Type it in</button>'
+    // v39.92 — Tony, 17 Nov 2026 ("Yes please"): the clip on the screen a new kitchen starts on, after the ways in
+    + '<button type="button" id="firstRunClipBtn" class="help-clip" style="max-width:300px;margin:10px auto 0;" onclick="openAddRecipeClip()" title="A short clip that shows every way to add a recipe.">\u{1F3AC} How to add a recipe</button>'
     + '<button onclick="addSampleRecipes()" style="margin-top:10px;background:none;border:none;color:var(--terracotta);text-decoration:underline;font-size:13px;font-weight:600;cursor:pointer;font-family:DM Sans,Heebo,sans-serif;">\u{1F35D} Or look around with 5 example recipes</button>'
     + '</div>';
 }
@@ -11215,7 +11217,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.91';
+var APP_VERSION = 'v39.92';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -14788,7 +14790,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.91</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.92</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14876,7 +14878,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.91</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.92</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -36526,7 +36528,7 @@ var HELP_SYSTEM_PROMPT = [
   "- Something not working at all: ⚙️ → 🔧 Troubleshooting → 🧪 Self Test, then 📋 Copy report (or Send to admin)",
   "",
   "- 🎬 THE ONE-MINUTE CLIP (v39.72): the ? button → 💬 Ask About the App → 🎬 Watch the one-minute clip plays a short film of what the app does, in a window inside the app (✕ closes it and stops it). It plays in Hebrew when the app is in Hebrew and in English in every other language. It needs an internet connection.",
-  "- 🎬 HOW TO ADD A RECIPE, THE CLIP (v39.91): + Add Recipe ▾ → 🎬 How to add a recipe (the menu's last item) plays an 80-second clip of every way to add a recipe — 📷 Scan recipe from a photo of a page, 🔗 Import from URL (a video's link too), ✍️ Paste free-hand text, the 📘 Save recipe button in the browser, Share → My Kitchen Notes from another app, 📁 From File, and ✏️ Fill in manually — in a window inside the app (✕ closes it and stops it). The same button appears under an answer here about adding a recipe. Hebrew when the app is in Hebrew, English in every other language; it needs an internet connection.",
+  "- 🎬 HOW TO ADD A RECIPE, THE CLIP (v39.91): + Add Recipe ▾ → 🎬 How to add a recipe (the menu's last item; also on the 'Add your first recipe' screen a new collection starts on, v39.92) plays an 80-second clip of every way to add a recipe — 📷 Scan recipe from a photo of a page, 🔗 Import from URL (a video's link too), ✍️ Paste free-hand text, the 📘 Save recipe button in the browser, Share → My Kitchen Notes from another app, 📁 From File, and ✏️ Fill in manually — in a window inside the app (✕ closes it and stops it). The same button appears under an answer here about adding a recipe. Hebrew when the app is in Hebrew, English in every other language; it needs an internet connection.",
   "- ▶ A RECIPE'S VIDEO PLAYS INSIDE THE APP (v39.74): in a recipe (or a recipe inside a collection — your own or a linked kitchen's — or a linked kitchen's recipe, or a recipe sent to you), a Source link with a small ▶ before it is a video the app can play: tap the link and it plays in a window inside the app — a YouTube video (Shorts too), Vimeo, an Instagram post or reel, a Facebook video or reel, a TikTok video, or a link straight to a video or sound file. The window opens through a camera lens — a small lens appears, its blades open, and it widens into the window, in about a second (a device set to reduce motion shows the window at once). ✕ closes the window and stops the video. Under the video, ↗ Open outside the app opens it in its own app or site — use it if the video does not play here (a private video, or one whose owner does not allow playing it elsewhere). A source that is an ordinary web page (a recipe site) has no ▶ and opens in the browser as before; so do short links that hide where they lead (fb.watch, vm.tiktok.com). TO ALWAYS OPEN VIDEOS OUTSIDE THE APP: ⚙️ Settings → 🎨 How it looks → tick 🎬 Use external players only (on this device; untick to play inside the app again). When a video plays inside the app, the device loads it from the site that hosts it, as when opening it there; the app sends that site nothing about you or your recipes (🔒 What leaves this device lists it).",
   "",
   "=== TIPS ===",
