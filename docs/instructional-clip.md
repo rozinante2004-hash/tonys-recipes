@@ -384,3 +384,16 @@ Tony: "Yes. Please handle the 1st frame in the English clip as well. the logo sh
   frames 1–9 differ from the 16 Nov file, the opening; the rest the same picture) and **the 16 Nov sound kept exactly**
   (`-c copy`; identical).
 - **The first clip** (both languages) got the same opening — `docs/promo-clip.md`, *The first frame is the logo ALONE*.
+
+## The band stays; "הדביקי" stressed on "בי" (17 Nov 2026)
+Tony: "No need to hide the band. Some pronunciation modifications.. The stress in 'הדביקי' is on the 'בי' and not on the
+'קי'. Also, I've closed the Hebrew clip and now I cannot access it again."
+- **The band:** back on the first frame (empty; the caption still waits for the first words) — both witch sketches, the
+  English witch video (picture rendered again, only frames 1–9 differ; the approved sound kept exactly), and the first
+  clip's two files again (`splice.sh`, sound identical) in `media/` on Test.
+- **"הדביקי":** vowel marks do not carry stress, so scene 3 was recorded in five spellings, two takes each
+  (`recvar.py`: הַדְבִּיקִי · with an accent mark (ole) or a meteg on בי · הַדְ-בִּי-קִי · הדבּיקי); `stress2.py` measures each
+  syllable's loudness, pitch and length (rough: the newer model's timings). In the sketch now: **A** (הדבּיקי, seed 3),
+  where "בי" measured loudest and highest. Tony has five short cuts of "…מהקישור, הדביקי את הטקסט שלו" (A–E) to choose
+  from (`snip.py`).
+- The Hebrew sketch: 83.5 s, https://claude.ai/artifact/YARKcw3QdciZxdn2Z4QeH5 (nothing locks it; reopened for Tony).
