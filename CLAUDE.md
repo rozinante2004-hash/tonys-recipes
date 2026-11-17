@@ -17,13 +17,12 @@ where.
 **Live now**
 - The family's copy (`main`, https://rozinante2004-hash.github.io/tonys-recipes/ — it forwards to the community app)
   and the community app (`beta`, https://mykitchennotes.community, Firebase project my-kitchen-notes-beta) run
-  **v39.93 + Worker v107** (released 17 Nov 2026, 19:55 Israel time, on 4b688fc — each farm animal speaks in its own
-  recorded voice, Tony's ElevenLabs cast in V4, `docs/farm-voices.md`; v39.91–v39.92 went out at 16:08 on 44a3e49: 🎬 How
-  to add a recipe at the bottom of + Add Recipe ▾, on the "Add your first recipe" screen and under Help answers about
-  adding a recipe, with the one-minute clips re-made to open on the logo; v39.90 at 14:36 on 44fa5d8; Worker v107 since
-  15 Nov 06:12: the page, video and photo fetches require a sign-in; the jobs are listed near the top of
-  `docs/history/2026-11.md`). **On Test, not released:** **v39.94** — the network Self Tests send the sign-in
-  (Tony's beta iPhone run: `net_url_import`, `net_photo` 401). The test copy
+  **v39.94 + Worker v107** (released 17 Nov 2026, 21:40 Israel time, on db945ab — the network Self Tests send the
+  sign-in, after Tony's beta iPhone run failed `net_url_import` and `net_photo` with 401; v39.93 went out at 19:55 on
+  4b688fc: each farm animal speaks in its own recorded voice, Tony's ElevenLabs cast in V4, `docs/farm-voices.md`;
+  v39.91–v39.92 at 16:08 on 44a3e49: 🎬 How to add a recipe in + Add Recipe ▾, on "Add your first recipe" and under
+  Help answers about adding; Worker v107 since 15 Nov 06:12: the page, video and photo fetches require a sign-in; the
+  jobs are listed near the top of `docs/history/2026-11.md`). **On Test, not released:** nothing. The test copy
   (https://tonys-recipes-test.pages.dev, its own database and rules) follows `test`.
 - **The beta has had testers since Sunday 25 Oct 2026** and is **by invitation only**: the owner invites with
   ⚙️ → 👑 → ✉️ Invite testers (the congratulatory wording of v39.60); a tester's share button asks the owner for an
