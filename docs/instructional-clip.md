@@ -375,3 +375,12 @@ which מַלְּאִי already gives.)
 - Separate takes now: scenes 2, 3, 5, 7, 8, 10, 11; from the one take: 1, 4, 6, 9. All brought to about −18 LUFS.
 - The Hebrew sketch is **83.3 s** (version 4 of https://claude.ai/artifact/YARKcw3QdciZxdn2Z4QeH5); the English sketch
   (version 6) also opens on the logo alone.
+
+## The logo alone on the first frame — the band too (17 Nov 2026)
+Tony: "Yes. Please handle the 1st frame in the English clip as well. the logo should be alone".
+- The caption's band is absent from the first frame and fades in, from the clock, to full by the first words (`FIRST`,
+  `capAlpha`, `setCap` in `wtemplate.html`); both witch sketches published again (Hebrew v5, English v7).
+- **The English video made again:** `my-kitchen-notes-add-a-recipe-en.mp4`, 80.8 s, the picture rendered anew (only
+  frames 1–9 differ from the 16 Nov file, the opening; the rest the same picture) and **the 16 Nov sound kept exactly**
+  (`-c copy`; identical).
+- **The first clip** (both languages) got the same opening — `docs/promo-clip.md`, *The first frame is the logo ALONE*.

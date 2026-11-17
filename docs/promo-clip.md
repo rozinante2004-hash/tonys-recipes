@@ -153,6 +153,20 @@ video's first frame; scene 1 used to fade in from nothing, so that frame was the
   64d974a. The template, `build.js`, `render-open.js` and `splice.sh` are stored with the clips' pages (the two
   artifacts, under `src/`), as the other sources are.
 
+## The first frame is the logo ALONE (17 Nov 2026)
+Tony, about the witch clip: "The 1st frame is reserved for the logo only, so it could be displayed before the clip
+starts" — and, asked whether this clip should follow: "Yes. Please handle the 1st frame in the English clip as well. the
+logo should be alone". The 14 Nov opening still had the caption band with "Welcome to My Kitchen Notes." under the logo.
+- **The template** (`template.html`): `caption()` is empty until the first words (`FIRST`), and the band's opacity comes
+  from the clock (`capAlpha`): 0 on the first frame, fading in to full by the first words (0.45 s) — so every frame is the
+  same each time it is made. Only `seek()` (the video) uses it; the page's own player is as before.
+- **The files:** made as on 14 Nov — `splice.sh en|he`: the first 250 frames photographed again, joined to the approved
+  files' own picture from frame 251 and their own sound (`-c copy`). Checked, both: frame count and length as before,
+  no decode error, every frame 1/30 s apart, the sound identical; against the 14 Nov files only frames 1–5 change
+  (15–31 dB: the band and caption gone), frames 6–250 are the same pictures encoded again (44–53 dB), 251 on identical.
+  The 14 Nov files are `media/*.mp4` at commit 408a544. In `media/` on Test; to the Family and Beta copies with the next
+  release Tony says yes to.
+
 ## What Tony asked for, in his words (13 Nov 2026)
 "After the clips are done, I would like to be able to play them from the Help section and also add a link to them in
 the testers' invites." And, 13 Nov: "When saying that I would like to play it from Help, I mean to create some kind of
