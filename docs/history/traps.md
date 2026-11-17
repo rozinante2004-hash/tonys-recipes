@@ -4868,3 +4868,12 @@ v38.30 on are in `2026-10.md` and `2026-11.md`.
     positioning belongs to the extension. `spellcheck="false"` on the ingredient
     fields is the only plausible lever and is NOT known to make Ginger skip
     them.
+
+- **A LIBRARY VOICE THAT SPEAKS THROUGH THE ELEVENLABS API IS ADDED TO TONY'S MY VOICES** (17 Nov 2026). For the farm
+  animals' voices I searched ElevenLabs' Voice Library (`/v1/shared-voices`) and had 41 candidates (and one test voice)
+  say two lines through `/v1/text-to-speech/<voice id>`, telling Tony that nothing would be added to his account until
+  he chose. Every one of them was added to his My Voices the moment it spoke. He found the candidates characterless,
+  chose to pick voices himself, and asked for all 42 to be removed; the key lacked `voices_write`, he granted it, and
+  `DELETE /v1/voices/<id>` removed exactly those 42 (checked against the list afterwards). Rule: audition only voices
+  Tony has added himself, or say beforehand that each voice tried is added to his account; remove what you added once
+  he has chosen.

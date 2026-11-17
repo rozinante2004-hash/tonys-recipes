@@ -494,6 +494,9 @@ One line each; the full story of every one is in `docs/history/traps.md` under t
 v38.30 on in `docs/history/2026-10.md` and `2026-11.md`). A new trap gets its full entry there and, if it is a rule
 every session needs, a line here.
 
+- **A LIBRARY VOICE THAT SPEAKS THROUGH THE ELEVENLABS API IS ADDED TO TONY'S MY VOICES** (17 Nov 2026: 42 farm
+  auditions landed there; Tony had them removed). Audition only voices he has added himself, or tell him before, and
+  remove what you added once he has chosen (the key needs Voices: Write for that).
 - **NO E-MAIL ADDRESS IS WRITTEN IN THE REPOSITORY** — it is public and so are its Actions logs; the owner is
   `APP_CONFIG.ownerKeys` (fingerprints) and GitHub secrets; tests use `stAsOwner()` / `ST_OWNER`.
   **AN E-MAIL ADDRESS IS NEVER A PHRASE** — the languages are public files and the harvest collects every visible text.
