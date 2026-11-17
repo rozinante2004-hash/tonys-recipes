@@ -356,3 +356,22 @@ timeline back and forth."
    paused and while playing, resume, stop. A standing rule for every sketch or clip page (CLAUDE.md, Decisions).
 - The Hebrew sketch is **84.0 s** (version 3 of https://claude.ai/artifact/YARKcw3QdciZxdn2Z4QeH5); the English sketch has
   the same controls (version 5 of https://claude.ai/artifact/Kg1LcVUQWirSF991tHcTLy; its video is unchanged).
+
+## Tony's second look at the Hebrew sketch (16–17 Nov 2026)
+Tony: "1. … 'אז.. נניח שאת מכשפה' already appears in the first slide holding the logo. It should appear only once Danit
+starts talking. The 1st frame is reserved for the logo only … 2. 'רבתה' is pronounced as Rub-Ta, not Rabata 3. 'ייבאי' is
+pronounced as Yub-E not Yuv-E. 4. 'הדביקי' … Hud-B-Key not Hed-B-Key. 5. 'הקליקי' … Kuk-Li-Key not Hek-Li-Key. 6. 'לחצי'
+… 'Lichtzi' not … Lechatzi. 7. 'החליפי' … Huch-li-fi not Hech-li-fi. 8. Please use the plural form in the final frame:
+'כל המתכונים שלכם, במקום אחד. לתמיד'". (His "u" is the Hebrew "a"; his earlier "מלאי … Mul-E" was the right reading,
+which מַלְּאִי already gives.)
+1. **The caption stays empty until the first words** (`caption()`; the page opens with an empty caption): the first
+   frame is the logo alone — both clips, and a rule for every clip (CLAUDE.md, the logo-first row). The English video
+   is made again with this when the Hebrew one is made.
+2.–7. The voice is given **רַבְּתָה, יַבְּאִי, הַדְבִּיקִי, הַקְלִיקִי, לִחְצִי, הַחְלִיפִי** (`hesay.py`; "יַבְּאִי" is spelled
+   for its sound — the caption keeps "ייבאי", and `scenefix.py` maps the timings across). Scenes 2, 3, 5 and 8 recorded
+   again on their own.
+8. **Scene 11 says and shows "My Kitchen Notes. כל המתכונים שלכם, במקום אחד. לתמיד."** (his words and punctuation);
+   recorded again (take 2: "לתמיד" falls at its end, the other rose). The end screen keeps its standing words.
+- Separate takes now: scenes 2, 3, 5, 7, 8, 10, 11; from the one take: 1, 4, 6, 9. All brought to about −18 LUFS.
+- The Hebrew sketch is **83.3 s** (version 4 of https://claude.ai/artifact/YARKcw3QdciZxdn2Z4QeH5); the English sketch
+  (version 6) also opens on the logo alone.
