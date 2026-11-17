@@ -1,7 +1,7 @@
 {
  "lang": "ar",
  "updatedAt": 1794938189765,
- "count": 2886,
+ "count": 2889,
  "strings": {
   "\"Add to Home Screen\"": "إضافة إلى الشاشة الرئيسية",
   "\"Open Bring!\"": "فتح Bring!",
@@ -646,6 +646,7 @@
   "Know someone who would enjoy My Kitchen Notes? The beta is by invitation only: ask the app’s owner to invite them. The owner decides, and sends the invitation.": "هل تعرف شخصًا سيحب My Kitchen Notes؟ النسخة التجريبية بالدعوة فقط: اطلب من مالك التطبيق أن يدعوه. المالك هو من يقرر ويرسل الدعوة.",
   "Know someone who would enjoy it? While the app takes new members by invitation only, the share button asks its owner to invite them.": "هل تعرف شخصًا سيحبه؟ بما أن التطبيق يقبل أعضاء جدد بالدعوة فقط، زر المشاركة يرسل طلبًا إلى مالكه ليدعوه.",
   "Kosher": "كوشير",
+  "Language": "اللغة",
   "Last backup": "آخر نسخة احتياطية",
   "Last backup: today": "آخر نسخة احتياطية: اليوم",
   "Last backup: yesterday": "آخر نسخة احتياطية: أمس",
@@ -862,6 +863,7 @@
   "One cookbook for your household: invite family and friends by e-mail, and everyone sees and adds the same recipes.": "كتاب وصفات واحد لعائلتك: ادعُ أفراد العائلة والأصدقاء بالبريد الإلكتروني، ليرى الجميع نفس الوصفات ويضيف إليها.",
   "One fewer serving": "حصة واحدة أقل",
   "One more serving": "حصة واحدة أكثر",
+  "One slot for each English sentence, said to everyone whose app is in this language. Only the ones filled in and ticked are said; with none filled in, they hear the English ones.": "خانة واحدة لكل جملة إنجليزية، تُقال لكل من يستخدم التطبيق بهذه اللغة. لا يُقال إلا ما مُلئ وحُدِّد؛ وإن لم يُملأ شيء، يسمعون الجمل الإنجليزية.",
   "One tap — then share recipes from Facebook, Instagram or any app.": "نقرة واحدة — ثم شارك الوصفات من فيسبوك أو إنستغرام أو أي تطبيق.",
   "Only members can become the owner. Invite someone first; once they have joined, you can hand {1} over.": "يمكن فقط للأعضاء أن يصبحوا المالك. ادعُ شخصًا أولًا؛ وبمجرد انضمامه، يمكنك تسليمه {1}.",
   "Only the app’s owner can open this.": "هذا متاح لمالك التطبيق فقط.",
@@ -1362,6 +1364,7 @@
   "The extension could not be put in a folder: {1} Use “or download the zip” instead.": "تعذّر وضع الإضافة في مجلد: {1} استخدم \"أو نزّل الملف المضغوط\" بدلاً من ذلك.",
   "The family’s recipes open for {1} once it is confirmed from the e-mail we sent (look in spam too). Your change is safe on this device and goes up once it is.": "تُفتح وصفات العائلة لـ {1} بمجرد تأكيدها من البريد الإلكتروني الذي أرسلناه (تحقق من البريد المزعج أيضًا). تغييرك محفوظ بأمان على هذا الجهاز وسيُرفع بمجرد ذلك.",
   "The farm visitors could not be saved: {1}": "تعذّر حفظ زوار المزرعة: {1}",
+  "The farm visitors’ sentences in {1} could not be saved: {2}": "تعذّر حفظ جمل زوار المزرعة باللغة {1}: {2}",
   "The highest rank there is.": "أعلى رتبة موجودة.",
   "The households linked with yours, and those you asked or that asked you. Only your household’s name is shown — never anyone’s e-mail or phone.": "الأسر المرتبطة بأسرتك، ومن طلبت التواصل معهم أو طلبوا التواصل معك. يظهر فقط اسم الأسرة — ولا يظهر أبدًا بريد أحد أو رقم هاتفه.",
   "The invitation in": "الدعوة بـ",

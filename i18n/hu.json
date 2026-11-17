@@ -1,7 +1,7 @@
 {
  "lang": "hu",
  "updatedAt": 1794938189765,
- "count": 2661,
+ "count": 2664,
  "strings": {
   "\"Add to Home Screen\"": "Hozzáadás a kezdőképernyőhöz",
   "\"Open Bring!\"": "Bring! megnyitása",
@@ -591,6 +591,7 @@
   "Know someone who would enjoy My Kitchen Notes? The beta is by invitation only: ask the app’s owner to invite them. The owner decides, and sends the invitation.": "Ismersz valakit, aki szívesen használná a My Kitchen Notes-ot? A béta csak meghívással érhető el: kérd meg az app tulajdonosát, hogy hívja meg. A tulajdonos dönt, és ő küldi a meghívást.",
   "Know someone who would enjoy it? While the app takes new members by invitation only, the share button asks its owner to invite them.": "Ismersz valakit, aki szívesen használná? Mivel az app csak meghívással bővül, a megosztás gomb megkéri a tulajdonost, hogy hívja meg.",
   "Kosher": "Kóser",
+  "Language": "Nyelv",
   "Last backup": "Legutóbbi mentés",
   "Last backup: today": "Utolsó mentés: ma",
   "Last backup: yesterday": "Utolsó biztonsági mentés: tegnap",
@@ -792,6 +793,7 @@
   "One cookbook for your household: invite family and friends by e-mail or with a link, and everyone sees and adds the same recipes.": "Egy szakácskönyv a háztartásodnak: hívj meg családtagokat és barátokat e-mailben vagy linkkel, és mindenki ugyanazokat a recepteket látja és adhatja hozzá.",
   "One fewer serving": "Eggyel kevesebb adag",
   "One more serving": "Eggyel több adag",
+  "One slot for each English sentence, said to everyone whose app is in this language. Only the ones filled in and ticked are said; with none filled in, they hear the English ones.": "Minden angol mondathoz egy mező, amelyet mindenki hall, akinek az alkalmazása ezen a nyelven van. Csak a kitöltött és bejelölt mondatok hangzanak el; ha egyik sincs kitöltve, az angolokat hallják.",
   "Only members can become the owner. Invite someone first; once they have joined, you can hand {1} over.": "Csak tagok lehetnek tulajdonosok. Először hívj meg valakit; miután csatlakozott, átadhatod neki {1}.",
   "Only the app’s owner can open this.": "Csak az alkalmazás tulajdonosa nyithatja meg ezt.",
   "Only the app’s owner can send invitations.": "Csak az alkalmazás tulajdonosa küldhet meghívókat.",
@@ -1250,6 +1252,7 @@
   "The extension could not be put in a folder: {1} Use “or download the zip” instead.": "A kiterjesztést nem sikerült mappába tenni: {1} Használd inkább az „vagy töltsd le a zip fájlt” lehetőséget.",
   "The family’s recipes open for {1} once it is confirmed from the e-mail we sent (look in spam too). Your change is safe on this device and goes up once it is.": "A család receptjei {1} számára nyílnak meg, amint megerősíti az elküldött e-mailt (nézd meg a spam mappát is). A módosításod biztonságban van ezen az eszközön, és feltöltődik, amint megtörténik a megerősítés.",
   "The farm visitors could not be saved: {1}": "A farmlátogatókat nem sikerült menteni: {1}",
+  "The farm visitors’ sentences in {1} could not be saved: {2}": "A farmlátogatók mondatait ({1}) nem sikerült menteni: {2}",
   "The highest rank there is.": "A legmagasabb rang, ami létezik.",
   "The households linked with yours, and those you asked or that asked you. Only your household’s name is shown — never anyone’s e-mail or phone.": "A veletek összekapcsolt háztartások, valamint azok, akiket felkértetek, vagy akik felkértek titeket. Csak a háztartás neve látszik — soha senkinek az e-mail címe vagy telefonszáma.",
   "The invitation in": "A meghívás nyelve",

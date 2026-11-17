@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.94 -->
+<!-- Tony's Recipes Collection v39.95 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -11217,7 +11217,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.94';
+var APP_VERSION = 'v39.95';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -12646,6 +12646,10 @@ body.banner-shown #envRibbon.env-beta { padding-top: 2px; }
 .fv-h { font-size: 13px; font-weight: 700; color: var(--heading); margin: 14px 0 6px; text-transform: uppercase; letter-spacing: .4px; }
 .fv-row { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
 .fv-row .fv-on { width: 18px; height: 18px; flex: none; accent-color: var(--terracotta); }
+.fv-lang { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; margin: 0 0 8px; font-size: 14px; color: var(--ink); }   /* v39.95 */
+.fv-lang select { font: inherit; padding: 6px 8px; min-height: 36px; max-width: 100%; border: 1px solid var(--border); border-radius: 8px; background: var(--card-bg); color: var(--ink); }
+.fv-slotbox { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.fv-slot .fv-en { font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
 .fv-row .fv-text { flex: 1; min-width: 0; padding: 7px 9px; border: 1px solid var(--border); border-radius: 8px; background: var(--card-bg); color: var(--ink); font: inherit; font-size: 14px; }
 .fv-row button { flex: none; width: 34px; height: 34px; border: 1px solid var(--border); border-radius: 8px; background: var(--card-bg); color: var(--heading); cursor: pointer; }
 .fv-add { border: 1px dashed var(--border); border-radius: 8px; background: transparent; color: var(--terracotta); padding: 7px 12px; cursor: pointer; font: inherit; font-size: 13px; font-weight: 600; }
@@ -14790,7 +14794,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.94</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.95</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14878,7 +14882,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.94</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.95</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -33411,10 +33415,59 @@ async function farmLoadConfig() {
   } catch(e) {}
   return null;
 }
-function farmPickSaying() {
-  var on = farmConfig().sayings.filter(function(s){ return s.on; });
-  return on.length ? on[Math.floor(Math.random() * on.length)].t : 'Ouch!';
+// ── v39.95 — THE SAYINGS IN OTHER LANGUAGES. Tony, 17 Nov 2026: "I would like to have the animals speak Hebrew as well
+// … add a languages selector in the modal, that will allow me to fill in the sentences for all other supported
+// languages. Each will have it's own DB or storage. If a language is empty, then use English." He chose: the person's
+// app language decides; one slot per English sentence (shown beside it), each with its own tick; and a language with
+// some sentences filled in says only those, never English. Each language is its own document, i18n/_farm_<lang>
+// ({ lang, sayings: [{ en, t, on }], at }), public like _farm, written by the owner; this device keeps a copy.
+var FARM_LANG_CFG_KEY = 'mkn_farm_cfg_';            // + language
+var _farmLangCfg = {};                              // language -> its slots, as saved
+function farmLangDoc(lang) { return FARM_DOC + '_' + lang; }
+function farmCleanLang(list) {
+  return (Array.isArray(list) ? list : []).map(function(x) {
+    return { en: String((x && x.en) || '').trim().slice(0, 80), t: String((x && x.t) || '').trim().slice(0, 80), on: !!(x && x.on) };
+  }).filter(function(x){ return x.en; }).slice(0, 40);
 }
+function farmLangSayings(lang) {
+  if (!lang || lang === 'en') return null;
+  if (_farmLangCfg[lang]) return _farmLangCfg[lang];
+  try { var c = JSON.parse(localStorage.getItem(FARM_LANG_CFG_KEY + lang) || 'null'); if (c && Array.isArray(c.sayings)) return (_farmLangCfg[lang] = farmCleanLang(c.sayings)); } catch(e) {}
+  return null;
+}
+function farmUseLang(lang, list) {
+  var clean = farmCleanLang(list); _farmLangCfg[lang] = clean;
+  try { localStorage.setItem(FARM_LANG_CFG_KEY + lang, JSON.stringify({ sayings: clean })); } catch(e) {}
+  return clean;
+}
+var _farmLangLoaded = {};
+async function farmLoadLang(lang) {
+  if (!lang || lang === 'en') return null;
+  _farmLangLoaded[lang] = true;
+  try {
+    var c = i18nCentral();
+    var d = c ? await i18nCentralGet(c.prefix + farmLangDoc(lang)) : null;     // nothing during a Self Test
+    if (d && Array.isArray(d.sayings)) return farmUseLang(lang, d.sayings);
+  } catch(e) {}
+  return farmLangSayings(lang);
+}
+// What this person's animals say: their app language's filled-in, ticked sentences (whose English sentence is still
+// there) — or, when that language has none, the ticked English ones. Each { t, lang }.
+function farmSayingsFor(lang) {
+  var L = lang == null ? _i18nLang : lang;
+  var english = farmConfig().sayings;
+  if (L && L !== 'en') {
+    var keys = english.map(function(s){ return farmSayingKey(s.t); });
+    var mine = (farmLangSayings(L) || []).filter(function(s){ return s.on && s.t && keys.indexOf(farmSayingKey(s.en)) !== -1; });
+    if (mine.length) return mine.map(function(s){ return { t: s.t, lang: L }; });
+  }
+  return english.filter(function(s){ return s.on; }).map(function(s){ return { t: s.t, lang: 'en' }; });
+}
+function farmPickSayingFor(lang) {
+  var on = farmSayingsFor(lang);
+  return on.length ? on[Math.floor(Math.random() * on.length)] : { t: 'Ouch!', lang: 'en' };
+}
+function farmPickSaying() { return farmPickSayingFor('en').t; }
 function farmPickAnimal() {
   var ids = farmConfig().animals;
   return farmAnimal(ids[Math.floor(Math.random() * ids.length)]) || FARM_ANIMALS[0];
@@ -33458,8 +33511,8 @@ function farmScottish(v) { return !!v && (/scot/i.test(v.lang || '') || /scot|\b
 // child voice (Microsoft Edge's Maisie, British, and Ana) speaks for the child, not raised again. The voices are read
 // afresh each time (an app brought back from the background can hold old ones), and the farm window names the voice
 // that speaks for each choice on that device.
-var FARM_VOICE_MALE_RE = /\b(male|man|daniel|arthur|oliver|ryan|george|thomas|aaron|alex|fred|gordon|rishi|lee|tom|evan|nathan|eddy|grandpa|reed|rocko|ralph|junior|albert|bruce|david|mark|james|richard|sean|ravi|guy|alfie|elliot|ethan|noah|christopher|eric|roger|steffan|brian|andrew|davis|jason|william|darren|duncan|ken|liam|mitchell|connor|prabhat|luke)\b/i;
-var FARM_VOICE_FEMALE_RE = /\b(female|woman|girl|fiona|samantha|karen|moira|tessa|victoria|allison|ava|susan|vicki|kathy|martha|serena|kate|stephanie|catherine|nicky|flo|grandma|sandy|shelley|veena|isha|zira|hazel|heera|linda|aria|jenny|ana|michelle|sonia|libby|maisie|abbi|bella|hollie|olivia|natasha|clara|emily|neerja|molly|leah|amy|emma|sara|jane|nancy|amber|ashley|cora|elizabeth|annette|carly|elsie|freya|joanne|kim|tina|imani)\b/i;
+var FARM_VOICE_MALE_RE = /\b(male|man|daniel|arthur|oliver|ryan|george|thomas|aaron|alex|fred|gordon|rishi|lee|tom|evan|nathan|eddy|grandpa|reed|rocko|ralph|junior|albert|bruce|david|mark|james|richard|sean|ravi|guy|alfie|elliot|ethan|noah|christopher|eric|roger|steffan|brian|andrew|davis|jason|william|darren|duncan|ken|liam|mitchell|connor|prabhat|luke|asaf|avri)\b/i;
+var FARM_VOICE_FEMALE_RE = /\b(female|woman|girl|fiona|samantha|karen|moira|tessa|victoria|allison|ava|susan|vicki|kathy|martha|serena|kate|stephanie|catherine|nicky|flo|grandma|sandy|shelley|veena|isha|zira|hazel|heera|linda|aria|jenny|ana|michelle|sonia|libby|maisie|abbi|bella|hollie|olivia|natasha|clara|emily|neerja|molly|leah|amy|emma|sara|jane|nancy|amber|ashley|cora|elizabeth|annette|carly|elsie|freya|joanne|kim|tina|imani|carmit|hila)\b/i;
 var FARM_VOICE_CHILD_RE = /\b(maisie|ana)\b/i;      // children's voices some devices have (Microsoft Edge)
 // 'f', 'm', or '' when the name does not say
 function farmVoiceSex(v) {
@@ -33561,9 +33614,17 @@ var FARM_CAST = {              // the ElevenLabs voice Tony chose for each (for 
 };
 // A sentence as it was recorded, whatever its apostrophes, capitals or spaces.
 function farmSayingKey(t) { return String(t == null ? '' : t).toLowerCase().replace(/[\u2018\u2019\u02bc`]/g, "'").replace(/\s+/g, ' ').trim(); }
-// The recording of this animal saying this sentence, or null (an animal or a sentence never recorded).
-function farmRecording(animalId, text) {
+// The recording of this animal saying this sentence, or null (an animal or a sentence never recorded). v39.95 — lang:
+// English unless said; a language is recorded when FARM_RECORDED names it (none yet but English).
+var FARM_RECORDED = {};                             // lang -> { dir, sayings: [the recorded sentences, in file order] }
+function farmRecording(animalId, text, lang) {
   if (!FARM_CAST[animalId]) return null;
+  if (lang && lang !== 'en') {
+    var r = FARM_RECORDED[lang]; if (!r) return null;
+    var kk = farmSayingKey(text);
+    for (var j = 0; j < r.sayings.length; j++) if (farmSayingKey(r.sayings[j]) === kk) return r.dir + animalId + '-' + j + '.mp3';
+    return null;
+  }
   var k = farmSayingKey(text);
   for (var i = 0; i < FARM_SAYINGS_DEFAULT.length; i++) if (farmSayingKey(FARM_SAYINGS_DEFAULT[i]) === k) return FARM_SOUNDS + animalId + '-' + i + '.mp3';
   return null;
@@ -33593,16 +33654,35 @@ function farmPlayRecording(src, fallback) {
   } catch (e) { fail(); }
   return true;
 }
+// v39.95 — a sentence in another language: the device's voice for that language (a man's or a woman's, as the animal),
+// tuned as the English ones; with none, the browser picks by the language alone.
+function farmLangVoice(lang, kind) {
+  var vs = []; try { vs = speechSynthesis.getVoices() || []; } catch(e) {}
+  var mine = vs.filter(function(v){ return String(v.lang || '').toLowerCase().replace('_', '-').split('-')[0] === lang; });
+  if (!mine.length) return null;
+  var want = kind === 'male' ? 'm' : 'f';
+  return mine.filter(function(v){ return farmVoiceSex(v) === want; })[0] || mine.filter(function(v){ return !farmVoiceSex(v); })[0] || mine[0];
+}
+function farmUtteranceIn(lang, text, pitch, kind) {
+  var k = FARM_VOICE_TUNE[kind] ? kind : 'female';
+  var u = new SpeechSynthesisUtterance(text), v = farmLangVoice(lang, k);
+  if (v) u.voice = v;
+  var t = farmTune(k, v);
+  u.lang = (v && v.lang) || lang; u.rate = t.rate; u.pitch = Math.max(0.55, Math.min(1.8, t.pitch + ((pitch || 1) - 1) * .3));
+  return u;
+}
 // voice: male | female | child | random — the farm window's choice by default (a sentence with no recording).
 // animalId (v39.93): the animal that speaks — its own recorded voice when the sentence was recorded.
-function farmSay(text, pitch, voice, animalId) {
+// lang (v39.95): the sentence's language — English unless said; another is spoken by the device's voice for it.
+function farmSay(text, pitch, voice, animalId, lang) {
   try {
-    var src = animalId ? farmRecording(animalId, text) : null;
+    var src = animalId ? farmRecording(animalId, text, lang) : null;
     var cast = animalId && FARM_CAST[animalId];
-    if (src && farmPlayRecording(src, function () { farmSay(text, pitch, voice || (cast && cast.kind)); })) return true;
+    if (src && farmPlayRecording(src, function () { farmSay(text, pitch, voice || (cast && cast.kind), null, lang); })) return true;
     if (!window.speechSynthesis || typeof SpeechSynthesisUtterance === 'undefined') return false;
     var kind = farmVoiceKind(voice || (cast && cast.kind) || farmConfig().voice);          // random: picked once per tap
-    var u = farmUtterance(text, pitch, kind), started = false;
+    var mk = function () { return (lang && lang !== 'en') ? farmUtteranceIn(lang, text, pitch, kind) : farmUtterance(text, pitch, kind); };
+    var u = mk(), started = false;
     u.onstart = function(){ started = true; };
     _farmUtter = u;
     function go() {
@@ -33610,7 +33690,7 @@ function farmSay(text, pitch, voice, animalId) {
       speechSynthesis.speak(u);
       setTimeout(function(){
         if (started || _farmUtter !== u || speechSynthesis.speaking || speechSynthesis.pending) return;
-        var again = farmUtterance(text, pitch, kind); _farmUtter = again;      // dropped: once more
+        var again = mk(); _farmUtter = again;      // dropped: once more
         speechSynthesis.speak(again);
       }, 900);
     }
@@ -33675,6 +33755,7 @@ document.addEventListener('visibilitychange', function() {
 // second, like an old game. Tapped: it stops, turns to you, speaks, walks on.
 var FARM_SWING = 24 * Math.PI / 180;
 function farmVisit(id, opts) {
+  if (_i18nLang && _i18nLang !== 'en' && !_farmLangLoaded[_i18nLang]) farmLoadLang(_i18nLang);   // v39.95 — the language changed since
   opts = opts || {};
   var a = (id && farmAnimal(id)) || farmPickAnimal();
   var style = FARM_STYLES.indexOf(opts.style) !== -1 ? opts.style : farmStyle();
@@ -33827,11 +33908,11 @@ function farmWalk(el, a, style, opts) {
 function farmOuch(el, a, keepFacing) {
   if (typeof insightCount === 'function') insightCount('farm', 'farm');
   var art = el.querySelector('.fv-art'), bubble = el.querySelector('.fv-bubble');
-  var said = farmPickSaying();
-  bubble.textContent = said;
+  var pick = farmPickSayingFor(), said = pick.t;                    // v39.95 — in this person's language
+  bubble.textContent = said; bubble.setAttribute('dir', 'auto'); bubble.setAttribute('lang', pick.lang);
   art.classList.add('turned');
   return new Promise(function(resolve) {
-    setTimeout(function(){ el.classList.add('fv-said'); farmSay(said, a.pitch, null, a.id); }, 180);   // v39.93 — its own voice
+    setTimeout(function(){ el.classList.add('fv-said'); farmSay(said, a.pitch, null, a.id, pick.lang); }, 180);   // v39.93 — its own voice
     setTimeout(function(){
       el.classList.remove('fv-said');
       if (!keepFacing) art.classList.remove('turned');
@@ -33888,8 +33969,49 @@ function farmSayingRow(s) {
     + '<button type="button" class="fv-hear" title="Hear it" aria-label="Hear it" onclick="farmHearSaying(this.parentNode.querySelector(\'.fv-text\').value)">\u{1F50A}</button>'
     + '<button type="button" class="fv-del" title="Remove" aria-label="Remove" onclick="this.parentNode.remove()">✕</button></div>';
 }
+// v39.95 — the farm window's languages: English (the sentences themselves) and every language the app speaks.
+var _farmWinLang = 'en', _farmLangDrafts = {};
+function farmLangOptions() {
+  return '<option value="en">English</option>' + Object.keys(I18N_LANGS).map(function(c) {
+    return '<option value="' + c + '" data-no-i18n>' + escH(I18N_LANGS[c].label + (I18N_LANGS[c].en && I18N_LANGS[c].en !== I18N_LANGS[c].label ? ' · ' + I18N_LANGS[c].en : '')) + '</option>';
+  }).join('');
+}
+// One slot: the English sentence it stands for (a guide, not editable here), the sentence in this language, its own tick.
+function farmSlotRow(en, slot, lang) {
+  return '<div class="fv-row fv-slot" data-en="' + escA(en) + '"><input type="checkbox" class="fv-on" aria-label="Use this sentence"' + ((slot ? slot.on : true) ? ' checked' : '') + '>'
+    + '<div class="fv-slotbox"><div class="fv-en" data-no-i18n dir="ltr">' + escH(en) + '</div>'
+    + '<input type="text" class="fv-text" maxlength="80" data-no-i18n dir="auto" lang="' + escA(lang) + '" value="' + escA(slot ? slot.t : '') + '" aria-label="What the animal says"></div>'
+    + '<button type="button" class="fv-hear" title="Hear it" aria-label="Hear it" onclick="farmHearSaying(this.parentNode.querySelector(\'.fv-text\').value, ' + jsA(lang) + ')">\u{1F50A}</button></div>';
+}
+// The English sentences as they stand in the window now (typed but not yet saved included).
+function farmEnglishRows() {
+  return Array.prototype.map.call(document.querySelectorAll('#farmSayings .fv-text'), function(i){ return String(i.value || '').trim(); }).filter(Boolean);
+}
+function farmReadSlots() {
+  return Array.prototype.map.call(document.querySelectorAll('#farmSayingsLang .fv-slot'), function(r) {
+    return { en: r.getAttribute('data-en'), t: String(r.querySelector('.fv-text').value || '').trim().slice(0, 80), on: r.querySelector('.fv-on').checked };
+  });
+}
+async function farmSwitchLang(lang) {
+  if (_farmWinLang !== 'en' && document.getElementById('farmSayingsLang')) _farmLangDrafts[_farmWinLang] = farmReadSlots();
+  _farmWinLang = lang || 'en';
+  var english = _farmWinLang === 'en', host = document.getElementById('farmSayingsLang');
+  if (!host) return false;
+  document.getElementById('farmSayings').hidden = !english;
+  document.getElementById('farmAddSaying').hidden = !english;
+  document.getElementById('farmLangNote').hidden = english;
+  host.hidden = english;
+  if (english) { host.innerHTML = ''; return true; }
+  var mine = _farmWinLang, saved = _farmLangDrafts[mine];
+  if (!saved) { host.innerHTML = '<div class="fv-note">Loading…</div>'; saved = (await farmLoadLang(mine)) || farmLangSayings(mine) || []; }
+  if (_farmWinLang !== mine || !host.isConnected) return false;          // switched again meanwhile
+  var by = {}; saved.forEach(function(x){ by[farmSayingKey(x.en)] = x; });
+  host.innerHTML = farmEnglishRows().map(function(en){ return farmSlotRow(en, by[farmSayingKey(en)], mine); }).join('');
+  return true;
+}
 function farmSettingsDraw() {
   var prev = document.getElementById('farmOverlay'); if (prev) prev.remove();
+  _farmWinLang = 'en'; _farmLangDrafts = {};
   var c = farmConfig();
   var ov = document.createElement('div');
   ov.id = 'farmOverlay'; ov.className = 'modal-overlay open';
@@ -33897,7 +34019,12 @@ function farmSettingsDraw() {
     + '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><div class="ask-title" id="farmTitle">\u{1F404} The farm visitors</div>'
     + '<button type="button" class="modal-close" style="position:relative;top:auto;right:auto;" aria-label="Close" onclick="document.getElementById(\'farmOverlay\').remove()">✕</button></div>'
     + '<div class="fv-note">For everyone, in every copy. When someone taps a visiting animal, it says one of the ticked sentences, picked at random, in its own voice. Each person can still switch the animals off in ⚙️ → How it looks.</div>'
-    + '<div class="fv-h">What they say</div><div id="farmSayings">' + c.sayings.map(farmSayingRow).join('') + '</div>'
+    + '<div class="fv-h">What they say</div>'
+    // v39.95 — the sentences in every language (Tony: "a languages selector in the modal")
+    + '<div class="fv-lang"><label for="farmLang">Language</label><select id="farmLang" onchange="farmSwitchLang(this.value)">' + farmLangOptions() + '</select></div>'
+    + '<div class="fv-note" id="farmLangNote" hidden>One slot for each English sentence, said to everyone whose app is in this language. Only the ones filled in and ticked are said; with none filled in, they hear the English ones.</div>'
+    + '<div id="farmSayings">' + c.sayings.map(farmSayingRow).join('') + '</div>'
+    + '<div id="farmSayingsLang" hidden></div>'
     + '<button type="button" class="fv-add" id="farmAddSaying" onclick="farmAddSaying()">➕ Add a sentence</button>'
     + '<div class="fv-h">How often</div><div class="fv-often">Between <input type="number" id="farmMin" min="1" max="' + FARM_MINUTES_CAP + '" value="' + c.minMinutes + '" aria-label="Shortest wait, in minutes"> and '
     + '<input type="number" id="farmMax" min="1" max="' + FARM_MINUTES_CAP + '" value="' + c.maxMinutes + '" aria-label="Longest wait, in minutes"> minutes apart, picked at random, counted while the app is open.</div>'
@@ -33940,11 +34067,11 @@ function farmSettingsRead() {
   return { sayings: sayings, animals: animals, minMinutes: lo, maxMinutes: hi, style: st ? st.value : farmStyle(), voice: farmWindowVoice() };
 }
 // v39.93 — 🔊 beside a sentence: one of the ticked animals says it, in its own voice where it was recorded.
-function farmHearSaying(text) {
+function farmHearSaying(text, lang) {
   var ids = Array.prototype.filter.call(document.querySelectorAll('#farmAnimals input'), function(i){ return i.checked; }).map(function(i){ return i.value; });
   if (!ids.length) ids = farmConfig().animals;
   var a = farmAnimal(ids[Math.floor(Math.random() * ids.length)]) || FARM_ANIMALS[0];
-  return farmSay(text, a.pitch, null, a.id);
+  return farmSay(text, a.pitch, null, a.id, lang || 'en');
 }
 // The voice once ticked in the farm window — since v39.93 there is no choice: the saved one is kept as it was.
 function farmWindowVoice() {
@@ -33973,6 +34100,19 @@ async function farmSettingsSave() {
     if (btn) { btn.disabled = false; btn.textContent = 'Save for everyone'; }
     showServiceError('The farm visitors could not be saved:\n\n' + ((e && e.message) || String(e))); return false;
   }
+  // v39.95 — and each language looked at in the window: its own document (one that was, or is now, filled in)
+  if (_farmWinLang !== 'en') _farmLangDrafts[_farmWinLang] = farmReadSlots();
+  var langs = Object.keys(_farmLangDrafts);
+  for (var li = 0; li < langs.length; li++) {
+    var L = langs[li], slots = farmCleanLang(_farmLangDrafts[L]);
+    var had = (farmLangSayings(L) || []).some(function(x){ return x.t; });
+    if (!had && !slots.some(function(x){ return x.t; })) continue;            // never filled in: nothing to keep
+    try { await cloudDoc(i18nDocId(farmLangDoc(L))).set({ lang: L, sayings: slots, at: Date.now() }); farmUseLang(L, slots); }
+    catch(e) {
+      if (btn) { btn.disabled = false; btn.textContent = 'Save for everyone'; }
+      showServiceError('The farm visitors\u2019 sentences in ' + i18nLangName(L) + ' could not be saved:\n\n' + ((e && e.message) || String(e))); return false;
+    }
+  }
   farmUseConfig(doc); _farmCentralCfg = farmCleanConfig(doc);    // v37.99 — what is saved is what is known
   farmSchedule();                                   // the new pace, here at once; elsewhere from their next start
   // v38.01 — Tony: "Please do not close the modal after clicking save for everyone."
@@ -33987,12 +34127,12 @@ async function farmSettingsSave() {
 }
 window.farmVisit = farmVisit; window.farmSetEnabled = farmSetEnabled; window.openFarmSettings = openFarmSettings;
 window.farmSettingsSave = farmSettingsSave; window.farmAddSaying = farmAddSaying; window.farmTryOne = farmTryOne; window.farmSay = farmSay;
-window.FARM_CAST = FARM_CAST; window.farmRecording = farmRecording; window.farmSayingKey = farmSayingKey; window.farmPlayRecording = farmPlayRecording; window.farmAudioEl = farmAudioEl; window.farmHearSaying = farmHearSaying;   // v39.93
+window.FARM_CAST = FARM_CAST; window.farmRecording = farmRecording; window.farmSayingsFor = farmSayingsFor; window.farmPickSayingFor = farmPickSayingFor; window.farmSwitchLang = farmSwitchLang; window.farmLangSayings = farmLangSayings; window.farmUseLang = farmUseLang; window.farmLoadLang = farmLoadLang; window.farmLangVoice = farmLangVoice; window.FARM_RECORDED = FARM_RECORDED; window.farmSayingKey = farmSayingKey; window.farmPlayRecording = farmPlayRecording; window.farmAudioEl = farmAudioEl; window.farmHearSaying = farmHearSaying;   // v39.93
 window.farmConfig = farmConfig; window.farmUseConfig = farmUseConfig; window.farmPickAnimal = farmPickAnimal; window.farmPickSaying = farmPickSaying;
 window.farmTyping = farmTyping; window.farmWait = farmWait; window.farmTick = farmTick; window.farmClear = farmClear; window.FARM_ANIMALS = FARM_ANIMALS;
 window.farmRefreshSettings = farmRefreshSettings; window.farmThumbs = farmThumbs; window.farmPixel = farmPixel; window.farmToonArt = farmToonArt;
 window.farmArtFor = farmArtFor; window.farmWindowVoice = farmWindowVoice; window.farmVoiceKind = farmVoiceKind; window.farmPoof = farmPoof; window.farmLoadConfig = farmLoadConfig; window.farmStyle = farmStyle; window.FARM_STYLES = FARM_STYLES; window.farmSettingsDraw = farmSettingsDraw; window.farmSchedule = farmSchedule;
-farmLoadConfig().then(function(){ farmSchedule(); });   // the pace may be Tony's; until it is read, the device's copy of it
+farmLoadConfig().then(function(){ farmSchedule(); if (_i18nLang && _i18nLang !== 'en') farmLoadLang(_i18nLang); });   // v39.95 — and this person's language   // the pace may be Tony's; until it is read, the device's copy of it
 
 // ─── THE KITCHEN RULES: AGREEING TO THE TERMS ON FIRST SIGN-IN (v37.83) ─────
 // Tony: on a person's first sign-in, the terms "in a stylized and appealing way,
@@ -36554,6 +36694,7 @@ var HELP_SYSTEM_PROMPT = [
   "",
   "=== THE FARM VISITORS ===",
   "- Now and then a cartoon farm animal strolls across the screen. Tap it and it turns to you and says something, then, still looking at you, it vanishes in a puff of smoke. EACH ANIMAL HAS ITS OWN VOICE (v39.93): the app's owner chose a voice for each of the fourteen, and they were recorded once (ElevenLabs), so every phone and computer hears the same voices; an animal heard once speaks offline too. A sentence the owner adds later in the farm window is said by the device's own voice — a man's, a woman's or a child's, as the animal's — until it is recorded too; so is a recording the device cannot play (offline before it was ever heard). The farm window no longer offers Male / Female / Child / A different one each time.",
+  "- THE FARM SAYINGS IN OTHER LANGUAGES (v39.95): the app's owner can give the sentences in any of the app's languages — the farm window's Language selector shows, for that language, one slot beside each English sentence, each with its own tick. Each person hears the animals in their own app language: the filled-in, ticked sentences of that language, never English mixed in; a language with none filled in uses the English ones. A sentence in another language is said by the device's own voice for that language until it is recorded too.",
   "- You can pick an animal up and move it (press and drag)",
   "- Switch them off or on: ⚙️ → 🎨 How it looks → 🐑 Farm guests? (this device only)",
   "",

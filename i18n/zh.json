@@ -1,7 +1,7 @@
 {
  "lang": "zh",
  "updatedAt": 1794938189765,
- "count": 2888,
+ "count": 2891,
  "strings": {
   "\"Add to Home Screen\"": "添加到主屏幕",
   "\"Open Bring!\"": "打开 Bring!",
@@ -646,6 +646,7 @@
   "Know someone who would enjoy My Kitchen Notes? The beta is by invitation only: ask the app’s owner to invite them. The owner decides, and sends the invitation.": "有人可能会喜欢 My Kitchen Notes 吗？测试版仅限邀请加入：请让应用拥有者邀请对方。由拥有者决定并发出邀请。",
   "Know someone who would enjoy it? While the app takes new members by invitation only, the share button asks its owner to invite them.": "有人可能会喜欢它吗？应用目前仅限邀请加入新成员，点击分享按钮即可请求拥有者邀请对方。",
   "Kosher": "洁食",
+  "Language": "语言",
   "Last backup": "上次备份",
   "Last backup: today": "上次备份：今天",
   "Last backup: yesterday": "上次备份：昨天",
@@ -862,6 +863,7 @@
   "One cookbook for your household: invite family and friends by e-mail, and everyone sees and adds the same recipes.": "全家共用一本菜谱：通过邮箱邀请亲友，大家都能查看和添加菜谱。",
   "One fewer serving": "减少一份",
   "One more serving": "增加一份",
+  "One slot for each English sentence, said to everyone whose app is in this language. Only the ones filled in and ticked are said; with none filled in, they hear the English ones.": "每句英文对应一个栏位，说给应用语言为此语言的所有人听。只说已填写并勾选的句子；一句都没填写时，他们听到的是英文句子。",
   "One tap — then share recipes from Facebook, Instagram or any app.": "轻点一下——即可从 Facebook、Instagram 或任意应用分享食谱。",
   "Only members can become the owner. Invite someone first; once they have joined, you can hand {1} over.": "只有成员才能成为所有者。先邀请对方加入，等他们加入后，你就可以把{1}交给他们。",
   "Only the app’s owner can open this.": "只有 App 所有者能打开此项。",
@@ -1362,6 +1364,7 @@
   "The extension could not be put in a folder: {1} Use “or download the zip” instead.": "扩展程序无法放入文件夹：{1} 请改用“或下载 zip”。",
   "The family’s recipes open for {1} once it is confirmed from the e-mail we sent (look in spam too). Your change is safe on this device and goes up once it is.": "确认我们发送的邮件后（也看看垃圾邮件），{1}即可打开家庭食谱。你的更改已安全保存在此设备上，确认后会同步上传。",
   "The farm visitors could not be saved: {1}": "农场访客保存失败：{1}",
+  "The farm visitors’ sentences in {1} could not be saved: {2}": "无法保存农场访客的{1}句子：{2}",
   "The highest rank there is.": "最高等级。",
   "The households linked with yours, and those you asked or that asked you. Only your household’s name is shown — never anyone’s e-mail or phone.": "与你关联的家庭，以及你邀请过或邀请你的家庭。只会显示家庭名称——不会显示任何人的邮箱或电话。",
   "The invitation in": "邀请使用的语言",

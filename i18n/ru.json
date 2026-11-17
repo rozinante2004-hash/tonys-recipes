@@ -1,7 +1,7 @@
 {
  "lang": "ru",
  "updatedAt": 1794938189765,
- "count": 3184,
+ "count": 3187,
  "strings": {
   "\"Add to Home Screen\"": "Добавить на главный экран",
   "\"One item away\" filter ({1}f.{2})": "Фильтр «Не хватает одного» ({1}ф.{2})",
@@ -787,6 +787,7 @@
   "Know someone who would enjoy My Kitchen Notes? The beta is by invitation only: ask the app’s owner to invite them. The owner decides, and sends the invitation.": "Знаете кого-то, кому понравились бы My Kitchen Notes? Бета-версия доступна только по приглашению: попросите владельца приложения пригласить его. Решение принимает и приглашение отправляет владелец.",
   "Know someone who would enjoy it? While the app takes new members by invitation only, the share button asks its owner to invite them.": "Знаете кого-то, кому это понравилось бы? Приложение принимает новых участников только по приглашению, поэтому кнопка «Поделиться» отправляет владельцу просьбу пригласить его.",
   "Kosher": "Кошерная",
+  "Language": "Язык",
   "Last backup": "Последний бэкап",
   "Last backup: today": "Последний бэкап: сегодня",
   "Last backup: yesterday": "Последняя резервная копия: вчера",
@@ -1016,6 +1017,7 @@
   "One fewer serving": "На одну порцию меньше",
   "One more serving": "На одну порцию больше",
   "One recipe can be pulled from the cloud without a reload ({1} §{2}, v{3})": "Один рецепт можно получить из облака без перезагрузки ({1} §{2}, v{3})",
+  "One slot for each English sentence, said to everyone whose app is in this language. Only the ones filled in and ticked are said; with none filled in, they hear the English ones.": "По одному полю на каждую английскую фразу; её услышат все, у кого приложение на этом языке. Произносятся только заполненные и отмеченные; если не заполнено ни одной, звучат английские.",
   "One tap — then share recipes from Facebook, Instagram or any app.": "Одно нажатие — и делитесь рецептами из Facebook, Instagram или любого приложения.",
   "Only changed recipes are written": "Записываются только изменённые рецепты",
   "Only members can become the owner. Invite someone first; once they have joined, you can hand {1} over.": "Владельцем может стать только участник. Сначала пригласите кого-нибудь; когда он присоединится, вы сможете передать {1}.",
@@ -1590,6 +1592,7 @@
   "The extension could not be put in a folder: {1} Use “or download the zip” instead.": "Не удалось поместить расширение в папку: {1} Используйте вместо этого «или скачать zip».",
   "The family’s recipes open for {1} once it is confirmed from the e-mail we sent (look in spam too). Your change is safe on this device and goes up once it is.": "Семейные рецепты откроются для {1}, как только адрес будет подтверждён по письму, которое мы отправили (проверьте и папку «Спам»). Изменение сохранено на этом устройстве и загрузится, как только это произойдёт.",
   "The farm visitors could not be saved: {1}": "Не удалось сохранить гостей фермы: {1}",
+  "The farm visitors’ sentences in {1} could not be saved: {2}": "Не удалось сохранить фразы гостей с фермы на языке {1}: {2}",
   "The filter-bar counts are not recomputed on every toggle (v{1})": "Счётчики панели фильтров не пересчитываются при каждом переключении (v{1})",
   "The harvest panel is reachable and feeds the existing importers ({1}f.{2})": "Панель сбора доступна и передаёт данные существующим импортёрам ({1}f.{2})",
   "The header follows the scroll, both ways (v{1})": "Заголовок следует за прокруткой в обе стороны (v{1})",

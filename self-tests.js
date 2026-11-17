@@ -11408,8 +11408,9 @@ window.SELF_TESTS = [
     }},
   { id:'farm_visitors', group:'UI', name:'🐑 The farm visitors: one strolls across, turns to you when tapped and says one of the ticked sentences in a Scottish voice (British where the device has none, v38.79), then vanishes in a puff of smoke (v38.19); never while typing; on by default (v37.88)',
     test: async()=>{
-      var real={ speak:window.speechSynthesis && speechSynthesis.speak, cfg:localStorage.getItem('mkn_farm_cfg'), on:localStorage.getItem('mkn_farm_on'), play:HTMLMediaElement.prototype.play }, spoken=[], played=[];
+      var real={ speak:window.speechSynthesis && speechSynthesis.speak, cfg:localStorage.getItem('mkn_farm_cfg'), on:localStorage.getItem('mkn_farm_on'), play:HTMLMediaElement.prototype.play, langCfg:_farmLangCfg[_i18nLang] }, spoken=[], played=[];
       var inp=null;
+      _farmLangCfg[_i18nLang]=[];      // v39.95 — this device's own language's sayings (if any) stay out of it: English here
       try{
         // 14 animals, each with a side-on head, a head turned to you, and legs (or a hop).
         if(FARM_ANIMALS.length<14) throw new Error('only '+FARM_ANIMALS.length+' animals');
@@ -11540,6 +11541,7 @@ window.SELF_TESTS = [
       } finally {
         if(window.speechSynthesis && real.speak) speechSynthesis.speak=real.speak;
         HTMLMediaElement.prototype.play=real.play;
+        if(real.langCfg===undefined) delete _farmLangCfg[_i18nLang]; else _farmLangCfg[_i18nLang]=real.langCfg;
         if(inp) inp.remove();
         farmClear();
         if(real.cfg===null) localStorage.removeItem('mkn_farm_cfg'); else localStorage.setItem('mkn_farm_cfg', real.cfg);
@@ -11699,6 +11701,73 @@ window.SELF_TESTS = [
         var o=document.getElementById('farmOverlay'); if(o) o.remove();
         if(real.cfg===null) localStorage.removeItem('mkn_farm_cfg'); else localStorage.setItem('mkn_farm_cfg', real.cfg);
         window._farmCfg=null; farmSchedule();
+      }
+    } },
+
+  { id:'farm_sayings_languages', group:'UI', name:'🐄 The farm sayings in other languages: a slot for each English sentence, each language its own document; a person hears their app language’s filled-in sentences, else the English ones (v39.95)',
+    test: async()=>{
+      // Tony, 17 Nov 2026: "add a languages selector in the modal … Each will have it's own DB or storage. If a language is
+      // empty, then use English." He chose: the person's app language; a slot per English sentence; only the filled-in ones.
+      var keepLS={}; ['mkn_farm_cfg','mkn_farm_cfg_he','mkn_farm_cfg_fr','mkn_farm_cfg_de'].forEach(function(k){ keepLS[k]=localStorage.getItem(k); });
+      var real={ lang:_i18nLang, langCfg:JSON.parse(JSON.stringify(_farmLangCfg)), owner:window.isAppOwner, own:window.i18nCentralIsOwn, user:window._fbUser, doc:window.cloudDoc, toast:window.toast,
+                 speak:window.speechSynthesis && speechSynthesis.speak, play:HTMLMediaElement.prototype.play }, wrote=[], spoken=[], played=[];
+      var wait=function(ms){ return new Promise(function(r){ setTimeout(r, ms||30); }); };
+      try{
+        ['he','fr','de'].forEach(function(l){ delete _farmLangCfg[l]; localStorage.removeItem('mkn_farm_cfg_'+l); });
+        if(!farmUseConfig({ sayings:[{ t:'Ouch!', on:true }, { t:'Not yet!', on:true }, { t:'Steady on!', on:true }], animals:['hen'], minMinutes:5, maxMinutes:9 })) throw new Error('the English sentences were refused');
+        // nothing in Hebrew: Hebrew users hear English
+        var he=farmSayingsFor('he');
+        if(he.length!==3 || he.some(function(x){ return x.lang!=='en'; })) throw new Error('an empty language does not fall back to English: '+JSON.stringify(he));
+        // some filled in: only those, never English; another language is untouched
+        farmUseLang('he', [{ en:'Ouch!', t:'איי!', on:true }, { en:'Not yet!', t:'', on:true }, { en:'Steady on!', t:'לאט לך!', on:false }]);
+        he=farmSayingsFor('he');
+        if(he.length!==1 || he[0].t!=='איי!' || he[0].lang!=='he') throw new Error('Hebrew users do not hear just the filled-in, ticked Hebrew: '+JSON.stringify(he));
+        if(farmSayingsFor('fr')[0].lang!=='en' || farmSayingsFor('en').length!==3) throw new Error('another language took the Hebrew');
+        // a translation whose English sentence is gone is not said
+        farmUseLang('he', [{ en:'A sentence no longer there', t:'משהו', on:true }]);
+        if(farmSayingsFor('he')[0].lang!=='en') throw new Error('a translation of a removed English sentence is still said');
+        // the window: a language selector; a slot per English sentence; a draft kept while switching; saved per language
+        window.toast=function(){}; window.isAppOwner=function(){ return true; }; window.i18nCentralIsOwn=function(){ return true; };
+        window._fbUser={ uid:'uO', email:'owner@example.com' };
+        window.cloudDoc=function(name){ return { set:async function(d){ wrote.push([name, JSON.parse(JSON.stringify(d))]); } }; };
+        var ov=openFarmSettings(); await wait();
+        var sel=ov.querySelector('#farmLang');
+        if(!sel || sel.options[0].value!=='en' || Object.keys(I18N_LANGS).some(function(c){ return !sel.querySelector('option[value="'+c+'"]'); })) throw new Error('the window has no selector with English and every language of the app');
+        sel.value='fr'; await farmSwitchLang('fr');
+        var slots=ov.querySelectorAll('#farmSayingsLang .fv-slot');
+        if(slots.length!==3 || Array.prototype.map.call(slots, function(r){ return r.getAttribute('data-en'); }).join('|')!=='Ouch!|Not yet!|Steady on!') throw new Error('not one slot for each English sentence, in order: '+slots.length);
+        if(Array.prototype.some.call(slots, function(r){ return r.querySelector('.fv-text').value; }) || !/Ouch!/.test(slots[0].querySelector('.fv-en').textContent)) throw new Error('a new language does not start with clean slots beside the English');
+        if(!ov.querySelector('#farmSayings').hidden || !ov.querySelector('#farmAddSaying').hidden || ov.querySelector('#farmLangNote').hidden) throw new Error('the English list, or no note, while another language is shown');
+        slots[0].querySelector('.fv-text').value='Aïe !'; slots[2].querySelector('.fv-on').checked=false;
+        await farmSwitchLang('de'); await farmSwitchLang('en');
+        if(ov.querySelector('#farmSayings').hidden) throw new Error('back in English, the English list is hidden');
+        await farmSwitchLang('fr');
+        if(ov.querySelector('#farmSayingsLang .fv-slot .fv-text').value!=='Aïe !') throw new Error('what was typed in French was lost on switching');
+        if(!(await farmSettingsSave())) throw new Error('saving failed');
+        var fr=wrote.filter(function(w){ return w[0]==='i18n__farm_fr'; })[0];
+        if(!wrote.some(function(w){ return w[0]==='i18n__farm'; })) throw new Error('the English sentences were not saved with it');
+        if(!fr || fr[1].lang!=='fr' || JSON.stringify(fr[1].sayings)!==JSON.stringify([{ en:'Ouch!', t:'Aïe !', on:true }, { en:'Not yet!', t:'', on:true }, { en:'Steady on!', t:'', on:false }]))
+          throw new Error('French was not saved in its own document as filled in: '+JSON.stringify(fr));
+        if(wrote.some(function(w){ return w[0]==='i18n__farm_de'; })) throw new Error('a language only looked at was saved');
+        if(JSON.stringify(farmLangSayings('fr'))!==JSON.stringify(fr[1].sayings)) throw new Error('what was saved is not what this device now knows');
+        ov.remove();
+        // a tapped animal, the app in Hebrew: the Hebrew sentence, right to left, in the device's Hebrew voice (no recording yet)
+        farmUseLang('he', [{ en:'Ouch!', t:'איי!', on:true }]); _i18nLang='he';
+        if(window.speechSynthesis) speechSynthesis.speak=function(u){ spoken.push([u.text, u.lang]); if(u.onstart) u.onstart(); };
+        HTMLMediaElement.prototype.play=function(){ played.push(this.getAttribute('src')); return Promise.resolve(); };
+        var el=farmVisit('hen', { speed:Math.min(1500, Math.max(300, window.innerWidth)), stops:0, ltr:true }); await el._farm.ready;
+        el.click(); await wait(320);
+        var b=el.querySelector('.fv-bubble');
+        if(b.textContent!=='איי!' || b.getAttribute('dir')!=='auto') throw new Error('the bubble does not say the Hebrew, right to left: '+b.textContent);
+        if(played.length || (window.speechSynthesis && (!spoken.length || spoken[0][0]!=='איי!' || !/^he/i.test(spoken[0][1])))) throw new Error('not said in Hebrew by the device: played '+played.join()+', spoken '+JSON.stringify(spoken));
+      } finally {
+        _i18nLang=real.lang; window.isAppOwner=real.owner; window.i18nCentralIsOwn=real.own; window._fbUser=real.user; window.cloudDoc=real.doc; window.toast=real.toast;
+        if(window.speechSynthesis && real.speak) speechSynthesis.speak=real.speak; HTMLMediaElement.prototype.play=real.play;
+        Object.keys(_farmLangCfg).forEach(function(k){ delete _farmLangCfg[k]; }); Object.assign(_farmLangCfg, real.langCfg);
+        Object.keys(keepLS).forEach(function(k){ if(keepLS[k]===null) localStorage.removeItem(k); else localStorage.setItem(k, keepLS[k]); });
+        window._farmCfg=null; farmClear();
+        var o=document.getElementById('farmOverlay'); if(o) o.remove();
+        farmSchedule();
       }
     } },
 

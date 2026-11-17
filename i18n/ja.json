@@ -1,7 +1,7 @@
 {
  "lang": "ja",
  "updatedAt": 1794938189765,
- "count": 3189,
+ "count": 3192,
  "strings": {
   "\"Add to Home Screen\"": "ホーム画面に追加",
   "\"One item away\" filter ({1}f.{2})": "「あと1品」フィルター（{1}f.{2}）",
@@ -788,6 +788,7 @@
   "Know someone who would enjoy My Kitchen Notes? The beta is by invitation only: ask the app’s owner to invite them. The owner decides, and sends the invitation.": "My Kitchen Notesを気に入ってくれそうな人はいますか?ベータ版は招待制です。アプリの管理者に招待をお願いしましょう。招待するかどうかは管理者が決め、送信します。",
   "Know someone who would enjoy it? While the app takes new members by invitation only, the share button asks its owner to invite them.": "気に入ってくれそうな人はいますか?このアプリは招待制ですが、共有ボタンから管理者に招待をお願いできます。",
   "Kosher": "コーシャ",
+  "Language": "言語",
   "Last backup": "最終バックアップ",
   "Last backup: today": "最終バックアップ：今日",
   "Last backup: yesterday": "前回のバックアップ: 昨日",
@@ -1017,6 +1018,7 @@
   "One fewer serving": "1人分減らす",
   "One more serving": "1人分増やす",
   "One recipe can be pulled from the cloud without a reload ({1} §{2}, v{3})": "リロードせずにクラウドから1件のレシピを取得できます（{1} §{2}, v{3}）",
+  "One slot for each English sentence, said to everyone whose app is in this language. Only the ones filled in and ticked are said; with none filled in, they hear the English ones.": "英語の文1つにつき1つの欄があり、アプリをこの言語で使っている人に話されます。入力してチェックした文だけが話され、1つも入力されていなければ英語の文が聞こえます。",
   "One tap — then share recipes from Facebook, Instagram or any app.": "ワンタップで、Facebook、Instagram、どんなアプリからでもレシピを共有。",
   "Only changed recipes are written": "変更されたレシピのみ書き込みます",
   "Only members can become the owner. Invite someone first; once they have joined, you can hand {1} over.": "オーナーになれるのはメンバーだけです。まず招待して、相手が参加したら{1}を引き継げます。",
@@ -1592,6 +1594,7 @@
   "The extension could not be put in a folder: {1} Use “or download the zip” instead.": "拡張機能をフォルダに入れられませんでした：{1} 代わりに「またはzipをダウンロード」を使ってください。",
   "The family’s recipes open for {1} once it is confirmed from the e-mail we sent (look in spam too). Your change is safe on this device and goes up once it is.": "送信したメール（迷惑メールフォルダも確認してください）で確認すると、家族のレシピが{1}に表示されます。この変更はこの端末に保存されており、確認後に反映されます。",
   "The farm visitors could not be saved: {1}": "動物の来訪設定を保存できませんでした：{1}",
+  "The farm visitors’ sentences in {1} could not be saved: {2}": "農場の訪問者の{1}の文を保存できませんでした: {2}",
   "The filter-bar counts are not recomputed on every toggle (v{1})": "フィルターバーの件数は切り替えのたびに再計算されない（v{1}）",
   "The harvest panel is reachable and feeds the existing importers ({1}f.{2})": "収集パネルにアクセスでき、既存のインポーターにデータを渡せる（{1}f.{2}）",
   "The header follows the scroll, both ways (v{1})": "ヘッダーは上下どちらのスクロールにも追従する（v{1}）",

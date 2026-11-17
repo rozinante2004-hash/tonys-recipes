@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v39.94` — app. **Worker: v107**, deployed separately and versioned separately
+**Current version:** `v39.95` — app. **Worker: v107**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -428,6 +428,19 @@ under its plain path only (a `?url=` request goes network-first).
 
 ### 1b.8 Other features of this era
 
+- **The farm sayings in other languages (v39.95).** Tony: "add a languages selector in the modal, that will allow me
+  to fill in the sentences for all other supported languages. Each will have it's own DB or storage. If a language is
+  empty, then use English." His choices: the person's app language decides; one slot per English sentence; only the
+  filled-in ones. The farm window has a Language selector (English + every language in `I18N_LANGS`); for another
+  language it shows one slot per English sentence as typed in the window (`farmEnglishRows`), the English faint above
+  the input (`farmSlotRow`), each slot with its own tick; drafts are kept while switching (`_farmLangDrafts`); Save for
+  everyone writes `i18n/_farm` and each language that is, or was, filled in to its own `i18n/_farm_<lang>`
+  (`{ lang, sayings: [{ en, t, on }], at }` — no address in it), which every copy reads publicly like `_farm`
+  (`farmLoadLang`, at start and on a visit when the app's language changed; this device keeps a copy,
+  `mkn_farm_cfg_<lang>`). `farmSayingsFor(lang)`: the language's filled-in, ticked slots whose English sentence is still
+  there — or, with none, the ticked English ones; `farmOuch` says one in the bubble (`dir="auto"`) and `farmSay(…,
+  lang)` plays its recording (`FARM_RECORDED[lang]`, none yet) or has the device's voice for the language say it
+  (`farmLangVoice`: by language, a man's or a woman's as the animal's kind). Self Test `farm_sayings_languages`.
 - **The farm visitors' own voices (v39.93).** Tony picked one ElevenLabs voice per animal himself (17 Nov 2026, after
   turning down my auditions: "Most of them have no character … I will pick the voices myself"), and each says the ten
   default sayings in it, recorded with ElevenLabs' V4 model (`eleven_v4`; Tony: "Please use the newer model (V4)"):

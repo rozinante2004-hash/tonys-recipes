@@ -1,7 +1,7 @@
 {
  "lang": "he",
  "updatedAt": 1794938189765,
- "count": 3312,
+ "count": 3315,
  "strings": {
   "\"Add to Home Screen\"": "הוספה למסך הבית",
   "\"One item away\" filter ({1}f.{2})": "פילטר \"פריט אחד חסר\" ({1}f.{2})",
@@ -811,6 +811,7 @@
   "Know someone who would enjoy My Kitchen Notes? The beta is by invitation only: ask the app’s owner to invite them. The owner decides, and sends the invitation.": "מכירים מישהו שיהנה מ-My Kitchen Notes? הגרסה הניסיונית היא בהזמנה בלבד: בקשו ממנהל האפליקציה להזמין אותם. הוא מחליט, והוא שולח את ההזמנה.",
   "Know someone who would enjoy it? While the app takes new members by invitation only, the share button asks its owner to invite them.": "מכירים מישהו שיהנה מזה? האפליקציה מצטרפת רק בהזמנה, וכפתור השיתוף פשוט מבקש ממנהל האפליקציה להזמין אותם.",
   "Kosher": "כשר",
+  "Language": "שפה",
   "Last backup": "גיבוי אחרון",
   "Last backup: today": "גיבוי אחרון: היום",
   "Last backup: yesterday": "גיבוי אחרון: אתמול",
@@ -1047,6 +1048,7 @@
   "One more serving": "מנה אחת נוספת",
   "One or more filter functions are missing. Check renderFilters, resetFilters, toggleFavFilter, toggleClipsFilter are all defined in the main script.": "חסרה פונקציית סינון אחת או יותר. בדקו ש-renderFilters, resetFilters, toggleFavFilter, toggleClipsFilter מוגדרות בקובץ הראשי.",
   "One recipe can be pulled from the cloud without a reload ({1} §{2}, v{3})": "אפשר למשוך מתכון אחד מהענן בלי לרענן ({1} §{2}, v{3})",
+  "One slot for each English sentence, said to everyone whose app is in this language. Only the ones filled in and ticked are said; with none filled in, they hear the English ones.": "משבצת אחת לכל משפט באנגלית, שנאמר לכל מי שהאפליקציה שלו בשפה הזו. רק המשפטים שמולאו וסומנו נאמרים; אם אף אחד לא מולא, שומעים את המשפטים באנגלית.",
   "One tap — then share recipes from Facebook, Instagram or any app.": "לחיצה אחת — ואז שתפו מתכונים מפייסבוק, אינסטגרם או כל אפליקציה אחרת.",
   "Only changed recipes are written": "רק מתכונים שהשתנו נכתבים",
   "Only members can become the owner. Invite someone first; once they have joined, you can hand {1} over.": "רק חברים יכולים להיות הבעלים. הזמינו מישהו קודם; ברגע שהם מצטרפים, תוכלו להעביר אליהם את {1}.",
@@ -1649,6 +1651,7 @@
   "The extension could not be put in a folder: {1} Use “or download the zip” instead.": "לא ניתן היה למקם את ההרחבה בתיקייה: {1} יש להשתמש ב\"או הורדת הזיפ\" במקום זאת.",
   "The family’s recipes open for {1} once it is confirmed from the e-mail we sent (look in spam too). Your change is safe on this device and goes up once it is.": "מתכוני המשפחה ייפתחו עבור {1} ברגע שזה יאושר מהמייל ששלחנו (תבדקו גם בספאם). השינוי שלכם שמור במכשיר הזה ויעלה ברגע שזה יקרה.",
   "The farm visitors could not be saved: {1}": "לא ניתן היה לשמור את מבקרי החווה: {1}",
+  "The farm visitors’ sentences in {1} could not be saved: {2}": "לא ניתן היה לשמור את המשפטים של מבקרי החווה בשפה {1}: {2}",
   "The filter-bar counts are not recomputed on every toggle (v{1})": "הספירות בשורת הסינון לא מחושבות מחדש בכל לחיצה (v{1})",
   "The harvest panel is reachable and feeds the existing importers ({1}f.{2})": "פאנל האיסוף נגיש ומזין את מנגנוני הייבוא הקיימים ({1}f.{2})",
   "The header follows the scroll, both ways (v{1})": "הכותרת עוקבת אחרי הגלילה, בשני הכיוונים (v{1})",

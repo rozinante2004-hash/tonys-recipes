@@ -41,6 +41,14 @@ Percy: two voices in Tony's list are called Liam; both were recorded and Tony ch
 - Tony heard all of them on a listening page (each animal's drawing from the app; Play all 10; ✎ to ask for a retake)
   and asked for no retakes.
 
+## Other languages (v39.95)
+The owner fills in each language's sentences in the farm window (Language selector, one slot per English sentence);
+each language is its own document, `i18n/_farm_<lang>`. A person hears their app language's filled-in sentences,
+else English. Until a language is recorded, the device's own voice for it says them. Next (Tony, 17 Nov): Hebrew in
+"all 8 Hebrew voices in ElevenLabs … male voices to male characters and female voices to female characters randomly",
+once he has filled the Hebrew slots in; the files will go to their own folder and `FARM_RECORDED.he` will name them.
+Every voice used through the API is added to his My Voices (he was told beforehand).
+
 ## Recording a new saying or a new voice
 Record it the same way, for every animal, into a NEW folder (`sounds/farm-2/…`) with all the files, and point
 `FARM_SOUNDS` and `tools/build.js` at it: the service worker keeps every `sounds/…mp3` for ever once heard, so a file

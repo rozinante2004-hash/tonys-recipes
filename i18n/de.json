@@ -1,7 +1,7 @@
 {
  "lang": "de",
  "updatedAt": 1794938189765,
- "count": 2883,
+ "count": 2886,
  "strings": {
   "\"Add to Home Screen\"": "Zum Home-Bildschirm hinzufügen",
   "\"Open Bring!\"": "Bring! öffnen",
@@ -646,6 +646,7 @@
   "Know someone who would enjoy My Kitchen Notes? The beta is by invitation only: ask the app’s owner to invite them. The owner decides, and sends the invitation.": "Kennst du jemanden, dem My Kitchen Notes gefallen würde? Die Beta läuft nur auf Einladung: Bitte den Besitzer der App, sie einzuladen. Er entscheidet und schickt die Einladung.",
   "Know someone who would enjoy it? While the app takes new members by invitation only, the share button asks its owner to invite them.": "Kennst du jemanden, dem das gefallen würde? Die App nimmt neue Mitglieder nur auf Einladung — der Teilen-Button bittet den Besitzer, sie einzuladen.",
   "Kosher": "Koscher",
+  "Language": "Sprache",
   "Last backup": "Letztes Backup",
   "Last backup: today": "Letztes Backup: heute",
   "Last backup: yesterday": "Letztes Backup: gestern",
@@ -862,6 +863,7 @@
   "One cookbook for your household: invite family and friends by e-mail, and everyone sees and adds the same recipes.": "Ein Kochbuch für den ganzen Haushalt: Lade Familie und Freunde per E-Mail ein – alle sehen und ergänzen dieselben Rezepte.",
   "One fewer serving": "Eine Portion weniger",
   "One more serving": "Eine Portion mehr",
+  "One slot for each English sentence, said to everyone whose app is in this language. Only the ones filled in and ticked are said; with none filled in, they hear the English ones.": "Ein Feld für jeden englischen Satz, gesprochen für alle, deren App in dieser Sprache ist. Nur ausgefüllte und angehakte Sätze werden gesagt; ist keiner ausgefüllt, hören sie die englischen.",
   "One tap — then share recipes from Facebook, Instagram or any app.": "Einmal tippen — dann Rezepte aus Facebook, Instagram oder jeder anderen App teilen.",
   "Only members can become the owner. Invite someone first; once they have joined, you can hand {1} over.": "Nur Mitglieder können Besitzer werden. Lade zuerst jemanden ein; sobald die Person beigetreten ist, kannst du {1} übergeben.",
   "Only the app’s owner can open this.": "Das kann nur der App-Besitzer öffnen.",
@@ -1362,6 +1364,7 @@
   "The extension could not be put in a folder: {1} Use “or download the zip” instead.": "Die Erweiterung konnte nicht in einen Ordner gelegt werden: {1} Nutze stattdessen „oder zip herunterladen“.",
   "The family’s recipes open for {1} once it is confirmed from the e-mail we sent (look in spam too). Your change is safe on this device and goes up once it is.": "Die Rezepte der Familie öffnen sich für {1}, sobald es über die E-Mail bestätigt ist, die wir geschickt haben (auch im Spam nachsehen). Deine Änderung ist auf diesem Gerät sicher und wird hochgeladen, sobald das passiert ist.",
   "The farm visitors could not be saved: {1}": "Die Hofbesucher konnten nicht gespeichert werden: {1}",
+  "The farm visitors’ sentences in {1} could not be saved: {2}": "Die Sätze der Hofbesucher auf {1} konnten nicht gespeichert werden: {2}",
   "The highest rank there is.": "Der höchste Rang, den es gibt.",
   "The households linked with yours, and those you asked or that asked you. Only your household’s name is shown — never anyone’s e-mail or phone.": "Die Haushalte, die mit deinem verbunden sind, sowie die, die du angefragt hast oder die dich angefragt haben. Es wird nur der Name des Haushalts angezeigt – nie eine E-Mail-Adresse oder Telefonnummer.",
   "The invitation in": "Die Einladung auf",

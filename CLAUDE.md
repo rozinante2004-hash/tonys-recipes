@@ -22,7 +22,8 @@ where.
   4b688fc: each farm animal speaks in its own recorded voice, Tony's ElevenLabs cast in V4, `docs/farm-voices.md`;
   v39.91–v39.92 at 16:08 on 44a3e49: 🎬 How to add a recipe in + Add Recipe ▾, on "Add your first recipe" and under
   Help answers about adding; Worker v107 since 15 Nov 06:12: the page, video and photo fetches require a sign-in; the
-  jobs are listed near the top of `docs/history/2026-11.md`). **On Test, not released:** nothing. The test copy
+  jobs are listed near the top of `docs/history/2026-11.md`). **On Test, not released:** **v39.95** — the farm sayings in other languages (a
+  Language selector in the farm window; each language its own `i18n/_farm_<lang>`). The test copy
   (https://tonys-recipes-test.pages.dev, its own database and rules) follows `test`.
 - **The beta has had testers since Sunday 25 Oct 2026** and is **by invitation only**: the owner invites with
   ⚙️ → 👑 → ✉️ Invite testers (the congratulatory wording of v39.60); a tester's share button asks the owner for an
