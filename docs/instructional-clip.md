@@ -397,3 +397,12 @@ Tony: "No need to hide the band. Some pronunciation modifications.. The stress i
   where "בי" measured loudest and highest. Tony has five short cuts of "…מהקישור, הדביקי את הטקסט שלו" (A–E) to choose
   from (`snip.py`).
 - The Hebrew sketch: 83.5 s, https://claude.ai/artifact/YARKcw3QdciZxdn2Z4QeH5 (nothing locks it; reopened for Tony).
+
+## The Hebrew video (17 Nov 2026)
+Tony, on the five cuts of "הדביקי": "Both A and B are correct and I cannot hear any difference between them" — A stays.
+- `my-kitchen-notes-add-a-recipe-he.mp4`: 1080 × 1080, 30 frames a second, H.264 + AAC, **83.5 s**, 9.2 MB — sent to Tony.
+  Rendered from the Hebrew sketch (version 6) by `render.js`; the sound raised 1.3 dB with a limiter (−0.5 dBFS) to
+  −16.3 LUFS, beside the English −15.9. The first frame: the logo over the empty band (checked).
+- The closing caption follows Tony's punctuation: "כל המתכונים שלכם, במקום אחד." then "לתמיד." as its own line.
+- Both witch clips are made; Tony: "We'll add them together, once the Hebrew version is ready as well" — where they go in
+  the app is the next decision (an app change: version, Help, translations, his yes for the release).
