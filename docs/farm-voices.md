@@ -49,6 +49,14 @@ else English. Until a language is recorded, the device's own voice for it says t
 once he has filled the Hebrew slots in; the files will go to their own folder and `FARM_RECORDED.he` will name them.
 Every voice used through the API is added to his My Voices (he was told beforehand).
 
+**Hebrew pronunciation (Tony, 17 Nov 2026):** "הי is pronounced as Hi, while היי is pronounced as Hey. I'm sure we'll
+find more to fix later." The text the voice reads may differ from what the bubble shows (as in the instructional
+clip: vowel marks or a respelling in the spoken text only); every such fix is listed here.
+| Written | Said |
+|---|---|
+| הי | "Hi" |
+| היי | "Hey" |
+
 ## Recording a new saying or a new voice
 Record it the same way, for every animal, into a NEW folder (`sounds/farm-2/…`) with all the files, and point
 `FARM_SOUNDS` and `tools/build.js` at it: the service worker keeps every `sounds/…mp3` for ever once heard, so a file
