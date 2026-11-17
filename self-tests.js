@@ -67,6 +67,13 @@ async function _gridOnly(name, fn){
 }
 function _cardOf(id){ return document.querySelector('#recipeGrid [ontouchstart*="swipeStart(event,'+id+')"]'); }
 
+// v39.94 — the body of a Worker call that needs the person's sign-in (Worker v107: page, video and photo fetches), as
+// the app sends it (workerBodySigned). Signed out, the test says so instead of failing on a bare 401.
+async function netSignedBody(payload){
+  var body=await workerBodySigned(payload);
+  if(!JSON.parse(body).idToken) throw new Error('this needs a signed-in person: the Worker serves page, video and photo fetches only with a sign-in (since Worker v107)');
+  return body;
+}
 function stAsOwner(){ var was=APP_OWNER_KEYS; APP_OWNER_KEYS=[ownerKeyOf(ST_OWNER)]; return function(){ APP_OWNER_KEYS=was; }; }
 
 window.SELF_TESTS = [
@@ -313,9 +320,12 @@ window.SELF_TESTS = [
   { id:'net_url_import', group:'Network', name:'URL import (test recipe URL)',
     test: async()=>{
       // Use a known accessible recipe URL provided for testing
+      // v39.94 — signed, as the app's own fetches are: since Worker v107 (15 Nov 2026) a page fetch without the person's
+      // sign-in is refused (401). Tony's iPhone Self Test on the beta (v39.93) failed here, and at net_photo, for that alone.
+      const body=await netSignedBody({action:'fetch-url',url:'https://mazon-izun.com/recipes/fermented-cucumbers/'});
       const resp=await fetch(WORKER_ENDPOINT,{
         method:'POST',headers: workerHeaders(),
-        body: workerBody({action:'fetch-url',url:'https://mazon-izun.com/recipes/fermented-cucumbers/'}),
+        body: body,
         signal:AbortSignal.timeout(20000)});
       if(!resp.ok) throw new Error('fetch-url returned '+resp.status);
       const data=await resp.json();
@@ -325,9 +335,10 @@ window.SELF_TESTS = [
   },
   { id:'net_photo',      group:'Network', name:'Photo search (Pixabay)',
     test: async()=>{
+      const body=await netSignedBody({action:'photo-search',query:'pasta'});   // v39.94 — signed (Worker v107)
       const resp=await fetch(WORKER_ENDPOINT,{
         method:'POST',headers: workerHeaders(),
-        body: workerBody({action:'photo-search',query:'pasta'}),
+        body: body,
         signal:AbortSignal.timeout(10000)});
       if(!resp.ok) throw new Error('photo-search returned '+resp.status);
       const data=await resp.json();
@@ -338,10 +349,13 @@ window.SELF_TESTS = [
   { id:'net_instagram',  group:'Network', name:'Instagram fetch (test post)',
     test: async()=>{
       // Use a known stable public post
+      const body=await netSignedBody({action:'instagram-fetch',shortcode:'C5IHqgqoFMo'});   // v39.94 — signed (Worker v107)
       const resp=await fetch(WORKER_ENDPOINT,{
         method:'POST',headers: workerHeaders(),
-        body: workerBody({action:'instagram-fetch',shortcode:'C5IHqgqoFMo'}),
+        body: body,
         signal:AbortSignal.timeout(10000)});
+      // v39.94 — a refused sign-in is not "the Worker handled it": it used to pass with 401, testing nothing
+      if(resp.status===401 || resp.status===403) throw new Error('instagram-fetch was refused ('+resp.status+') — the sign-in was not accepted');
       // Instagram's oEmbed API now requires auth — Worker returns 404 (not 500) when unavailable.
       // Accept 200 or 404; only fail on 500 (true Worker crash).
       if(resp.status===500) throw new Error('Worker crashed on instagram-fetch (500)');

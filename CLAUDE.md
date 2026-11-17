@@ -22,7 +22,8 @@ where.
   to add a recipe at the bottom of + Add Recipe ▾, on the "Add your first recipe" screen and under Help answers about
   adding a recipe, with the one-minute clips re-made to open on the logo; v39.90 at 14:36 on 44fa5d8; Worker v107 since
   15 Nov 06:12: the page, video and photo fetches require a sign-in; the jobs are listed near the top of
-  `docs/history/2026-11.md`). **On Test, not released:** nothing. The test copy
+  `docs/history/2026-11.md`). **On Test, not released:** **v39.94** — the network Self Tests send the sign-in
+  (Tony's beta iPhone run: `net_url_import`, `net_photo` 401). The test copy
   (https://tonys-recipes-test.pages.dev, its own database and rules) follows `test`.
 - **The beta has had testers since Sunday 25 Oct 2026** and is **by invitation only**: the owner invites with
   ⚙️ → 👑 → ✉️ Invite testers (the congratulatory wording of v39.60); a tester's share button asks the owner for an
