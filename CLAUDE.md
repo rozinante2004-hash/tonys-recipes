@@ -17,13 +17,12 @@ where.
 **Live now**
 - The family's copy (`main`, https://rozinante2004-hash.github.io/tonys-recipes/ — it forwards to the community app)
   and the community app (`beta`, https://mykitchennotes.community, Firebase project my-kitchen-notes-beta) run
-  **v39.92 + Worker v107** (released 17 Nov 2026, 16:08 Israel time, on 44a3e49 — v39.91–v39.92: 🎬 How to add a
-  recipe, the witch clip in English and Hebrew, at the bottom of + Add Recipe ▾, on the "Add your first recipe" screen
-  and under Help answers about adding a recipe; with it the one-minute clips re-made to open on the logo over the band;
-  v39.90, the Method box's example in the interface language, went out the same day at 14:36 on 44fa5d8; Worker v107
-  since 15 Nov 06:12: the page, video and photo fetches require a sign-in; the jobs are listed near the top of
-  `docs/history/2026-11.md`). **On Test, not released:** **v39.93** — each farm animal speaks in its own recorded
-  voice (Tony's ElevenLabs cast, V4; `docs/farm-voices.md`). The test copy
+  **v39.93 + Worker v107** (released 17 Nov 2026, 19:55 Israel time, on 4b688fc — each farm animal speaks in its own
+  recorded voice, Tony's ElevenLabs cast in V4, `docs/farm-voices.md`; v39.91–v39.92 went out at 16:08 on 44a3e49: 🎬 How
+  to add a recipe at the bottom of + Add Recipe ▾, on the "Add your first recipe" screen and under Help answers about
+  adding a recipe, with the one-minute clips re-made to open on the logo; v39.90 at 14:36 on 44fa5d8; Worker v107 since
+  15 Nov 06:12: the page, video and photo fetches require a sign-in; the jobs are listed near the top of
+  `docs/history/2026-11.md`). **On Test, not released:** nothing. The test copy
   (https://tonys-recipes-test.pages.dev, its own database and rules) follows `test`.
 - **The beta has had testers since Sunday 25 Oct 2026** and is **by invitation only**: the owner invites with
   ⚙️ → 👑 → ✉️ Invite testers (the congratulatory wording of v39.60); a tester's share button asks the owner for an
@@ -35,7 +34,7 @@ where.
   `docs/history/2026-11.md`, and update "Live now" here.
 - The rules were last published on 10 Nov 2026 (deploy-rules on 99558ae, success). A push to `test` that changes
   them publishes to the test project only; a release publishes to the family's and the beta's.
-- The Self Tests: **488 pass, 0 fail, 7 skipped** (the network ones) on v39.92, locally (English and Hebrew).
+- The Self Tests: **489 pass, 0 fail, 7 skipped** (the network ones) on v39.93, locally (English and Hebrew).
 
 **The audit of 10 Nov 2026 (`AUDIT-2026-11-10.md`) — Tony's answers of 11 Nov, and where each item is.** In the
 order of work; update this list as items land. Each change: Self Tests + knock-outs, the local checks, Help and
