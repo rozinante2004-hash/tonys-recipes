@@ -11394,7 +11394,7 @@ window.SELF_TESTS = [
     }},
   { id:'farm_visitors', group:'UI', name:'🐑 The farm visitors: one strolls across, turns to you when tapped and says one of the ticked sentences in a Scottish voice (British where the device has none, v38.79), then vanishes in a puff of smoke (v38.19); never while typing; on by default (v37.88)',
     test: async()=>{
-      var real={ speak:window.speechSynthesis && speechSynthesis.speak, cfg:localStorage.getItem('mkn_farm_cfg'), on:localStorage.getItem('mkn_farm_on') }, spoken=[];
+      var real={ speak:window.speechSynthesis && speechSynthesis.speak, cfg:localStorage.getItem('mkn_farm_cfg'), on:localStorage.getItem('mkn_farm_on'), play:HTMLMediaElement.prototype.play }, spoken=[], played=[];
       var inp=null;
       try{
         // 14 animals, each with a side-on head, a head turned to you, and legs (or a hop).
@@ -11414,6 +11414,7 @@ window.SELF_TESTS = [
         for(i=0;i<50;i++){ var w=farmWait(); if(w<2*60000 || w>4*60000) throw new Error('waited '+w+' ms, outside 2–4 minutes'); }
         // A visit: across the screen, and gone at the end.
         if(window.speechSynthesis) speechSynthesis.speak=function(u){ spoken.push([u.text, u.lang, u.pitch]); };
+        HTMLMediaElement.prototype.play=function(){ played.push(this.getAttribute('src')||this.src); return Promise.resolve(); };   // v39.93 — its own recorded voice
         // v39.30 — at most the screen's width a second: at 1,500 px/s the goose crossed a phone's 393 px and was gone
         // before the second look (370 ms), so on Tony's iPhone "it does not walk" — now and then; a computer is 1,280 wide.
         var el=farmVisit(null, { speed:Math.min(1500, Math.max(300, window.innerWidth)), stops:0, ltr:true }); await el._farm.ready;
@@ -11423,7 +11424,12 @@ window.SELF_TESTS = [
         // Tapped: it stops, turns, speaks.
         el.click(); await wait(320);
         if(!el.querySelector('.fv-art').classList.contains('turned') || !el.classList.contains('fv-said') || el.querySelector('.fv-bubble').textContent!=='Not yet!') throw new Error('tapping did not turn it to say its sentence');
-        if(window.speechSynthesis && (!spoken.length || spoken[0][0]!=='Not yet!' || !/^en-GB/i.test(spoken[0][1]) && !/scot/i.test(spoken[0][1]))) throw new Error('it did not speak in Scottish or British English: '+JSON.stringify(spoken));
+        // v39.93 — in its own recorded voice (Gertrude the goose: "Not yet!" is the third saying), the device silent
+        if(!/sounds\/farm-1\/goose-2\.mp3$/.test(played[0]||'') || spoken.length) throw new Error('it did not say it in its own recorded voice: played '+JSON.stringify(played)+', the device said '+JSON.stringify(spoken));
+        HTMLMediaElement.prototype.play=real.play;
+        // A sentence never recorded is said by the device: in Scottish or British English (v38.79)
+        farmSay('Never recorded, this one', 1, null, 'goose'); await wait(150);
+        if(window.speechSynthesis && (!spoken.length || spoken[0][0]!=='Never recorded, this one' || !/^en-GB/i.test(spoken[0][1]) && !/scot/i.test(spoken[0][1]))) throw new Error('it did not speak in Scottish or British English: '+JSON.stringify(spoken));
         // v38.79 — Tony: "Please change the animals' accents from British to Scottish": a Scottish voice is chosen first
         // wherever the device has one (Apple's Fiona; eSpeak's English (Scotland)) — never Lancashire's gbclan
         if(window.speechSynthesis){ var realGV=speechSynthesis.getVoices, realFV=Object.assign({}, _farmVoices);
@@ -11519,6 +11525,7 @@ window.SELF_TESTS = [
         }
       } finally {
         if(window.speechSynthesis && real.speak) speechSynthesis.speak=real.speak;
+        HTMLMediaElement.prototype.play=real.play;
         if(inp) inp.remove();
         farmClear();
         if(real.cfg===null) localStorage.removeItem('mkn_farm_cfg'); else localStorage.setItem('mkn_farm_cfg', real.cfg);
@@ -11672,13 +11679,60 @@ window.SELF_TESTS = [
         window._farmCfg=farmCleanConfig({ sayings:[{ t:'x', on:true }], animals:FARM_ANIMALS.map(function(a){ return a.id; }), minMinutes:1, maxMinutes:2 });
         var ov=openFarmSettings(); await ov._fresh;
         var ticked=Array.prototype.map.call(document.querySelectorAll('#farmAnimals input:checked'), function(i){ return i.value; }).sort().join();
-        var voice=(document.querySelector('#farmOverlay input[name="farmVoice"]:checked')||{}).value;
-        if(ticked!=='goose,pig' || voice!=='child') throw new Error('the window shows '+ticked+' / '+voice+', not what is saved');
+        if(ticked!=='goose,pig' || farmWindowVoice()!=='child') throw new Error('the window shows '+ticked+' / '+farmWindowVoice()+', not what is saved');
       } finally {
         window.i18nCentralGet=real.get; window.isAppOwner=real.owner; window.i18nCentralIsOwn=real.own; window._farmCentralCfg=real.central; window._fbUser=real.user;
         var o=document.getElementById('farmOverlay'); if(o) o.remove();
         if(real.cfg===null) localStorage.removeItem('mkn_farm_cfg'); else localStorage.setItem('mkn_farm_cfg', real.cfg);
         window._farmCfg=null; farmSchedule();
+      }
+    } },
+
+  { id:'farm_own_voices', group:'UI', name:'🐄 Each farm animal speaks in its own recorded voice (ElevenLabs, chosen by Tony); a sentence never recorded, or a recording that cannot play, in the device’s voice of the animal’s kind (v39.93)',
+    test: async()=>{
+      // Tony, 17 Nov 2026: "I will pick the voices myself" — fourteen voices, one per animal; "Please use the newer model (V4)".
+      var real={ play:HTMLMediaElement.prototype.play, speak:window.speechSynthesis && speechSynthesis.speak, cancel:window.speechSynthesis && speechSynthesis.cancel }, played=[], spoken=[];
+      var wait=function(ms){ return new Promise(function(r){ setTimeout(r, ms); }); };
+      try{
+        // every animal has its voice, and its ten recordings are on the site
+        FARM_ANIMALS.forEach(function(a){ if(!FARM_CAST[a.id] || ['male','female','child'].indexOf(FARM_CAST[a.id].kind)<0) throw new Error(a.name+' has no voice of its own'); });
+        if(Object.keys(FARM_CAST).length!==FARM_ANIMALS.length) throw new Error('a voice for an animal that does not exist');
+        var probe=[['sheep',0],['llama',9],['pig',3],['rabbit',5]];
+        for(var pi=0; pi<probe.length; pi++){
+          var url=farmRecording(probe[pi][0], FARM_SAYINGS_DEFAULT[probe[pi][1]]);
+          var r=await fetch(url, { cache:'no-store' });
+          if(!r.ok || !/audio|mpeg|octet/.test(r.headers.get('content-type')||'') || (await r.arrayBuffer()).byteLength<2000) throw new Error('the recording '+url+' is not on the site');
+        }
+        // which file says which sentence — whatever its apostrophes, capitals and spaces; a sentence added later has none
+        if(farmRecording('goat', 'I’m not on the menu!')!=='sounds/farm-1/goat-3.mp3' || farmRecording('goat', "  i'm NOT on the   menu! ")!=='sounds/farm-1/goat-3.mp3') throw new Error('a recorded sentence is not found: '+farmRecording('goat', "i'm not on the menu!"));
+        if(farmRecording('goat', 'Mind the gravy!')!==null || farmRecording('unicorn', 'Ouch!')!==null) throw new Error('a sentence or an animal never recorded has a file');
+        // a tapped animal plays its own recording, and the device says nothing
+        HTMLMediaElement.prototype.play=function(){ played.push(this.getAttribute('src')||this.src); return Promise.resolve(); };
+        if(window.speechSynthesis){ speechSynthesis.speak=function(u){ spoken.push(u.text+'|'+(u.voice?u.voice.name:'')); if(u.onstart) u.onstart(); }; speechSynthesis.cancel=function(){}; }
+        if(!farmSay('Wash your hands first!', 1, null, 'hen')) throw new Error('the hen did not speak');
+        await wait(30);
+        if(!/sounds\/farm-1\/hen-7\.mp3$/.test(played[played.length-1]||'') || spoken.length) throw new Error('the hen did not use her own voice: played '+played.join()+', spoken '+spoken.join());
+        // a sentence never recorded: the device's voice of the animal's kind (the rabbit is a child)
+        played=[]; spoken=[];
+        var kindAsked=[]; var realKind=window.farmVoiceKind; window.farmVoiceKind=function(k){ kindAsked.push(k); return realKind(k); };
+        try{ farmSay('Mind the gravy!', 1, null, 'rabbit'); await wait(120); } finally { window.farmVoiceKind=realKind; }
+        if(played.length || (window.speechSynthesis && !spoken.length) || kindAsked[0]!=='child') throw new Error('a sentence never recorded: played '+played.join()+', spoken '+spoken.length+', kind '+kindAsked.join());
+        // a recording that cannot play (offline, never heard before): the device says it instead
+        played=[]; spoken=[];
+        HTMLMediaElement.prototype.play=function(){ played.push(this.src); return Promise.reject(new Error('NotAllowedError')); };
+        farmSay('Ouch!', 1, null, 'horse'); await wait(150);
+        if(!played.length || (window.speechSynthesis && !spoken.length)) throw new Error('a recording that could not play was not said by the device instead');
+        // the window's 🔊 beside a sentence: a ticked animal says it in its own voice
+        played=[]; HTMLMediaElement.prototype.play=function(){ played.push(this.getAttribute('src')||this.src); return Promise.resolve(); };
+        farmHearSaying('Steady on!'); await wait(30);
+        if(!/sounds\/farm-1\/[a-z]+-4\.mp3$/.test(played[0]||'')) throw new Error('🔊 in the window did not play a recording: '+played.join());
+        // the service worker keeps them on first use (an animal heard once speaks offline)
+        var sw=await (await fetch('sw.js', { cache:'no-store' })).text();
+        if(!/BASE \+ 'sounds\/'/.test(sw)) throw new Error('the service worker does not keep the recordings');
+      } finally {
+        HTMLMediaElement.prototype.play=real.play;
+        if(window.speechSynthesis){ speechSynthesis.speak=real.speak; speechSynthesis.cancel=real.cancel; }
+        try{ var el=farmAudioEl(); if(el){ el.pause(); el.onerror=null; el.removeAttribute('src'); } }catch(e){}
       }
     } },
 
@@ -11703,10 +11757,10 @@ window.SELF_TESTS = [
         var radios=ov.querySelectorAll('input[name="farmStyle"]');
         if(radios.length!==3 || ov.querySelector('input[name="farmStyle"]:checked').value!=='cartoon') throw new Error('the three looks are not offered, 3D cartoon first');
         var px=ov.querySelector('input[name="farmStyle"][value="pixel"]'); px.checked=true; px.onchange();
-        // v37.99 — the voice: four choices, the saved one ticked; the child chosen here.
-        var vr=ov.querySelectorAll('input[name="farmVoice"]');
-        if(vr.length!==4 || ov.querySelector('input[name="farmVoice"]:checked').value!==(farmConfig().voice||'female')) throw new Error('the four voices are not offered, the saved one ticked');
-        ov.querySelector('input[name="farmVoice"][value="child"]').checked=true;
+        // v39.93 — the voice: each animal its own (Tony: "Follow my cast choice"); no choice offered, the saved one kept as it was.
+        var keptVoice=farmConfig().voice||'female';
+        if(ov.querySelectorAll('input[name="farmVoice"]').length) throw new Error('the window still offers Male / Female / Child / Random');
+        if(!ov.querySelector('#farmOwnVoices') || !/own voice/.test(ov.querySelector('#farmOwnVoices').textContent)) throw new Error('the window does not say each animal speaks in its own voice');
         for(var k=0;k<40 && !ov.querySelector('#farmAnimals .fv-thumb .fv-px');k++) await wait(50);
         if(ov.querySelectorAll('#farmAnimals .fv-thumb .fv-px').length!==FARM_ANIMALS.length) throw new Error('the animals are not shown in the look that is ticked');
         // Change things: one sentence off, a new one, the pig out, every 1–2 minutes.
@@ -11728,7 +11782,7 @@ window.SELF_TESTS = [
         var w=wrote[0];
         if(!w || w[0]!=='i18n__farm') throw new Error('not saved where every copy reads it: '+(w&&w[0]));
         var d=w[1];
-        if(d.sayings[1].on || !d.sayings.some(function(x){ return x.t==='Mind the gravy!' && x.on; }) || d.animals.indexOf('pig')!==-1 || d.animals.length!==FARM_ANIMALS.length-1 || d.minMinutes!==1 || d.maxMinutes!==2 || d.style!=='pixel' || d.voice!=='child') throw new Error('what was saved is not what was chosen: '+JSON.stringify(d).slice(0,300));
+        if(d.sayings[1].on || !d.sayings.some(function(x){ return x.t==='Mind the gravy!' && x.on; }) || d.animals.indexOf('pig')!==-1 || d.animals.length!==FARM_ANIMALS.length-1 || d.minMinutes!==1 || d.maxMinutes!==2 || d.style!=='pixel' || d.voice!==keptVoice) throw new Error('what was saved is not what was chosen (the old voice choice kept): '+JSON.stringify(d).slice(0,300));
         // v38.01 — Tony: "do not close the modal after clicking save for everyone".
         if(farmConfig().maxMinutes!==2 || !document.getElementById('farmOverlay')) throw new Error('the choice was not taken up here, or the window closed');
         if(!/Saved/.test(document.getElementById('farmSave').textContent) || document.getElementById('farmSave').disabled || document.getElementById('farmCancel').textContent!=='Close')

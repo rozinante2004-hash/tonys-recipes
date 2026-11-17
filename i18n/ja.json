@@ -1,7 +1,7 @@
 {
  "lang": "ja",
  "updatedAt": 1794924583225,
- "count": 3187,
+ "count": 3189,
  "strings": {
   "\"Add to Home Screen\"": "ホーム画面に追加",
   "\"One item away\" filter ({1}f.{2})": "「あと1品」フィルター（{1}f.{2}）",
@@ -491,6 +491,7 @@
   "Dynamic": "ダイナミック",
   "E-mail address": "メールアドレス",
   "EDITED_ELSEWHERE: {1} recipe(s) were changed on another device after this one last synced, so they were NOT overwritten: {2} Your version is still safe on this device, and nothing has been lost — but the two versions have to be reconciled by you rather than guessed at.{3}": "EDITED_ELSEWHERE: {1}件のレシピが、このデバイスの最終同期後に別のデバイスで変更されていたため、上書きされませんでした：{2} このデバイスのバージョンは無事に残っており、何も失われていません — ただし、2つのバージョンはあなた自身で照合する必要があります。{3}",
+  "Each animal speaks in its own voice, recorded once for the app. A sentence you add is said by the device’s own voice (a man’s, a woman’s or a child’s, as the animal’s) until it is recorded too.": "どの動物も、アプリ用に一度だけ録音したその動物自身の声で話します。追加した文は、録音されるまでは端末の音声（動物に合わせて男性・女性・子どもの声）で読み上げます。",
   "Each becomes a normal recipe of its own, and the collection “{1}” is removed. You can undo this straight afterwards, and nothing is lost either way — every recipe survives as its own card.": "それぞれが独立した通常のレシピになり、コレクション「{1}」は削除されます。この操作はすぐ後に取り消せますし、どちらにしてもレシピは1枚も失われず、すべてカードとして残ります。",
   "Each recipe in a collection has its own actions (v{1})": "コレクション内の各レシピには、それぞれの操作があります（v{1}）",
   "Each recipe is analysed and diet tags suggested. You can edit any of them afterwards.": "各レシピを解析し、ダイエットタグを提案します。後からいつでも編集できます。",
@@ -592,6 +593,7 @@
   "Folder URL saved": "フォルダURLを保存しました",
   "For everyone, in every copy. When someone taps a visiting animal, it says one of the ticked sentences, picked at random, in English with a British voice. Each person can still switch the animals off in ⚙️ → How it looks.": "全員の、すべてのコピーに適用されます。訪れた動物をタップすると、チェックしたセリフの中からランダムに1つをイギリス訛りの英語で話します。各自で ⚙️ →「見た目」から動物をオフにすることもできます。",
   "For everyone, in every copy. When someone taps a visiting animal, it says one of the ticked sentences, picked at random, in English with a Scottish voice where the device has one (an iPhone, an iPad or a Mac has Fiona), otherwise a British one. Each person can still switch the animals off in ⚙️ → How it looks.": "誰にとっても、どのコピーでも同じです。訪問動物をタップすると、チェック済みの文からランダムに1つを英語で読み上げます。端末にスコットランド訛りの音声があればそれを使い(iPhone、iPad、Macには Fiona が入っています)、なければイギリス訛りの音声になります。各自、⚙️→「見た目」で動物をオフにすることもできます。",
+  "For everyone, in every copy. When someone taps a visiting animal, it says one of the ticked sentences, picked at random, in its own voice. Each person can still switch the animals off in ⚙️ → How it looks.": "誰にとっても、どのコピーでも同じです。訪問動物をタップすると、チェック済みの文からランダムに1つを、その動物自身の声で話します。各自、⚙️→「見た目」で動物をオフにすることもできます。",
   "Forget it": "やめる",
   "Forget the saved list and read the chats from scratch next time": "保存済みリストを破棄して、次回はチャットを最初から読み込む",
   "Forgot password?": "パスワードをお忘れですか?",

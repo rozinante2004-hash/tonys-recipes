@@ -1,7 +1,7 @@
 {
  "lang": "fr",
  "updatedAt": 1794924583225,
- "count": 2882,
+ "count": 2884,
  "strings": {
   "\"Add to Home Screen\"": "Ajouter à l'écran d'accueil",
   "\"Open Bring!\"": "Ouvrir Bring!",
@@ -398,6 +398,7 @@
   "Dynamic": "Dynamique",
   "E-mail address": "Adresse e-mail",
   "EDITED_ELSEWHERE: {1} recipe(s) were changed on another device after this one last synced, so they were NOT overwritten: {2} Your version is still safe on this device, and nothing has been lost — but the two versions have to be reconciled by you rather than guessed at.{3}": "MODIFIÉ_AILLEURS : {1} recette(s) ont été modifiées sur un autre appareil après la dernière synchro de celui-ci, elles n'ont donc PAS été écrasées : {2} Votre version est toujours intacte sur cet appareil, rien n'est perdu — mais les deux versions doivent être réconciliées par vous, pas devinées.{3}",
+  "Each animal speaks in its own voice, recorded once for the app. A sentence you add is said by the device’s own voice (a man’s, a woman’s or a child’s, as the animal’s) until it is recorded too.": "Chaque animal parle avec sa propre voix, enregistrée une fois pour l’application. Une phrase que vous ajoutez est dite par la voix de l’appareil (celle d’un homme, d’une femme ou d’un enfant, selon l’animal) jusqu’à ce qu’elle soit enregistrée elle aussi.",
   "Each becomes a normal recipe of its own, and the collection “{1}” is removed. You can undo this straight afterwards, and nothing is lost either way — every recipe survives as its own card.": "Chacune devient une recette à part entière, et la collection « {1} » est supprimée. Vous pouvez annuler juste après, et rien n'est perdu dans tous les cas — chaque recette survit sous forme de fiche indépendante.",
   "Each recipe is analysed and diet tags suggested. You can edit any of them afterwards.": "Chaque recette est analysée et des tags de régime sont suggérés. Vous pouvez tous les modifier ensuite.",
   "Eastern European": "Europe de l'Est",
@@ -479,6 +480,7 @@
   "Folder URL saved": "URL du dossier enregistrée",
   "For everyone, in every copy. When someone taps a visiting animal, it says one of the ticked sentences, picked at random, in English with a British voice. Each person can still switch the animals off in ⚙️ → How it looks.": "Pour tout le monde, sur chaque copie. Quand quelqu'un touche un animal de passage, il dit une des phrases cochées, choisie au hasard, en anglais avec une voix britannique. Chacun peut quand même désactiver les animaux dans ⚙️ → Apparence.",
   "For everyone, in every copy. When someone taps a visiting animal, it says one of the ticked sentences, picked at random, in English with a Scottish voice where the device has one (an iPhone, an iPad or a Mac has Fiona), otherwise a British one. Each person can still switch the animals off in ⚙️ → How it looks.": "Pour tout le monde, dans toutes les copies. Quand quelqu'un touche un animal de passage, il dit une des phrases cochées, choisie au hasard, en anglais avec une voix écossaise si l'appareil en a une (un iPhone, un iPad ou un Mac a Fiona), sinon une voix britannique. Chacun peut quand même désactiver les animaux dans ⚙️ → Apparence.",
+  "For everyone, in every copy. When someone taps a visiting animal, it says one of the ticked sentences, picked at random, in its own voice. Each person can still switch the animals off in ⚙️ → How it looks.": "Pour tout le monde, dans toutes les copies. Quand quelqu’un touche un animal de passage, il dit une des phrases cochées, choisie au hasard, avec sa propre voix. Chacun peut quand même désactiver les animaux dans ⚙️ → Apparence.",
   "Forget it": "Laisser tomber",
   "Forget the saved list and read the chats from scratch next time": "Oublier la liste enregistrée et relire les discussions depuis le début la prochaine fois",
   "Forgot password?": "Mot de passe oublié ?",

@@ -1,7 +1,7 @@
 {
  "lang": "he",
  "updatedAt": 1794924583225,
- "count": 3310,
+ "count": 3312,
  "strings": {
   "\"Add to Home Screen\"": "הוספה למסך הבית",
   "\"One item away\" filter ({1}f.{2})": "פילטר \"פריט אחד חסר\" ({1}f.{2})",
@@ -502,6 +502,7 @@
   "Dynamic": "דינמי",
   "E-mail address": "כתובת אימייל",
   "EDITED_ELSEWHERE: {1} recipe(s) were changed on another device after this one last synced, so they were NOT overwritten: {2} Your version is still safe on this device, and nothing has been lost — but the two versions have to be reconciled by you rather than guessed at.{3}": "EDITED_ELSEWHERE: {1} מתכונים שונו במכשיר אחר מאז הסנכרון האחרון, ולכן הם לא נדרסו: {2} הגרסה שלכם עדיין שמורה במכשיר הזה ולא אבד שום דבר — אבל שתי הגרסאות צריכות ליישוב על ידך, לא בניחוש.{3}",
+  "Each animal speaks in its own voice, recorded once for the app. A sentence you add is said by the device’s own voice (a man’s, a woman’s or a child’s, as the animal’s) until it is recorded too.": "לכל חיה יש קול משלה, שהוקלט פעם אחת עבור האפליקציה. משפט שתוסיפו נאמר בקול של המכשיר (קול של גבר, של אישה או של ילד, לפי החיה) עד שגם הוא יוקלט.",
   "Each becomes a normal recipe of its own, and the collection “{1}” is removed. You can undo this straight afterwards, and nothing is lost either way — every recipe survives as its own card.": "כל אחד הופך למתכון רגיל בפני עצמו, והאוסף „{1}” מוסר. אפשר לבטל את זה מיד לאחר מכן, ובכל מקרה שום דבר לא הולך לאיבוד — כל מתכון נשאר ככרטיס משלו.",
   "Each recipe in a collection has its own actions (v{1})": "לכל מתכון באוסף יש פעולות משלו (v{1})",
   "Each recipe is analysed and diet tags suggested. You can edit any of them afterwards.": "כל מתכון מנותח ומוצעות לו תגיות תזונה. אפשר לערוך כל אחת מהן אחר כך.",
@@ -608,6 +609,7 @@
   "Folder URL saved": "כתובת התיקייה נשמרה",
   "For everyone, in every copy. When someone taps a visiting animal, it says one of the ticked sentences, picked at random, in English with a British voice. Each person can still switch the animals off in ⚙️ → How it looks.": "לכולם, בכל עותק. כשמישהו נוגע בחיה שמבקרת, היא אומרת אחד מהמשפטים המסומנים, שנבחר אקראית, באנגלית בקול בריטי. כל אחד עדיין יכול לכבות את החיות ב-⚙️ ← איך זה נראה.",
   "For everyone, in every copy. When someone taps a visiting animal, it says one of the ticked sentences, picked at random, in English with a Scottish voice where the device has one (an iPhone, an iPad or a Mac has Fiona), otherwise a British one. Each person can still switch the animals off in ⚙️ → How it looks.": "לכולם, בכל עותק. כשמישהו נוגע בחיה שמבקרת, היא אומרת אחד מהמשפטים המסומנים, שנבחר אקראית, באנגלית בקול סקוטי אם יש כזה במכשיר (באייפון, באייפד או במק יש Fiona), ואם לא — בקול בריטי. כל אחד עדיין יכול לכבות את החיות ב-⚙️ → איך זה נראה.",
+  "For everyone, in every copy. When someone taps a visiting animal, it says one of the ticked sentences, picked at random, in its own voice. Each person can still switch the animals off in ⚙️ → How it looks.": "לכולם, בכל עותק. כשמישהו נוגע בחיה שמבקרת, היא אומרת אחד מהמשפטים המסומנים, שנבחר אקראית, בקול שלה. כל אחד עדיין יכול לכבות את החיות ב-⚙️ ← איך זה נראה.",
   "Forget it": "לא משנה",
   "Forget the saved list and read the chats from scratch next time": "שכחו את הרשימה השמורה וקראו את הצ'אטים מחדש בפעם הבאה",
   "Forgot password?": "שכחתם סיסמה?",

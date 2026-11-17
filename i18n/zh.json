@@ -1,7 +1,7 @@
 {
  "lang": "zh",
  "updatedAt": 1794924583225,
- "count": 2886,
+ "count": 2888,
  "strings": {
   "\"Add to Home Screen\"": "添加到主屏幕",
   "\"Open Bring!\"": "打开 Bring!",
@@ -398,6 +398,7 @@
   "Dynamic": "动态",
   "E-mail address": "电子邮箱",
   "EDITED_ELSEWHERE: {1} recipe(s) were changed on another device after this one last synced, so they were NOT overwritten: {2} Your version is still safe on this device, and nothing has been lost — but the two versions have to be reconciled by you rather than guessed at.{3}": "EDITED_ELSEWHERE：{1} 个食谱在另一台设备上被修改，且是在本设备上次同步之后，因此未被覆盖：{2} 你的版本仍安全保存在本设备上，没有任何丢失——但这两个版本需要由你来协调，而不是靠猜测。{3}",
+  "Each animal speaks in its own voice, recorded once for the app. A sentence you add is said by the device’s own voice (a man’s, a woman’s or a child’s, as the animal’s) until it is recorded too.": "每只动物都用自己的声音说话，这些声音为应用专门录制过一次。你添加的句子在录制之前，由设备自带的语音朗读（根据动物，用男声、女声或童声）。",
   "Each becomes a normal recipe of its own, and the collection “{1}” is removed. You can undo this straight afterwards, and nothing is lost either way — every recipe survives as its own card.": "每个都会变成独立的普通食谱，集合“{1}”将被删除。之后你可以立即撤销此操作，无论哪种情况都不会丢失任何内容——每个食谱都会作为独立卡片保留下来。",
   "Each recipe is analysed and diet tags suggested. You can edit any of them afterwards.": "系统会分析每个食谱并建议饮食标签，之后你可以随时编辑。",
   "Eastern European": "东欧",
@@ -479,6 +480,7 @@
   "Folder URL saved": "文件夹网址已保存",
   "For everyone, in every copy. When someone taps a visiting animal, it says one of the ticked sentences, picked at random, in English with a British voice. Each person can still switch the animals off in ⚙️ → How it looks.": "对所有人、所有副本生效。有人点击来访的动物时，它会用英式口音随机说出一句已勾选的句子。每个人仍可在 ⚙️ →「外观」中关闭动物。",
   "For everyone, in every copy. When someone taps a visiting animal, it says one of the ticked sentences, picked at random, in English with a Scottish voice where the device has one (an iPhone, an iPad or a Mac has Fiona), otherwise a British one. Each person can still switch the animals off in ⚙️ → How it looks.": "适用于所有人、所有副本。当有人点击来访的动物时，它会随机说出一句已勾选的句子，使用英语朗读——如果设备有苏格兰语音（iPhone、iPad 或 Mac 上有 Fiona）就用苏格兰口音，否则用英式口音。每个人仍可以在 ⚙️ → 外观设置 中关闭动物。",
+  "For everyone, in every copy. When someone taps a visiting animal, it says one of the ticked sentences, picked at random, in its own voice. Each person can still switch the animals off in ⚙️ → How it looks.": "适用于所有人、所有副本。当有人点击来访的动物时，它会用自己的声音随机说出一句已勾选的句子。每个人仍可以在 ⚙️ → 外观设置 中关闭动物。",
   "Forget it": "算了",
   "Forget the saved list and read the chats from scratch next time": "忘记已保存的列表，下次从头读取聊天记录",
   "Forgot password?": "忘记密码？",

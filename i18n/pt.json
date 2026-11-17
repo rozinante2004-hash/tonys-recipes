@@ -1,7 +1,7 @@
 {
  "lang": "pt",
  "updatedAt": 1794924583225,
- "count": 2646,
+ "count": 2648,
  "strings": {
   "\"Add to Home Screen\"": "Adicionar à tela inicial",
   "\"Open Bring!\"": "Abrir Bring!",
@@ -368,6 +368,7 @@
   "Dynamic": "Dinâmico",
   "E-mail address": "Endereço de e-mail",
   "EDITED_ELSEWHERE: {1} recipe(s) were changed on another device after this one last synced, so they were NOT overwritten: {2} Your version is still safe on this device, and nothing has been lost — but the two versions have to be reconciled by you rather than guessed at.{3}": "EDITED_ELSEWHERE: {1} receita(s) foram alteradas em outro dispositivo depois da última sincronização deste, por isso NÃO foram substituídas: {2} Sua versão continua segura neste dispositivo, e nada foi perdido — mas as duas versões precisam ser reconciliadas por você, em vez de adivinhadas.{3}",
+  "Each animal speaks in its own voice, recorded once for the app. A sentence you add is said by the device’s own voice (a man’s, a woman’s or a child’s, as the animal’s) until it is recorded too.": "Cada animal fala com a sua própria voz, gravada uma vez para a app. Uma frase que acrescente é dita pela voz do aparelho (a de um homem, de uma mulher ou de uma criança, conforme o animal) até ser gravada também.",
   "Each becomes a normal recipe of its own, and the collection “{1}” is removed. You can undo this straight afterwards, and nothing is lost either way — every recipe survives as its own card.": "Cada uma se torna uma receita normal e independente, e a coleção “{1}” é removida. Você pode desfazer isso logo em seguida, e nada se perde de qualquer forma — cada receita sobrevive como seu próprio cartão.",
   "Each recipe is analysed and diet tags suggested. You can edit any of them afterwards.": "Cada receita é analisada e etiquetas de dieta são sugeridas. Você pode editar qualquer uma delas depois.",
   "Eastern European": "Europa Oriental",
@@ -437,6 +438,7 @@
   "First your current password, for {1}.": "Primeiro sua senha atual, para {1}.",
   "Folder URL saved": "URL da pasta guardado",
   "For everyone, in every copy. When someone taps a visiting animal, it says one of the ticked sentences, picked at random, in English with a Scottish voice where the device has one (an iPhone, an iPad or a Mac has Fiona), otherwise a British one. Each person can still switch the animals off in ⚙️ → How it looks.": "Para todos, em todas as cópias. Quando alguém toca num animal visitante, ele diz uma das frases marcadas, escolhida ao acaso, em inglês com uma voz escocesa quando o aparelho tiver uma (um iPhone, um iPad ou um Mac têm a Fiona), caso contrário uma voz britânica. Cada pessoa pode sempre desligar os animais em ⚙️ → Aparência.",
+  "For everyone, in every copy. When someone taps a visiting animal, it says one of the ticked sentences, picked at random, in its own voice. Each person can still switch the animals off in ⚙️ → How it looks.": "Para todos, em todas as cópias. Quando alguém toca num animal visitante, ele diz uma das frases marcadas, escolhida ao acaso, com a sua própria voz. Cada pessoa pode sempre desligar os animais em ⚙️ → Aparência.",
   "Forget the saved list and read the chats from scratch next time": "Esquecer a lista guardada e ler as conversas desde o início da próxima vez",
   "Forgot password?": "Esqueceste-te da palavra-passe?",
   "Français": "Français",

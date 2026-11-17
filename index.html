@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.92 -->
+<!-- Tony's Recipes Collection v39.93 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -11217,7 +11217,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.92';
+var APP_VERSION = 'v39.93';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -14790,7 +14790,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.92</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.93</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14878,7 +14878,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.92</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.93</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -33511,6 +33511,7 @@ var _farmWarm = false, _farmUtter = null;
 function farmWarm() {
   if (_farmWarm || !window.speechSynthesis || typeof SpeechSynthesisUtterance === 'undefined') return;
   _farmWarm = true;
+  farmAudioUnlock();                                 // v39.93 — the recorded voices, too
   try { var fv = farmVoice('female'); var w = new SpeechSynthesisUtterance(' '); w.volume = 0; w.lang = (fv && fv.lang) || 'en-GB'; if (fv) w.voice = fv; speechSynthesis.speak(w); } catch(e) {}
 }
 document.addEventListener('pointerdown', farmWarm, true);
@@ -33540,11 +33541,67 @@ function farmUtterance(text, pitch, kind) {
   u.lang = farmUtterLang(v); u.rate = t.rate; u.pitch = Math.max(0.55, Math.min(1.8, t.pitch + ((pitch || 1) - 1) * .3));
   return u;
 }
-// voice: male | female | child | random — the farm window's choice by default.
-function farmSay(text, pitch, voice) {
+// ── v39.93 — EACH ANIMAL ITS OWN VOICE. Tony chose a voice for each of the fourteen in ElevenLabs' Voice Library
+// (17 Nov 2026: "I will pick the voices myself"), and each says the ten sayings in it, recorded once with ElevenLabs'
+// V4 model (Tony: "Please use the newer model (V4)") — the same voice on every phone and computer. The files are
+// sounds/farm-1/<animal>-<0..9>.mp3, one per saying of FARM_SAYINGS_DEFAULT, in its order (the folder's number changes
+// when they are recorded again, so a stored copy is never out of date: the service worker keeps each on first use).
+// A sentence the owner adds in the farm window has no recording: the device's own voice says it, as before — a man's,
+// a woman's or a child's, as the animal's (kind). The window's old Male / Female / Child / Random choice is gone (Tony
+// chose "a cast", and for the choice: "Follow my cast choice"); the saved `voice` is kept for older versions.
+var FARM_SOUNDS = 'sounds/farm-1/';
+var FARM_CAST = {              // the ElevenLabs voice Tony chose for each (for the notes), and its kind for a sentence not recorded
+  cow:      { voice: 'Delphi',          kind: 'female' }, sheep:   { voice: 'Canny',           kind: 'female' },
+  pig:      { voice: 'Liam Dale',       kind: 'male'   }, hen:     { voice: 'Grandma Rachel',  kind: 'female' },
+  goat:     { voice: 'Rusty Malone',    kind: 'male'   }, duck:    { voice: 'Elmoe',           kind: 'male'   },
+  horse:    { voice: 'Potato',          kind: 'male'   }, donkey:  { voice: 'Kavian R',        kind: 'male'   },
+  rooster:  { voice: 'Gravel Midnight', kind: 'male'   }, turkey:  { voice: 'Ivanna',          kind: 'female' },
+  goose:    { voice: 'Blondie',         kind: 'female' }, rabbit:  { voice: 'Chutki',          kind: 'child'  },
+  sheepdog: { voice: 'Flint',           kind: 'male'   }, llama:   { voice: 'Jim',             kind: 'male'   }
+};
+// A sentence as it was recorded, whatever its apostrophes, capitals or spaces.
+function farmSayingKey(t) { return String(t == null ? '' : t).toLowerCase().replace(/[\u2018\u2019\u02bc`]/g, "'").replace(/\s+/g, ' ').trim(); }
+// The recording of this animal saying this sentence, or null (an animal or a sentence never recorded).
+function farmRecording(animalId, text) {
+  if (!FARM_CAST[animalId]) return null;
+  var k = farmSayingKey(text);
+  for (var i = 0; i < FARM_SAYINGS_DEFAULT.length; i++) if (farmSayingKey(FARM_SAYINGS_DEFAULT[i]) === k) return FARM_SOUNDS + animalId + '-' + i + '.mp3';
+  return null;
+}
+// One <audio> for all of them. A phone plays a sound only in answer to a touch, and an animal speaks a moment after
+// it is tapped; so the first touch anywhere starts this element with a whisper of silence (farmWarm), and from then on
+// it may play.
+var FARM_SILENCE = 'data:audio/mpeg;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjYwLjE2LjEwMAAAAAAAAAAAAAAA//NwwAAAAAAAAAAAAEluZm8AAAAPAAAABgAAAVMAnZ2dnZ2dnZ2dnZ2dnZ2dnbGxsbGxsbGxsbGxsbGxsbGxxcXFxcXFxcXFxcXFxcXFxdjY2NjY2NjY2NjY2NjY2NjY7Ozs7Ozs7Ozs7Ozs7Ozs7Oz/////////////////////AAAAAExhdmM2MC4zMQAAAAAAAAAAAAAAACQEUQAAAAAAAAFTx3TIuwAAAAAAAAAAAAAAAAD/8xDEAAAAA0gAAAAATEFNRTMuMTAwVVVVVf/zEsQNAAADSAAAAABVVVVVVVVVVVVVVVVVVf/zEMQbAAADSAAAAABVVVVVVVVVVVVVVVVV//MQxCgAAANIAAAAAFVVVVVVVVVVVVVVVVX/8xDENQAAA0gAAAAAVVVVVVVVVVVVVVVVVf/zEMRCAAADSAAAAABVVVVVVVVVVVVVVVVV';
+var _farmAudio = null, _farmAudioUnlocked = false;
+function farmAudioEl() { if (!_farmAudio && typeof Audio !== 'undefined') { try { _farmAudio = new Audio(); _farmAudio.preload = 'auto'; } catch (e) { _farmAudio = null; } } return _farmAudio; }
+function farmAudioUnlock() {
+  if (_farmAudioUnlocked) return; var el = farmAudioEl(); if (!el) return; _farmAudioUnlocked = true;
+  try { el.src = FARM_SILENCE; var p = el.play(); if (p && p.catch) p.catch(function () {}); } catch (e) {}
+}
+// Plays a recording; fallback() if it cannot (no file — offline before it was ever heard — or the browser refuses).
+function farmPlayRecording(src, fallback) {
+  var el = farmAudioEl(); if (!el) return false;
+  var settled = false;
+  function fail() { if (settled) return; settled = true; el.onerror = null; try { fallback(); } catch (e) {} }
+  try { if (window.speechSynthesis && (speechSynthesis.speaking || speechSynthesis.pending)) speechSynthesis.cancel(); } catch (e) {}
+  _farmUtter = null;
+  el.onerror = fail;
   try {
+    el.src = src;
+    var p = el.play();
+    if (p && p.then) p.then(function () { settled = true; el.onerror = null; }, fail);
+  } catch (e) { fail(); }
+  return true;
+}
+// voice: male | female | child | random — the farm window's choice by default (a sentence with no recording).
+// animalId (v39.93): the animal that speaks — its own recorded voice when the sentence was recorded.
+function farmSay(text, pitch, voice, animalId) {
+  try {
+    var src = animalId ? farmRecording(animalId, text) : null;
+    var cast = animalId && FARM_CAST[animalId];
+    if (src && farmPlayRecording(src, function () { farmSay(text, pitch, voice || (cast && cast.kind)); })) return true;
     if (!window.speechSynthesis || typeof SpeechSynthesisUtterance === 'undefined') return false;
-    var kind = farmVoiceKind(voice || farmConfig().voice);          // random: picked once per tap
+    var kind = farmVoiceKind(voice || (cast && cast.kind) || farmConfig().voice);          // random: picked once per tap
     var u = farmUtterance(text, pitch, kind), started = false;
     u.onstart = function(){ started = true; };
     _farmUtter = u;
@@ -33774,7 +33831,7 @@ function farmOuch(el, a, keepFacing) {
   bubble.textContent = said;
   art.classList.add('turned');
   return new Promise(function(resolve) {
-    setTimeout(function(){ el.classList.add('fv-said'); farmSay(said, a.pitch); }, 180);
+    setTimeout(function(){ el.classList.add('fv-said'); farmSay(said, a.pitch, null, a.id); }, 180);   // v39.93 — its own voice
     setTimeout(function(){
       el.classList.remove('fv-said');
       if (!keepFacing) art.classList.remove('turned');
@@ -33828,7 +33885,7 @@ function openFarmSettings() {
 function farmSayingRow(s) {
   return '<div class="fv-row"><input type="checkbox" class="fv-on" aria-label="Use this sentence"' + (s.on ? ' checked' : '') + '>'
     + '<input type="text" class="fv-text" maxlength="80" data-no-i18n value="' + escA(s.t) + '" aria-label="What the animal says">'
-    + '<button type="button" class="fv-hear" title="Hear it" aria-label="Hear it" onclick="farmSay(this.parentNode.querySelector(\'.fv-text\').value, 1, farmWindowVoice())">\u{1F50A}</button>'
+    + '<button type="button" class="fv-hear" title="Hear it" aria-label="Hear it" onclick="farmHearSaying(this.parentNode.querySelector(\'.fv-text\').value)">\u{1F50A}</button>'
     + '<button type="button" class="fv-del" title="Remove" aria-label="Remove" onclick="this.parentNode.remove()">✕</button></div>';
 }
 function farmSettingsDraw() {
@@ -33839,17 +33896,16 @@ function farmSettingsDraw() {
   ov.innerHTML = '<div class="ask-card fv-card" role="dialog" aria-modal="true" aria-labelledby="farmTitle">'
     + '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><div class="ask-title" id="farmTitle">\u{1F404} The farm visitors</div>'
     + '<button type="button" class="modal-close" style="position:relative;top:auto;right:auto;" aria-label="Close" onclick="document.getElementById(\'farmOverlay\').remove()">✕</button></div>'
-    + '<div class="fv-note">For everyone, in every copy. When someone taps a visiting animal, it says one of the ticked sentences, picked at random, in English with a Scottish voice where the device has one (an iPhone, an iPad or a Mac has Fiona), otherwise a British one. Each person can still switch the animals off in ⚙️ → How it looks.</div>'
-    + farmVoiceHereHtml()
+    + '<div class="fv-note">For everyone, in every copy. When someone taps a visiting animal, it says one of the ticked sentences, picked at random, in its own voice. Each person can still switch the animals off in ⚙️ → How it looks.</div>'
     + '<div class="fv-h">What they say</div><div id="farmSayings">' + c.sayings.map(farmSayingRow).join('') + '</div>'
     + '<button type="button" class="fv-add" id="farmAddSaying" onclick="farmAddSaying()">➕ Add a sentence</button>'
     + '<div class="fv-h">How often</div><div class="fv-often">Between <input type="number" id="farmMin" min="1" max="' + FARM_MINUTES_CAP + '" value="' + c.minMinutes + '" aria-label="Shortest wait, in minutes"> and '
     + '<input type="number" id="farmMax" min="1" max="' + FARM_MINUTES_CAP + '" value="' + c.maxMinutes + '" aria-label="Longest wait, in minutes"> minutes apart, picked at random, counted while the app is open.</div>'
     + '<div class="fv-h">How they look</div><div class="fv-styles" role="radiogroup" aria-label="How they look">'
     + FARM_STYLES.map(function(st){ return '<label class="fv-style"><input type="radio" name="farmStyle" value="' + st + '"' + (c.style === st ? ' checked' : '') + ' onchange="farmThumbs(this.value)"> ' + escH(FARM_STYLE_NAMES[st]) + '</label>'; }).join('') + '</div>'
-    + '<div class="fv-h">Their voice</div><div class="fv-styles" role="radiogroup" aria-label="Their voice">'
-    + FARM_VOICES.map(function(v){ return '<label class="fv-style"><input type="radio" name="farmVoice" value="' + v + '"' + ((c.voice || 'female') === v ? ' checked' : '') + '> ' + escH(FARM_VOICE_NAMES[v]) + '</label>'; }).join('')
-    + '<button type="button" class="fv-hear" id="farmVoiceHear" title="Hear it" aria-label="Hear this voice" onclick="farmSay(farmPickSaying(), 1, farmWindowVoice())">\u{1F50A}</button></div>'
+    // v39.93 — each animal its own recorded voice: no choice to make here any more (Tony: "Follow my cast choice")
+    + '<div class="fv-h">Their voice</div><div class="fv-note" id="farmOwnVoices">Each animal speaks in its own voice, recorded once for the app. A sentence you add is said by the device’s own voice (a man’s, a woman’s or a child’s, as the animal’s) until it is recorded too.</div>'
+    + farmVoiceHereHtml()
     + '<div class="fv-h">Who may visit</div><div class="fv-grid" id="farmAnimals">'
     + FARM_ANIMALS.map(function(a){ return '<label class="fv-pick"><input type="checkbox" value="' + a.id + '"' + (c.animals.indexOf(a.id) !== -1 ? ' checked' : '') + '>'
         + '<span class="fv-thumb" data-animal="' + a.id + '"></span><span>' + escH(a.name) + '</span></label>'; }).join('') + '</div>'
@@ -33883,7 +33939,14 @@ function farmSettingsRead() {
   var st = document.querySelector('#farmOverlay input[name="farmStyle"]:checked');
   return { sayings: sayings, animals: animals, minMinutes: lo, maxMinutes: hi, style: st ? st.value : farmStyle(), voice: farmWindowVoice() };
 }
-// The voice ticked in the farm window (the saved one when it is not open).
+// v39.93 — 🔊 beside a sentence: one of the ticked animals says it, in its own voice where it was recorded.
+function farmHearSaying(text) {
+  var ids = Array.prototype.filter.call(document.querySelectorAll('#farmAnimals input'), function(i){ return i.checked; }).map(function(i){ return i.value; });
+  if (!ids.length) ids = farmConfig().animals;
+  var a = farmAnimal(ids[Math.floor(Math.random() * ids.length)]) || FARM_ANIMALS[0];
+  return farmSay(text, a.pitch, null, a.id);
+}
+// The voice once ticked in the farm window — since v39.93 there is no choice: the saved one is kept as it was.
 function farmWindowVoice() {
   var v = document.querySelector('#farmOverlay input[name="farmVoice"]:checked');
   return v ? v.value : (farmConfig().voice || 'female');
@@ -33924,6 +33987,7 @@ async function farmSettingsSave() {
 }
 window.farmVisit = farmVisit; window.farmSetEnabled = farmSetEnabled; window.openFarmSettings = openFarmSettings;
 window.farmSettingsSave = farmSettingsSave; window.farmAddSaying = farmAddSaying; window.farmTryOne = farmTryOne; window.farmSay = farmSay;
+window.FARM_CAST = FARM_CAST; window.farmRecording = farmRecording; window.farmSayingKey = farmSayingKey; window.farmPlayRecording = farmPlayRecording; window.farmAudioEl = farmAudioEl; window.farmHearSaying = farmHearSaying;   // v39.93
 window.farmConfig = farmConfig; window.farmUseConfig = farmUseConfig; window.farmPickAnimal = farmPickAnimal; window.farmPickSaying = farmPickSaying;
 window.farmTyping = farmTyping; window.farmWait = farmWait; window.farmTick = farmTick; window.farmClear = farmClear; window.FARM_ANIMALS = FARM_ANIMALS;
 window.farmRefreshSettings = farmRefreshSettings; window.farmThumbs = farmThumbs; window.farmPixel = farmPixel; window.farmToonArt = farmToonArt;
@@ -36489,7 +36553,7 @@ var HELP_SYSTEM_PROMPT = [
   "- 📲 The share icon next to the language picker (and ··· More → 🏡 Kitchens and people → Share this app): while the app takes newcomers by invitation only it is called 'Share this app with family' and invites someone to your kitchen (see the household section) instead of sending the app's link; otherwise it sends a link to the app",
   "",
   "=== THE FARM VISITORS ===",
-  "- Now and then a cartoon farm animal strolls across the screen. Tap it and it turns to you and says something — in a Scottish voice where the device has one (an iPhone, an iPad or a Mac has Fiona), otherwise a British one; then, still looking at you, it vanishes in a puff of smoke. The voice is the one the app's owner chose for everyone (male, female, child, or a different one each time): a female or a child speaks with a woman's voice raised — or the device's own child voice where it has one (Microsoft Edge's Maisie) — and never with a man's while the device has another; the owner's farm window says which voice speaks for each choice on that device (v39.35)",
+  "- Now and then a cartoon farm animal strolls across the screen. Tap it and it turns to you and says something, then, still looking at you, it vanishes in a puff of smoke. EACH ANIMAL HAS ITS OWN VOICE (v39.93): the app's owner chose a voice for each of the fourteen, and they were recorded once (ElevenLabs), so every phone and computer hears the same voices; an animal heard once speaks offline too. A sentence the owner adds later in the farm window is said by the device's own voice — a man's, a woman's or a child's, as the animal's — until it is recorded too; so is a recording the device cannot play (offline before it was ever heard). The farm window no longer offers Male / Female / Child / A different one each time.",
   "- You can pick an animal up and move it (press and drag)",
   "- Switch them off or on: ⚙️ → 🎨 How it looks → 🐑 Farm guests? (this device only)",
   "",

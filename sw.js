@@ -47,9 +47,12 @@ function isPrecachedAsset(url) {
 // stored copy can never be out of date: kept on first use and served from here after — which is what the
 // long browser caching of those services used to give, and what lets the app start offline. The two font
 // style sheets have plain names, so they go to the network first and fall back to the stored copy.
+// v39.93 (app) — the farm animals' recorded voices (sounds/farm-<n>/…): the folder's number changes whenever they are
+// recorded again, so they are kept on first use like the rest, and an animal heard once speaks offline too.
 function isVersionedAsset(url) {
   var p = swPath(url);
-  return p.indexOf(BASE + 'vendor/') === 0 || (p.indexOf(BASE + 'fonts/') === 0 && /\.woff2$/.test(p));
+  return p.indexOf(BASE + 'vendor/') === 0 || (p.indexOf(BASE + 'fonts/') === 0 && /\.woff2$/.test(p))
+    || (p.indexOf(BASE + 'sounds/') === 0 && /\.mp3$/.test(p));
 }
 function isFontSheet(url) {
   var p = swPath(url);

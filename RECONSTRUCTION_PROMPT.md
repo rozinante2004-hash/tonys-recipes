@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v39.92` — app. **Worker: v107**, deployed separately and versioned separately
+**Current version:** `v39.93` — app. **Worker: v107**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -428,6 +428,22 @@ under its plain path only (a `?url=` request goes network-first).
 
 ### 1b.8 Other features of this era
 
+- **The farm visitors' own voices (v39.93).** Tony picked one ElevenLabs voice per animal himself (17 Nov 2026, after
+  turning down my auditions: "Most of them have no character … I will pick the voices myself"), and each says the ten
+  default sayings in it, recorded with ElevenLabs' V4 model (`eleven_v4`; Tony: "Please use the newer model (V4)"):
+  `sounds/farm-1/<animal>-<0..9>.mp3` (140 files, mono 64 kbps, loudness evened to −16 LUFS, about 2 MB), one per
+  saying in `FARM_SAYINGS_DEFAULT`'s order. `FARM_CAST` names each animal's voice and its kind (male / female /
+  child). `farmRecording(animal, text)` finds the file by the sentence (`farmSayingKey`: apostrophes, capitals and
+  spaces do not matter), null for a sentence the owner added; `farmSay(text, pitch, voice, animalId)` plays the
+  recording on one shared `<audio>` (`farmAudioEl`), unlocked by the first touch anywhere (`farmAudioUnlock` in
+  `farmWarm`, a silent data: clip) because the animal speaks 180 ms after its tap; a sentence never recorded, or a
+  recording that cannot play (offline before it was ever heard), is said by the device's voice of the animal's kind,
+  as below. The service worker keeps `sounds/…mp3` on first use (`isVersionedAsset`: the folder's number changes when
+  they are recorded again). The farm window's Male / Female / Child / Random choice is gone (Tony: "Follow my cast
+  choice"); "Their voice" says each animal speaks in its own voice, then the device-voice lines below; 🔊 beside a
+  sentence has a ticked animal say it (`farmHearSaying`); the saved `voice` is kept for older versions.
+  `tools/build.js` refuses a copy without the 140 files. How they were made: `docs/farm-voices.md`. Self Test
+  `farm_own_voices`.
 - **The farm visitors** — now and then one of 14 hand-drawn farm animals walks across the app
   (three looks: 3D cartoon, Storybook, Pixel art — the pixel art sampled from the SVG at run time);
   tapped, it turns, speaks a saying in a Scottish voice where the device has one (Apple’s Fiona, eSpeak’s English (Scotland); v38.79), else a British one (Male / Female / Child / random), then
