@@ -81,7 +81,7 @@ to `test`; releases only on his yes.
     v39.63, passes or fails since v39.70 (*How to verify*).
 - **The instructional clip "How to add a recipe" (16–17 Nov 2026): `docs/instructional-clip.md`** — Tony's witch idea;
   English (Bella) and Hebrew (Danit) made and approved; in the app as **v39.91 on Test** (+ Add Recipe ▾'s last item,
-  and under Help answers about adding a recipe). Tony has the five cuts of "החליפי" (A is in the video) to confirm.
+  and under Help answers about adding a recipe). "החליפי": A, stressed on "לי" (Tony: "Definitely A").
 - **The promotional clip (12–13 Nov 2026): `docs/promo-clip.md`** — both clips are made and approved (English: Jon;
   Hebrew: Nimrod), with how they are made and Tony's decisions. **The in-app player (v39.72, live)** plays them
   from 🎬 Watch the one-minute clip in 💬 Ask About the App (Hebrew for a Hebrew interface, English otherwise; the

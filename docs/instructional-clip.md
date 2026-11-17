@@ -414,7 +414,7 @@ I agree with putting it in several places: 1. I'm fine with the bottom of the '+
 better to link it under any Help answer related to adding recipes. Once we accumulate enough such manual clips, we would
 create a videos library with a TOC for all the clips."
 - **"החליפי" (scene 8):** recorded in five spellings, as "הדביקי" was (`recvar.py`, `stress2.py`); **A** (הַחְלִיפי — the
-  pointing stops before the last syllable) is in the sketch and the video; Tony has the five cuts (A–E) to confirm.
+  pointing stops before the last syllable) is in the sketch and the video; Tony, on the five cuts (A–E): "Definitely A".
   Scene 8's gain 2.7. The Hebrew video made again: **83.2 s**, −16.3 LUFS, the logo over the empty band first; the Hebrew
   sketch republished (version 7).
 - **In the app (v39.91, on Test):** the two files are `media/my-kitchen-notes-add-a-recipe-en|he.mp4` (and a `.jpg`
