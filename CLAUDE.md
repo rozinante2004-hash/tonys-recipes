@@ -17,15 +17,12 @@ where.
 **Live now**
 - The family's copy (`main`, https://rozinante2004-hash.github.io/tonys-recipes/ — it forwards to the community app)
   and the community app (`beta`, https://mykitchennotes.community, Firebase project my-kitchen-notes-beta) run
-  **v39.90 + Worker v107** (released 17 Nov 2026, 14:36 Israel time, on 44fa5d8 — the Method box's example "Boil the
-  pasta / Mix eggs and cheese / Serve hot" in the interface language, on three whole lines; v39.89, "Recent:" the same
-  list on every device of a person, the rule `users/<uid>/prefs/recent` and Privacy Statement 1.17, went out on
-  16 Nov at 19:09 on 7282293; Worker v107 since 15 Nov 06:12: the page, video and photo fetches require a sign-in; the
-  jobs are listed near the top of `docs/history/2026-11.md`). **On Test, not released:** **v39.91–v39.92** — 🎬 How to add a
-  recipe, the witch clip, at the bottom of + Add Recipe ▾, on the "Add your first recipe" screen (v39.92) and under
-  Help answers about adding a recipe; and the two
-  one-minute clips (`media/my-kitchen-notes-clip-en.mp4`, `-he.mp4`) re-made so the first frame is the logo alone, the
-  band kept (8c50a5b, ef62991 — the clip work, `docs/promo-clip.md`); they go out with the next release Tony says yes to. The test copy
+  **v39.92 + Worker v107** (released 17 Nov 2026, 16:08 Israel time, on 44a3e49 — v39.91–v39.92: 🎬 How to add a
+  recipe, the witch clip in English and Hebrew, at the bottom of + Add Recipe ▾, on the "Add your first recipe" screen
+  and under Help answers about adding a recipe; with it the one-minute clips re-made to open on the logo over the band;
+  v39.90, the Method box's example in the interface language, went out the same day at 14:36 on 44fa5d8; Worker v107
+  since 15 Nov 06:12: the page, video and photo fetches require a sign-in; the jobs are listed near the top of
+  `docs/history/2026-11.md`). **On Test, not released:** nothing. The test copy
   (https://tonys-recipes-test.pages.dev, its own database and rules) follows `test`.
 - **The beta has had testers since Sunday 25 Oct 2026** and is **by invitation only**: the owner invites with
   ⚙️ → 👑 → ✉️ Invite testers (the congratulatory wording of v39.60); a tester's share button asks the owner for an
@@ -81,8 +78,8 @@ to `test`; releases only on his yes.
 13. **H4 — keep the screen walk: done** (Tony: "Sure. Let's do that."): `tests/screen-walk.js`, in the repo since
     v39.63, passes or fails since v39.70 (*How to verify*).
 - **The instructional clip "How to add a recipe" (16–17 Nov 2026): `docs/instructional-clip.md`** — Tony's witch idea;
-  English (Bella) and Hebrew (Danit) made and approved; in the app as **v39.91–v39.92 on Test** (+ Add Recipe ▾'s last
-  item, the "Add your first recipe" screen, and under Help answers about adding a recipe). "החליפי": A, stressed on "לי" (Tony: "Definitely A").
+  English (Bella) and Hebrew (Danit) made and approved; in the app since **v39.91–v39.92 (live, 17 Nov)** (+ Add Recipe
+  ▾'s last item, the "Add your first recipe" screen, and under Help answers about adding a recipe). "החליפי": A, stressed on "לי" (Tony: "Definitely A").
 - **The promotional clip (12–13 Nov 2026): `docs/promo-clip.md`** — both clips are made and approved (English: Jon;
   Hebrew: Nimrod), with how they are made and Tony's decisions. **The in-app player (v39.72, live)** plays them
   from 🎬 Watch the one-minute clip in 💬 Ask About the App (Hebrew for a Hebrew interface, English otherwise; the
