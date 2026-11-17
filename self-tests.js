@@ -21781,6 +21781,77 @@ window.SELF_TESTS = [
       }
     } },
 
+  { id:'player_how_to_add_a_recipe', group:'Features', name:'🎬 How to add a recipe: the last item of + Add Recipe ▾, and under a Help answer about adding a recipe — Hebrew for a Hebrew app, English otherwise (v39.91)',
+    test: async()=>{
+      // Tony, 17 Nov 2026: "I'm fine with the bottom of the “+ Add Recipe ▾” menu. It makes sense. However, stacking
+      // the in the same place as the other clip, under About, will make it crowded. I think it would be better to link it
+      // under any Help answer related to adding recipes."
+      var real={ lang:_i18nLang, dict:_i18nDict, ai:window.aiCall, play:HTMLMediaElement.prototype.play, load:HTMLMediaElement.prototype.load }, played=0;
+      var ov=document.getElementById('playerOverlay'), v=document.getElementById('playerVideo'), menu=document.getElementById('addDrop'), item=document.getElementById('addClipItem');
+      var wait=function(ms){ return new Promise(function(r){ setTimeout(r, ms||30); }); };
+      try{
+        // which clip: Hebrew for Hebrew, English for every other language
+        if(appClip('addRecipe','he').src!=='media/my-kitchen-notes-add-a-recipe-he.mp4' || appClip('addRecipe','he').poster!=='media/my-kitchen-notes-add-a-recipe-he.jpg') throw new Error('a Hebrew app does not get the Hebrew clip: '+JSON.stringify(appClip('addRecipe','he')));
+        ['en','fr','ar','ru','zh'].forEach(function(l){ if(appClip('addRecipe',l).src!=='media/my-kitchen-notes-add-a-recipe-en.mp4') throw new Error(l+' does not get the English clip: '+appClip('addRecipe',l).src); });
+        if(tourClip('he').src!=='media/my-kitchen-notes-clip-he.mp4') throw new Error('the one-minute clip lost its own file');
+        // 1. the menu: its last item, set apart
+        if(!menu || !item || !menu.contains(item)) throw new Error('+ Add Recipe ▾ has no 🎬 How to add a recipe');
+        var items=menu.querySelectorAll('.drop-item'); if(items[items.length-1]!==item) throw new Error('🎬 How to add a recipe is not the last item of the menu');
+        if(parseFloat(getComputedStyle(item).borderTopWidth)<1) throw new Error('the clip is not set apart from the ways to add a recipe');
+        HTMLMediaElement.prototype.play=function(){ played++; return Promise.resolve(); };
+        HTMLMediaElement.prototype.load=function(){};
+        _i18nLang='he'; item.click();
+        if(!ov.classList.contains('open')) throw new Error('the menu item did not open the player');
+        if(v.getAttribute('src')!=='media/my-kitchen-notes-add-a-recipe-he.mp4') throw new Error('in Hebrew the menu played '+v.getAttribute('src'));
+        if(v.style.aspectRatio.replace(/\s/g,'')!=='1/1') throw new Error('the square clip is not shown square: '+v.style.aspectRatio);
+        if(!played) throw new Error('the clip was not started');
+        closeM('playerOverlay'); if(v.getAttribute('src')) throw new Error('a closed player still holds the clip');
+        // 2. Help: the assistant is told when to mark an answer; a marked answer gets the button, without the mark
+        _i18nLang='en';
+        if(HELP_SYSTEM_PROMPT.indexOf('[CLIP:ADD-RECIPE]')<0) throw new Error('the help assistant is not told to mark an answer about adding a recipe');
+        var ask=async function(answer){
+          window.aiCall=async function(){ return answer; };
+          document.getElementById('helpInput').value='How do I get a recipe in?'; await askHelp(); await wait();
+          return document.getElementById('helpAnswer');
+        };
+        openHelp();
+        var ans=await ask('Take a photo of the page and the app types it out.\n[CLIP:ADD-RECIPE]');
+        var b=ans.querySelector('[data-clip="addRecipe"]');
+        if(!b) throw new Error('a marked answer about adding a recipe has no clip under it');
+        if(/CLIP/.test(ans.textContent)) throw new Error('the mark shows in the answer: '+ans.textContent.slice(0,160));
+        if(b.compareDocumentPosition(ans.querySelector('.help-input'))&Node.DOCUMENT_POSITION_PRECEDING) throw new Error('the clip is not under the answer');
+        b.click();
+        if(v.getAttribute('src')!=='media/my-kitchen-notes-add-a-recipe-en.mp4') throw new Error('in English the answer’s button played '+v.getAttribute('src'));
+        closeM('playerOverlay');
+        // unmarked, but the answer sends the person to the menu
+        ans=await ask('1. Tap + Add Recipe ▾\n2. Choose \u{1F517} Import from URL and paste the link.');
+        if(!ans.querySelector('[data-clip="addRecipe"]')) throw new Error('an answer that sends you to + Add Recipe has no clip');
+        // about something else: no clip ("Add recipes" to a collection is not the menu)
+        ans=await ask('Open the collection and tap Add recipes, then tick the ones you want.');
+        if(ans.querySelector('[data-clip]')) throw new Error('an answer about collections got the clip');
+        // in Hebrew, the menu as the person sees it
+        _i18nLang='he'; _i18nDict=Object.assign({}, real.dict||{}, { '\u{1F517} Import from URL':'\u{1F517} ייבוא מכתובת URL' });
+        if(!helpAboutAdding('לחצו על \u{1F517} ייבוא מכתובת URL והדביקו את הקישור')) throw new Error('a Hebrew answer that names the menu item is not seen as about adding');
+        if(helpAboutAdding('פתחו את האוסף ולחצו על הוספה')) throw new Error('a Hebrew answer about something else is seen as about adding');
+        _i18nLang='en'; _i18nDict=real.dict;
+        // 3. 🔍 Details: the same button; it closes the Details window (that sits above the player) and plays
+        window.aiCall=async function(){ return 'Tap the share icon, then My Kitchen Notes.\n[CLIP:ADD-RECIPE]'; };
+        showHelpDetail('Share it from another app', 'How do I get a recipe in?'); await wait(60);
+        var det=document.getElementById('helpDetailOverlay'), db=det && det.querySelector('[data-clip="addRecipe"]');
+        if(!db) throw new Error('🔍 Details about adding a recipe has no clip');
+        if(/CLIP/.test(det.textContent)) throw new Error('the mark shows in Details');
+        db.click();
+        if(document.getElementById('helpDetailOverlay')) throw new Error('the Details window stays over the player');
+        if(!ov.classList.contains('open') || v.getAttribute('src')!=='media/my-kitchen-notes-add-a-recipe-en.mp4') throw new Error('Details’ button did not play the clip');
+      } finally {
+        HTMLMediaElement.prototype.play=real.play; HTMLMediaElement.prototype.load=real.load; window.aiCall=real.ai; _i18nLang=real.lang; _i18nDict=real.dict;
+        try{ var d=document.getElementById('helpDetailOverlay'); if(d) d.remove(); }catch(e){}
+        try{ if(ov && ov.classList.contains('open')) closeM('playerOverlay'); }catch(e){}
+        try{ closeM('helpOverlay'); }catch(e){}
+        try{ if(v){ v.removeAttribute('src'); v.load(); } }catch(e){}
+      }
+    } },
+
   { id:'player_plays_a_recipes_source', group:'Features', name:'▶ A recipe’s video source plays inside the app — and “Use external players only” sends it outside again (v39.74)',
     test: async()=>{
       // Tony, 14 Nov 2026: "Please allow all sources in recipes to be played in the in-app player by default. However, let it

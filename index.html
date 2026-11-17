@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.90 -->
+<!-- Tony's Recipes Collection v39.91 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -11215,7 +11215,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.90';
+var APP_VERSION = 'v39.91';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -14373,6 +14373,10 @@ body.banner-shown .header {
 .help-clip { display: block; width: 100%; margin: 0 0 12px; padding: 9px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--card-bg);
   color: var(--terracotta); font: 600 13.5px 'DM Sans','Heebo',sans-serif; cursor: pointer; text-align: center; }
 .help-clip:hover { border-color: var(--terracotta); }
+/* v39.91 — "🎬 How to add a recipe": the last item of + Add Recipe ▾, set apart by a line; and the same clip's button
+   under a Help answer about adding a recipe (in the answer, and in its 🔍 Details) */
+.drop-item.drop-clip { border-top: 1px solid var(--border); }
+.help-clip.help-clip-answer { margin: 4px 0 0; }
 #playerVideo { display: block; margin: 0 auto; width: 100%; height: auto; max-width: 100%; background: #000; border-radius: 10px; }
 #playerNote { margin-top: 10px; font-size: 13px; line-height: 1.5; color: var(--ink); text-align: center; }
 #playerFrame { display: block; margin: 0 auto; width: 100%; max-width: 100%; border: 0; background: #000; border-radius: 10px; }
@@ -14784,7 +14788,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.90</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.91</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14872,7 +14876,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.90</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.91</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -15104,6 +15108,8 @@ body.banner-shown .header {
           <button class="drop-item" onclick="closeDrop('addDrop');openFreehandModal()">✍️ Paste free-hand text</button>
           <button class="drop-item" onclick="closeDrop('addDrop');openUrlImportModal()">🔗 Import from URL</button>
           <button class="drop-item" onclick="closeDrop('addDrop');openCameraImport()">📷 Scan recipe (camera/photo)</button>
+          <!-- v39.91 — Tony, 17 Nov 2026: "I'm fine with the bottom of the “+ Add Recipe ▾” menu. It makes sense." -->
+          <button class="drop-item drop-clip" id="addClipItem" onclick="closeDrop('addDrop');openAddRecipeClip()" title="A short clip that shows every way to add a recipe.">🎬 How to add a recipe</button>
         </div>
       </div>
     </div>
@@ -36274,6 +36280,7 @@ window.gingerCheck = gingerCheck; window.gingerPresent = gingerPresent;
 var HELP_SYSTEM_PROMPT = [
   "You are the built-in help assistant for My Kitchen Notes — a recipe app for a household (the family's own copy is called Tony's Recipes Collection; the header shows the household's own name).",
   "Answer questions clearly, practically, and in the same language the user writes in.",
+  "THE CLIP'S MARK (v39.91): when the question is about ADDING a recipe to the app — any way of getting one in (+ Add Recipe ▾ and its items, the 📘 Save recipe button in the browser, Share → My Kitchen Notes from another app, 📁 From File, a video's link) — end the answer with one last line holding only [CLIP:ADD-RECIPE]. The app shows a button there that plays the clip 🎬 How to add a recipe; never mention the mark itself. Never write it for anything else (adding a recipe to a collection, ingredients to Bring!, a photo to a recipe, editing a recipe).",
   "",
   "=== APP OVERVIEW ===",
   (APP_CONFIG.environment === 'live' ? "Tony's Recipes Collection" : (APP_CONFIG.brandName || 'My Kitchen Notes')) + " is a single-page web app hosted at " + APP_CONFIG.siteOrigin + APP_CONFIG.sitePath,
@@ -36519,6 +36526,7 @@ var HELP_SYSTEM_PROMPT = [
   "- Something not working at all: ⚙️ → 🔧 Troubleshooting → 🧪 Self Test, then 📋 Copy report (or Send to admin)",
   "",
   "- 🎬 THE ONE-MINUTE CLIP (v39.72): the ? button → 💬 Ask About the App → 🎬 Watch the one-minute clip plays a short film of what the app does, in a window inside the app (✕ closes it and stops it). It plays in Hebrew when the app is in Hebrew and in English in every other language. It needs an internet connection.",
+  "- 🎬 HOW TO ADD A RECIPE, THE CLIP (v39.91): + Add Recipe ▾ → 🎬 How to add a recipe (the menu's last item) plays an 80-second clip of every way to add a recipe — 📷 Scan recipe from a photo of a page, 🔗 Import from URL (a video's link too), ✍️ Paste free-hand text, the 📘 Save recipe button in the browser, Share → My Kitchen Notes from another app, 📁 From File, and ✏️ Fill in manually — in a window inside the app (✕ closes it and stops it). The same button appears under an answer here about adding a recipe. Hebrew when the app is in Hebrew, English in every other language; it needs an internet connection.",
   "- ▶ A RECIPE'S VIDEO PLAYS INSIDE THE APP (v39.74): in a recipe (or a recipe inside a collection — your own or a linked kitchen's — or a linked kitchen's recipe, or a recipe sent to you), a Source link with a small ▶ before it is a video the app can play: tap the link and it plays in a window inside the app — a YouTube video (Shorts too), Vimeo, an Instagram post or reel, a Facebook video or reel, a TikTok video, or a link straight to a video or sound file. The window opens through a camera lens — a small lens appears, its blades open, and it widens into the window, in about a second (a device set to reduce motion shows the window at once). ✕ closes the window and stops the video. Under the video, ↗ Open outside the app opens it in its own app or site — use it if the video does not play here (a private video, or one whose owner does not allow playing it elsewhere). A source that is an ordinary web page (a recipe site) has no ▶ and opens in the browser as before; so do short links that hide where they lead (fb.watch, vm.tiktok.com). TO ALWAYS OPEN VIDEOS OUTSIDE THE APP: ⚙️ Settings → 🎨 How it looks → tick 🎬 Use external players only (on this device; untick to play inside the app again). When a video plays inside the app, the device loads it from the site that hosts it, as when opening it there; the app sends that site nothing about you or your recipes (🔒 What leaves this device lists it).",
   "",
   "=== TIPS ===",
@@ -36597,11 +36605,20 @@ function openHelp() {
 // Content-Security-Policy lets media come from nowhere else, and the service worker leaves media/ alone, so the
 // browser streams it and seeking works). Closing the window — ✕, Escape, a tap beside it — stops the clip and lets
 // go of the file. Other sources come later, as other kinds of the same call.
-var PLAYER_TOUR = 'media/my-kitchen-notes-clip-';   // + en|he + .mp4 (and .jpg, the still shown before it plays)
-function tourClip(lang) {
+// v39.91 — the app's own clips, by name: each in Hebrew and in English (+ en|he + .mp4, and .jpg: the still shown
+// before it plays), Hebrew for a Hebrew app and English for every other language. Tony, 17 Nov 2026: "Once we
+// accumulate enough such manual clips, we would create a videos library with a TOC for all the clips" — this list is it.
+var APP_CLIPS = {
+  tour:      { base: 'media/my-kitchen-notes-clip-',         title: '\u{1F3AC} The app in one minute' },       // v39.72
+  addRecipe: { base: 'media/my-kitchen-notes-add-a-recipe-', title: '\u{1F3AC} How to add a recipe' }          // v39.91
+};
+var PLAYER_TOUR = APP_CLIPS.tour.base;
+function appClip(id, lang) {
+  var c = APP_CLIPS[id]; if (!c) return null;
   var l = (lang == null ? _i18nLang : lang) === 'he' ? 'he' : 'en';
-  return { lang: l, src: PLAYER_TOUR + l + '.mp4', poster: PLAYER_TOUR + l + '.jpg' };
+  return { id: id, lang: l, src: c.base + l + '.mp4', poster: c.base + l + '.jpg', title: c.title };
 }
+function tourClip(lang) { return appClip('tour', lang); }
 function playerSay(text) { var n = document.getElementById('playerNote'); if (!n) return; n.textContent = text || ''; n.hidden = !text; }
 var PLAYER_TITLE = '\u{1F3AC} The app in one minute';   // the window's name while nothing plays (a window needs one)
 // v39.74 — what of a recipe's source the player can play. A video on YouTube, Vimeo, Instagram, Facebook or TikTok plays
@@ -36787,10 +36804,55 @@ function playerOpenAnim() {
   _playerAnimTimer = setTimeout(function () { if (run === _playerAnimRun) playerAnimStop(); }, PLAYER_OPEN_MS + 600);
   return true;
 }
-function openTourClip() {
-  var c = tourClip();
-  return openPlayer({ title: PLAYER_TITLE, src: c.src, poster: c.poster, aspect: '1 / 1' });
+// The app's clips are square (1080 × 1080).
+function openAppClip(id) {
+  var c = appClip(id); if (!c) return false;
+  return openPlayer({ title: c.title, src: c.src, poster: c.poster, aspect: '1 / 1' });
 }
+function openTourClip() { return openAppClip('tour'); }
+function openAddRecipeClip() { return openAppClip('addRecipe'); }   // v39.91 — + Add Recipe ▾, and Help's answers about adding
+
+// v39.91 — Tony, 17 Nov 2026: "link it under any Help answer related to adding recipes" (not beside the one-minute
+// clip at the top of 💬 Ask About the App: "it will make it crowded"). The assistant ends such an answer with a line of
+// its own, [CLIP:ADD-RECIPE] (HELP_SYSTEM_PROMPT says when); the app takes that line out and puts the clip's button
+// under the answer. Should the mark be missing, an answer that sends the person to + Add Recipe ▾ or one of its items —
+// named in English, or as the menu reads in this language — counts as well.
+var HELP_CLIP_MARK = /\[\s*CLIP\s*:\s*ADD[\s_-]*RECIPE\s*\]/i;
+var ADD_RECIPE_LABELS = ['+ Add Recipe ▾', '✏️ Fill in manually', '✍️ Paste free-hand text', '\u{1F517} Import from URL', '\u{1F4F7} Scan recipe (camera/photo)'];
+function helpClipLabel(s) {
+  return String(s || '').replace(/\([^)]*\)/g, ' ').replace(/[+▾]/g, ' ')
+    .replace(/[\u{1F000}-\u{1FAFF}←-⇿☀-➿️‍]/gu, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
+}
+// the answer's text without the mark (and without the empty line it leaves)
+function helpClipStrip(text) {
+  return String(text || '').split('\n').map(function (l) { return l.replace(new RegExp(HELP_CLIP_MARK.source, 'gi'), '').replace(/\s+$/, ''); })
+    .filter(function (l, i, a) { return l.trim() || (i > 0 && a[i - 1].trim()); }).join('\n').trim();
+}
+function helpAboutAdding(text) {
+  var t = String(text || ''); if (HELP_CLIP_MARK.test(t)) return true;
+  var low = ' ' + t.toLowerCase().replace(/\s+/g, ' ') + ' ';
+  return ADD_RECIPE_LABELS.some(function (k) {
+    var names = [helpClipLabel(k)], mine = _i18nLang !== 'en' && _i18nDict && _i18nDict[k];
+    if (mine) names.push(helpClipLabel(mine));
+    return names.some(function (n) {
+      if (n.length < 4) return false;
+      for (var i = low.indexOf(n); i >= 0; i = low.indexOf(n, i + 1)) {
+        // the name itself, not the start of a longer word ("Add Recipes to a collection" is not this menu)
+        if (!/[\p{L}\p{N}]/u.test(low.charAt(i - 1)) && !/[\p{L}\p{N}]/u.test(low.charAt(i + n.length))) return true;
+      }
+      return false;
+    });
+  });
+}
+// The clip's button under an answer. before(): what to close first (the 🔍 Details window sits above the player).
+function helpClipButton(before) {
+  var b = document.createElement('button'); b.type = 'button'; b.className = 'help-clip help-clip-answer'; b.setAttribute('data-clip', 'addRecipe');
+  b.textContent = APP_CLIPS.addRecipe.title; b.title = 'A short clip that shows every way to add a recipe.';
+  b.onclick = function () { if (before) before(); openAddRecipeClip(); };
+  return b;
+}
+window.appClip = appClip; window.openAppClip = openAppClip; window.openAddRecipeClip = openAddRecipeClip; window.APP_CLIPS = APP_CLIPS;
+window.helpAboutAdding = helpAboutAdding; window.helpClipStrip = helpClipStrip; window.helpClipButton = helpClipButton;
 window.inviteClipLink = inviteClipLink; window.tourClip = tourClip; window.openPlayer = openPlayer; window.playerStop = playerStop; window.openTourClip = openTourClip;
 window.playerSource = playerSource; window.sourcePlay = sourcePlay;
 window.playerOpenAnim = playerOpenAnim; window.playerAnimStop = playerAnimStop; window.playerIrisBuild = playerIrisBuild; window.playerIrisFrame = playerIrisFrame; window.playerReducedMotion = playerReducedMotion;
@@ -36806,6 +36868,7 @@ async function askHelp() {
   try {
     var answer=await aiCall(q+'\n\nBe concise.',500,null,AI_MODEL_SMALL,helpSystemPrompt());
     answer=answer.trim(); answerEl.innerHTML='';
+    var aboutAdding=helpAboutAdding(answer); answer=helpClipStrip(answer);   // v39.91 — the clip under an answer about adding a recipe
     var lines=answer.split('\n');
     // v39.63 (audit) — 🔍 Details beside each numbered or bulleted step; an answer with no steps keeps one per line
     var stepRe=/^\s*(\d+[.)]|[-*\u2022]|\(\d+\))\s+/, hasSteps=lines.some(function(l){ return stepRe.test(l); });
@@ -36821,6 +36884,7 @@ async function askHelp() {
       }
       answerEl.appendChild(row);
     });
+    if(aboutAdding) answerEl.appendChild(helpClipButton());
     var followRow=document.createElement('div'); followRow.style.cssText='margin-top:12px;padding-top:10px;border-top:1px solid var(--border);';
     followRow.innerHTML='<div style="font-size:11px;color:var(--muted);margin-bottom:6px;">Ask a follow-up:</div>';
     var followInp=document.createElement('input'); followInp.className='help-input'; followInp.placeholder='Ask more...';
@@ -36849,7 +36913,11 @@ function showHelpDetail(topic, context) {
   overlay.onclick=function(e){ if(e.target===overlay) overlay.remove(); };
   document.body.appendChild(overlay);
   aiCall('The user asked: "'+context+'"\nThey want details about: "'+topic+'"\nProvide focused step-by-step details, under 200 words.',600,null,AI_MODEL_SMALL,helpSystemPrompt())
-    .then(function(d){ body.style.cssText='font-size:13px;color:var(--ink);line-height:1.7;white-space:pre-wrap;'; body.setAttribute('dir','auto'); body.setAttribute('data-no-i18n',''); body.innerHTML=d.trim().split('\n').map(helpLineHtml).join('\n'); })
+    .then(function(d){
+      var aboutAdding=helpAboutAdding(d)||helpAboutAdding(topic); d=helpClipStrip(d);   // v39.91 — as under the answer itself
+      body.style.cssText='font-size:13px;color:var(--ink);line-height:1.7;white-space:pre-wrap;'; body.setAttribute('dir','auto'); body.setAttribute('data-no-i18n',''); body.innerHTML=d.trim().split('\n').map(helpLineHtml).join('\n');
+      if(aboutAdding) card.appendChild(helpClipButton(function(){ overlay.remove(); }));
+    })
     .catch(function(e){ body.textContent='Error: '+e.message; });
 }
 

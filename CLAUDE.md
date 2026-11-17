@@ -21,9 +21,10 @@ where.
   pasta / Mix eggs and cheese / Serve hot" in the interface language, on three whole lines; v39.89, "Recent:" the same
   list on every device of a person, the rule `users/<uid>/prefs/recent` and Privacy Statement 1.17, went out on
   16 Nov at 19:09 on 7282293; Worker v107 since 15 Nov 06:12: the page, video and photo fetches require a sign-in; the
-  jobs are listed near the top of `docs/history/2026-11.md`). **On Test, not released:** the two one-minute clips
-  (`media/my-kitchen-notes-clip-en.mp4`, `-he.mp4`) re-made so the first frame is the logo alone, the band kept
-  (8c50a5b, ef62991 — the clip work, `docs/promo-clip.md`); they go out with the next release Tony says yes to. The test copy
+  jobs are listed near the top of `docs/history/2026-11.md`). **On Test, not released:** **v39.91** — 🎬 How to add a
+  recipe, the witch clip, at the bottom of + Add Recipe ▾ and under Help answers about adding a recipe; and the two
+  one-minute clips (`media/my-kitchen-notes-clip-en.mp4`, `-he.mp4`) re-made so the first frame is the logo alone, the
+  band kept (8c50a5b, ef62991 — the clip work, `docs/promo-clip.md`); they go out with the next release Tony says yes to. The test copy
   (https://tonys-recipes-test.pages.dev, its own database and rules) follows `test`.
 - **The beta has had testers since Sunday 25 Oct 2026** and is **by invitation only**: the owner invites with
   ⚙️ → 👑 → ✉️ Invite testers (the congratulatory wording of v39.60); a tester's share button asks the owner for an
@@ -35,7 +36,7 @@ where.
   `docs/history/2026-11.md`, and update "Live now" here.
 - The rules were last published on 10 Nov 2026 (deploy-rules on 99558ae, success). A push to `test` that changes
   them publishes to the test project only; a release publishes to the family's and the beta's.
-- The Self Tests: **487 pass, 0 fail, 7 skipped** (the network ones) on v39.90, locally.
+- The Self Tests: **488 pass, 0 fail, 7 skipped** (the network ones) on v39.91, locally (English and Hebrew).
 
 **The audit of 10 Nov 2026 (`AUDIT-2026-11-10.md`) — Tony's answers of 11 Nov, and where each item is.** In the
 order of work; update this list as items land. Each change: Self Tests + knock-outs, the local checks, Help and
@@ -78,8 +79,9 @@ to `test`; releases only on his yes.
     three of them real lost writes, now logged); CI fails when more than 25 sit around a write.
 13. **H4 — keep the screen walk: done** (Tony: "Sure. Let's do that."): `tests/screen-walk.js`, in the repo since
     v39.63, passes or fails since v39.70 (*How to verify*).
-- **The instructional clip "How to add a recipe" (16 Nov 2026): `docs/instructional-clip.md`** — Tony's witch-and-cat
-  idea, three script options (A, B, C) and ten questions sent; waiting for his choice and answers.
+- **The instructional clip "How to add a recipe" (16–17 Nov 2026): `docs/instructional-clip.md`** — Tony's witch idea;
+  English (Bella) and Hebrew (Danit) made and approved; in the app as **v39.91 on Test** (+ Add Recipe ▾'s last item,
+  and under Help answers about adding a recipe). Tony has the five cuts of "החליפי" (A is in the video) to confirm.
 - **The promotional clip (12–13 Nov 2026): `docs/promo-clip.md`** — both clips are made and approved (English: Jon;
   Hebrew: Nimrod), with how they are made and Tony's decisions. **The in-app player (v39.72, live)** plays them
   from 🎬 Watch the one-minute clip in 💬 Ask About the App (Hebrew for a Hebrew interface, English otherwise; the
@@ -482,6 +484,7 @@ Look at the screenshots — that is what it is for. Not in CI (about 10 minutes)
 | **Every clip opens on the logo — the frame a chat shows before it plays (Tony, 16 Nov 2026).** | "Please make a note to have all future clips to also open on the logo (the frame WhatsApp shows before playing)." WhatsApp (and most chats) show a video's first frame until it is played; a clip that fades in from nothing shows a blank square. Any new or remade clip, in any language, starts on the app's logo, large and sharp (`icons/icon-512.png`), from its very first frame — how it is done for the two clips of 14 Nov: `docs/promo-clip.md`, *The first frame is the logo*. Check the first frame (`ffmpeg -i <file> -frames:v 1 first.png`) before sending a clip. **The first frame is the logo alone — no caption** (Tony, 16 Nov 2026, the witch clip: "It should appear only once Danit starts talking. The 1st frame is reserved for the logo only, so it could be displayed before the clip starts."): the caption stays empty until the first words are said; the caption's band stays (Tony, 17 Nov: "No need to hide the band"). |
 | **📊 Households: one line per household; the sort kept on the device; a phone shows Household, Owner and the sort's two columns (Tony, 16 Nov 2026).** | His five points (`docs/history/2026-11.md`, v39.88). A tap opens one line (every value); a tap on it opens the details; ⊞ Expand all. The pairs beyond his two examples are `PHONE_COLS` in manage.js. The Recipes number is the top bar badge's (`recipeHonourCount`, collections' recipes each counted), never the entries. |
 | **"Recent:" is the person's own, the same on all their devices, as many as the row holds (Tony, 16 Nov 2026).** | "display the same recipes on mobile and PC"; "the number of recipes shown is not a set count, but rather the number of recipes which can be displayed in a single row" (three on his phone, seven on his wide screen). Kept in `users/<uid>/prefs/recent` (theirs alone — never another household member's view), merged by time, listened to live. |
+| **A how-to clip goes where the task is — not beside the one-minute clip (Tony, 17 Nov 2026).** | "I'm fine with the bottom of the '+ Add Recipe ▾' menu. It makes sense. However, stacking the in the same place as the other clip, under About, will make it crowded. I think it would be better to link it under any Help answer related to adding recipes. Once we accumulate enough such manual clips, we would create a videos library with a TOC for all the clips." 🎬 How to add a recipe is the last item of + Add Recipe ▾ and a button under a Help answer about adding a recipe (the assistant's `[CLIP:ADD-RECIPE]` mark, or the answer naming the menu). Every clip is in `APP_CLIPS`, Hebrew for Hebrew and English otherwise — the library's contents when it comes. |
 | **The one-minute clip: Hebrew for a Hebrew interface, English for every other language (Tony, 13 Nov 2026).** | "The Hebrew clip should be linked if the interface language is Hebrew. For all other languages link the English version. No point in linking both for everyone. Link it in the '💬 Ask About the App' modal." `tourClip()`. The clips play from the app's own site (`media/`), inside the app's player — no video site; "if installing the app is mandatory for the clip to be viewable, then it cannot be used as a marketing tool", so a link for people without the app must play in a plain browser. The service worker must keep leaving `media/` alone (a cached video cannot be seeked on an iPhone). |
 | **Sharing produces a file, not a public link.** | Publishing family recipes to a public endpoint is Tony's decision to make, not a share button's. |
 | **Declined:** 3.8 nutrition per-serving; 4.4 filter counts; 4.8 header touch targets. | Asked for and declined. Don't re-propose without reason. **5.6 (CI) was accepted in Aug 2026**; 3.1 (meal planner) is not declined but low priority — Tony cooks once a week. |

@@ -1,7 +1,7 @@
 {
  "lang": "ru",
  "updatedAt": 1794919057128,
- "count": 3180,
+ "count": 3182,
  "strings": {
   "\"Add to Home Screen\"": "Добавить на главный экран",
   "\"One item away\" filter ({1}f.{2})": "Фильтр «Не хватает одного» ({1}ф.{2})",
@@ -102,6 +102,7 @@
   "A request to link kitchens": "Запрос на объединение кухонь",
   "A request to link kitchens was sent to {1}. It shows here once that address is confirmed — open the link in the e-mail we send you, then open this app again.": "Запрос на объединение кухонь отправлен на {1}. Он появится здесь, как только адрес будет подтверждён — откройте ссылку в письме, которое мы вам отправили, затем снова откройте это приложение.",
   "A self test never puts its own recipes in the cloud (v{1})": "Самопроверка никогда не отправляет свои рецепты в облако (v{1})",
+  "A short clip that shows every way to add a recipe.": "Короткий ролик обо всех способах добавить рецепт.",
   "A short tour of where things are. Changes nothing.": "Короткая экскурсия — где что находится. Ничего не меняет.",
   "A sound when a message or a request to link kitchens arrives. Untick to mute it. On this device.": "Звук при получении сообщения или запроса на объединение кухонь. Снимите галочку, чтобы отключить. На этом устройстве.",
   "A stale-base write is refused, not applied": "Запись с устаревшей базой отклоняется, а не применяется",
@@ -2726,6 +2727,7 @@
   "🎨 How it looks": "🎨 Внешний вид",
   "🎨 The usual colours again": "🎨 Снова обычные цвета",
   "🎬 A video — e.g. a screen recording of a reel": "🎬 Видео — например, запись экрана с рилсом",
+  "🎬 How to add a recipe": "🎬 Как добавить рецепт",
   "🎬 The app in one minute": "🎬 Приложение за одну минуту",
   "🎬 Use external players only": "🎬 Только внешние проигрыватели",
   "🎬 Watch the one-minute clip": "🎬 Посмотреть минутный ролик",

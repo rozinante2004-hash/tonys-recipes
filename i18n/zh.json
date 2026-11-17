@@ -1,7 +1,7 @@
 {
  "lang": "zh",
  "updatedAt": 1794919057128,
- "count": 2884,
+ "count": 2886,
  "strings": {
   "\"Add to Home Screen\"": "添加到主屏幕",
   "\"Open Bring!\"": "打开 Bring!",
@@ -68,6 +68,7 @@
   "A record of what sync did, kept on this device only": "记录同步操作内容，仅保存在本设备上",
   "A request to link kitchens": "一条关联厨房的请求",
   "A request to link kitchens was sent to {1}. It shows here once that address is confirmed — open the link in the e-mail we send you, then open this app again.": "已发送厨房关联请求给 {1}。该地址确认后会显示在这里——请打开我们发给你的邮件中的链接，然后再次打开此应用。",
+  "A short clip that shows every way to add a recipe.": "一段短片，展示添加食谱的所有方式。",
   "A short tour of where things are. Changes nothing.": "简短介绍功能分布，不会更改任何内容。",
   "A sound when a message or a request to link kitchens arrives. Untick to mute it. On this device.": "收到消息或连接厨房的请求时会有提示音。取消勾选即可静音。仅限本设备。",
   "A word about them": "简单介绍一下",
@@ -2430,6 +2431,7 @@
   "🎨 How it looks": "🎨 外观",
   "🎨 The usual colours again": "🎨 恢复常规配色",
   "🎬 A video — e.g. a screen recording of a reel": "🎬 视频 — 比如一段短视频的录屏",
+  "🎬 How to add a recipe": "🎬 如何添加食谱",
   "🎬 The app in one minute": "🎬 一分钟了解这款应用",
   "🎬 Use external players only": "🎬 仅使用外部播放器",
   "🎬 Watch the one-minute clip": "🎬 观看一分钟短片",

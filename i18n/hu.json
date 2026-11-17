@@ -1,7 +1,7 @@
 {
  "lang": "hu",
  "updatedAt": 1794919057128,
- "count": 2657,
+ "count": 2659,
  "strings": {
   "\"Add to Home Screen\"": "Hozzáadás a kezdőképernyőhöz",
   "\"Open Bring!\"": "Bring! megnyitása",
@@ -65,6 +65,7 @@
   "A record of what sync did, kept on this device only": "Napló a szinkronizálás tevékenységéről, csak ezen az eszközön tárolva",
   "A request to link kitchens": "Konyha-összekapcsolási kérés",
   "A request to link kitchens was sent to {1}. It shows here once that address is confirmed — open the link in the e-mail we send you, then open this app again.": "Konyha-összekapcsolási kérést küldtünk ide: {1}. Akkor jelenik meg itt, ha a cím megerősítésre került – nyisd meg a linket az e-mailben, amit küldtünk, majd nyisd meg újra ezt az appot.",
+  "A short clip that shows every way to add a recipe.": "Rövid klip a recept hozzáadásának összes módjáról.",
   "A short tour of where things are. Changes nothing.": "Rövid bemutató, hol mi található. Semmit nem változtat.",
   "A sound when a message or a request to link kitchens arrives. Untick to mute it. On this device.": "Hang jelzi, ha üzenet vagy konyha-összekapcsolási kérés érkezik. Vedd ki a pipát a némításhoz. Csak ezen a készüléken.",
   "A word about them": "Pár szó róluk",
@@ -2224,6 +2225,7 @@
   "🎨 How it looks": "🎨 Megjelenés",
   "🎨 The usual colours again": "🎨 A szokásos színek",
   "🎬 A video — e.g. a screen recording of a reel": "🎬 Egy videó — pl. egy reel képernyőfelvétele",
+  "🎬 How to add a recipe": "🎬 Így adhat hozzá receptet",
   "🎬 The app in one minute": "🎬 Az alkalmazás egy percben",
   "🎬 Use external players only": "🎬 Csak külső lejátszók használata",
   "🎬 Watch the one-minute clip": "🎬 Az egyperces klip megtekintése",

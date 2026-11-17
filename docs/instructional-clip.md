@@ -406,3 +406,21 @@ Tony, on the five cuts of "הדביקי": "Both A and B are correct and I cannot
 - The closing caption follows Tony's punctuation: "כל המתכונים שלכם, במקום אחד." then "לתמיד." as its own line.
 - Both witch clips are made; Tony: "We'll add them together, once the Hebrew version is ready as well" — where they go in
   the app is the next decision (an app change: version, Help, translations, his yes for the release).
+
+## "החליפי" stressed on "לי"; where the clips go in the app (17 Nov 2026)
+Tony: "One last pronunciation fix ... The stress in 'החליפי' is on the 'לי' not on the 'פי'. As for where to find them,
+I agree with putting it in several places: 1. I'm fine with the bottom of the '+ Add Recipe ▾' menu. It makes sense.
+2. However, stacking the in the same place as the other clip, under About, will make it crowded. I think it would be
+better to link it under any Help answer related to adding recipes. Once we accumulate enough such manual clips, we would
+create a videos library with a TOC for all the clips."
+- **"החליפי" (scene 8):** recorded in five spellings, as "הדביקי" was (`recvar.py`, `stress2.py`); **A** (הַחְלִיפי — the
+  pointing stops before the last syllable) is in the sketch and the video; Tony has the five cuts (A–E) to confirm.
+  Scene 8's gain 2.7. The Hebrew video made again: **83.2 s**, −16.3 LUFS, the logo over the empty band first; the Hebrew
+  sketch republished (version 7).
+- **In the app (v39.91, on Test):** the two files are `media/my-kitchen-notes-add-a-recipe-en|he.mp4` (and a `.jpg`
+  still: the first frame, the logo); Hebrew for a Hebrew interface, English for every other language, as the first
+  clip. **+ Add Recipe ▾ → 🎬 How to add a recipe**, the menu's last item, set apart by a line; and the same button
+  **under a Help answer about adding a recipe** (in 💬 Ask About the App, and in that answer's 🔍 Details). Not beside the
+  one-minute clip at the top of Help.
+- **The future videos library:** the app's clips are one list in the code (`APP_CLIPS`: the one-minute clip and this
+  one, each with its file name and title) — the table of contents Tony means can be built from it once there are enough.

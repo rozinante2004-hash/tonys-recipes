@@ -41,7 +41,7 @@ Hebrew/RTL, with some Russian filenames) and heavily AI‑assisted via Claude.
 **Where everything runs and how it connects:** `ARCHITECTURE.md` — recreate it with the rest.
 **Owner/brand:** "Tony Schvekher". The app recognises its owner by a salted fingerprint of his Google address
 (`APP_CONFIG.ownerKeys`); the address itself is only in the GitHub secret `OWNER_EMAIL` (§1b.5).
-**Current version:** `v39.90` — app. **Worker: v107**, deployed separately and versioned separately
+**Current version:** `v39.91` — app. **Worker: v107**, deployed separately and versioned separately
 (§4). There are **five** version strings to bump together: `version.json`, the HTML comment on line
 1, `APP_VERSION`, and the two version badges in the markup. A CI step fails the build when they
 disagree, and a self test (`ver_manifest`) fails in the browser before that. Both exist because
@@ -871,6 +871,21 @@ invitation-only (unless adding to the tester's household)."
   **🎬 Watch the one-minute clip** at the top of 💬 Ask About the App (`#helpClipBtn`). It grew in v39.74 (next
   point). How the clips are made:
   `docs/promo-clip.md`. Self Test `player_plays_the_clip`; `tests/phone-fit.js` opens it on the phone sizes.
+- **🎬 How to add a recipe (v39.91).** The second clip (the witch: every way to add a recipe; how it is made:
+  `docs/instructional-clip.md`): `media/my-kitchen-notes-add-a-recipe-en|he.mp4|.jpg` (1080 × 1080, about 81–83 s;
+  the still is the first frame, the logo). The app's clips are one list, `APP_CLIPS = { tour: {base, title},
+  addRecipe: {base, title} }`; `appClip(id, lang)` → `{src, poster, title}` (Hebrew for a Hebrew interface, English
+  otherwise; `tourClip(lang)` = `appClip('tour', lang)`); `openAppClip(id)` plays one square. Tony: "I'm fine with the
+  bottom of the '+ Add Recipe ▾' menu … stacking [it] in the same place as the other clip … will make it crowded … link
+  it under any Help answer related to adding recipes." So: the last item of + Add Recipe ▾, `#addClipItem` (class
+  `drop-clip`: a line above it) → `openAddRecipeClip()`; and a button (`helpClipButton()`, class `help-clip
+  help-clip-answer`, `data-clip="addRecipe"`) under a Help answer about adding a recipe, above "Ask a follow-up", and
+  in its 🔍 Details (closing the Details window first — it sits above the player). Which answers: `HELP_SYSTEM_PROMPT`
+  tells the assistant to end one with a line of its own, `[CLIP:ADD-RECIPE]` ("THE CLIP'S MARK"), which
+  `helpClipStrip` takes out; failing the mark, `helpAboutAdding` looks for + Add Recipe ▾ or one of its four items by
+  name — English, and as the menu reads in this language — standing alone ("Add recipes" to a collection is not it).
+  `tools/build.js` refuses a copy without the four files. Tony's next step for clips: a videos library with a table of
+  contents, built from `APP_CLIPS`, once there are enough. Self Test `player_how_to_add_a_recipe`.
 - **A recipe's source in the player (v39.74).** Tony: "Please allow all sources in recipes to be played in the in-app
   player by default. However, let it be overwritten, if desired, by a checkbox in settings, called 'use external
   players only'." `playerSource(url)` says what plays and how: YouTube (watch / youtu.be / Shorts / live, start time
@@ -2444,7 +2459,8 @@ Send photos to the cloud, Photo rescue, Undo auto-fetch, Clean up orphaned photo
   (v39.28: a rule older than the project's history hid them on phones — "I do not see an option to save a backup",
   Tony). Drop File Here is `.drop-computer-only`: hidden under `(hover: none) and (pointer: coarse)` — a file cannot be
   dragged into a phone's browser (v39.27).
-- **+ Add Recipe** → Fill in manually, Paste free‑hand text, Import from URL, Scan (camera).
+- **+ Add Recipe** → Fill in manually, Paste free‑hand text, Import from URL, Scan (camera); then, set apart by a line,
+  🎬 How to add a recipe (v39.91: the clip, in the in-app player).
 
 A thin save‑status bar with a **Reset** (clear all data) link sits under the header.
 
@@ -2596,6 +2612,8 @@ lines accept `amount — name` / `amount - name` separators. Editing preserves `
   to English if needed, Pixabay‑search, download + compress the top hit into `photo`.
 - **Help assistant** (`openHelp`/`askHelp`): in‑app Q&A bot with a big `HELP_SYSTEM_PROMPT`
   describing every feature; quick‑question chips; can surface detail cards.
+  **v39.91:** an answer about adding a recipe ends with the assistant's `[CLIP:ADD-RECIPE]` line, which the app turns
+  into the 🎬 How to add a recipe button (above).
   **v39.42:** it must name each feature by the words on its own buttons — a WhatsApp import ("upload to the server")
   and how to use 💬 Ask my WhatsApp groups were missing, and five settings; Self Test `help_knows_whatsapp_import`
   reads those buttons' labels and the Ask window's lines and fails when the prompt does not say them.

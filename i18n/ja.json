@@ -1,7 +1,7 @@
 {
  "lang": "ja",
  "updatedAt": 1794919057128,
- "count": 3185,
+ "count": 3187,
  "strings": {
   "\"Add to Home Screen\"": "ホーム画面に追加",
   "\"One item away\" filter ({1}f.{2})": "「あと1品」フィルター（{1}f.{2}）",
@@ -103,6 +103,7 @@
   "A request to link kitchens": "キッチン連携のリクエスト",
   "A request to link kitchens was sent to {1}. It shows here once that address is confirmed — open the link in the e-mail we send you, then open this app again.": "キッチン連携のリクエストを{1}に送信しました。アドレスが確認されるとここに表示されます。送信されたメールのリンクを開いてから、もう一度このアプリを開いてください。",
   "A self test never puts its own recipes in the cloud (v{1})": "セルフテストは自分のレシピをクラウドに置かない（v{1}）",
+  "A short clip that shows every way to add a recipe.": "レシピを追加するすべての方法を紹介する短い動画です。",
   "A short tour of where things are. Changes nothing.": "どこに何があるかの簡単なご案内です。内容は変更されません。",
   "A sound when a message or a request to link kitchens arrives. Untick to mute it. On this device.": "メッセージやキッチン連携リクエストが届いたときの音。チェックを外すとミュートになります。このデバイスの設定。",
   "A stale-base write is refused, not applied": "古い状態への書き込みは適用されず拒否される",
@@ -2731,6 +2732,7 @@
   "🎨 How it looks": "🎨 見た目",
   "🎨 The usual colours again": "🎨 いつもの色に戻す",
   "🎬 A video — e.g. a screen recording of a reel": "🎬 動画 — 例:リールの画面収録",
+  "🎬 How to add a recipe": "🎬 レシピの追加方法",
   "🎬 The app in one minute": "🎬 1分でわかるアプリ",
   "🎬 Use external players only": "🎬 外部プレーヤーのみを使う",
   "🎬 Watch the one-minute clip": "🎬 1分の紹介動画を見る",

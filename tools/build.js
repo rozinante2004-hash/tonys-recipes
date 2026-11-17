@@ -184,8 +184,9 @@ copyTree(repo, outDir);
   }
 }
 // v39.72 — the clips the in-app player names must be in the copy (the page asks for them by these names).
-for (const l of ['en', 'he']) for (const ext of ['mp4', 'jpg']) {
-  const f = path.join('media', 'my-kitchen-notes-clip-' + l + '.' + ext);
+// v39.91 — and "How to add a recipe" (+ Add Recipe ▾, and Help's answers about adding).
+for (const base of ['my-kitchen-notes-clip-', 'my-kitchen-notes-add-a-recipe-']) for (const l of ['en', 'he']) for (const ext of ['mp4', 'jpg']) {
+  const f = path.join('media', base + l + '.' + ext);
   if (!fs.existsSync(path.join(outDir, f))) fail(f + ' is missing: the in-app player would have nothing to play');
 }
 // …except what the in-app Self Test itself loads from tests/ (the live site

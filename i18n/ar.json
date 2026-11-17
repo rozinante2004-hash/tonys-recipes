@@ -1,7 +1,7 @@
 {
  "lang": "ar",
  "updatedAt": 1794919057128,
- "count": 2882,
+ "count": 2884,
  "strings": {
   "\"Add to Home Screen\"": "إضافة إلى الشاشة الرئيسية",
   "\"Open Bring!\"": "فتح Bring!",
@@ -68,6 +68,7 @@
   "A record of what sync did, kept on this device only": "سجل بما قامت به المزامنة، محفوظ على هذا الجهاز فقط",
   "A request to link kitchens": "طلب ربط مطبخين",
   "A request to link kitchens was sent to {1}. It shows here once that address is confirmed — open the link in the e-mail we send you, then open this app again.": "تم إرسال طلب ربط المطابخ إلى {1}. سيظهر هنا بمجرد تأكيد هذا العنوان — افتح الرابط في البريد الإلكتروني الذي نرسله لك، ثم افتح هذا التطبيق مرة أخرى.",
+  "A short clip that shows every way to add a recipe.": "مقطع قصير يعرض كل طرق إضافة وصفة.",
   "A short tour of where things are. Changes nothing.": "جولة قصيرة لمعرفة أماكن الأشياء. لا تغيّر شيئًا.",
   "A sound when a message or a request to link kitchens arrives. Untick to mute it. On this device.": "صوت عند وصول رسالة أو طلب ربط مطابخ. ألغِ التحديد لكتمه. على هذا الجهاز.",
   "A word about them": "كلمة عنهم",
@@ -2429,6 +2430,7 @@
   "🎨 How it looks": "🎨 المظهر",
   "🎨 The usual colours again": "🎨 الألوان المعتادة من جديد",
   "🎬 A video — e.g. a screen recording of a reel": "🎬 فيديو — مثلاً تسجيل شاشة لريل",
+  "🎬 How to add a recipe": "🎬 كيفية إضافة وصفة",
   "🎬 The app in one minute": "🎬 التطبيق في دقيقة واحدة",
   "🎬 Use external players only": "🎬 استخدام المشغّلات الخارجية فقط",
   "🎬 Watch the one-minute clip": "🎬 شاهد مقطع الدقيقة الواحدة",

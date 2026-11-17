@@ -1,7 +1,7 @@
 {
  "lang": "he",
  "updatedAt": 1794919057128,
- "count": 3308,
+ "count": 3310,
  "strings": {
   "\"Add to Home Screen\"": "הוספה למסך הבית",
   "\"One item away\" filter ({1}f.{2})": "פילטר \"פריט אחד חסר\" ({1}f.{2})",
@@ -104,6 +104,7 @@
   "A request to link kitchens": "בקשה לקישור מטבחים",
   "A request to link kitchens was sent to {1}. It shows here once that address is confirmed — open the link in the e-mail we send you, then open this app again.": "בקשה לחיבור מטבחים נשלחה אל {1}. היא תופיע כאן ברגע שהכתובת תאושר — פתחו את הקישור במייל ששלחנו לכם, ואז פתחו את האפליקציה הזו שוב.",
   "A self test never puts its own recipes in the cloud (v{1})": "בדיקה עצמית לעולם לא מעלה את המתכונים שלה לענן (v{1})",
+  "A short clip that shows every way to add a recipe.": "סרטון קצר שמראה את כל הדרכים להוסיף מתכון.",
   "A short tour of where things are. Changes nothing.": "סיור קצר על איפה מה נמצא. לא משנה כלום.",
   "A sound when a message or a request to link kitchens arrives. Untick to mute it. On this device.": "צליל כשהודעה או בקשה לחיבור מטבחים מגיעה. הסירו סימון כדי להשתיק. במכשיר הזה.",
   "A stale-base write is refused, not applied": "כתיבה על בסיס לא עדכני נדחית, לא מוחלת",
@@ -2850,6 +2851,7 @@
   "🎨 How it looks": "🎨 איך זה נראה",
   "🎨 The usual colours again": "🎨 הצבעים הרגילים בחזרה",
   "🎬 A video — e.g. a screen recording of a reel": "🎬 סרטון — למשל הקלטת מסך של רילס",
+  "🎬 How to add a recipe": "🎬 איך מוסיפים מתכון",
   "🎬 The app in one minute": "🎬 האפליקציה בדקה אחת",
   "🎬 Use external players only": "🎬 שימוש בנגנים חיצוניים בלבד",
   "🎬 Watch the one-minute clip": "🎬 צפו בסרטון של דקה",
