@@ -17,12 +17,13 @@ where.
 **Live now**
 - The family's copy (`main`, https://rozinante2004-hash.github.io/tonys-recipes/ — it forwards to the community app)
   and the community app (`beta`, https://mykitchennotes.community, Firebase project my-kitchen-notes-beta) run
-  **v39.89 + Worker v107** (released 16 Nov 2026, 19:09 Israel time, on 7282293 — "Recent:" the same list on every
-  device of a person, each screen as many as its row holds; the rule `users/<uid>/prefs/recent`, published; Privacy
-  Statement 1.17; v39.88, 📊 Households one line per household and the recipe count as the badge counts it, went out
-  the same afternoon at 15:55 on b826d69; Worker v107 since 15 Nov 06:12: the page, video and photo fetches require a
-  sign-in; the jobs are listed near the top of `docs/history/2026-11.md`). **v39.90 waits on Test** (the Method box's
-  example "Boil the pasta / Mix eggs and cheese / Serve hot" in the interface language, on three whole lines). The test copy
+  **v39.90 + Worker v107** (released 17 Nov 2026, 14:36 Israel time, on 44fa5d8 — the Method box's example "Boil the
+  pasta / Mix eggs and cheese / Serve hot" in the interface language, on three whole lines; v39.89, "Recent:" the same
+  list on every device of a person, the rule `users/<uid>/prefs/recent` and Privacy Statement 1.17, went out on
+  16 Nov at 19:09 on 7282293; Worker v107 since 15 Nov 06:12: the page, video and photo fetches require a sign-in; the
+  jobs are listed near the top of `docs/history/2026-11.md`). **On Test, not released:** the two one-minute clips
+  (`media/my-kitchen-notes-clip-en.mp4`, `-he.mp4`) re-made so the first frame is the logo alone, the band kept
+  (8c50a5b, ef62991 — the clip work, `docs/promo-clip.md`); they go out with the next release Tony says yes to. The test copy
   (https://tonys-recipes-test.pages.dev, its own database and rules) follows `test`.
 - **The beta has had testers since Sunday 25 Oct 2026** and is **by invitation only**: the owner invites with
   ⚙️ → 👑 → ✉️ Invite testers (the congratulatory wording of v39.60); a tester's share button asks the owner for an
