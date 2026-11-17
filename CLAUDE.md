@@ -17,13 +17,13 @@ where.
 **Live now**
 - The family's copy (`main`, https://rozinante2004-hash.github.io/tonys-recipes/ — it forwards to the community app)
   and the community app (`beta`, https://mykitchennotes.community, Firebase project my-kitchen-notes-beta) run
-  **v39.94 + Worker v107** (released 17 Nov 2026, 21:40 Israel time, on db945ab — the network Self Tests send the
-  sign-in, after Tony's beta iPhone run failed `net_url_import` and `net_photo` with 401; v39.93 went out at 19:55 on
-  4b688fc: each farm animal speaks in its own recorded voice, Tony's ElevenLabs cast in V4, `docs/farm-voices.md`;
-  v39.91–v39.92 at 16:08 on 44a3e49: 🎬 How to add a recipe in + Add Recipe ▾, on "Add your first recipe" and under
-  Help answers about adding; Worker v107 since 15 Nov 06:12: the page, video and photo fetches require a sign-in; the
-  jobs are listed near the top of `docs/history/2026-11.md`). **On Test, not released:** **v39.95** — the farm sayings in other languages (a
-  Language selector in the farm window; each language its own `i18n/_farm_<lang>`). The test copy
+  **v39.95 + Worker v107** (released 17 Nov 2026, 23:50 Israel time, on da3f6d9 — the farm sayings in other languages:
+  a Language selector in the farm window, each language its own `i18n/_farm_<lang>`; v39.94 at 21:40 on db945ab: the
+  network Self Tests send the sign-in; v39.93 at 19:55 on 4b688fc: each farm animal in its own recorded voice,
+  `docs/farm-voices.md`; Worker v107 since 15 Nov 06:12; the jobs are listed near the top of `docs/history/2026-11.md`).
+  **Next:** Tony fills in the Hebrew sayings, then they are recorded with the 8 Hebrew ElevenLabs voices (male voices
+  for male animals, female for female, at random; his pronunciation notes in `docs/farm-voices.md`).
+  **On Test, not released:** nothing. The test copy
   (https://tonys-recipes-test.pages.dev, its own database and rules) follows `test`.
 - **The beta has had testers since Sunday 25 Oct 2026** and is **by invitation only**: the owner invites with
   ⚙️ → 👑 → ✉️ Invite testers (the congratulatory wording of v39.60); a tester's share button asks the owner for an
@@ -35,7 +35,7 @@ where.
   `docs/history/2026-11.md`, and update "Live now" here.
 - The rules were last published on 10 Nov 2026 (deploy-rules on 99558ae, success). A push to `test` that changes
   them publishes to the test project only; a release publishes to the family's and the beta's.
-- The Self Tests: **489 pass, 0 fail, 7 skipped** (the network ones) on v39.93, locally (English and Hebrew).
+- The Self Tests: **490 pass, 0 fail, 7 skipped** (the network ones) on v39.95, locally (English and Hebrew).
 
 **The audit of 10 Nov 2026 (`AUDIT-2026-11-10.md`) — Tony's answers of 11 Nov, and where each item is.** In the
 order of work; update this list as items land. Each change: Self Tests + knock-outs, the local checks, Help and
