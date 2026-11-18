@@ -21729,6 +21729,50 @@ window.SELF_TESTS = [
         try{ i18nRevertAll(); }catch(e){} i18nInstall(prevLang, prevDict);
       }
     } },
+  { id:'pantry_hint_translates', group:'UI', name:'🥫 The pantry’s example is in the reader’s language on its five lines, the last in another language; a text box’s own labels are translated; the hints the harvest never saw are among the phrases (v39.97)',
+    test: async()=>{
+      // Tony, 18 Nov 2026: "Better also translate the pantry hints as well, while you're at it and scan for other places
+      // hints might hide".
+      var prevDict=i18nCurrentDict(), prevLang=i18nLang(), ov=document.getElementById('pantryOverlay'), ta=document.getElementById('pantryInput');
+      var realCount=window.insightCount, box=null;
+      var tick=function(ms){ return new Promise(function(r){ setTimeout(r, ms); }); };
+      var says=function(){ return JSON.stringify(ta.getAttribute('placeholder')); };
+      var HE={ 'olive oil':'שמן זית', 'flour':'קמח', 'eggs':'ביצים', 'salt':'מלח', 'Your message':'ההודעה שלכם' };
+      try{
+        if(!ta) throw new Error('#pantryInput missing');
+        if(typeof pantryHintPhrases!=='function' || pantryHintPhrases().join('|')!=='olive oil|flour|eggs|salt') throw new Error('the pantry’s English lines are not olive oil, flour, eggs, salt');
+        pantryHintPhrases().concat(['already in your collection', 'This is not a recipe — the detection was wrong', 'A recipe, but hide it and never show it again',
+          'Your message', 'Select this one (for Take back, Send again or Copy the links, for all selected)', 'Set up the authenticator'])
+          .forEach(function(p){ if(I18N_EXTRA.indexOf(p)<0) throw new Error('"'+p+'" is not among the phrases to translate'); });
+        window.insightCount=function(){};
+        // opened in Hebrew: four staples in Hebrew and a fifth in English (the English one ends in Hebrew)
+        i18nInstall('he', HE);
+        ta.setAttribute('placeholder', 'olive oil\nflour\neggs\nsalt\nשמן זית');
+        openPantry();
+        if(ta.getAttribute('placeholder')!=='שמן זית\nקמח\nביצים\nמלח\nolive oil') throw new Error('opened in Hebrew, the pantry’s hint says '+says());
+        // the translator leaves it be (it would make the five lines one)
+        i18nStartObserver(); i18nApply(ov); await tick(200);
+        if(ta.getAttribute('placeholder')!=='שמן זית\nקמח\nביצים\nמלח\nolive oil') throw new Error('the translator rewrote the pantry’s hint: '+says());
+        // the language changes while it is open
+        i18nInstall('ru', { 'olive oil':'оливковое масло', 'flour':'мука', 'eggs':'яйца', 'salt':'соль' });
+        if(ta.getAttribute('placeholder')!=='оливковое масло\nмука\nяйца\nсоль\nolive oil') throw new Error('after a change to Russian the pantry’s hint says '+says());
+        i18nInstall('en', null);
+        if(ta.getAttribute('placeholder')!=='olive oil\nflour\neggs\nsalt\nשמן זית') throw new Error('back in English the pantry’s hint says '+says());
+        if(ta.value!==getPantry().join('\n')) throw new Error('the hint reached the pantry box’s contents');
+        // a text box's own label is the app's words (its dir="auto" is about what is typed) — not inside a recipe
+        box=document.createElement('div');
+        box.innerHTML='<textarea id="stLblA" dir="auto" aria-label="Your message"></textarea><div dir="auto"><textarea id="stLblB" aria-label="Your message"></textarea></div>';
+        document.body.appendChild(box);
+        i18nInstall('he', HE); i18nApply(box); await tick(200);
+        var a=document.getElementById('stLblA').getAttribute('aria-label'), b=document.getElementById('stLblB').getAttribute('aria-label');
+        if(a!=='ההודעה שלכם') throw new Error('a text box’s own label stayed '+JSON.stringify(a));
+        if(b!=='Your message') throw new Error('a label inside a recipe’s words was translated: '+JSON.stringify(b));
+        return 'Hebrew and Russian on five lines (the fifth in English), English ending in Hebrew; left alone by the translator; a box’s label translated, a recipe’s left';
+      } finally {
+        window.insightCount=realCount; if(box) box.remove(); if(ov) ov.classList.remove('open');
+        try{ i18nRevertAll(); }catch(e){} i18nInstall(prevLang, prevDict);
+      }
+    } },
   { id:'recent_row_on_top', group:'Features', name:'"Recent:" — the recipes opened last fill the top row of the list, in a box with its title; the rest follow in the order chosen, without them (v39.80); a Self Test run leaves the list as it was, and a recipe no longer here gives its place up (v39.83)',
     test: async()=>{
       // Tony, 15 Nov 2026: "In the list of recipes, I would like to see in the top row the recent recipes accessed. The rest

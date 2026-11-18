@@ -634,7 +634,11 @@ under its plain path only (a `?url=` request goes network-first).
   translated, never its contents (multi-line examples carry `data-i18n-skip-attrs="placeholder"`: a key makes every run of
   white space one space, so the translator would put them on one line; the Method box's three-line example is
   translated line by line in code instead — `stepsHintPhrases()` in I18N_EXTRA, `stepsHintPaint()` when the form opens
-  and in `i18nActivate`, v39.90); (4) the harvest
+  and in `i18nActivate`, v39.90; the pantry's five-line example the same way — `pantryHintPhrases()` (olive oil, flour,
+  eggs, salt in the reader's language) and a fifth line in another language, "שמן זית" in English and "olive oil"
+  otherwise, `pantryHintPaint()` in `openPantry` and `i18nActivate`, v39.97); a text box's own aria-label and title are
+  the app's words too — its own dir="auto" is about what is typed, so whether they are content is asked of its parent
+  (`attrSkip`, v39.97); (4) the harvest
   draws the empty kitchen's first screen and the chats with other kitchens, and lists the welcome's paragraphs
   (`HH_WELCOME`), the tour (`TOUR_STEPS`), the badge's words and the example recipes' meal types; (5) the language
   offer (`firstRunLanguageOffer`, z 10100) comes above the sign-in screen and the kitchen rules, so both are in that

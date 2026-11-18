@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.96 -->
+<!-- Tony's Recipes Collection v39.97 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -11217,7 +11217,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.96';
+var APP_VERSION = 'v39.97';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -14794,7 +14794,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.96</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.97</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14882,7 +14882,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.96</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.97</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -17069,6 +17069,7 @@ window.invalidateFilterCounts = invalidateFilterCounts; window.filterCountKey = 
 function openPantry() {
   if (typeof insightCount === 'function') insightCount('pantry');
   document.getElementById('pantryInput').value = getPantry().join('\n');
+  pantryHintPaint();        // v39.97 — the example, in the reader's language
   document.getElementById('pantryOverlay').classList.add('open');
 }
 function savePantry() {
@@ -17699,6 +17700,10 @@ function i18nUnits(root) {
     var hardSkip = isBox || i18nSkip(el, null);
     // …unless the only thing still worth reading here is a placeholder.
     if (hardSkip && i18nSkip(el, 'placeholder')) continue;
+    // v39.97 — and a text box's other labels (aria-label, title) are the app's words too: its own dir="auto" is about
+    // what is typed in it, so whether they are content is its surroundings' question. The chat boxes' "Your message"
+    // stayed English for ever (Tony: "scan for other places hints might hide").
+    var attrSkip = (isBox || el.tagName === 'INPUT') ? (el.hasAttribute('data-no-i18n') || i18nSkip(el.parentElement || el, null)) : hardSkip;
     // Attributes people actually read.
     // `data-i18n-skip-attrs` is for the case dir="auto" cannot reach: an
     // ATTRIBUTE holding recipe data on an element whose children are chrome.
@@ -17708,7 +17713,7 @@ function i18nUnits(root) {
     var skipAttrs = el.getAttribute('data-i18n-skip-attrs') || '';
     ['placeholder', 'title', 'aria-label'].forEach(function(a) {
       if (skipAttrs.indexOf(a) !== -1) return;
-      if (hardSkip && a !== 'placeholder') return;
+      if (attrSkip && a !== 'placeholder') return;
       // Same question for an attribute: the parked copy is only this element's
       // English while the attribute still holds it or holds our translation.
       var live = el.getAttribute(a);
@@ -18710,6 +18715,11 @@ var I18N_EXTRA = [
     + 'The sync log in ⚙️ → 🔧 Troubleshooting → Logging & debugging stays on this device, is never put into a backup, and leaves it only when you choose to send it to the app\u2019s admin.'
 ].concat(appFeaturePhrases(), contactPhrases(), surveyPhrases(),
   stepsHintPhrases(),   // v39.90 — the Method box's example, one phrase per line (stepsHintPaint)
+  pantryHintPhrases(),  // v39.97 — the pantry's (pantryHintPaint)
+  // v39.97 — tooltips and screen-reader labels in windows the harvest had never seen (a scan of every hint, Tony:
+  // "scan for other places hints might hide"): the WhatsApp list, the chat boxes, the links sent, the authenticator.
+  ['already in your collection', 'This is not a recipe — the detection was wrong', 'A recipe, but hide it and never show it again',
+   'Your message', 'Select this one (for Take back, Send again or Copy the links, for all selected)', 'Set up the authenticator'],
   // v38.90 — the welcome's paragraphs and the tour's steps (each drawn inside dir="auto", translated by i18nAsk)
   Object.keys(HH_WELCOME).map(function(k){ return HH_WELCOME[k]; }), TOUR_STEPS.map(function(st){ return st.text; }),
   setupPhrases(), ['\u{1F9ED} Show me around', 'I’ll look around by myself'],   // v38.95 — the wizard
@@ -20925,6 +20935,7 @@ function i18nActivate(lang, dict, changed) {
   i18nRenderBadge();
   // v39.90 — the Method box's example: its lines are looked up in code (several lines are beyond the translator)
   if (typeof stepsHintPaint === 'function') { try { stepsHintPaint(); } catch(e) {} }
+  if (typeof pantryHintPaint === 'function') { try { pantryHintPaint(); } catch(e) {} }   // v39.97 — the pantry's
   // Recipe cards are translated while they are BUILT (renderGrid), and the
   // observer leaves them alone, so a different language has to redraw them.
   if (was !== _i18nDict || changed) {
@@ -25719,6 +25730,21 @@ function stepsHintPaint() {
   return want;
 }
 window.stepsHintPhrases = stepsHintPhrases; window.stepsHintPaint = stepsHintPaint;
+// v39.97 — THE PANTRY'S EXAMPLE TOO (Tony: "Better also translate the pantry hints as well"). Five lines, kept out of
+// the translator for the same reason (data-i18n-skip-attrs): four staples in the reader's language, and a fifth in
+// another language, as the English one has always ended in Hebrew (שמן זית) — a pantry can be written in the
+// languages the recipes are in. In any other interface that fifth line is the English "olive oil".
+function pantryHintPhrases() { return ['olive oil', 'flour', 'eggs', 'salt']; }
+function pantryHintPaint() {
+  var ta = document.getElementById('pantryInput');
+  if (!ta) return '';
+  var lines = pantryHintPhrases().map(function(s){ return i18nPhrase(s); });
+  lines.push(_i18nLang === 'en' || lines[0] === 'olive oil' ? 'שמן זית' : 'olive oil');
+  var want = lines.join('\n');
+  if (ta.getAttribute('placeholder') !== want) ta.setAttribute('placeholder', want);
+  return want;
+}
+window.pantryHintPhrases = pantryHintPhrases; window.pantryHintPaint = pantryHintPaint;
 
 function openAddModal(id){
   editingId=id||null;
