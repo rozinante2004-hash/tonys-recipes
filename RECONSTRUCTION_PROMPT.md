@@ -439,8 +439,19 @@ under its plain path only (a `?url=` request goes network-first).
   (`farmLoadLang`, at start and on a visit when the app's language changed; this device keeps a copy,
   `mkn_farm_cfg_<lang>`). `farmSayingsFor(lang)`: the language's filled-in, ticked slots whose English sentence is still
   there — or, with none, the ticked English ones; `farmOuch` says one in the bubble (`dir="auto"`) and `farmSay(…,
-  lang)` plays its recording (`FARM_RECORDED[lang]`, none yet) or has the device's voice for the language say it
+  lang)` plays its recording (`FARM_RECORDED[lang]`: Hebrew since v39.96, below) or has the device's voice for the language say it
   (`farmLangVoice`: by language, a man's or a woman's as the animal's kind). Self Test `farm_sayings_languages`.
+- **The farm sayings recorded again, and in Hebrew (v39.96).** Tony rewrote the first and last English sayings in the
+  farm window ("Ouch! Quit it!", "Hands off, I'm free-range!!") and asked: "Please record again so all the recorded
+  sentences match what is written". `FARM_SAYINGS_DEFAULT` holds his wording; `FARM_SOUNDS` is `sounds/farm-2/` (those
+  two recorded again in every voice, the other eight the same files as farm-1's; farm-1 stays for copies not yet
+  updated). Hebrew: his ten sentences in ElevenLabs' eight Hebrew voices ("assign male voices to male characters and
+  female voices to female characters randomly" — the cast is in the comment above `FARM_RECORDED` and in
+  `docs/farm-voices.md`; animals sharing a voice each have their own take and a pitch change), V4, in
+  `sounds/farm-he-1/<animal>-<n>.mp3`; `FARM_RECORDED.he = { dir, sayings }` lists the sentences in file order, and
+  `farmRecording(animal, text, 'he')` finds the file by the sentence. היי is said "Hey" (a vowel mark in the text the
+  voice read only). A sentence he changes has none until recorded again (all of them into a new folder). `tools/build.js`
+  refuses a copy without 140 files in each folder the page names. Self Test `farm_own_voices`.
 - **The farm visitors' own voices (v39.93).** Tony picked one ElevenLabs voice per animal himself (17 Nov 2026, after
   turning down my auditions: "Most of them have no character … I will pick the voices myself"), and each says the ten
   default sayings in it, recorded with ElevenLabs' V4 model (`eleven_v4`; Tony: "Please use the newer model (V4)"):

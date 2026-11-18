@@ -11440,7 +11440,7 @@ window.SELF_TESTS = [
         el.click(); await wait(320);
         if(!el.querySelector('.fv-art').classList.contains('turned') || !el.classList.contains('fv-said') || el.querySelector('.fv-bubble').textContent!=='Not yet!') throw new Error('tapping did not turn it to say its sentence');
         // v39.93 — in its own recorded voice (Gertrude the goose: "Not yet!" is the third saying), the device silent
-        if(!/sounds\/farm-1\/goose-2\.mp3$/.test(played[0]||'') || spoken.length) throw new Error('it did not say it in its own recorded voice: played '+JSON.stringify(played)+', the device said '+JSON.stringify(spoken));
+        if(!/sounds\/farm-2\/goose-2\.mp3$/.test(played[0]||'') || spoken.length) throw new Error('it did not say it in its own recorded voice: played '+JSON.stringify(played)+', the device said '+JSON.stringify(spoken));
         HTMLMediaElement.prototype.play=real.play;
         // A sentence never recorded is said by the device: in Scottish or British English (v38.79)
         farmSay('Never recorded, this one', 1, null, 'goose'); await wait(150);
@@ -11787,14 +11787,27 @@ window.SELF_TESTS = [
           if(!r.ok || !/audio|mpeg|octet/.test(r.headers.get('content-type')||'') || (await r.arrayBuffer()).byteLength<2000) throw new Error('the recording '+url+' is not on the site');
         }
         // which file says which sentence — whatever its apostrophes, capitals and spaces; a sentence added later has none
-        if(farmRecording('goat', 'I’m not on the menu!')!=='sounds/farm-1/goat-3.mp3' || farmRecording('goat', "  i'm NOT on the   menu! ")!=='sounds/farm-1/goat-3.mp3') throw new Error('a recorded sentence is not found: '+farmRecording('goat', "i'm not on the menu!"));
-        if(farmRecording('goat', 'Mind the gravy!')!==null || farmRecording('unicorn', 'Ouch!')!==null) throw new Error('a sentence or an animal never recorded has a file');
+        if(farmRecording('goat', 'I’m not on the menu!')!=='sounds/farm-2/goat-3.mp3' || farmRecording('goat', "  i'm NOT on the   menu! ")!=='sounds/farm-2/goat-3.mp3') throw new Error('a recorded sentence is not found: '+farmRecording('goat', "i'm not on the menu!"));
+        if(farmRecording('goat', 'Mind the gravy!')!==null || farmRecording('unicorn', 'Ouch! Quit it!')!==null) throw new Error('a sentence or an animal never recorded has a file');
+        // v39.96 — Tony's rewritten first and last sayings are the recorded ones ("so all the recorded sentences match what is written")
+        if(farmRecording('cow', 'Ouch! Quit it!')!=='sounds/farm-2/cow-0.mp3' || farmRecording('llama', 'Hands off, I’m free-range!!')!=='sounds/farm-2/llama-9.mp3') throw new Error('the rewritten sayings are not the recorded ones: '+farmRecording('cow', 'Ouch! Quit it!'));
+        // v39.96 — Hebrew: Tony's ten sentences, each animal in its Hebrew voice; a sentence he changes has none until recorded again
+        if(!FARM_RECORDED.he || FARM_RECORDED.he.sayings.length!==10) throw new Error('the Hebrew recordings are not named');
+        if(farmRecording('goose', 'עוד לא!', 'he')!=='sounds/farm-he-1/goose-2.mp3' || farmRecording('pig', 'היי! תפסיק עם זה!', 'he')!=='sounds/farm-he-1/pig-0.mp3') throw new Error('a recorded Hebrew sentence is not found: '+farmRecording('goose', 'עוד לא!', 'he'));
+        if(farmRecording('goose', 'עוד לא!!!', 'he')!==null || farmRecording('goose', 'עוד לא!', 'fr')!==null || farmRecording('goose', 'Not yet!', 'he')!==null) throw new Error('a sentence never recorded in that language has a file');
+        var hr=await fetch(farmRecording('rabbit', 'בלי ידיים! אני תרנגולת חופש!', 'he'), { cache:'no-store' });
+        if(!hr.ok || (await hr.arrayBuffer()).byteLength<2000) throw new Error('the Hebrew recordings are not on the site');
         // a tapped animal plays its own recording, and the device says nothing
         HTMLMediaElement.prototype.play=function(){ played.push(this.getAttribute('src')||this.src); return Promise.resolve(); };
         if(window.speechSynthesis){ speechSynthesis.speak=function(u){ spoken.push(u.text+'|'+(u.voice?u.voice.name:'')); if(u.onstart) u.onstart(); }; speechSynthesis.cancel=function(){}; }
         if(!farmSay('Wash your hands first!', 1, null, 'hen')) throw new Error('the hen did not speak');
         await wait(30);
-        if(!/sounds\/farm-1\/hen-7\.mp3$/.test(played[played.length-1]||'') || spoken.length) throw new Error('the hen did not use her own voice: played '+played.join()+', spoken '+spoken.join());
+        if(!/sounds\/farm-2\/hen-7\.mp3$/.test(played[played.length-1]||'') || spoken.length) throw new Error('the hen did not use her own voice: played '+played.join()+', spoken '+spoken.join());
+        // …and in Hebrew, her Hebrew voice (v39.96)
+        played=[];
+        if(!farmSay('קודם תרחץ ידיים!', 1, null, 'hen', 'he')) throw new Error('the hen did not speak Hebrew');
+        await wait(30);
+        if(!/sounds\/farm-he-1\/hen-7\.mp3$/.test(played[played.length-1]||'') || spoken.length) throw new Error('the hen did not use her Hebrew voice: played '+played.join()+', spoken '+spoken.join());
         // a sentence never recorded: the device's voice of the animal's kind (the rabbit is a child)
         played=[]; spoken=[];
         var kindAsked=[]; var realKind=window.farmVoiceKind; window.farmVoiceKind=function(k){ kindAsked.push(k); return realKind(k); };
@@ -11803,12 +11816,12 @@ window.SELF_TESTS = [
         // a recording that cannot play (offline, never heard before): the device says it instead
         played=[]; spoken=[];
         HTMLMediaElement.prototype.play=function(){ played.push(this.src); return Promise.reject(new Error('NotAllowedError')); };
-        farmSay('Ouch!', 1, null, 'horse'); await wait(150);
+        farmSay(FARM_SAYINGS_DEFAULT[0], 1, null, 'horse'); await wait(150);
         if(!played.length || (window.speechSynthesis && !spoken.length)) throw new Error('a recording that could not play was not said by the device instead');
         // the window's 🔊 beside a sentence: a ticked animal says it in its own voice
         played=[]; HTMLMediaElement.prototype.play=function(){ played.push(this.getAttribute('src')||this.src); return Promise.resolve(); };
         farmHearSaying('Steady on!'); await wait(30);
-        if(!/sounds\/farm-1\/[a-z]+-4\.mp3$/.test(played[0]||'')) throw new Error('🔊 in the window did not play a recording: '+played.join());
+        if(!/sounds\/farm-2\/[a-z]+-4\.mp3$/.test(played[0]||'')) throw new Error('🔊 in the window did not play a recording: '+played.join());
         // the service worker keeps them on first use (an animal heard once speaks offline)
         var sw=await (await fetch('sw.js', { cache:'no-store' })).text();
         if(!/BASE \+ 'sounds\/'/.test(sw)) throw new Error('the service worker does not keep the recordings');

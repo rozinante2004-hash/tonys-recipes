@@ -190,11 +190,14 @@ for (const base of ['my-kitchen-notes-clip-', 'my-kitchen-notes-add-a-recipe-'])
   if (!fs.existsSync(path.join(outDir, f))) fail(f + ' is missing: the in-app player would have nothing to play');
 }
 // v39.93 — the farm animals' recorded voices: one file per animal and saying (the page asks for them by these names).
-{
-  const dir = path.join(outDir, 'sounds', 'farm-1');
+// v39.96 — the folders the page names now: English (farm-2) and Hebrew (farm-he-1).
+for (const folder of ['farm-2', 'farm-he-1']) {
+  const dir = path.join(outDir, 'sounds', folder);
   const have = fs.existsSync(dir) ? fs.readdirSync(dir).filter(f => /\.mp3$/.test(f)).length : 0;
-  if (have !== 140) fail('sounds/farm-1 holds ' + have + ' recordings, not 140 (14 animals × 10 sayings): the farm visitors would fall back to the device voice');
+  if (have !== 140) fail('sounds/' + folder + ' holds ' + have + ' recordings, not 140 (14 animals × 10 sayings): the farm visitors would fall back to the device voice');
 }
+{ const m = page.match(/var FARM_SOUNDS = '([^']+)'/), dirs = (page.match(/dir: 'sounds\/[^']+'/g) || []).map(x => x.slice(6, -1));
+  [m && m[1]].concat(dirs).forEach(d => { if (!d || !fs.existsSync(path.join(outDir, d))) fail('the page names the recordings folder ' + d + ', which is not in the copy'); }); }
 // …except what the in-app Self Test itself loads from tests/ (the live site
 // serves the whole repository, so there it has always been reachable).
 const SELF_TEST_FILES = ['tests/sw-probe.js'];

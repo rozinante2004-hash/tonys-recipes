@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.95 -->
+<!-- Tony's Recipes Collection v39.96 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -11217,7 +11217,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.95';
+var APP_VERSION = 'v39.96';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -14794,7 +14794,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.95</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.96</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14882,7 +14882,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.95</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.96</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -32950,8 +32950,9 @@ var FARM_ON_KEY = 'mkn_farm_on', FARM_CFG_KEY = 'mkn_farm_cfg', FARM_DOC = '_far
 // How often is Tony's to set too ("Please make the frequency changeable as
 // well"): between minMinutes and maxMinutes apart, counted while the app is open.
 var FARM_MIN_DEFAULT = 10, FARM_MAX_DEFAULT = 180, FARM_MINUTES_CAP = 24 * 60;
-var FARM_SAYINGS_DEFAULT = ['Ouch!', 'Don’t play with your food!', 'Not yet!', 'I’m not on the menu!', 'Steady on!',
-  'That tickles!', 'Do you mind?', 'Wash your hands first!', 'Is it dinner time yet?', 'Hands off, I’m free-range!'];
+// v39.96 — the first and the last as Tony rewrote them in the farm window (17 Nov 2026), recorded again in every voice.
+var FARM_SAYINGS_DEFAULT = ['Ouch! Quit it!', 'Don’t play with your food!', 'Not yet!', 'I’m not on the menu!', 'Steady on!',
+  'That tickles!', 'Do you mind?', 'Wash your hands first!', 'Is it dinner time yet?', 'Hands off, I’m free-range!!'];
 // Each drawn facing right on the same scale (a 170-wide viewBox): legs that
 // swing from the hip (.leg a/b), the body, a side-on head and a head turned
 // to the viewer. The colours are the animals' own, the same in either theme.
@@ -33465,7 +33466,7 @@ function farmSayingsFor(lang) {
 }
 function farmPickSayingFor(lang) {
   var on = farmSayingsFor(lang);
-  return on.length ? on[Math.floor(Math.random() * on.length)] : { t: 'Ouch!', lang: 'en' };
+  return on.length ? on[Math.floor(Math.random() * on.length)] : { t: FARM_SAYINGS_DEFAULT[0], lang: 'en' };
 }
 function farmPickSaying() { return farmPickSayingFor('en').t; }
 function farmPickAnimal() {
@@ -33599,10 +33600,13 @@ function farmUtterance(text, pitch, kind) {
 // V4 model (Tony: "Please use the newer model (V4)") — the same voice on every phone and computer. The files are
 // sounds/farm-1/<animal>-<0..9>.mp3, one per saying of FARM_SAYINGS_DEFAULT, in its order (the folder's number changes
 // when they are recorded again, so a stored copy is never out of date: the service worker keeps each on first use).
+// v39.96 — sounds/farm-2/: Tony rewrote the first and the last saying ("Please record again so all the recorded
+// sentences match what is written"); those two recorded again in every voice, the other eight the same as farm-1's.
+// farm-1 stays on the site for a while for copies of the app not yet updated.
 // A sentence the owner adds in the farm window has no recording: the device's own voice says it, as before — a man's,
 // a woman's or a child's, as the animal's (kind). The window's old Male / Female / Child / Random choice is gone (Tony
 // chose "a cast", and for the choice: "Follow my cast choice"); the saved `voice` is kept for older versions.
-var FARM_SOUNDS = 'sounds/farm-1/';
+var FARM_SOUNDS = 'sounds/farm-2/';
 var FARM_CAST = {              // the ElevenLabs voice Tony chose for each (for the notes), and its kind for a sentence not recorded
   cow:      { voice: 'Delphi',          kind: 'female' }, sheep:   { voice: 'Canny',           kind: 'female' },
   pig:      { voice: 'Liam Dale',       kind: 'male'   }, hen:     { voice: 'Grandma Rachel',  kind: 'female' },
@@ -33615,8 +33619,18 @@ var FARM_CAST = {              // the ElevenLabs voice Tony chose for each (for 
 // A sentence as it was recorded, whatever its apostrophes, capitals or spaces.
 function farmSayingKey(t) { return String(t == null ? '' : t).toLowerCase().replace(/[\u2018\u2019\u02bc`]/g, "'").replace(/\s+/g, ' ').trim(); }
 // The recording of this animal saying this sentence, or null (an animal or a sentence never recorded). v39.95 — lang:
-// English unless said; a language is recorded when FARM_RECORDED names it (none yet but English).
-var FARM_RECORDED = {};                             // lang -> { dir, sayings: [the recorded sentences, in file order] }
+// English unless said; a language is recorded when FARM_RECORDED names it.
+// v39.96 — Hebrew: Tony's ten sentences (i18n/_farm_he, 17 Nov 2026) in ElevenLabs' eight Hebrew voices, V4 — "assign
+// male voices to male characters and female voices to female characters randomly": pig Nimrod, goat Herzl Ben,
+// sheepdog Herzl Ben (lower), duck Itamar, horse Dorian, donkey Viktor M, llama Viktor M (higher), rooster Erez;
+// sheep Danit, hen Danit (lower), goose Danit (higher), turkey Zina, cow Zina (lower), rabbit Zina (higher). Where
+// animals share a voice each has its own take and pitch. היי is said "Hey" (Tony: "הי is pronounced as Hi, while היי
+// is pronounced as Hey") — a vowel mark in the text the voice read; the bubble shows his text. A sentence he changes
+// has no recording until recorded again (into sounds/farm-he-2/, all of them), and the device's Hebrew voice says it.
+var FARM_RECORDED = {                               // lang -> { dir, sayings: [the recorded sentences, in file order] }
+  he: { dir: 'sounds/farm-he-1/', sayings: ['היי! תפסיק עם זה!', 'אל תשחק באוכל!', 'עוד לא!', 'אני לא בתפריט!', 'חזק ואמץ!',
+    'זה מדגדג!', 'אכפת לך?!', 'קודם תרחץ ידיים!', 'מתי אוכלים?', 'בלי ידיים! אני תרנגולת חופש!'] }
+};
 function farmRecording(animalId, text, lang) {
   if (!FARM_CAST[animalId]) return null;
   if (lang && lang !== 'en') {
@@ -36694,7 +36708,7 @@ var HELP_SYSTEM_PROMPT = [
   "",
   "=== THE FARM VISITORS ===",
   "- Now and then a cartoon farm animal strolls across the screen. Tap it and it turns to you and says something, then, still looking at you, it vanishes in a puff of smoke. EACH ANIMAL HAS ITS OWN VOICE (v39.93): the app's owner chose a voice for each of the fourteen, and they were recorded once (ElevenLabs), so every phone and computer hears the same voices; an animal heard once speaks offline too. A sentence the owner adds later in the farm window is said by the device's own voice — a man's, a woman's or a child's, as the animal's — until it is recorded too; so is a recording the device cannot play (offline before it was ever heard). The farm window no longer offers Male / Female / Child / A different one each time.",
-  "- THE FARM SAYINGS IN OTHER LANGUAGES (v39.95): the app's owner can give the sentences in any of the app's languages — the farm window's Language selector shows, for that language, one slot beside each English sentence, each with its own tick. Each person hears the animals in their own app language: the filled-in, ticked sentences of that language, never English mixed in; a language with none filled in uses the English ones. A sentence in another language is said by the device's own voice for that language until it is recorded too.",
+  "- THE FARM SAYINGS IN OTHER LANGUAGES (v39.95): the app's owner can give the sentences in any of the app's languages — the farm window's Language selector shows, for that language, one slot beside each English sentence, each with its own tick. Each person hears the animals in their own app language: the filled-in, ticked sentences of that language, never English mixed in; a language with none filled in uses the English ones. A sentence in another language is said by the device's own voice for that language until it is recorded too. HEBREW IS RECORDED (v39.96): each animal has its own Hebrew voice for the owner's Hebrew sentences; a Hebrew sentence the owner changes later is said by the device's Hebrew voice until it is recorded again.",
   "- You can pick an animal up and move it (press and drag)",
   "- Switch them off or on: ⚙️ → 🎨 How it looks → 🐑 Farm guests? (this device only)",
   "",
