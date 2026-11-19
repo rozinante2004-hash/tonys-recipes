@@ -449,6 +449,19 @@ under its plain path only (a `?url=` request goes network-first).
   there — or, with none, the ticked English ones; `farmOuch` says one in the bubble (`dir="auto"`) and `farmSay(…,
   lang)` plays its recording (`FARM_RECORDED[lang]`: Hebrew since v39.96, below) or has the device's voice for the language say it
   (`farmLangVoice`: by language, a man's or a woman's as the animal's kind). Self Test `farm_sayings_languages`.
+- **📍 Take me there in Help (v40.01).** Tony: a "Take me there" next to a Help answer's Details "and also inside the
+  modal opening in response to clicking the Details button, in the appropriate places", "not … when it is not
+  applicable". `HELP_PLACES` ([id, path, the item's function or #id, 'open' | 'show' | 'menu']) names 70 places in ⚙️,
+  ··· More, 📁 Files & backup, + Add Recipe, the language and sort menus; `helpPlaceItem` finds each item in the page;
+  `helpPlacesAvailable()` keeps those this person has (`helpPlacesRefresh` runs the menus' own refreshers; owner-only
+  items for the owner; judged up to the item's section body, `settingsItemShown`). `helpGoRule()` is added to
+  `helpSystemPrompt()` (every language): the places and the mark `[GO:<id>]` for a step that leads into one.
+  `helpGoSplit(line)` → { text without the mark, place if this person has it }. `askHelp` puts `helpGoButton(place)` under
+  the step's 🔍 Details (`.help-acts`, stacked); `showHelpDetail(topic, q, place)` puts one beside each of its own marked
+  steps (`.help-drow`), or under the text for the step's place when it has none. `helpGo(id, {fast})`: closes Help and
+  Details, opens the menu (`toggleDrop`), unfolds the section (`settingsGroup` / `moreGroup`), outlines the item
+  (`.help-here`), then `el.click()` after 900 ms for 'open'; 'show' (switches, one-tap actions) is never pressed.
+  Self Test `help_take_me_there`.
 - **The farm sayings recorded again, and in Hebrew (v39.96).** Tony rewrote the first and last English sayings in the
   farm window ("Ouch! Quit it!", "Hands off, I'm free-range!!") and asked: "Please record again so all the recorded
   sentences match what is written". `FARM_SAYINGS_DEFAULT` holds his wording; `FARM_SOUNDS` is `sounds/farm-2/` (those

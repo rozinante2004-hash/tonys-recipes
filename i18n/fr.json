@@ -1,7 +1,7 @@
 {
  "lang": "fr",
  "updatedAt": 1795129628652,
- "count": 2947,
+ "count": 2950,
  "strings": {
   "\"Add to Home Screen\"": "Ajouter à l'écran d'accueil",
   "\"Open Bring!\"": "Ouvrir Bring!",
@@ -905,6 +905,7 @@
   "Opening Bring! relay...": "Ouverture du relais Bring!...",
   "Opening each panel in turn…": "Ouverture de chaque panneau l'un après l'autre…",
   "Opening recipe {3} of {4}…": "Ouverture de la recette {3} sur {4}…",
+  "Opens it for you": "L'ouvre pour vous",
   "Or e-mail me a one-time sign-in link (no password)": "Ou recevoir un lien de connexion par e-mail (sans mot de passe)",
   "Our kitchen rules — please give them a read. 🍳": "Les règles de notre cuisine — merci de les lire. 🍳",
   "Outdent this line": "Désindenter cette ligne",
@@ -1328,6 +1329,7 @@
   "That is enough requests for today — try again tomorrow.": "Assez de demandes pour aujourd'hui — réessaie demain.",
   "That is neither an identifier (MKN-…) nor an e-mail address.": "Ce n'est ni un identifiant (MKN-…) ni une adresse e-mail.",
   "That is not an invitation": "Ce n'est pas une invitation",
+  "That is not available here.": "Ce n'est pas disponible ici.",
   "That is not the password of {1}. Forgot it? Sign out and press “Forgot password?” on the sign-in screen: an e-mail lets you choose a new one.": "Ce n'est pas le mot de passe de {1}. Oublié ? Déconnectez-vous et appuyez sur « Mot de passe oublié ? » sur l'écran de connexion : un e-mail vous permettra d'en choisir un nouveau.",
   "That is the bookmark’s code, not a link — copy the post’s link instead.": "C'est le code du favori, pas un lien — copiez plutôt le lien de la publication.",
   "That is the bookmark’s code, not a recipe": "C'est le code du favori, pas une recette",
@@ -2627,6 +2629,7 @@
   "📋 Worker {1} copied — {2} characters. In Cloudflare: select all, paste, and check the last line reads \"END OF WORKER {3}\".": "📋 Worker {1} copié — {2} caractères. Dans Cloudflare : tout sélectionner, coller, et vérifier que la dernière ligne indique bien \"END OF WORKER {3}\".",
   "📋 {1} copied": "📋 {1} copié",
   "📋 {1} copied{2}": "📋 {1} copié{2}",
+  "📍 Take me there": "📍 M'y emmener",
   "📏 Units: imperial": "📏 Unités : impérial",
   "📏 Units: metric": "📏 Unités : métrique",
   "📏 Units: {1}": "📏 Unités : {1}",

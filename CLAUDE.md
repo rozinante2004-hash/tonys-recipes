@@ -17,8 +17,8 @@ where.
 **Live now**
 - The family's copy (`main`, https://rozinante2004-hash.github.io/tonys-recipes/ — it forwards to the community app)
   and the community app (`beta`, https://mykitchennotes.community, Firebase project my-kitchen-notes-beta) run
-  **v39.99 + Worker v107** (released 20 Nov 2026, 00:11 Israel time, on 3eea878 — an open window holds the page behind
-  it still; v39.98: 📊 Households' ▾ folds a household, addresses and identifiers copy on a tap; v39.97 on 19 Nov at
+  **v40.00 + Worker v107** (released 20 Nov 2026, 01:06 Israel time, on 01370e6 — 52 button labels in rarely-opened
+  windows translated by hand; v39.99 at 00:11 on 3eea878: an open window holds the page behind it still; v39.98: 📊 Households' ▾ folds a household, addresses and identifiers copy on a tap; v39.97 on 19 Nov at
   00:48 on 2414b8f: the pantry's example in the reader's language, a text box's own labels translated, six hints the
   harvest never saw; v39.96 on 18 Nov at 02:41 on 8e4ac76:
   the farm sayings recorded again in
@@ -27,8 +27,9 @@ where.
   own `i18n/_farm_<lang>`; v39.94 at 21:40 on db945ab: the
   network Self Tests send the sign-in; v39.93 at 19:55 on 4b688fc: each farm animal in its own recorded voice,
   `docs/farm-voices.md`; Worker v107 since 15 Nov 06:12; the jobs are listed near the top of `docs/history/2026-11.md`).
-  **On Test, not released:** v40.00 — the untranslated button labels (52, rarely-opened windows) by hand in all 11
-  languages; release on Tony's yes. The test copy
+  **On Test, not released:** v40.01 — 📍 Take me there in Help answers and their Details. **Building:** chat
+  notifications when the app is closed (Web Push; family and linked-kitchen chats; the message text shown; Tony, 20 Nov).
+  The test copy
   (https://tonys-recipes-test.pages.dev, its own database and rules) follows `test`.
 - **The beta has had testers since Sunday 25 Oct 2026** and is **by invitation only**: the owner invites with
   ⚙️ → 👑 → ✉️ Invite testers (the congratulatory wording of v39.60); a tester's share button asks the owner for an

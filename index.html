@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v40.00 -->
+<!-- Tony's Recipes Collection v40.01 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -11217,7 +11217,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v40.00';
+var APP_VERSION = 'v40.01';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -14415,6 +14415,17 @@ body.banner-shown .header {
    under a Help answer about adding a recipe (in the answer, and in its 🔍 Details) */
 .drop-item.drop-clip { border-top: 1px solid var(--border); }
 .help-clip.help-clip-answer { margin: 4px 0 0; }
+/* v40.01 — 📍 Take me there, beside a step's 🔍 Details; and the menu item it leads to, shown a moment before it opens */
+.help-drow { display: flex; align-items: flex-start; gap: 8px; }
+.help-drow .help-dtext { flex: 1; min-width: 0; white-space: pre-wrap; }
+.help-drow .help-go { flex-shrink: 0; margin-top: 2px; }
+.help-acts { flex-shrink: 0; display: flex; flex-direction: column; align-items: stretch; gap: 4px; }
+.help-go { padding: 4px 10px; border: 1px solid var(--terracotta); border-radius: 6px; background: var(--card-bg); color: var(--terracotta);
+  font-family: 'DM Sans', 'Heebo', sans-serif; font-size: 11px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.help-go:hover, .help-go:focus-visible { background: var(--terracotta-fill); color: #fff; }
+.drop-item.help-here { outline: 3px solid var(--terracotta); outline-offset: -3px; border-radius: 6px; animation: helpHere 0.9s ease-in-out 2; }
+@keyframes helpHere { 50% { background: rgba(232,120,74,0.18); } }
+@media (prefers-reduced-motion: reduce) { .drop-item.help-here { animation: none; } }
 #playerVideo { display: block; margin: 0 auto; width: 100%; height: auto; max-width: 100%; background: #000; border-radius: 10px; }
 #playerNote { margin-top: 10px; font-size: 13px; line-height: 1.5; color: var(--ink); text-align: center; }
 #playerFrame { display: block; margin: 0 auto; width: 100%; max-width: 100%; border: 0; background: #000; border-radius: 10px; }
@@ -14826,7 +14837,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v40.00</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v40.01</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14914,7 +14925,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v40.00</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v40.01</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -18749,6 +18760,7 @@ var I18N_EXTRA = [
   stepsHintPhrases(),   // v39.90 — the Method box's example, one phrase per line (stepsHintPaint)
   pantryHintPhrases(),  // v39.97 — the pantry's (pantryHintPaint)
   hiddenButtonPhrases(),   // v40.00 — buttons in windows the harvest had never seen
+  ['\u{1F4CD} Take me there', 'Opens it for you', 'That is not available here.'],   // v40.01 — 📍 Take me there (helpGoButton, helpGo)
   // v39.97 — tooltips and screen-reader labels in windows the harvest had never seen (a scan of every hint, Tony:
   // "scan for other places hints might hide"): the WhatsApp list, the chat boxes, the links sent, the authenticator.
   ['already in your collection', 'This is not a recipe — the detection was wrong', 'A recipe, but hide it and never show it again',
@@ -36828,6 +36840,7 @@ var HELP_SYSTEM_PROMPT = [
   "- Something not working at all: ⚙️ → 🔧 Troubleshooting → 🧪 Self Test, then 📋 Copy report (or Send to admin)",
   "",
   "- 🎬 THE ONE-MINUTE CLIP (v39.72): the ? button → 💬 Ask About the App → 🎬 Watch the one-minute clip plays a short film of what the app does, in a window inside the app (✕ closes it and stops it). It plays in Hebrew when the app is in Hebrew and in English in every other language. It needs an internet connection.",
+  "- 📍 TAKE ME THERE (v40.01): in an answer from 💬 Ask About the App, a step that leads to a place in the app has 📍 Take me there beside its 🔍 Details (and beside each such step inside the Details window). One tap closes Help, opens the menu and its section, shows the item for a moment and then opens it — the window you were told about. A setting that switches something (the theme, units, farm guests, a reset or a backup) is only shown, never pressed for you. It appears only for places you have: the app owner’s items for the owner alone, a feature switched off not at all.",
   "- 🎬 HOW TO ADD A RECIPE, THE CLIP (v39.91): + Add Recipe ▾ → 🎬 How to add a recipe (the menu's last item; also on the 'Add your first recipe' screen a new collection starts on, v39.92) plays an 80-second clip of every way to add a recipe — 📷 Scan recipe from a photo of a page, 🔗 Import from URL (a video's link too), ✍️ Paste free-hand text, the 📘 Save recipe button in the browser, Share → My Kitchen Notes from another app, 📁 From File, and ✏️ Fill in manually — in a window inside the app (✕ closes it and stops it). The same button appears under an answer here about adding a recipe. Hebrew when the app is in Hebrew, English in every other language; it needs an internet connection.",
   "- ▶ A RECIPE'S VIDEO PLAYS INSIDE THE APP (v39.74): in a recipe (or a recipe inside a collection — your own or a linked kitchen's — or a linked kitchen's recipe, or a recipe sent to you), a Source link with a small ▶ before it is a video the app can play: tap the link and it plays in a window inside the app — a YouTube video (Shorts too), Vimeo, an Instagram post or reel, a Facebook video or reel, a TikTok video, or a link straight to a video or sound file. The window opens through a camera lens — a small lens appears, its blades open, and it widens into the window, in about a second (a device set to reduce motion shows the window at once). ✕ closes the window and stops the video. Under the video, ↗ Open outside the app opens it in its own app or site — use it if the video does not play here (a private video, or one whose owner does not allow playing it elsewhere). A source that is an ordinary web page (a recipe site) has no ▶ and opens in the browser as before; so do short links that hide where they lead (fb.watch, vm.tiktok.com). TO ALWAYS OPEN VIDEOS OUTSIDE THE APP: ⚙️ Settings → 🎨 How it looks → tick 🎬 Use external players only (on this device; untick to play inside the app again). When a video plays inside the app, the device loads it from the site that hosts it, as when opening it there; the app sends that site nothing about you or your recipes (🔒 What leaves this device lists it).",
   "",
@@ -36875,13 +36888,15 @@ function helpGlossary() {
   return _helpGlossary.text;
 }
 function helpSystemPrompt() {
-  if (_i18nLang === 'en') return HELP_SYSTEM_PROMPT;
+  var go = '';
+  try { go = helpGoRule(); } catch (e) {}   // v40.01 — 📍 Take me there: the places this person has
+  if (_i18nLang === 'en') return HELP_SYSTEM_PROMPT + go;
   var name = i18nLangName(_i18nLang);
   return HELP_SYSTEM_PROMPT + '\n\n=== THE PERSON\'S LANGUAGE: ' + name.toUpperCase() + ' ===\n'
     + 'The person uses the app in ' + name + ': every button, menu, tab and screen they see is labelled in ' + name + ', not English. '
     + 'Answer in ' + name + '. Whenever you name a button, menu item, tab or screen, write it EXACTLY as it is labelled in ' + name
     + ' (emoji included), using the list below (English label \u2192 what the person sees). Never write the English label. '
-    + 'If a label is not in the list, describe it in ' + name + ' and keep its emoji.\n' + helpGlossary();
+    + 'If a label is not in the list, describe it in ' + name + ' and keep its emoji.\n' + helpGlossary() + go;
 }
 // The answer's own marks (**bold**, # heading) shown as such, not as symbols.
 function helpLineHtml(line) {
@@ -37159,6 +37174,187 @@ window.inviteClipLink = inviteClipLink; window.tourClip = tourClip; window.openP
 window.playerSource = playerSource; window.sourcePlay = sourcePlay;
 window.playerOpenAnim = playerOpenAnim; window.playerAnimStop = playerAnimStop; window.playerIrisBuild = playerIrisBuild; window.playerIrisFrame = playerIrisFrame; window.playerReducedMotion = playerReducedMotion;
 
+// ─── 📍 TAKE ME THERE (v40.01) ────────────────────────────────────────────────────────────────────────────────────────
+// Tony, 20 Nov 2026: "Can we please add a "Take me there" to relevant Help items? … if I ask "how do I chat with family
+// members?", the Help provides me with several options and a "Details" button. If we have a "Take me there" button next
+// to it, the user could simply click it and the app will open the relevant path and land him directly on the relevant
+// page/modal. Naturally, this button will not show up when it is not applicable."
+// The help assistant ends a step that leads to one of these places with its mark, [GO:<id>] (helpGoRule — only the
+// places this person has right now are offered, so it cannot point at one they do not see). The app takes the mark out
+// and puts 📍 Take me there beside the step's 🔍 Details (and in the Details window): it closes Help, opens the menu,
+// unfolds the section, shows the item for a moment, then opens it — a window, landed on. A switch or an action that does
+// something at once (a theme, a reset, a backup) is shown, never pressed ('show').
+// [id, the path as the person reads it (English; the glossary gives theirs), the item: its function or #its id, kind]
+var HELP_PLACES = [
+  ['grid-layout', '⚙️ → 🎨 How it looks → 📱 Grid Layout', 'openGridSettings', 'open'],
+  ['units', '⚙️ → 🎨 How it looks → 📏 Units (metric / imperial)', '#unitsMenuItem', 'show'],
+  ['farm-guests', '⚙️ → 🎨 How it looks → 🐑 Farm guests? (switch them off or on)', '#farmToggleItem', 'show'],
+  ['farm-visitors', '⚙️ → 🎨 How it looks → 🐄 The farm visitors… (what they say, who visits)', 'openFarmSettings', 'open'],
+  ['external-players', '⚙️ → 🎨 How it looks → 🎬 Use external players only', '#playerExternalItem', 'show'],
+  ['colour-blind', '⚙️ → ♿ Accessibility → 🎨 Colours for red–green colour blindness', '#cvdToggleItem', 'show'],
+  ['dot-ring', '⚙️ → ♿ Accessibility → 🟡 A yellow ring round the notification dots', '#dotRingToggleItem', 'show'],
+  ['theme', '⚙️ → ♿ Accessibility → 🌗 Theme (light / dark / auto)', '#themeModeItem', 'show'],
+  ['message-sound', '⚙️ → ♿ Accessibility → 🔔 Sound for messages and requests', '#chimeToggleItem', 'show'],
+  ['message-sound-choice', '⚙️ → ♿ Accessibility → 🎵 The sound', 'openChimeSettings', 'open'],
+  ['family-access', '⚙️ → 🏠 My household → 👥 Family Access (who is in the household, invite family, roles)', 'openAccessControl', 'open'],
+  ['my-identifier', '⚙️ → 🏠 My household → 🪪 Display my personal identifier', 'openMyIdentifier', 'open'],
+  ['link-requests', '⚙️ → 🏠 My household → 📬 Link requests', 'openLinkRequests', 'open'],
+  ['pantry', '⚙️ → 🏠 My household → 🥫 My Pantry', 'openPantry', 'open'],
+  ['whatsapp-groups', '⚙️ → 📥 Saving recipes from other apps → 💬 WhatsApp Groups', 'openWaSetup', 'open'],
+  ['iphone-share', '⚙️ → 📥 Saving recipes from other apps → 📱 Save from the iPhone’s Share menu', '#iosShortcutItem', 'open'],
+  ['android-share', '⚙️ → 📥 Saving recipes from other apps → 📱 Save from the phone’s Share menu', '#androidShareItem', 'open'],
+  ['chrome-extension', '⚙️ → 📥 Saving recipes from other apps → 🧩 Chrome extension (Save-recipe button)', 'openExtensionOffer', 'open'],
+  ['backups', '⚙️ → 💾 Backups and photos → 💾 Backups', 'showBackupPanel', 'open'],
+  ['photos-to-cloud', '⚙️ → 💾 Backups and photos → ☁️ Send my photos to the cloud', 'healCloudPhotos', 'show'],
+  ['restore-photos', '⚙️ → 💾 Backups and photos → 🖼️ Restore photos from a backup', 'openPhotoRescue', 'open'],
+  ['tester-welcome', '⚙️ → 💬 Help and feedback → 👋 Welcome to the beta', 'testerWelcome', 'open'],
+  ['tour', '⚙️ → 💬 Help and feedback → 🧭 Take the tour', 'startTour', 'open'],
+  ['send-feedback', '⚙️ → 💬 Help and feedback → ✉️ Send feedback', 'sendFeedback', 'open'],
+  ['feedback-answers', '⚙️ → 💬 Help and feedback → 📨 Answers to my notes', 'openFbReplies', 'open'],
+  ['feedback-button', '⚙️ → 💬 Help and feedback → 💬 Feedback button (shown / hidden)', '#feedbackFabItem', 'show'],
+  ['sync-health', '⚙️ → 🔧 Troubleshooting → 📡 Sync Health', 'openSyncHealth', 'open'],
+  ['logging', '⚙️ → 🔧 Troubleshooting → 🪵 Logging & debugging', 'showLoggingPanel', 'open'],
+  ['self-test', '⚙️ → 🔧 Troubleshooting → 🧪 Self Test', 'openSelfTest', 'open'],
+  ['reset-device', '⚙️ → 🔧 Troubleshooting → 🧽 Reset this device…', '#resetDeviceItem', 'show'],
+  ['change-password', '⚙️ → 🔑 Change my password', '#changePasswordItem', 'show'],
+  ['delete-account', '⚙️ → 🗑 Delete my account…', '#deleteAccountItem', 'show'],
+  ['households', '⚙️ → 👑 App owner → 📊 Households (management)', 'openManagement', 'open'],
+  ['server-allowances', '⚙️ → 👑 App owner → 🩺 Server allowances', 'openServerAllowances', 'open'],
+  ['phone-alerts', '⚙️ → 👑 App owner → 📲 Phone alerts', 'openWhatsAppAlerts', 'open'],
+  ['setup-preview', '⚙️ → 👑 App owner → 🧑‍🍳 Preview the first-visit setup', 'setupPreview', 'open'],
+  ['invite-testers', '⚙️ → 👑 App owner → ✉️ Invite testers', 'openInviteTesters', 'open'],
+  ['payments', '⚙️ → 👑 App owner → 💳 Payments', 'openPayments', 'open'],
+  ['deployments', '⚙️ → 👑 App owner → 🚀 Deployments', 'openDeployments', 'open'],
+  ['key-check', '⚙️ → 👑 App owner → 🔑 Check the app’s key', 'openKeyCheck', 'open'],
+  ['owner-two-step', '⚙️ → 👑 App owner → 🔐 Two-step sign-in for the owner', 'openOwnerTwoStep', 'open'],
+  ['gmail-setup', '⚙️ → 👑 App owner → 📧 Gmail Setup', 'openGmailSetup', 'open'],
+  ['bring-connection', '⚙️ → 👑 App owner → 🛒 Bring! Connection', 'showBringBookmarklet', 'open'],
+  ['explore', '··· More → 💡 Ideas → 🔭 Explore meal ideas', 'openExploreModal', 'open'],
+  ['suggest', '··· More → 💡 Ideas → ✨ Suggest recipes', 'openSuggestModal', 'open'],
+  ['what-can-i-make', '··· More → 💡 Ideas → 🥫 What can I make with what I have?', 'openWhatCanIMake', 'open'],
+  ['converter', '··· More → 🧰 Tools → ⚖️ Measurement converter', 'openCalcModal', 'open'],
+  ['connect-household', '··· More → 🏡 Kitchens and people → 🤝 Connect with another household', 'openConnectHousehold', 'open'],
+  ['family-chat', '··· More → 🏡 Kitchens and people → 👪 Chat with family members', 'openFamilyChat', 'open'],
+  ['kitchen-chats', '··· More → 🏡 Kitchens and people → 💬 Chats with linked kitchens', 'openKitchenChats', 'open'],
+  ['recipes-sent-to-me', '··· More → 🏡 Kitchens and people → 📨 Recipes sent to me', 'openGiftsIn', 'open'],
+  ['recipes-i-sent', '··· More → 🏡 Kitchens and people → 📤 Recipes I sent', 'openGiftsOut', 'open'],
+  ['delete-requests', '··· More → 🏡 Kitchens and people → 🗑️ Requests to delete', 'openDeleteAsks', 'open'],
+  ['share-app', '··· More → 🏡 Kitchens and people → Share this app', 'openShareAppModal', 'open'],
+  ['ask-whatsapp', '··· More → 📱 WhatsApp → 💬 Ask my WhatsApp groups', 'openWaAsk', 'open'],
+  ['whatsapp-recipes', '··· More → 📱 WhatsApp → 🧺 Recipes hiding in my chats', 'openWaLinks', 'open'],
+  ['auto-tag', '··· More → 🧹 Tidy up → 🏷️ Auto-tag diet types', 'aiTagAllDiets', 'show'],
+  ['auto-photos', '··· More → 🧹 Tidy up → 📸 Auto-fetch missing photos', 'autoFetchMissingPhotos', 'show'],
+  ['from-file', '📁 Files & backup ▾ → 📁 From File', "getElementById('fileIn')", 'show'],
+  ['drop-file', '📁 Files & backup ▾ → 📂 Drop File Here', 'openDropZone', 'open'],
+  ['all-to-word', '📁 Files & backup ▾ → 📄 All to Word', 'exportAllWord', 'show'],
+  ['backup-save', '📁 Files & backup ▾ → 💾 Backup — Save', '#backupSaveBtn', 'show'],
+  ['backup-restore', '📁 Files & backup ▾ → 📂 Backup — Restore', '#backupRestoreBtn', 'show'],
+  ['add-manually', '+ Add Recipe ▾ → ✏️ Fill in manually', 'openAddModal', 'open'],
+  ['paste-text', '+ Add Recipe ▾ → ✍️ Paste free-hand text', 'openFreehandModal', 'open'],
+  ['import-url', '+ Add Recipe ▾ → 🔗 Import from URL', 'openUrlImportModal', 'open'],
+  ['scan-recipe', '+ Add Recipe ▾ → 📷 Scan recipe (camera/photo)', 'openCameraImport', 'open'],
+  ['add-recipe-clip', '+ Add Recipe ▾ → 🎬 How to add a recipe', 'openAddRecipeClip', 'open'],
+  ['language', '🌐 the language button (top of the screen) — the app’s language', '@langMenu', 'menu'],
+  ['sort', '⇅ Sort — the order of the recipe list', '@sortDrop', 'menu']
+];
+var HELP_GO_MARK = /\[\s*GO\s*:\s*([a-z0-9-]+)\s*\]/i;
+function helpPlace(id) { return HELP_PLACES.filter(function (p) { return p[0] === id; })[0] || null; }
+// the menu item a place is (null for a whole menu, or one not in this copy)
+function helpPlaceItem(p) {
+  if (!p || p[3] === 'menu') return null;
+  if (p[2].charAt(0) === '#') return document.getElementById(p[2].slice(1));
+  var menus = document.querySelectorAll('.drop-menu');
+  for (var i = 0; i < menus.length; i++) {
+    var items = menus[i].querySelectorAll('.drop-item[onclick]');
+    for (var j = 0; j < items.length; j++) if (items[j].getAttribute('onclick').indexOf(p[2]) !== -1) return items[j];
+  }
+  return null;
+}
+// what each menu shows right now (as it does when it opens), quietly
+function helpPlacesRefresh() {
+  try { if (typeof applyOwnerOnlyItems === 'function') applyOwnerOnlyItems(); } catch (e) {}
+  try { if (typeof renderUnitsMenuItem === 'function') renderUnitsMenuItem(); } catch (e) {}
+  try { var ci = document.getElementById('confirmEmailItem'); if (ci) ci.style.display = (window._fbUser && window._fbUser.email && window._fbUser.emailVerified === false) ? '' : 'none'; } catch (e) {}
+  try { var cp = document.getElementById('changePasswordItem'); if (cp) cp.style.display = accountHasPassword(window._fbAuth && window._fbAuth.currentUser) ? '' : 'none'; } catch (e) {}
+  try { refreshShortcutsSection(); } catch (e) {}
+  try { applySelfTestVisibility(); } catch (e) {}
+  try { settingsGroupsRefresh(false); } catch (e) {}
+  try { moreSectionsRefresh(false); } catch (e) {}
+}
+// Is it there for this person now? (shown in its menu: not the owner's to someone else, not a feature switched off,
+// not hidden in this copy or for this account)
+function helpPlaceShown(p) {
+  if (!p) return false;
+  if (p[3] === 'menu') { var m = document.getElementById(p[2].slice(1)), b = m && (m.previousElementSibling || null); return !!m && (!b || settingsItemShown(b, document.body)); }
+  var el = helpPlaceItem(p);
+  if (!el) return false;
+  if (el.hasAttribute('data-owner-only') && !(typeof isAppOwner === 'function' && isAppOwner())) return false;
+  // judged up to its section's body (closed while the section is folded), as the menus judge their own (v39.30)
+  return settingsItemShown(el, el.closest('.set-body') || el.closest('.drop-menu'));
+}
+function helpPlacesAvailable() {
+  helpPlacesRefresh();
+  return HELP_PLACES.filter(helpPlaceShown);
+}
+// The rule for the help assistant, with the places this person has
+function helpGoRule() {
+  var list = helpPlacesAvailable();
+  if (!list.length) return '';
+  return '\n\n=== TAKE ME THERE MARKS (v40.01) ===\n'
+    + 'When a numbered or bulleted step (or a one-line answer) tells the person to open one of the places below, end THAT line with the place’s mark, '
+    + 'e.g. "… tap \u{1F46A} Chat with family members. [GO:family-chat]". The app puts a \u{1F4CD} Take me there button beside the step, which takes them straight there. '
+    + 'Use only the ids below, never invent one, at most one mark per line, and only where the step leads into that very place '
+    + '(the last one, when a step names several on the way). No mark on a line that leads nowhere in this list. Never mention the marks.\n'
+    + list.map(function (p) { return '[GO:' + p[0] + '] ' + p[1]; }).join('\n');
+}
+// the mark of one line (a place this person has), and the line without it
+function helpGoSplit(line) {
+  var m = HELP_GO_MARK.exec(String(line || '')), p = m ? helpPlace(m[1].toLowerCase()) : null;
+  var text = String(line || '').replace(new RegExp(HELP_GO_MARK.source, 'gi'), '').replace(/\s+$/, '');
+  return { text: text, place: p && helpPlaceShown(p) ? p[0] : null };
+}
+// Go: Help closes; the menu opens, the section unfolds, the item is shown a moment, and opened ('open') — or left shown
+// ('show': a switch or an action is never pressed for them). opts.fast: no pause (the Self Test).
+function helpGo(id, opts) {
+  opts = opts || {};
+  var p = helpPlace(id);
+  if (!p) return false;
+  helpPlacesRefresh();
+  if (!helpPlaceShown(p)) { toast('That is not available here.'); return false; }
+  var d = document.getElementById('helpDetailOverlay'); if (d) d.remove();
+  try { closeM('helpOverlay'); } catch (e) {}
+  if (p[3] === 'menu') {
+    var mid = p[2].slice(1), mm = document.getElementById(mid);
+    if (mid === 'langMenu' && typeof toggleLangMenu === 'function') { if (!mm.classList.contains('open')) toggleLangMenu(); }
+    else if (mm && !mm.classList.contains('open')) toggleDrop(mid);
+    return true;
+  }
+  var el = helpPlaceItem(p), menu = el.closest('.drop-menu');
+  if (menu && !menu.classList.contains('open')) toggleDrop(menu.id);
+  var g = el.closest('.set-group[data-group], .more-sec[data-group]');
+  if (g && !g.classList.contains('open') && menu) {
+    if (menu.id === 'settingsDrop') settingsGroup(g.getAttribute('data-group'));
+    else if (menu.id === 'moreDrop') moreGroup(g.getAttribute('data-group'));
+  }
+  try { el.scrollIntoView({ block: 'nearest' }); } catch (e) {}
+  el.classList.add('help-here');
+  setTimeout(function () { el.classList.remove('help-here'); }, 2600);
+  if (p[3] === 'open') {
+    var press = function () { el.classList.remove('help-here'); el.click(); };
+    if (opts.fast) press(); else setTimeout(press, 900);
+  }
+  return true;
+}
+// the button
+function helpGoButton(id, before) {
+  var b = document.createElement('button'); b.type = 'button'; b.className = 'help-go'; b.setAttribute('data-go', id);
+  b.textContent = '\u{1F4CD} Take me there'; b.title = 'Opens it for you';
+  b.onclick = function () { if (before) before(); helpGo(id); };
+  return b;
+}
+window.HELP_PLACES = HELP_PLACES; window.helpPlace = helpPlace; window.helpPlaceItem = helpPlaceItem; window.helpPlaceShown = helpPlaceShown;
+window.helpPlacesAvailable = helpPlacesAvailable; window.helpGoRule = helpGoRule; window.helpGoSplit = helpGoSplit; window.helpGo = helpGo; window.helpGoButton = helpGoButton;
+
 function askHelpQ(q) { document.getElementById('helpInput').value = (_i18nLang !== 'en' && _i18nDict && _i18nDict[q]) || q; askHelp(); }
 
 async function askHelp() {
@@ -37174,16 +37370,19 @@ async function askHelp() {
     var lines=answer.split('\n');
     // v39.63 (audit) — 🔍 Details beside each numbered or bulleted step; an answer with no steps keeps one per line
     var stepRe=/^\s*(\d+[.)]|[-*\u2022]|\(\d+\))\s+/, hasSteps=lines.some(function(l){ return stepRe.test(l); });
+    var acts=function(row){ var a=row.querySelector('.help-acts'); if(!a){ a=document.createElement('div'); a.className='help-acts'; row.appendChild(a); } return a; };
     lines.forEach(function(line) {
+      var go=helpGoSplit(line); line=go.text;   // v40.01 — 📍 Take me there: the step's place, its mark out of the text
       if(!line.trim()) return;
       var row=document.createElement('div'); row.style.cssText='display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;';
       var lineText=document.createElement('div'); lineText.style.cssText='flex:1;font-size:13px;line-height:1.6;color:var(--ink);padding-top:4px;'; lineText.setAttribute('dir','auto'); lineText.setAttribute('data-no-i18n',''); lineText.innerHTML=helpLineHtml(line);
       row.appendChild(lineText);
       if(line.trim().length>15 && !line.trim().endsWith(':') && (!hasSteps || stepRe.test(line))) {
         var btn=document.createElement('button'); btn.style.cssText='flex-shrink:0;padding:4px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;font-family:DM Sans,Heebo,sans-serif;font-size:11px;color:var(--muted);cursor:pointer;white-space:nowrap;'; btn.textContent='🔍 Details';
-        (function(topic){ btn.onclick=function(){ showHelpDetail(topic,q); }; })(line.trim().replace(/^#+\s*/,'').replace(/\*\*/g,''));
-        row.appendChild(btn);
+        (function(topic, place){ btn.onclick=function(){ showHelpDetail(topic,q,place); }; })(line.trim().replace(/^#+\s*/,'').replace(/\*\*/g,''), go.place);
+        acts(row).appendChild(btn);
       }
+      if(go.place) acts(row).appendChild(helpGoButton(go.place));   // v40.01 — under 🔍 Details, so the step keeps its width
       answerEl.appendChild(row);
     });
     if(aboutAdding) answerEl.appendChild(helpClipButton());
@@ -37201,7 +37400,7 @@ async function askHelp() {
   }
 }
 
-function showHelpDetail(topic, context) {
+function showHelpDetail(topic, context, place) {
   var existing=document.getElementById('helpDetailOverlay'); if(existing) existing.remove();
   var overlay=document.createElement('div'); overlay.id='helpDetailOverlay';
   overlay.style.cssText='position:fixed;inset:0;background:rgba(28,26,24,0.4);z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px;';
@@ -37217,8 +37416,21 @@ function showHelpDetail(topic, context) {
   aiCall('The user asked: "'+context+'"\nThey want details about: "'+topic+'"\nProvide focused step-by-step details, under 200 words.',600,null,AI_MODEL_SMALL,helpSystemPrompt())
     .then(function(d){
       var aboutAdding=helpAboutAdding(d)||helpAboutAdding(topic); d=helpClipStrip(d);   // v39.91 — as under the answer itself
-      body.style.cssText='font-size:13px;color:var(--ink);line-height:1.7;white-space:pre-wrap;'; body.setAttribute('dir','auto'); body.setAttribute('data-no-i18n',''); body.innerHTML=d.trim().split('\n').map(helpLineHtml).join('\n');
+      // v40.01 — Tony: "The "Take me there" button should appear both next to the Details button and also inside the modal
+      // opening in response to clicking the Details button, in the appropriate places": beside each of these steps that
+      // leads to a place this person has (its mark taken out); with none, under the text for the step it came from.
+      var parts=d.trim().split('\n').map(helpGoSplit), anyGo=parts.some(function(g){ return g.place; });
+      body.style.cssText='font-size:13px;color:var(--ink);line-height:1.7;'; body.setAttribute('dir','auto'); body.setAttribute('data-no-i18n','');
+      body.innerHTML='';
+      parts.forEach(function(g){
+        var row=document.createElement('div'); row.className='help-drow';
+        var txt=document.createElement('div'); txt.className='help-dtext'; txt.innerHTML=g.text.trim() ? helpLineHtml(g.text) : '&nbsp;';
+        row.appendChild(txt);
+        if(g.place) row.appendChild(helpGoButton(g.place, function(){ overlay.remove(); }));
+        body.appendChild(row);
+      });
       if(aboutAdding) card.appendChild(helpClipButton(function(){ overlay.remove(); }));
+      if(!anyGo && place && helpPlaceShown(helpPlace(place))) { var gb=helpGoButton(place, function(){ overlay.remove(); }); gb.style.marginTop='12px'; card.appendChild(gb); }
     })
     .catch(function(e){ body.textContent='Error: '+e.message; });
 }

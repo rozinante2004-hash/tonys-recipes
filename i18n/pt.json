@@ -1,7 +1,7 @@
 {
  "lang": "pt",
  "updatedAt": 1795129628652,
- "count": 2712,
+ "count": 2715,
  "strings": {
   "\"Add to Home Screen\"": "Adicionar à tela inicial",
   "\"Open Bring!\"": "Abrir Bring!",
@@ -827,6 +827,7 @@
   "Open ↗": "Abrir ↗",
   "Opening Bring! relay...": "Abrindo o relay do Bring!...",
   "Opening each panel in turn…": "Abrindo cada painel, um de cada vez…",
+  "Opens it for you": "Abre isso para você",
   "Or e-mail me a one-time sign-in link (no password)": "Ou envie-me um link de acesso único por e-mail (sem senha)",
   "Our kitchen rules — please give them a read. 🍳": "As regras da nossa cozinha — dá uma lida. 🍳",
   "Outdent this line, or the selected lines": "Diminuir recuo desta linha, ou das linhas selecionadas",
@@ -1215,6 +1216,7 @@
   "That file is not a readable backup: {1}": "Esse ficheiro não é uma cópia de segurança legível: {1}",
   "That is enough requests for today — try again tomorrow.": "Já chega de pedidos por hoje — tente novamente amanhã.",
   "That is neither an identifier (MKN-…) nor an e-mail address.": "Isso não é nem um identificador (MKN-…) nem um endereço de e-mail.",
+  "That is not available here.": "Isso não está disponível aqui.",
   "That is not the password of {1}. Forgot it? Sign out and press “Forgot password?” on the sign-in screen: an e-mail lets you choose a new one.": "Essa não é a senha de {1}. Esqueceu a sua? Saia e toque em “Esqueci minha senha” na tela de login: um e-mail permite escolher uma nova.",
   "That is the bookmark’s code, not a link — copy the post’s link instead.": "Isso é o código do marcador, não um link — copia antes o link da publicação.",
   "That is the bookmark’s code, not a recipe": "Isso é o código do marcador, não uma receita",
@@ -2407,6 +2409,7 @@
   "📋 Worker {1} copied — {2} characters. In Cloudflare: select all, paste, and check the last line reads \"END OF WORKER {3}\".": "📋 Worker {1} copiado — {2} caracteres. No Cloudflare: selecione tudo, cole e confira se a última linha diz \"END OF WORKER {3}\".",
   "📋 {1} copied": "📋 {1} copiado",
   "📋 {1} copied{2}": "📋 {1} copiado{2}",
+  "📍 Take me there": "📍 Levar-me até lá",
   "📏 Units: imperial": "📏 Unidades: imperial",
   "📏 Units: metric": "📏 Unidades: métrico",
   "📏 Units: {1}": "📏 Unidades: {1}",

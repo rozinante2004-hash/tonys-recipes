@@ -1,7 +1,7 @@
 {
  "lang": "zh",
  "updatedAt": 1795129628652,
- "count": 2951,
+ "count": 2954,
  "strings": {
   "\"Add to Home Screen\"": "添加到主屏幕",
   "\"Open Bring!\"": "打开 Bring!",
@@ -905,6 +905,7 @@
   "Opening Bring! relay...": "正在打开 Bring! 中转…",
   "Opening each panel in turn…": "正在依次打开每个面板…",
   "Opening recipe {3} of {4}…": "正在打开第 {3} 个食谱，共 {4} 个…",
+  "Opens it for you": "帮你打开",
   "Or e-mail me a one-time sign-in link (no password)": "或给我发一个一次性登录链接（无需密码）",
   "Our kitchen rules — please give them a read. 🍳": "我们的厨房规矩——请花点时间看看。🍳",
   "Outdent this line": "取消该行缩进",
@@ -1328,6 +1329,7 @@
   "That is enough requests for today — try again tomorrow.": "今天的申请次数已用完——请明天再试。",
   "That is neither an identifier (MKN-…) nor an e-mail address.": "这既不是标识符（MKN-…），也不是电子邮件地址。",
   "That is not an invitation": "这不是邀请",
+  "That is not available here.": "这里无法使用。",
   "That is not the password of {1}. Forgot it? Sign out and press “Forgot password?” on the sign-in screen: an e-mail lets you choose a new one.": "这不是 {1} 的密码。忘记了？请退出登录，在登录界面点“忘记密码？”：一封邮件就能让你设置新密码。",
   "That is the bookmark’s code, not a link — copy the post’s link instead.": "这是书签代码，不是链接——请复制帖子的链接。",
   "That is the bookmark’s code, not a recipe": "这是书签代码，不是食谱",
@@ -2630,6 +2632,7 @@
   "📋 Worker {1} copied — {2} characters. In Cloudflare: select all, paste, and check the last line reads \"END OF WORKER {3}\".": "📋 Worker {1} 已复制——共 {2} 个字符。在 Cloudflare 中：全选、粘贴，并检查最后一行是否为 “END OF WORKER {3}”。",
   "📋 {1} copied": "📋 已复制 {1}",
   "📋 {1} copied{2}": "📋 {1}已复制{2}",
+  "📍 Take me there": "📍 带我去那里",
   "📏 Units: imperial": "📏 单位：英制",
   "📏 Units: metric": "📏 单位：公制",
   "📏 Units: {1}": "📏 单位：{1}",

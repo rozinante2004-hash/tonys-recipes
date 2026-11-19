@@ -1,7 +1,7 @@
 {
  "lang": "he",
  "updatedAt": 1795129628652,
- "count": 3375,
+ "count": 3378,
  "strings": {
   "\"Add to Home Screen\"": "הוספה למסך הבית",
   "\"One item away\" filter ({1}f.{2})": "פילטר \"פריט אחד חסר\" ({1}f.{2})",
@@ -1092,6 +1092,7 @@
   "Opening Bring! relay...": "פותח ממסר Bring!...",
   "Opening each panel in turn…": "פותח כל פאנל בתורו…",
   "Opening recipe {3} of {4}…": "פותח מתכון {3} מתוך {4}…",
+  "Opens it for you": "פותח את זה בשבילכם",
   "Or e-mail me a one-time sign-in link (no password)": "או שלחו לי קישור כניסה חד-פעמי (בלי סיסמה)",
   "Orphaned photo documents can be swept ({1}d.{2})": "אפשר לנקות מסמכי תמונות יתומים ({1}d.{2})",
   "Our kitchen rules — please give them a read. 🍳": "חוקי המטבח שלנו — כדאי לקרוא אותם. 🍳",
@@ -1604,6 +1605,7 @@
   "That is enough requests for today — try again tomorrow.": "זה מספיק בקשות להיום — נסו שוב מחר.",
   "That is neither an identifier (MKN-…) nor an e-mail address.": "זה לא מזהה (MKN-…) ולא כתובת אימייל.",
   "That is not an invitation": "זאת לא הזמנה",
+  "That is not available here.": "זה לא זמין כאן.",
   "That is not the password of {1}. Forgot it? Sign out and press “Forgot password?” on the sign-in screen: an e-mail lets you choose a new one.": "זו לא הסיסמה של {1}. שכחתם אותה? התנתקו ולחצו על \"שכחתם סיסמה?\" במסך ההתחברות: מייל יאפשר לכם לבחור חדשה.",
   "That is the bookmark’s code, not a link — copy the post’s link instead.": "זה הקוד של הסימנייה, לא קישור — העתיקו במקום זאת את הקישור לפוסט.",
   "That is the bookmark’s code, not a recipe": "זה הקוד של הסימנייה, לא מתכון",
@@ -3050,6 +3052,7 @@
   "📋 Worker {1} copied — {2} characters. In Cloudflare: select all, paste, and check the last line reads \"END OF WORKER {3}\".": "📋 {1} של Worker הועתק — {2} תווים. ב-Cloudflare: בחרו הכל, הדביקו, וודאו שהשורה האחרונה היא \"END OF WORKER {3}\".",
   "📋 {1} copied": "📋 {1} הועתק",
   "📋 {1} copied{2}": "📋 {1} הועתק{2}",
+  "📍 Take me there": "📍 קחו אותי לשם",
   "📏 Units: imperial": "📏 יחידות: אימפריאלי",
   "📏 Units: metric": "📏 יחידות: מטרי",
   "📏 Units: {1}": "📏 יחידות: {1}",

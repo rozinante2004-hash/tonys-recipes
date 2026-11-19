@@ -1595,6 +1595,7 @@
       if (!t) return Promise.resolve(false);
       var done = function (ok) {
         if (!ok) {
+          el.classList.remove('mg-copied'); el.style.minWidth = '';   // the text itself, not a "Copied!" from a moment ago
           try { var rg = document.createRange(); rg.selectNodeContents(el.querySelector('.mg-cpt') || el); var sel = getSelection(); sel.removeAllRanges(); sel.addRange(rg); } catch (e) {}
           if (typeof toast === 'function') toast('It could not be copied by itself — it is selected: copy it now.', 5000);
           return false;

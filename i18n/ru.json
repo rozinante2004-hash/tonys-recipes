@@ -1,7 +1,7 @@
 {
  "lang": "ru",
  "updatedAt": 1795129628652,
- "count": 3247,
+ "count": 3250,
  "strings": {
   "\"Add to Home Screen\"": "Добавить на главный экран",
   "\"One item away\" filter ({1}f.{2})": "Фильтр «Не хватает одного» ({1}ф.{2})",
@@ -1060,6 +1060,7 @@
   "Opening Bring! relay...": "Подключение к Bring!...",
   "Opening each panel in turn…": "Открываем панели одну за другой…",
   "Opening recipe {3} of {4}…": "Открываем рецепт {3} из {4}…",
+  "Opens it for you": "Откроет это за вас",
   "Or e-mail me a one-time sign-in link (no password)": "Или отправить ссылку для входа на почту (без пароля)",
   "Orphaned photo documents can be swept ({1}d.{2})": "Осиротевшие фото можно удалить ({1}шт.{2})",
   "Our kitchen rules — please give them a read. 🍳": "Правила нашей кухни — пожалуйста, прочитайте их. 🍳",
@@ -1548,6 +1549,7 @@
   "That is enough requests for today — try again tomorrow.": "На сегодня запросов достаточно — попробуйте завтра.",
   "That is neither an identifier (MKN-…) nor an e-mail address.": "Это не идентификатор (MKN-…) и не e-mail адрес.",
   "That is not an invitation": "Это не приглашение",
+  "That is not available here.": "Здесь это недоступно.",
   "That is not the password of {1}. Forgot it? Sign out and press “Forgot password?” on the sign-in screen: an e-mail lets you choose a new one.": "Это не пароль {1}. Забыли его? Выйдите и нажмите «Забыли пароль?» на экране входа: письмо позволит выбрать новый.",
   "That is the bookmark’s code, not a link — copy the post’s link instead.": "Это код закладки, а не ссылка — скопируйте ссылку на пост.",
   "That is the bookmark’s code, not a recipe": "Это код закладки, а не рецепт",
@@ -2926,6 +2928,7 @@
   "📋 Worker {1} copied — {2} characters. In Cloudflare: select all, paste, and check the last line reads \"END OF WORKER {3}\".": "📋 Worker {1} скопирован — {2} символов. В Cloudflare: выделите всё, вставьте и проверьте, что последняя строка — \"END OF WORKER {3}\".",
   "📋 {1} copied": "📋 {1} скопировано",
   "📋 {1} copied{2}": "📋 {1} скопировано{2}",
+  "📍 Take me there": "📍 Перейти туда",
   "📏 Units: imperial": "📏 Единицы: имперские",
   "📏 Units: metric": "📏 Единицы измерения: метрические",
   "📏 Units: {1}": "📏 Единицы: {1}",

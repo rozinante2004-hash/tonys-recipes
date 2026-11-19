@@ -1,7 +1,7 @@
 {
  "lang": "hu",
  "updatedAt": 1795129628652,
- "count": 2725,
+ "count": 2728,
  "strings": {
   "\"Add to Home Screen\"": "Hozzáadás a kezdőképernyőhöz",
   "\"Open Bring!\"": "Bring! megnyitása",
@@ -830,6 +830,7 @@
   "Open ↗": "Megnyitás ↗",
   "Opening Bring! relay...": "Bring! kapcsolat megnyitása…",
   "Opening each panel in turn…": "Panelek megnyitása sorban…",
+  "Opens it for you": "Megnyitja neked",
   "Or e-mail me a one-time sign-in link (no password)": "Vagy kérek egy egyszeri bejelentkezési linket e-mailben (jelszó nélkül)",
   "Our kitchen rules — please give them a read. 🍳": "A konyhánk szabályai — kérlek, olvasd el őket. 🍳",
   "Outdent this line, or the selected lines": "Behúzás csökkentése ezen a soron, vagy a kijelölt sorokon",
@@ -1219,6 +1220,7 @@
   "That file is not a readable backup: {1}": "Ez a fájl nem olvasható biztonsági mentés: {1}",
   "That is enough requests for today — try again tomorrow.": "Mára elég volt a kérésekből — próbáld újra holnap.",
   "That is neither an identifier (MKN-…) nor an e-mail address.": "Ez se nem azonosító (MKN-…), se nem e-mail cím.",
+  "That is not available here.": "Ez itt nem érhető el.",
   "That is not the password of {1}. Forgot it? Sign out and press “Forgot password?” on the sign-in screen: an e-mail lets you choose a new one.": "Ez nem {1} jelszava. Elfelejtette? Jelentkezz ki, és nyomd meg az „Elfelejtett jelszó?” gombot a bejelentkezési képernyőn: egy e-mail segítségével új jelszót választhat.",
   "That is the bookmark’s code, not a link — copy the post’s link instead.": "Ez a könyvjelző kódja, nem link — inkább a bejegyzés linkjét másold ki.",
   "That is the bookmark’s code, not a recipe": "Ez a könyvjelző kódja, nem recept",
@@ -2419,6 +2421,7 @@
   "📋 Worker {1} copied — {2} characters. In Cloudflare: select all, paste, and check the last line reads \"END OF WORKER {3}\".": "📋 {1} worker kimásolva — {2} karakter. Cloudflare-ben: jelöld ki az egészet, illeszd be, és ellenőrizd, hogy az utolsó sor ez: \"END OF WORKER {3}\".",
   "📋 {1} copied": "📋 {1} kimásolva",
   "📋 {1} copied{2}": "📋 {1} másolva{2}",
+  "📍 Take me there": "📍 Vigyél oda",
   "📏 Units: imperial": "📏 Mértékegység: angolszász",
   "📏 Units: metric": "📏 Mértékegység: metrikus",
   "📏 Units: {1}": "📏 Mértékegység: {1}",

@@ -1,7 +1,7 @@
 {
  "lang": "ar",
  "updatedAt": 1795129628652,
- "count": 2949,
+ "count": 2952,
  "strings": {
   "\"Add to Home Screen\"": "إضافة إلى الشاشة الرئيسية",
   "\"Open Bring!\"": "فتح Bring!",
@@ -905,6 +905,7 @@
   "Opening Bring! relay...": "جارٍ فتح وسيط Bring!...",
   "Opening each panel in turn…": "جارٍ فتح كل لوحة بدورها…",
   "Opening recipe {3} of {4}…": "جاري فتح الوصفة {3} من {4}…",
+  "Opens it for you": "يفتحه لك",
   "Or e-mail me a one-time sign-in link (no password)": "أو أرسل لي رابط دخول لمرة واحدة (بدون كلمة مرور)",
   "Our kitchen rules — please give them a read. 🍳": "قواعد مطبخنا — يرجى قراءتها. 🍳",
   "Outdent this line": "إزاحة هذا السطر للخارج",
@@ -1328,6 +1329,7 @@
   "That is enough requests for today — try again tomorrow.": "هذا يكفي من الطلبات لهذا اليوم — حاول غدًا.",
   "That is neither an identifier (MKN-…) nor an e-mail address.": "هذا ليس معرّفًا (MKN-…) ولا بريدًا إلكترونيًا.",
   "That is not an invitation": "هذه ليست دعوة",
+  "That is not available here.": "هذا غير متاح هنا.",
   "That is not the password of {1}. Forgot it? Sign out and press “Forgot password?” on the sign-in screen: an e-mail lets you choose a new one.": "هذه ليست كلمة مرور {1}. نسيتها؟ سجّل الخروج واضغط \"نسيت كلمة المرور؟\" في شاشة تسجيل الدخول: سيصلك بريد إلكتروني لاختيار كلمة جديدة.",
   "That is the bookmark’s code, not a link — copy the post’s link instead.": "هذا رمز الإشارة المرجعية، وليس رابطًا — انسخ رابط المنشور بدلاً من ذلك.",
   "That is the bookmark’s code, not a recipe": "هذا رمز الإشارة المرجعية، وليس وصفة",
@@ -2629,6 +2631,7 @@
   "📋 Worker {1} copied — {2} characters. In Cloudflare: select all, paste, and check the last line reads \"END OF WORKER {3}\".": "📋 تم نسخ Worker {1} — {2} حرفًا. في Cloudflare: حدد الكل، الصق، وتأكد أن آخر سطر هو \"END OF WORKER {3}\".",
   "📋 {1} copied": "📋 تم نسخ {1}",
   "📋 {1} copied{2}": "📋 تم نسخ {1}{2}",
+  "📍 Take me there": "📍 خذني إلى هناك",
   "📏 Units: imperial": "📏 الوحدات: إمبراطورية",
   "📏 Units: metric": "📏 الوحدات: مترية",
   "📏 Units: {1}": "📏 الوحدات: {1}",

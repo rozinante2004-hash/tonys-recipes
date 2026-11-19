@@ -1,7 +1,7 @@
 {
  "lang": "it",
  "updatedAt": 1795129628652,
- "count": 2853,
+ "count": 2856,
  "strings": {
   "\"Add to Home Screen\"": "Aggiungi a Home",
   "\"Open Bring!\"": "Apri Bring!",
@@ -874,6 +874,7 @@
   "Opening Bring! relay...": "Apertura relay Bring!...",
   "Opening each panel in turn…": "Apertura di ogni pannello…",
   "Opening recipe {3} of {4}…": "Apertura ricetta {3} di {4}…",
+  "Opens it for you": "Lo apre per te",
   "Or e-mail me a one-time sign-in link (no password)": "Oppure inviami un link di accesso temporaneo via e-mail (senza password)",
   "Our kitchen rules — please give them a read. 🍳": "Le regole della nostra cucina — dagli un'occhiata. 🍳",
   "Outdent this line": "Riduci rientro riga",
@@ -1284,6 +1285,7 @@
   "That is enough requests for today — try again tomorrow.": "Richieste esaurite per oggi — riprova domani.",
   "That is neither an identifier (MKN-…) nor an e-mail address.": "Non è né un identificativo (MKN-…) né un indirizzo e-mail.",
   "That is not an invitation": "Questo non è un invito",
+  "That is not available here.": "Qui non è disponibile.",
   "That is not the password of {1}. Forgot it? Sign out and press “Forgot password?” on the sign-in screen: an e-mail lets you choose a new one.": "Non è la password di {1}. L'hai dimenticata? Esci e premi \"Password dimenticata?\" nella schermata di accesso: un'e-mail ti permetterà di sceglierne una nuova.",
   "That is the bookmark’s code, not a link — copy the post’s link instead.": "Questo è il codice del segnalibro, non un link — copia invece il link del post.",
   "That is the bookmark’s code, not a recipe": "Questo è il codice del segnalibro, non una ricetta",
@@ -2538,6 +2540,7 @@
   "📋 Worker {1} copied — {2} characters. In Cloudflare: select all, paste, and check the last line reads \"END OF WORKER {3}\".": "📋 Worker {1} copiato — {2} caratteri. In Cloudflare: seleziona tutto, incolla e controlla che l'ultima riga sia \"END OF WORKER {3}\".",
   "📋 {1} copied": "📋 {1} copiato",
   "📋 {1} copied{2}": "📋 {1} copiato{2}",
+  "📍 Take me there": "📍 Portami lì",
   "📏 Units: imperial": "📏 Unità: imperiali",
   "📏 Units: metric": "📏 Unità: metriche",
   "📏 Units: {1}": "📏 Unità: {1}",

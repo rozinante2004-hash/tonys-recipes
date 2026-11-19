@@ -1567,7 +1567,7 @@ window.SELF_TESTS = [
         var ans=document.getElementById('helpAnswer');
         if(!ans.querySelector('strong') || /\*\*|^#/.test(ans.textContent)) throw new Error('the answer shows ** or # marks: '+ans.textContent.slice(0,120));
         // English: the help text alone.
-        _i18nLang='en'; if(helpSystemPrompt()!==HELP_SYSTEM_PROMPT) throw new Error('English help is changed');
+        _i18nLang='en'; if(helpSystemPrompt()!==HELP_SYSTEM_PROMPT+helpGoRule()) throw new Error('English help is changed');   // v40.01 — only the 📍 places added
       } finally {
         window.aiCall=real.ai; _i18nLang=real.lang; _i18nDict=real.dict; _helpGlossary={ lang:'', text:'' };
         try{ closeM('helpOverlay'); }catch(e){}
@@ -12346,7 +12346,7 @@ window.SELF_TESTS = [
         openHelp(); askHelpQ('How do I link one recipe to another?'); await wait(3); await new Promise(function(r){ setTimeout(r,120); });
         var b=buttons();
         if(b.length!==3) throw new Error('an answer with three steps got '+b.length+' Details buttons');
-        var rows=b.map(function(x){ return x.parentNode.textContent.replace(/Details/,'').trim().slice(0,2); });
+        var rows=b.map(function(x){ var row=x.parentNode.classList.contains('help-acts') ? x.parentNode.parentNode : x.parentNode; return row.textContent.replace(/Details/,'').trim().slice(0,2); });   // v40.01 — the buttons stacked
         if(rows.join()!=='1.,2.,3.') throw new Error('the buttons are not beside the steps: '+rows.join(' | '));
         window.aiCall=async function(){ return 'Open ⚙️ Settings and tap Accessibility, then choose the ring you like best.'; };
         askHelpQ('How do I change the ring?'); await wait(1); await new Promise(function(r){ setTimeout(r,120); });
@@ -21782,6 +21782,74 @@ window.SELF_TESTS = [
       } finally {
         _editFormSnapshot=null; if(ov) ov.classList.remove('open');
         try{ i18nRevertAll(); }catch(e){} i18nInstall(prevLang, prevDict);
+      }
+    } },
+  { id:'help_take_me_there', group:'UI', name:'📍 Help: a step that leads to a place in the app has “Take me there” beside its Details (and in the Details window) — only for places this person has; it closes Help, opens the menu and section, shows the item, then opens it; a switch or an action is shown, never pressed (v40.01)',
+    test: async()=>{
+      // Tony, 20 Nov 2026: "Can we please add a "Take me there" to relevant Help items? … the app will open the relevant path and
+      // land him directly on the relevant page/modal. Naturally, this button will not show up when it is not applicable."
+      var real={ ai:window.aiCall, owner:window.isAppOwner, calc:window.openCalcModal, theme:window.cycleTheme, toast:window.toast };
+      var calls=[], tick=function(ms){ return new Promise(function(r){ setTimeout(r, ms); }); };
+      try{
+        window.toast=function(){};
+        // every place is a real item (or a real menu), each id once
+        var ids={};
+        HELP_PLACES.forEach(function(p){ if(ids[p[0]]) throw new Error('the place '+p[0]+' twice'); ids[p[0]]=1;
+          if(['open','show','menu'].indexOf(p[3])<0) throw new Error(p[0]+': what kind of place is '+p[3]+'?');
+          if(p[3]==='menu' ? !document.getElementById(p[2].slice(1)) : !helpPlaceItem(p)) throw new Error('the place '+p[0]+' is not in the app'); });
+        // only what this person has: the owner's places for the owner alone
+        window.isAppOwner=function(){ return false; };
+        var rule=helpGoRule();
+        if(!/\[GO:converter\]/.test(rule) || /\[GO:households\]/.test(rule)) throw new Error('the places offered to someone who is not the owner are wrong');
+        window.isAppOwner=function(){ return true; };
+        if(!/\[GO:households\]/.test(helpGoRule())) throw new Error('the owner is not offered his places');
+        if(helpSystemPrompt().indexOf('[GO:converter]')<0) throw new Error('the help assistant is not told the places');
+        window.isAppOwner=function(){ return false; };
+        // an answer: the button beside the step that leads somewhere this person has — and the mark out of the text
+        window.aiCall=async function(){ return 'Two ways:\n1. Open the Measurement converter in More to convert it. [GO:converter]\n2. Ask the owner to look at Households for you. [GO:households]\n3. A step that leads to a place that does not exist. [GO:moon-base]'; };
+        openHelp(); document.getElementById('helpInput').value='how do I convert?'; await askHelp();
+        var rows=Array.prototype.slice.call(document.querySelectorAll('#helpAnswer > div')).filter(function(r){ return /Two ways|converter|Households|does not exist/.test(r.textContent); });
+        var withGo=rows.filter(function(r){ return r.querySelector('.help-go'); });
+        if(withGo.length!==1 || !/converter/.test(withGo[0].textContent) || withGo[0].querySelector('.help-go').getAttribute('data-go')!=='converter') throw new Error('Take me there is not beside the one step it applies to: '+withGo.length);
+        if(/\[GO:/i.test(document.getElementById('helpAnswer').textContent)) throw new Error('a mark shows in the answer');
+        if(!withGo[0].querySelector('.help-acts button:not(.help-go)')) throw new Error('Details is not beside it');
+        // Take me there: Help closes, ··· More opens at its section, the item is shown, then opened
+        window.openCalcModal=function(){ calls.push('calc'); };
+        if(!helpGo('converter', { fast:true })) throw new Error('it did not go');
+        await tick(30);
+        if(document.getElementById('helpOverlay').classList.contains('open')) throw new Error('Help stayed open');
+        if(calls.join()!=='calc') throw new Error('the converter was not opened: '+calls.join());
+        // a switch is shown, never pressed
+        window.cycleTheme=function(){ calls.push('theme'); };
+        if(!helpGo('theme', { fast:true })) throw new Error('it did not go to the theme');
+        var th=document.getElementById('themeModeItem');
+        if(calls.indexOf('theme')!==-1) throw new Error('the theme was switched for them');
+        if(!document.getElementById('settingsDrop').classList.contains('open') || !th.classList.contains('help-here')) throw new Error('⚙️ was not opened at the theme, shown');
+        closeDrop('settingsDrop'); th.classList.remove('help-here');
+        // a place this person does not have: nothing happens
+        if(helpGo('households', { fast:true })) throw new Error('it went to the owner’s place for someone else');
+        // the Details window: beside each of its steps that leads somewhere this person has (Tony: "also inside the modal
+        // opening in response to clicking the Details button, in the appropriate places")
+        window.aiCall=async function(){ return '1. Open ··· More.\n2. Tap 🧰 Tools, then ⚖️ Measurement converter. [GO:converter]\n3. Or ask for Households. [GO:households]\n4. Choose the units.'; };
+        showHelpDetail('Open the converter', 'how do I convert?', 'converter'); await tick(60);
+        var dw=document.getElementById('helpDetailOverlay');
+        var drows=dw ? Array.prototype.slice.call(dw.querySelectorAll('.help-drow')) : [];
+        var dgo=drows.filter(function(r){ return r.querySelector('.help-go'); });
+        if(drows.length!==4 || dgo.length!==1 || !/Measurement converter/.test(dgo[0].textContent) || dgo[0].querySelector('.help-go').getAttribute('data-go')!=='converter')
+          throw new Error('Take me there is not beside the one step of the Details that leads somewhere: '+dgo.length+' of '+drows.length);
+        if(/\[GO:/.test(dw.textContent)) throw new Error('a mark shows in the Details');
+        dw.remove();
+        // Details without a mark of their own: one under the text, for the step they came from
+        window.aiCall=async function(){ return 'Open ··· More, then the converter.'; };
+        showHelpDetail('Open the converter', 'how do I convert?', 'converter'); await tick(60);
+        dw=document.getElementById('helpDetailOverlay');
+        if(!dw || dw.querySelectorAll('.help-go[data-go="converter"]').length!==1) throw new Error('Details with no mark of their own have no Take me there for their step');
+        return HELP_PLACES.length+' places, each real; only the person’s own offered; beside the one step; Help closed, the window opened; a switch shown, not pressed; in Details too';
+      } finally {
+        window.aiCall=real.ai; window.isAppOwner=real.owner; window.openCalcModal=real.calc; window.cycleTheme=real.theme; window.toast=real.toast;
+        var d=document.getElementById('helpDetailOverlay'); if(d) d.remove();
+        try{ closeM('helpOverlay'); }catch(e){} try{ closeDrop('settingsDrop'); closeDrop('moreDrop'); }catch(e){}
+        try{ applyOwnerOnlyItems(); }catch(e){}
       }
     } },
   { id:'hidden_buttons_translated', group:'UI', name:'🌐 The buttons in rarely-opened windows (links sent, the household bar, the import fallbacks, the WhatsApp list, the add-on offer, sign-in by link) are among the phrases and are translated when drawn — the icon kept (v40.00)',
