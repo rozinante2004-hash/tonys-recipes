@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.99 -->
+<!-- Tony's Recipes Collection v40.00 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -11217,7 +11217,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.99';
+var APP_VERSION = 'v40.00';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -14826,7 +14826,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.99</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v40.00</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14914,7 +14914,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.99</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v40.00</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -18748,6 +18748,7 @@ var I18N_EXTRA = [
 ].concat(appFeaturePhrases(), contactPhrases(), surveyPhrases(),
   stepsHintPhrases(),   // v39.90 — the Method box's example, one phrase per line (stepsHintPaint)
   pantryHintPhrases(),  // v39.97 — the pantry's (pantryHintPaint)
+  hiddenButtonPhrases(),   // v40.00 — buttons in windows the harvest had never seen
   // v39.97 — tooltips and screen-reader labels in windows the harvest had never seen (a scan of every hint, Tony:
   // "scan for other places hints might hide"): the WhatsApp list, the chat boxes, the links sent, the authenticator.
   ['already in your collection', 'This is not a recipe — the detection was wrong', 'A recipe, but hide it and never show it again',
@@ -25777,6 +25778,12 @@ function pantryHintPaint() {
   return want;
 }
 window.pantryHintPhrases = pantryHintPhrases; window.pantryHintPaint = pantryHintPaint;
+// v40.00 — Tony, 20 Nov 2026: "Please translate the untranslated button labels too." Buttons in windows the translation
+// harvest had never opened (links sent and received, the household bar, the import fallbacks, the WhatsApp list, the
+// add-on offer, sign-in by link, the WhatsApp list's marks and tooltips): listed here so they are among the phrases to
+// translate (I18N_EXTRA), and translated by hand in every language.
+function hiddenButtonPhrases() { return ["+ Add to My Recipes", "Copy the links", "E-mail me a sign-in link", "Edit my pantry", "Finish", "I already have an account — sign in", "Import this", "Leave this household", "Open WhatsApp settings", "Parse this into a recipe", "Show as in the recipe", "Show them again", "Stop", "Take back", "↩️ Take it back", "↻ Put the newest version there", "↻ Read everything again", "↻ Try again", "⏹ Stop", "☑ Show all kitchens", "✉️ Ask for an invitation", "✋ Ask to add and change recipes", "✍️ Paste a recipe by hand", "🎬 Another video", "🎬 Import the video", "👀 Look", "💬 Feedback button: shown", "💾 Save as new recipe in collection", "📁 Put it in a folder", "📁 Put the new version in a folder", "📋 Paste the caption", "📋 Paste what I copied", "📘 The Facebook bookmark", "📨 Send again", "📷 Import screenshots", "📸 Show Original", "🔄 Read what is new", "🔖 Just bookmark it", "🗑️ Remove Original", "🙈 Not interested", "🚫 Not a recipe", "▶︎ Continue", "⏸ Pause", "✔︎ Imported", "◉ Viewed", "◎ Viewed", "✍️ Paste the text instead", "Save as bookmark", "🐞 Debug mode: On", "Imported", "You marked this viewed", "Mark as viewed"]; }
+window.hiddenButtonPhrases = hiddenButtonPhrases;
 
 function openAddModal(id){
   editingId=id||null;
@@ -41882,7 +41889,7 @@ function showSaveAsVideoBookmark(url, suggestedName, emoji) {
     + '</div>'
     + '<div style="display:flex;gap:8px;">'
     + '<button onclick="saveAsVideoBookmark(this)" data-url="' + escA(url) + '" data-emoji="' + escA(emoji||'🎥') + '" style="flex:1;padding:12px;background:var(--terracotta-fill);color:white;border:none;border-radius:8px;font-family:DM Sans,Heebo,sans-serif;font-size:14px;font-weight:600;cursor:pointer;">'
-    + (emoji||'🎥') + ' Save as bookmark</button>'
+    + '<span>' + escH(emoji||'🎥') + '</span> Save as bookmark</button>'   // v40.00 — the icon on its own: one phrase to translate
     + '<button onclick="clearUrlImportResult()" style="padding:12px 16px;background:var(--bg);border:1px solid var(--border);border-radius:8px;font-family:DM Sans,Heebo,sans-serif;font-size:13px;cursor:pointer;">Cancel</button>'
     + '</div>'
     + '</div>';

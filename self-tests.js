@@ -21784,6 +21784,34 @@ window.SELF_TESTS = [
         try{ i18nRevertAll(); }catch(e){} i18nInstall(prevLang, prevDict);
       }
     } },
+  { id:'hidden_buttons_translated', group:'UI', name:'🌐 The buttons in rarely-opened windows (links sent, the household bar, the import fallbacks, the WhatsApp list, the add-on offer, sign-in by link) are among the phrases and are translated when drawn — the icon kept (v40.00)',
+    test: async()=>{
+      // Tony, 20 Nov 2026: "Please translate the untranslated button labels too."
+      var prevDict=i18nCurrentDict(), prevLang=i18nLang(), box=null;
+      var tick=function(ms){ return new Promise(function(r){ setTimeout(r, ms); }); };
+      try{
+        var list=hiddenButtonPhrases();
+        if(!Array.isArray(list) || list.length<40) throw new Error('the list of buttons is missing or short: '+(list && list.length));
+        list.forEach(function(p){ if(I18N_EXTRA.indexOf(p)<0) throw new Error('"'+p+'" is not among the phrases to translate'); });
+        // each drawn as a button, in a language that has it: the translation shows (a leading icon in the words is part of the phrase)
+        var dict={}; list.forEach(function(p, i){ dict[p]='ת'+i; });
+        dict['Save as bookmark']='שמירה';   // the bookmark button: its icon is a piece of its own, the words one phrase
+        box=document.createElement('div');
+        box.innerHTML=list.map(function(p, i){ return '<button type="button" data-i="'+i+'">'+escH(p)+'</button>'; }).join('')
+          + '<button type="button" id="stBmk"><span>🎬</span> Save as bookmark</button>';
+        document.body.appendChild(box);
+        i18nInstall('he', dict); i18nStartObserver(); i18nApply(box); await tick(250);
+        var bad=[];
+        Array.prototype.forEach.call(box.querySelectorAll('button[data-i]'), function(b){ var i=+b.getAttribute('data-i'); if(b.textContent.trim()!==dict[list[i]]) bad.push(list[i]+' → '+b.textContent.trim()); });
+        if(bad.length) throw new Error(bad.length+' not translated when drawn: '+bad.slice(0, 4).join('; '));
+        var bm=document.getElementById('stBmk');
+        if(!/🎬/.test(bm.textContent) || bm.textContent.indexOf('שמירה')<0 || /Save as bookmark/.test(bm.textContent)) throw new Error('the bookmark button: '+bm.textContent);
+        return list.length+' buttons translated when drawn; the bookmark’s icon kept apart from its words';
+      } finally {
+        if(box) box.remove();
+        try{ i18nRevertAll(); }catch(e){} i18nInstall(prevLang, prevDict);
+      }
+    } },
   { id:'windows_hold_the_page', group:'UI', name:'🪟 While a window is open the page behind it holds still (a swipe or the wheel never scrolls it), and a window’s own scrolling stops at its ends; closed, the page scrolls again (v39.99)',
     test: async()=>{
       // Tony, 19 Nov 2026: "sometimes, for example in the "Invite testers" modal, instead of scrolling the modal, it scrolls

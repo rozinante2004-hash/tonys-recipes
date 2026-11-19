@@ -646,7 +646,10 @@ under its plain path only (a `?url=` request goes network-first).
   eggs, salt in the reader's language) and a fifth line in another language, "שמן זית" in English and "olive oil"
   otherwise, `pantryHintPaint()` in `openPantry` and `i18nActivate`, v39.97); a text box's own aria-label and title are
   the app's words too — its own dir="auto" is about what is typed, so whether they are content is asked of its parent
-  (`attrSkip`, v39.97); (4) the harvest
+  (`attrSkip`, v39.97); buttons in windows the harvest never opens (links sent and received, the household bar, the
+  import fallbacks, the WhatsApp list and its marks, the add-on offer, sign-in by link) are listed in
+  `hiddenButtonPhrases()` in I18N_EXTRA and translated by hand (v40.00; the bookmark button's changing icon is a span of
+  its own, so its words are one phrase); (4) the harvest
   draws the empty kitchen's first screen and the chats with other kitchens, and lists the welcome's paragraphs
   (`HH_WELCOME`), the tour (`TOUR_STEPS`), the badge's words and the example recipes' meal types; (5) the language
   offer (`firstRunLanguageOffer`, z 10100) comes above the sign-in screen and the kitchen rules, so both are in that
