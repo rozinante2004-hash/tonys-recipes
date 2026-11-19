@@ -2693,6 +2693,217 @@ console.log('\nv106: a page\'s own recipe data');
   } finally { globalThis.fetch = realFetch; }
 }
 
+console.log('\nChat notifications when the app is closed (v108): devices kept per household, a message read with the sender\'s sign-in, encrypted for each device:');
+{
+  const nodeCrypto = await import('node:crypto');
+  const { execFileSync } = await import('node:child_process');
+  const { DatabaseSync } = await import('node:sqlite');
+  const raw = new DatabaseSync(':memory:');
+  const stmt = (sql, args) => ({ bind: (...a) => stmt(sql, a), first: async () => raw.prepare(sql).get(...(args || [])) || null,
+    all: async () => ({ results: raw.prepare(sql).all(...(args || [])) }),
+    run: async () => { const x = raw.prepare(sql).run(...(args || [])); return { success: true, meta: { last_row_id: Number(x.lastInsertRowid), changes: Number(x.changes) } }; },
+    _run() { raw.prepare(sql).run(...(args || [])); } });
+  const db = { raw, prepare: (sql) => stmt(sql, []), batch: async (l) => { l.forEach(x => x._run()); return []; } };
+  const kp = await crypto.subtle.generateKey({ name: 'RSASSA-PKCS1-v1_5', modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' }, true, ['sign', 'verify']);
+  const pub = await crypto.subtle.exportKey('jwk', kp.publicKey);
+  const b64u = (x) => Buffer.from(typeof x === 'string' ? x : JSON.stringify(x)).toString('base64url');
+  const tok = async (claims) => { const now = Math.floor(Date.now() / 1000);
+    const c = Object.assign({ iss: 'https://securetoken.google.com/my-kitchen-notes-beta', aud: 'my-kitchen-notes-beta', sub: 'uA', email: 'cook@example.com', email_verified: true, iat: now - 10, exp: now + 3600 }, claims);
+    const head = b64u({ alg: 'RS256', kid: 'p1' }), bd = b64u(c);
+    const sig = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', kp.privateKey, new TextEncoder().encode(head + '.' + bd));
+    return head + '.' + bd + '.' + Buffer.from(sig).toString('base64url'); };
+  // The key exactly as the deploy job makes it (tools/vapid-key.mjs), from a stand-in token.
+  const jwk = execFileSync(process.execPath, [new URL('../tools/vapid-key.mjs', import.meta.url).pathname],
+    { env: Object.assign({}, process.env, { CLOUDFLARE_API_TOKEN: 'a-stand-in-cloudflare-token' }) }).toString();
+  const jwk2 = execFileSync(process.execPath, [new URL('../tools/vapid-key.mjs', import.meta.url).pathname],
+    { env: Object.assign({}, process.env, { CLOUDFLARE_API_TOKEN: 'a-stand-in-cloudflare-token' }) }).toString();
+  expect('v108: the deploy job makes the same key every time from the same token (a JWK with its private part)', jwk === jwk2 && /"d":"[A-Za-z0-9_-]{43}"/.test(jwk), jwk.slice(0, 20));
+  // Devices: each its own key pair and secret, as a browser makes them.
+  const device = (endpoint) => { const e = nodeCrypto.createECDH('prime256v1'); e.generateKeys(); const auth = nodeCrypto.randomBytes(16);
+    return { e, auth, sub: { endpoint, keys: { p256dh: e.getPublicKey().toString('base64url'), auth: auth.toString('base64url') } } }; };
+  const devA = device('https://fcm.googleapis.com/fcm/send/devA'), devB = device('https://web.push.apple.com/devB'),
+        devC = device('https://updates.push.services.mozilla.com/wpush/v2/devC'), devK = device('https://fcm.googleapis.com/fcm/send/devK'),
+        devGone = device('https://fcm.googleapis.com/fcm/send/gone-devG'), devOld = device('https://fcm.googleapis.com/fcm/send/devOld');
+  const byEndpoint = new Map([devA, devB, devC, devK, devGone, devOld].map(d => [d.sub.endpoint, d]));
+  // Message Encryption for Web Push (RFC 8291) undone here with node:crypto's HMAC and AES — written from the RFC, not
+  // from the Worker — so the two would have to make the same mistake for a broken message to pass.
+  const hmac = (k, d) => nodeCrypto.createHmac('sha256', k).update(d).digest();
+  function decrypt(body, dev) {
+    const salt = body.subarray(0, 16), rs = body.readUInt32BE(16), idlen = body[20], keyid = body.subarray(21, 21 + idlen), ct = body.subarray(21 + idlen);
+    if (rs < 18 || idlen !== 65) throw new Error('header: rs ' + rs + ', idlen ' + idlen);
+    const shared = dev.e.computeSecret(keyid);
+    const ikm = hmac(hmac(dev.auth, shared), Buffer.concat([Buffer.from('WebPush: info\0'), dev.e.getPublicKey(), keyid, Buffer.from([1])]));
+    const prk = hmac(salt, ikm);
+    const cek = hmac(prk, Buffer.concat([Buffer.from('Content-Encoding: aes128gcm\0'), Buffer.from([1])])).subarray(0, 16);
+    const nonce = hmac(prk, Buffer.concat([Buffer.from('Content-Encoding: nonce\0'), Buffer.from([1])])).subarray(0, 12);
+    const d = nodeCrypto.createDecipheriv('aes-128-gcm', cek, nonce);
+    d.setAuthTag(ct.subarray(ct.length - 16));
+    const plain = Buffer.concat([d.update(ct.subarray(0, ct.length - 16)), d.final()]);
+    let i = plain.length - 1; while (i >= 0 && plain[i] === 0) i--;
+    if (plain[i] !== 2) throw new Error('not marked as the last record');
+    return JSON.parse(plain.subarray(0, i).toString('utf8'));
+  }
+  function vapidOk(auth, endpoint) {
+    const m = /^vapid t=([^.]+)\.([^.]+)\.([^,]+), k=([A-Za-z0-9_-]+)$/.exec(String(auth || ''));
+    if (!m) return 'not "vapid t=…, k=…": ' + auth;
+    const k = Buffer.from(m[4], 'base64url');
+    if (k.length !== 65 || !jwk.includes(k.subarray(1, 33).toString('base64url'))) return 'k is not the server\'s public key';
+    const key = nodeCrypto.createPublicKey({ key: { kty: 'EC', crv: 'P-256', x: k.subarray(1, 33).toString('base64url'), y: k.subarray(33).toString('base64url') }, format: 'jwk' });
+    if (!nodeCrypto.verify('sha256', Buffer.from(m[1] + '.' + m[2]), { key, dsaEncoding: 'ieee-p1363' }, Buffer.from(m[3], 'base64url'))) return 'the signature does not verify';
+    const c = JSON.parse(Buffer.from(m[2], 'base64url').toString()), h = JSON.parse(Buffer.from(m[1], 'base64url').toString());
+    if (h.alg !== 'ES256') return 'alg ' + h.alg;
+    if (c.aud !== new URL(endpoint).origin) return 'aud ' + c.aud;
+    const left = c.exp - Date.now() / 1000;
+    if (!(left > 3600 && left <= 86400)) return 'exp in ' + left + ' s';
+    if (!/^https:\/\//.test(c.sub)) return 'sub ' + c.sub;
+    return '';
+  }
+  let pushed = [];
+  const fakeFetch = async (url, init) => {
+    url = String(url);
+    if (!byEndpoint.has(url)) throw new Error('unexpected ' + url);
+    pushed.push({ url, headers: init.headers, body: Buffer.from(init.body) });
+    return new Response('', { status: /gone-/.test(url) ? 410 : 201 });
+  };
+  // Firestore: hP = Dana (uA), Ben (uB), Cleo (uC); hK = the linked kitchen (uK); hZ asked, never linked.
+  const now = Date.now();
+  const members = { hP: new Set(['uA', 'uB', 'uC']), hK: new Set(['uK']), hZ: new Set(['uZ']) };
+  const talk = {
+    m1: { by: 'uA', name: 'Dana', text: 'Dinner at 8 🍝\n  bring   the bread', to: 'all', at: now },
+    m2: { by: 'uA', name: 'Dana', text: 'Only for you, Ben', to: 'uB', at: now },
+    m3: { by: 'uB', name: 'Ben', text: 'Ben wrote this', to: 'all', at: now },
+    mOld: { by: 'uA', name: 'Dana', text: 'Yesterday', to: 'all', at: now - 864e5 },
+    m4: { by: 'uA', name: 'Dana', text: 'After Cleo left', to: 'all', at: now },
+    m5: { by: 'uA', name: 'Dana', text: 'x'.repeat(500), to: 'all', at: now },
+  };
+  const kitchenTalk = { 'hK_hP/k1': { from: 'hP', by: 'uA', name: 'Dana’s Kitchen', text: 'Shalom from our kitchen', at: now },
+                        'hP_hZ/z1': { from: 'hP', by: 'uA', name: 'Dana’s Kitchen', text: 'Not linked yet', at: now } };
+  const links = { 'hP/hK': true, 'hK/hP': true };
+  const fv = (o) => { const f = {}; Object.keys(o).forEach(k => { f[k] = typeof o[k] === 'number' ? { integerValue: String(o[k]) } : { stringValue: o[k] }; }); return f; };
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (url, init) => {
+    url = decodeURIComponent(String(url));
+    if (!url.startsWith('https://fs.push/')) return realFetch(url, init);
+    const who = JSON.parse(Buffer.from(String((init && init.headers && init.headers.Authorization) || '').split('.')[1] || '', 'base64url').toString() || '{}').sub;
+    const p = url.replace(/^.*\/documents\//, '').replace(/\?.*$/, '');
+    let m;
+    if ((m = /^households\/(\w+)\/members$/.exec(p))) {
+      if (!members[m[1]] || !members[m[1]].has(who)) return new Response('{}', { status: 403 });
+      return new Response(JSON.stringify({ documents: [...members[m[1]]].map(u => ({ name: 'projects/x/databases/(default)/documents/households/' + m[1] + '/members/' + u })) }), { status: 200 });
+    }
+    if ((m = /^households\/(\w+)\/members\/(\w+)$/.exec(p))) return new Response(members[m[1]] && members[m[1]].has(m[2]) && m[2] === who ? '{"fields":{"role":{"stringValue":"editor"}}}' : '{}', { status: members[m[1]] && members[m[1]].has(m[2]) && m[2] === who ? 200 : 403 });
+    if ((m = /^households\/(\w+)$/.exec(p))) return new Response('{"fields":{"name":{"stringValue":"Dana’s Kitchen"}}}', { status: 200 });
+    if ((m = /^households\/(\w+)\/talk\/(\w+)$/.exec(p))) {
+      const t = talk[m[2]];
+      if (!t || m[1] !== 'hP' || !members.hP.has(who) || !(t.to === 'all' || t.to === who || t.by === who)) return new Response('{}', { status: t ? 403 : 404 });
+      return new Response(JSON.stringify({ fields: fv(t) }), { status: 200 });
+    }
+    if ((m = /^households\/(\w+)\/links\/(\w+)$/.exec(p))) return new Response('{}', { status: links[m[1] + '/' + m[2]] && members[m[1]].has(who) ? 200 : 404 });
+    if ((m = /^linkTalk\/(\w+)\/messages\/(\w+)$/.exec(p))) {
+      const t = kitchenTalk[m[1] + '/' + m[2]];
+      return t ? new Response(JSON.stringify({ fields: fv(t) }), { status: 200 }) : new Response('{}', { status: 404 });
+    }
+    return new Response('{}', { status: 404 });
+  };
+  const env = { METER_DB: db, VAPID_JWK: jwk, __testKeys: { p1: Object.assign({ kid: 'p1' }, pub) }, __firestoreBase: 'https://fs.push', __fetch: fakeFetch };
+  const call = async (body, e = env) => { const r = await worker.fetch(post(Object.assign({ appKey: 'k' }, body)), e);
+    let d = null; try { d = await r.json(); } catch (x) {} return { status: r.status, d }; };
+  const rows = () => raw.prepare('SELECT endpoint, uid, hid, lang, project FROM push_subs ORDER BY endpoint').all();
+  try {
+    let r = await call({ action: 'push-key' }, { METER_DB: db });
+    expect('v108: without its key the server says notifications are not set up', r.status === 503 && r.d.needsConfig === true, JSON.stringify(r));
+    r = await call({ action: 'push-key' });
+    const key = r.d && r.d.key;
+    expect('v108: push-key gives the public key (65 bytes, uncompressed)', r.status === 200 && Buffer.from(key || '', 'base64url').length === 65 && Buffer.from(key, 'base64url')[0] === 4, JSON.stringify(r));
+    r = await call({ action: 'health' });
+    expect('v108: health says push is on', r.d && r.d.push === true, JSON.stringify(r.d && r.d.push));
+    const tA = await tok({ sub: 'uA' }), tB = await tok({ sub: 'uB' }), tC = await tok({ sub: 'uC' }), tK = await tok({ sub: 'uK' });
+    r = await call({ action: 'push-subscribe', hid: 'hP', sub: devA.sub });
+    expect('v108: keeping a device needs a sign-in', r.status === 401, JSON.stringify(r));
+    r = await call({ action: 'push-subscribe', idToken: tA, hid: 'hP', sub: Object.assign({}, devA.sub, { endpoint: 'https://evil.example/collect' }) });
+    expect('v108: …and an address at a real push service (no other server is ever posted to)', r.status === 400 && !rows().length, JSON.stringify(r));
+    r = await call({ action: 'push-subscribe', idToken: tA, hid: 'hP', sub: { endpoint: devA.sub.endpoint, keys: { p256dh: 'abc', auth: devA.sub.keys.auth } } });
+    expect('v108: …and the device\'s real keys', r.status === 400, JSON.stringify(r));
+    r = await call({ action: 'push-subscribe', idToken: tK, hid: 'hP', sub: devK.sub });
+    expect('v108: …and that the person is in that household', r.status === 403 && !rows().length, JSON.stringify(r));
+    r = await call({ action: 'push-subscribe', idToken: await tok({ sub: 'uA', email_verified: false }), hid: 'hP', sub: devA.sub });
+    expect('v108: …with a confirmed address', r.status === 403, JSON.stringify(r));
+    r = await call({ action: 'push-subscribe', idToken: tA, hid: 'hP', sub: devA.sub, lang: 'en', words: { all: '(to everyone)' } });
+    expect('v108: a member\'s device is kept, with the copy, the household and the language', r.status === 200 && r.d.key === key
+      && rows().length === 1 && rows()[0].uid === 'uA' && rows()[0].hid === 'hP' && rows()[0].project === 'my-kitchen-notes-beta' && rows()[0].lang === 'en', JSON.stringify([r, rows()]));
+    await call({ action: 'push-subscribe', idToken: tB, hid: 'hP', sub: devB.sub, lang: 'he', words: { all: '(לכולם)' } });
+    await call({ action: 'push-subscribe', idToken: tC, hid: 'hP', sub: devC.sub, lang: 'en', words: { all: '(to everyone)' } });
+    await call({ action: 'push-subscribe', idToken: tC, hid: 'hP', sub: devGone.sub, lang: 'en' });
+    await call({ action: 'push-subscribe', idToken: tK, hid: 'hK', sub: devK.sub, lang: 'fr' });
+    await call({ action: 'push-subscribe', idToken: tK, hid: 'hK', sub: devOld.sub, lang: 'fr' });
+    raw.prepare('UPDATE push_subs SET at = ? WHERE endpoint = ?').run(now - 46 * 864e5, devOld.sub.endpoint);
+    expect('v108: six devices kept', rows().length === 6, JSON.stringify(rows()));
+
+    pushed = [];
+    r = await call({ action: 'push-notify', idToken: tA, kind: 'family', hid: 'hP', id: 'm1' });
+    const to = pushed.map(p => p.url).sort();
+    expect('v108: a message to everyone reaches the household\'s other devices — never the sender\'s own',
+      r.status === 200 && r.d.sent === 2 && to.join() === [devB.sub.endpoint, devC.sub.endpoint, devGone.sub.endpoint].sort().join(), JSON.stringify([r, to]));
+    expect('v108: …a device whose push service says it is gone (410) is forgotten', !rows().some(x => x.endpoint === devGone.sub.endpoint), JSON.stringify(rows()));
+    const forB = pushed.find(p => p.url === devB.sub.endpoint), forC = pushed.find(p => p.url === devC.sub.endpoint);
+    let msgB = null, msgC = null;
+    try { msgB = decrypt(forB.body, devB); msgC = decrypt(forC.body, devC); } catch (e) { msgB = { error: e.message }; }
+    expect('v108: each device can read its message (RFC 8291, checked with a separate decryption): the name, "to everyone" in its own language, the text',
+      msgB && msgB.title === '\u{1F46A} Dana (לכולם)' && msgB.body === 'Dinner at 8 🍝 bring the bread' && msgB.chat === 'f:all' && msgB.hid === 'hP'
+      && msgC && msgC.title === '\u{1F46A} Dana (to everyone)', JSON.stringify([msgB, msgC]));
+    expect('v108: …and only that device: another device\'s keys cannot open it', (() => { try { decrypt(forB.body, devC); return false; } catch (e) { return true; } })(), 'devC opened devB\'s message');
+    expect('v108: …sent as aes128gcm with a lifetime, high urgency', forB.headers['Content-Encoding'] === 'aes128gcm' && forB.headers.TTL === '86400' && forB.headers.Urgency === 'high', JSON.stringify(forB.headers));
+    const vB = vapidOk(forB.headers.Authorization, devB.sub.endpoint), vC = vapidOk(forC.headers.Authorization, devC.sub.endpoint);
+    expect('v108: …signed for each push service (RFC 8292: ES256, its origin, under a day, an https contact)', !vB && !vC, vB || vC);
+    expect('v108: the message travels encrypted: its text is not in what the push service gets', !forB.body.includes(Buffer.from('Dinner')) && !forB.body.includes(Buffer.from('Dana')), 'plain text found');
+
+    pushed = [];
+    r = await call({ action: 'push-notify', idToken: tA, kind: 'family', hid: 'hP', id: 'm1' });
+    expect('v108: the same message a second time is not announced again', r.status === 200 && r.d.already === true && !pushed.length, JSON.stringify(r));
+    r = await call({ action: 'push-notify', idToken: tA, kind: 'family', hid: 'hP', id: 'm2' });
+    expect('v108: a message to one person reaches only their devices', r.d && r.d.sent === 1 && pushed.length === 1 && pushed[0].url === devB.sub.endpoint
+      && decrypt(pushed[0].body, devB).chat === 'f:uA' && decrypt(pushed[0].body, devB).title === '\u{1F46A} Dana', JSON.stringify([r, pushed.map(p => p.url)]));
+    pushed = [];
+    r = await call({ action: 'push-notify', idToken: tA, kind: 'family', hid: 'hP', id: 'm3' });
+    expect('v108: nobody can announce someone else\'s message', r.status === 403 && !pushed.length, JSON.stringify(r));
+    r = await call({ action: 'push-notify', idToken: tA, kind: 'family', hid: 'hP', id: 'nope' });
+    expect('v108: …or one that is not there', r.status === 404 && !pushed.length, JSON.stringify(r));
+    r = await call({ action: 'push-notify', idToken: tA, kind: 'family', hid: 'hP', id: 'mOld' });
+    expect('v108: …or an old one', r.status === 200 && r.d.old === true && !pushed.length, JSON.stringify(r));
+    r = await call({ action: 'push-notify', kind: 'family', hid: 'hP', id: 'm1' });
+    expect('v108: announcing needs a sign-in', r.status === 401, JSON.stringify(r));
+    members.hP.delete('uC');
+    r = await call({ action: 'push-notify', idToken: tA, kind: 'family', hid: 'hP', id: 'm4' });
+    expect('v108: someone who left the household hears nothing more — and their device is forgotten',
+      r.d && r.d.sent === 1 && pushed.length === 1 && pushed[0].url === devB.sub.endpoint && !rows().some(x => x.uid === 'uC'), JSON.stringify([r, rows()]));
+    pushed = [];
+    r = await call({ action: 'push-notify', idToken: tA, kind: 'family', hid: 'hP', id: 'm5' });
+    const long = pushed[0] && decrypt(pushed[0].body, devB);
+    expect('v108: a long message is shortened for the notification (300 characters and …)', long && long.body.length === 301 && /…$/.test(long.body), long && long.body.length);
+
+    pushed = [];
+    r = await call({ action: 'push-notify', idToken: tA, kind: 'kitchen', pair: 'hK_hP', id: 'k1' });
+    const forK = pushed[0] && decrypt(pushed[0].body, devK);
+    expect('v108: a message to a linked kitchen reaches that kitchen\'s devices, signed with the household\'s name',
+      r.d && r.d.sent === 1 && pushed.length === 1 && pushed[0].url === devK.sub.endpoint && forK.title === '\u{1F4AC} Dana’s Kitchen'
+      && forK.body === 'Shalom from our kitchen' && forK.chat === 'k:hP' && forK.hid === 'hK', JSON.stringify([r, forK]));
+    expect('v108: …but not a device not heard from for 45 days', !pushed.some(p => p.url === devOld.sub.endpoint), 'the old device was sent to');
+    pushed = [];
+    r = await call({ action: 'push-notify', idToken: tA, kind: 'kitchen', pair: 'hP_hZ', id: 'z1' });
+    expect('v108: a household that is not linked (asking, refused or blocked) is told nothing', r.status === 200 && r.d.notLinked === true && !pushed.length, JSON.stringify(r));
+    r = await call({ action: 'push-notify', idToken: tK, kind: 'kitchen', pair: 'hK_hP', id: 'k1' });
+    expect('v108: …and a kitchen message is announced only by the one who wrote it', r.status === 403, JSON.stringify(r));
+
+    r = await call({ action: 'push-forget', endpoint: devB.sub.endpoint });
+    expect('v108: turning it off on a device forgets that device', r.status === 200 && !rows().some(x => x.endpoint === devB.sub.endpoint), JSON.stringify(rows()));
+    r = await call({ action: 'push-forget', endpoint: 'https://evil.example/x' });
+    expect('v108: …an address that is not a push service\'s is refused', r.status === 400, JSON.stringify(r));
+    for (let i = 0; i < 12; i++) await call({ action: 'push-subscribe', idToken: tA, hid: 'hP', sub: device('https://fcm.googleapis.com/fcm/send/many' + i).sub });
+    expect('v108: at most ten devices a person (the newest kept)', raw.prepare("SELECT COUNT(*) AS n FROM push_subs WHERE uid = 'uA'").get().n === 10
+      && !rows().some(x => x.endpoint === devA.sub.endpoint), raw.prepare("SELECT COUNT(*) AS n FROM push_subs WHERE uid = 'uA'").get().n);
+  } finally { globalThis.fetch = realFetch; }
+}
+
 if (failures.length) {
   console.log(`\n${failures.length} failure(s):`);
   failures.forEach(f => console.log('  - ' + f));

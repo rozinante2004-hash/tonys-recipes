@@ -449,6 +449,38 @@ under its plain path only (a `?url=` request goes network-first).
   there — or, with none, the ticked English ones; `farmOuch` says one in the bubble (`dir="auto"`) and `farmSay(…,
   lang)` plays its recording (`FARM_RECORDED[lang]`: Hebrew since v39.96, below) or has the device's voice for the language say it
   (`farmLangVoice`: by language, a man's or a woman's as the animal's kind). Self Test `farm_sayings_languages`.
+- **🔔 Chat notifications when the app is closed (v40.02, Worker v108).** Tony: "when using the chat in "Chat with
+  family members", is there a way to make notifications audible even if the app is not running?" — "Yes, build it, show
+  the message text, both family and linked kitchen chats. Let's leave the Pushover for now." Web Push (VAPID, RFC 8292;
+  payload encryption, RFC 8291 aes128gcm). THE APP: a `.push-slot` at the foot of 👪 Chat with family members and of 💬
+  Chats with linked kitchens (outside `#famBody` / `#kcBody2`, so a redraw keeps it), shown only when health says
+  `push: true`; `pushState(dev)` → 'on' | 'off' | 'blocked' | 'install' (an iPhone's browser: only the Home Screen app,
+  iOS 16.4+) | 'unable'; `pushRowHtml(state)`. `pushTurnOn()` asks `Notification.requestPermission()` FIRST, on the tap
+  (iOS asks only then), then `pushSignUp()`: `push-key` → `pushManager.subscribe({ userVisibleOnly, applicationServerKey })`
+  (a new server key: unsubscribe and again) → `push-subscribe` { hid, sub, lang, words: { all: '(to everyone)' in the
+  person's language } }; `mkn_push_on` / `mkn_push_sent` on the device. `pushRefresh()` as the household goes live
+  (`linkLiveStart` → `pushAfterLive`): permission taken away in the settings → `pushForgetDevice()`; else told again
+  once a day, or at once when the household, the person or the language is not what the Worker was told.
+  `pushTurnOff()` / sign-out (`signOutNow`) → `pushForgetDevice()` (unsubscribe + `push-forget` { endpoint }, no
+  sign-in). Sent: `famSend` → `pushAnnounce(pushFamilyBody(m))` (someone else in the household), `talkSend` →
+  `pushAnnounce(pushKitchenBody(pair, other, m))` (a LINKED kitchen only) — never during a Self Test, never when the
+  server cannot. A tap: sw.js `notificationclick` opens `?chat=f:all | f:<uid> | k:<hid>` (read at start into
+  `_pushChatAsked`, taken out of the address) or tells the open app (`mkn-open-chat`); `pushOpenChat(chat)`. sw.js
+  `push`: shows `{ title, body, tag, chat }` with `renotify` — not while the app is on the screen (it chimes itself),
+  except on Apple's devices. THE WORKER: `push-key` → { key }; `push-subscribe` (verified sign-in, confirmed address,
+  member of `hid` by `meterMembership`; the endpoint must be at fcm.googleapis.com, *.push.apple.com, Mozilla's or
+  *.notify.windows.com; ten devices a person) → D1 `push_subs` (endpoint, project, uid, hid, p256dh, auth, lang, words,
+  at, sent_at, fails); `push-forget`; `push-notify` { kind 'family', hid, id } or { kind 'kitchen', pair, id }: the
+  message READ FROM FIRESTORE WITH THE SENDER'S TOKEN, `by` the caller, written in the last ten minutes; family: the
+  household's other devices (one person's for a message to one person), their owners checked against the members list
+  at that moment (rows of those gone are deleted); kitchen: only with `households/<from>/links/<other>`, the other
+  household's devices heard from in the last 45 days. Once per message (`counters` `push:<project>:<kind>:<id>`), at most
+  40 devices, payload `{ title: '👪 <name> (to everyone)' | '💬 <household>', body: ≤300 chars, tag, chat, hid, u }`,
+  TTL a day, Urgency high; 404/410 deletes the row, twenty other failures too. The key: Worker secret `VAPID_JWK`, made
+  by the deploy job (`tools/vapid-key.mjs`: HMAC of the Cloudflare token → a P-256 private key; the same every deploy;
+  never printed). Privacy Statement 1.18; ⚙️ → What leaves this device: the device's notification service. Self Tests
+  `chat_notifications_switch`, `chat_notifications_announced`, `chat_notifications_shown_and_tapped` (the real sw.js
+  handlers, through `tests/sw-probe.js`); Worker checks in `tests/worker-cors.mjs` (a separate RFC 8291 decryption).
 - **📍 Take me there in Help (v40.01).** Tony: a "Take me there" next to a Help answer's Details "and also inside the
   modal opening in response to clicking the Details button, in the appropriate places", "not … when it is not
   applicable". `HELP_PLACES` ([id, path, the item's function or #id, 'open' | 'show' | 'menu']) names 70 places in ⚙️,

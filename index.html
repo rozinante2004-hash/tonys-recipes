@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v40.01 -->
+<!-- Tony's Recipes Collection v40.02 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -6344,6 +6344,7 @@ async function talkSend(other, given) {
   // this list one too long, and the other kitchen's next message then looked like nothing new. Added only if missing.
   var mine = (_talk[pair] = _talk[pair] || []);
   if (!m.id || !mine.some(function(x){ return x.id === m.id; })) mine.push(m);
+  pushAnnounce(pushKitchenBody(pair, other, m));                             // v40.02 — to the linked kitchen's closed apps
   // v38.77 — Tony: "the last message sent still appears in the message box … I need to clear the last message from
   // the box before I start typing a new message" (📬 Link requests). That same early listener redrew the page while
   // add() was pending, and a redraw keeps what is in a box (v38.49): the box cleared here was the old one. The box
@@ -6392,13 +6393,14 @@ async function openKitchenChats(other) {
     ov.innerHTML = '<div class="ask-card" role="dialog" aria-modal="true" aria-labelledby="kchTitle" style="max-width:540px;width:94%;text-align:start;max-height:88vh;overflow-y:auto;">'
       + '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><div class="ask-title" id="kchTitle" style="margin:0;">\u{1F4AC} Chats with linked kitchens</div>'
       + '<button type="button" class="modal-close" style="position:relative;top:auto;right:auto;" aria-label="Close" onclick="closeKitchenChats()">✕</button></div>'
-      + '<div id="kcBody2"><div style="color:var(--muted);font-size:13px;padding:14px 0;">⏳ Opening the conversations…</div></div></div>';
+      + '<div id="kcBody2"><div style="color:var(--muted);font-size:13px;padding:14px 0;">⏳ Opening the conversations…</div></div>' + pushSlotHtml() + '</div>';   // v40.02 — 🔔
     ov.onclick = function(e){ if (e.target === ov) closeKitchenChats(); };
     document.body.appendChild(ov);
   }
   if (_linkState.loadedFor !== _household.hid) { await hhLoadLinks(); await hhLoadIncoming(); }
   await talkLoad();
   renderKitchenChats(true);
+  pushRowsRefresh();
   return ov;
 }
 function closeKitchenChats() { var o = document.getElementById('kitchenChatOverlay'); if (o) o.remove(); _chatWith = null; }
@@ -6583,12 +6585,13 @@ async function openFamilyChat(room) {
     ov.innerHTML = '<div class="ask-card" role="dialog" aria-modal="true" aria-labelledby="famTitle" style="max-width:540px;width:94%;text-align:start;max-height:88vh;overflow-y:auto;">'
       + '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><div class="ask-title" id="famTitle" style="margin:0;">\u{1F46A} Chat with family members</div>'
       + '<button type="button" class="modal-close" style="position:relative;top:auto;right:auto;" aria-label="Close" onclick="closeFamilyChat()">✕</button></div>'
-      + '<div id="famBody"></div></div>';
+      + '<div id="famBody"></div>' + pushSlotHtml() + '</div>';   // v40.02 — 🔔 notifications when the app is closed
     ov.onclick = function(e){ if (e.target === ov) closeFamilyChat(); };
     document.body.appendChild(ov);
   }
   famLiveStart();                                                              // someone may have joined since
   renderFamilyChat(true);
+  pushRowsRefresh();
   return ov;
 }
 function closeFamilyChat() { var o = document.getElementById('familyChatOverlay'); if (o) o.remove(); _fam.with = null; }
@@ -6670,6 +6673,7 @@ async function famSend() {
   } finally { btn = document.getElementById('famSendBtn'); if (btn) btn.disabled = false; }
   m.id = ref.id;
   if (!famAll().some(function(x){ return x.id === m.id; })) _fam.local[m.id] = m;   // the listener has it already, as a rule
+  pushAnnounce(pushFamilyBody(m));                                           // v40.02 — to the household's closed apps
   box = document.getElementById('famIn');                                    // the box on the screen NOW (v38.77)
   if (box) { if (box.value.trim() === text) box.value = ''; box.focus(); }
   famMarkSeen(room);
@@ -6680,6 +6684,194 @@ async function famSend() {
 window.openFamilyChat = openFamilyChat; window.closeFamilyChat = closeFamilyChat; window.renderFamilyChat = renderFamilyChat;
 window.famSend = famSend; window.famKey = famKey; window.famLiveStart = famLiveStart; window.famLiveStop = famLiveStop;
 window.famPeople = famPeople; window.famNewCount = famNewCount; window._fam = _fam;
+// ─── CHAT NOTIFICATIONS WHEN THE APP IS CLOSED (v40.02, Worker v108) ────────────────────────────────────────────────
+// Tony, 20 Nov 2026: "when using the chat in "Chat with family members", is there a way to make notifications audible
+// even if the app is not running?" — "Yes, build it, show the message text, both family and linked kitchen chats.
+// Let's leave the Pushover for now." Web Push, the browsers' own: 🔔 at the foot of both chat windows (one switch per
+// device, for both chats). The tap asks the browser (an iPhone asks only on a tap, and only in the app opened from the
+// Home Screen, iOS 16.4+), which gives this device an address at its push service; the app hands it to the Worker
+// (push-subscribe) with the household, the person and the language. Each message sent is announced (push-notify): the
+// Worker reads it with the sender's sign-in and sends it, encrypted, to the devices of those who may read it — the
+// sender's own never. The notification shows who wrote and the text, with the phone's own sound; a tap opens that
+// conversation (sw.js → ?chat=… or a message to the open app). Kept fresh once a day and whenever the household, the
+// person or the language changes; forgotten on 🔕, on signing out, and when the phone's settings take the permission away.
+var PUSH_ON_KEY = 'mkn_push_on', PUSH_SENT_KEY = 'mkn_push_sent';
+var _pushBusy = false, _pushRefreshAt = 0, _pushChatAsked = '';
+var PUSH_BLOCKED = '\u{1F515} Notifications are blocked for this app — allow them in the phone’s (or this browser’s) settings, then come back here.';
+function pushServerOn() { return !!(_workerHealth && _workerHealth.push === true); }
+function pushCan() { return 'serviceWorker' in navigator && 'PushManager' in window && typeof Notification !== 'undefined'; }
+function pushLs(k, v) {
+  try { if (v === undefined) return localStorage.getItem(k); if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch(e) {}
+  return null;
+}
+// 'on' · 'off' · 'blocked' (refused in the settings) · 'install' (an iPhone's browser: only the Home Screen app can) · 'unable'
+function pushState(dev) {
+  dev = dev || { can: pushCan(), perm: typeof Notification !== 'undefined' ? Notification.permission : '', ios: deviceKind() === 'ios',
+                 installed: appInstalled(), on: pushLs(PUSH_ON_KEY) === '1' };
+  if (!dev.can) return dev.ios && !dev.installed ? 'install' : 'unable';
+  if (dev.perm === 'denied') return 'blocked';
+  return dev.on && dev.perm === 'granted' ? 'on' : 'off';
+}
+function pushRowHtml(state) {
+  var st = state || pushState(), btn = 'background:none;border:1px solid var(--border);border-radius:999px;padding:6px 12px;font:inherit;font-size:12.5px;'
+    + 'font-weight:600;color:var(--terracotta);cursor:pointer;min-height:34px;';
+  if (_pushBusy) return '<span>⏳ Turning on…</span>';
+  if (st === 'on') return '<span>\u{1F514} Notifications are on for this device.</span> <button type="button" class="push-btn" onclick="pushTurnOff()" style="' + btn + '">\u{1F515} Turn off</button>';
+  if (st === 'off') return '<button type="button" class="push-btn push-on" onclick="pushTurnOn()" style="' + btn + '">\u{1F514} Notify me of new messages when the app is closed</button>';
+  if (st === 'blocked') return '<span>' + PUSH_BLOCKED + '</span>';
+  if (st === 'install') return '<span>\u{1F514} On an iPhone or iPad, notifications come only to the app on the Home Screen: Share → Add to Home Screen, then open the app from there.</span>';
+  return '<span>This browser cannot show notifications when the app is closed.</span>';
+}
+// The foot of each chat window (outside the part the conversation redraws).
+function pushRowsRefresh() {
+  var show = pushServerOn() && !!window._fbUser && !!_household;
+  document.querySelectorAll('.push-slot').forEach(function(el){
+    el.hidden = !show;
+    el.innerHTML = show ? pushRowHtml() : '';
+  });
+}
+function pushSlotHtml() {
+  return '<div class="push-slot" hidden style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);font-size:12.5px;color:var(--muted);line-height:1.5;"></div>';
+}
+async function pushWorker(body) {
+  var r = await fetch(WORKER_ENDPOINT, { method: 'POST', headers: workerHeaders(), signal: AbortSignal.timeout(15000), body: await workerBodySigned(body) });
+  var d = {};
+  try { d = await r.json(); } catch(e) {}
+  return { ok: r.ok, status: r.status, d: d || {} };
+}
+function pushKeyBytes(b64) {
+  var s = String(b64 || '').replace(/-/g, '+').replace(/_/g, '/');
+  while (s.length % 4) s += '=';
+  var bin = atob(s), a = new Uint8Array(bin.length);
+  for (var i = 0; i < bin.length; i++) a[i] = bin.charCodeAt(i);
+  return a;
+}
+function pushSent() { try { return JSON.parse(pushLs(PUSH_SENT_KEY) || 'null') || {}; } catch(e) { return {}; } }
+// This device's address, made (or the one it has) and handed to the Worker for this household.
+async function pushSignUp() {
+  if (!_household || !window._fbUser) return false;
+  var k = await pushWorker({ action: 'push-key' });
+  if (!k.ok || !k.d.key) { syncLog('error', 'Chat notifications: the server has no key', { status: k.status }); return false; }
+  var reg = await navigator.serviceWorker.ready;
+  var sub = await reg.pushManager.getSubscription(), was = pushSent();
+  if (sub && was.key && was.key !== k.d.key) { try { await sub.unsubscribe(); } catch(e) {} sub = null; }   // the server's key is new
+  if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: pushKeyBytes(k.d.key) });
+  var lang = _i18nLang || 'en';
+  var r = await pushWorker({ action: 'push-subscribe', hid: _household.hid, sub: sub.toJSON(), lang: lang, words: { all: i18nPhrase('(to everyone)') } });
+  if (!r.ok) {
+    syncLog('error', 'This device could not be signed up for chat notifications', { status: r.status, reason: String(r.d.error || '').slice(0, 160) });
+    return false;
+  }
+  pushLs(PUSH_SENT_KEY, JSON.stringify({ at: Date.now(), hid: _household.hid, uid: _fbUser.uid, lang: lang, key: k.d.key }));
+  return true;
+}
+async function pushTurnOn() {
+  if (_pushBusy || !pushCan()) return false;
+  var ask = Notification.permission === 'granted' ? Promise.resolve('granted') : Notification.requestPermission();   // on the tap itself
+  _pushBusy = true; pushRowsRefresh();
+  try {
+    var perm = await ask;
+    if (perm !== 'granted') {
+      var why = 'Notifications were not turned on.';
+      if (perm === 'denied') why = PUSH_BLOCKED;
+      toast(why, 8000);
+      return false;
+    }
+    if (!await pushSignUp()) { toast('Notifications could not be turned on just now — try again in a moment.', 7000); return false; }
+    pushLs(PUSH_ON_KEY, '1');
+    syncLog('save', 'Chat notifications turned on on this device', { language: _i18nLang || 'en' });
+    toast('\u{1F514} Done — new messages will be announced on this device, even when the app is closed.', 7000);
+    return true;
+  } catch(e) {
+    syncLog('error', 'Chat notifications could not be turned on', String((e && ((e.name || '') + ': ' + e.message)) || e).slice(0, 160));
+    toast('Notifications could not be turned on just now — try again in a moment.', 7000);
+    return false;
+  } finally { _pushBusy = false; pushRowsRefresh(); }
+}
+// Off on this device: the browser's address dropped and the Worker told (the address is all it needs — no sign-in).
+async function pushForgetDevice() {
+  pushLs(PUSH_ON_KEY, null); pushLs(PUSH_SENT_KEY, null);
+  if (!pushCan()) return false;
+  try {
+    var reg = await navigator.serviceWorker.getRegistration(), sub = reg && await reg.pushManager.getSubscription();
+    if (!sub) return false;
+    var ep = sub.endpoint;
+    try { await sub.unsubscribe(); } catch(e) {}
+    await fetch(WORKER_ENDPOINT, { method: 'POST', headers: workerHeaders(), signal: AbortSignal.timeout(10000), body: workerBody({ action: 'push-forget', endpoint: ep }) });
+    return true;
+  } catch(e) { return false; }
+}
+async function pushTurnOff() {
+  await pushForgetDevice();
+  syncLog('save', 'Chat notifications turned off on this device', {});
+  toast('\u{1F515} Notifications are off on this device.', 6000);
+  pushRowsRefresh();
+  return true;
+}
+// As the household goes live: still on? (the phone's settings may have taken it away) — and the Worker told again once a
+// day, or at once when the household, the person or the language is not the one it was told.
+async function pushRefresh() {
+  if (window._selfTestRunning || !pushCan() || pushLs(PUSH_ON_KEY) !== '1') return false;
+  if (Notification.permission !== 'granted') { await pushForgetDevice(); return false; }
+  if (!_household || !window._fbUser) return false;
+  if (_workerHealth === null && typeof checkWorkerHealth === 'function') await checkWorkerHealth();
+  if (!pushServerOn()) return false;
+  var was = pushSent(), reg = null, sub = null;
+  try { reg = await navigator.serviceWorker.getRegistration(); sub = reg && await reg.pushManager.getSubscription(); } catch(e) {}
+  if (sub && was.hid === _household.hid && was.uid === _fbUser.uid && was.lang === (_i18nLang || 'en') && Date.now() - (was.at || 0) < 864e5) return true;
+  if (Date.now() - _pushRefreshAt < 60e3) return false;
+  _pushRefreshAt = Date.now();
+  try { return await pushSignUp(); }
+  catch(e) { syncLog('error', 'Chat notifications could not be renewed on this device', String((e && e.message) || e).slice(0, 160)); return false; }
+}
+// What the Worker is asked to announce — nothing when there is nobody who could hear it.
+function pushFamilyBody(m) {
+  if (!m || !m.id || !_household || !famPeople().length) return null;
+  return { action: 'push-notify', kind: 'family', hid: _household.hid, id: m.id };
+}
+function pushKitchenBody(pair, other, m) {
+  if (!m || !m.id || !hhLinks().some(function(l){ return l.hid === other; })) return null;   // a linked kitchen only
+  return { action: 'push-notify', kind: 'kitchen', pair: pair, id: m.id };
+}
+function pushAnnounce(body) {
+  if (!body || !pushServerOn() || window._selfTestRunning) return false;
+  pushWorker(body).then(function(r){
+    if (!r.ok) syncLog('error', 'A chat notification was not sent', { status: r.status, reason: String(r.d.error || '').slice(0, 120) });
+  }).catch(function(e){ syncLog('error', 'A chat notification was not sent', { reason: String((e && e.message) || e).slice(0, 120) }); });
+  return true;
+}
+// A tapped notification: 'f:all' / 'f:<uid>' — the family chat; 'k:<household>' — that linked kitchen's chat.
+function pushOpenChat(chat) {
+  var m = /^([fk]):([A-Za-z0-9_-]{1,80})$/.exec(String(chat || ''));
+  if (!m || !_household || !window._fbUser) return false;
+  document.querySelectorAll('.drop-menu.open').forEach(function(d){ d.classList.remove('open'); });
+  if (m[1] === 'f') openFamilyChat(m[2]); else openKitchenChats(m[2]);
+  return true;
+}
+// Started by a tap on a notification while the app was closed: the conversation opens once the household is there.
+(function(){
+  var c = '';
+  try { c = new URLSearchParams(location.search).get('chat') || ''; } catch(e) { c = ''; }
+  if (/^[fk]:[A-Za-z0-9_-]{1,80}$/.test(c)) {
+    _pushChatAsked = c;
+    var rest = location.search.replace(/[?&]chat=[^&]*/, '').replace(/^&/, '?');
+    try { history.replaceState(history.state, '', location.pathname + rest + location.hash); }
+    catch(e) { syncLog('error', 'A tapped notification\u2019s address could not be tidied', String((e && e.message) || e).slice(0, 120)); }
+  }
+  if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', function(e){
+    var d = e.data || {};
+    if (d.type === 'mkn-open-chat') { if (!pushOpenChat(d.chat)) _pushChatAsked = d.chat; }
+  });
+})();
+function pushAfterLive() {
+  pushRowsRefresh();
+  if (_pushChatAsked && pushOpenChat(_pushChatAsked)) _pushChatAsked = '';
+  pushRefresh().then(pushRowsRefresh).catch(function(){});
+}
+window.pushTurnOn = pushTurnOn; window.pushTurnOff = pushTurnOff; window.pushState = pushState; window.pushRowHtml = pushRowHtml;
+window.pushRowsRefresh = pushRowsRefresh; window.pushRefresh = pushRefresh; window.pushForgetDevice = pushForgetDevice;
+window.pushFamilyBody = pushFamilyBody; window.pushKitchenBody = pushKitchenBody; window.pushAnnounce = pushAnnounce;
+window.pushOpenChat = pushOpenChat; window.pushWorker = pushWorker; window.pushAfterLive = pushAfterLive;
 async function linkReqAct(i, what) {
   var r = _linkState.pending[i];
   if (!r || !householdCanManage()) return false;
@@ -6938,6 +7130,7 @@ function linkLiveStart(force) {
   linkLiveRecipes();                                              // v38.52 — their recipes, live
   famLiveStart(force);                                            // v38.78 — the household's own chat
   giftLiveStart();                                                // v39.10 — recipes sent to this kitchen
+  if (!window._selfTestRunning && typeof pushAfterLive === 'function') pushAfterLive();   // v40.02 — chat notifications
   return true;
 }
 // v38.52 — Tony: "Tester1 has updated its recipes, but Admin, who is joined to their kitchen cannot see the changes
@@ -11217,7 +11410,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v40.01';
+var APP_VERSION = 'v40.02';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -14837,7 +15030,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v40.01</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v40.02</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14925,7 +15118,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v40.01</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v40.02</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -18761,6 +18954,13 @@ var I18N_EXTRA = [
   pantryHintPhrases(),  // v39.97 — the pantry's (pantryHintPaint)
   hiddenButtonPhrases(),   // v40.00 — buttons in windows the harvest had never seen
   ['\u{1F4CD} Take me there', 'Opens it for you', 'That is not available here.'],   // v40.01 — 📍 Take me there (helpGoButton, helpGo)
+  ['\u{1F514} Notify me of new messages when the app is closed', '\u{1F514} Notifications are on for this device.', '\u{1F515} Turn off',   // v40.02 — chat notifications
+   '\u{1F515} Notifications are blocked for this app — allow them in the phone’s (or this browser’s) settings, then come back here.',
+   '\u{1F514} On an iPhone or iPad, notifications come only to the app on the Home Screen: Share → Add to Home Screen, then open the app from there.',
+   'This browser cannot show notifications when the app is closed.', '⏳ Turning on…', 'Notifications were not turned on.',
+   'Notifications could not be turned on just now — try again in a moment.',
+   '\u{1F514} Done — new messages will be announced on this device, even when the app is closed.',
+   '\u{1F515} Notifications are off on this device.', '(to everyone)'],
   // v39.97 — tooltips and screen-reader labels in windows the harvest had never seen (a scan of every hint, Tony:
   // "scan for other places hints might hide"): the WhatsApp list, the chat boxes, the links sent, the authenticator.
   ['already in your collection', 'This is not a recipe — the detection was wrong', 'A recipe, but hide it and never show it again',
@@ -34403,6 +34603,7 @@ async function signOut() {
 // v37.96 — the same without asking (a newcomer the family's copy cannot take).
 function signOutNow() {
   if (typeof linkLiveStop === 'function') linkLiveStop();   // v38.49
+  if (!window._selfTestRunning && typeof pushForgetDevice === 'function') pushForgetDevice();   // v40.02 — no notifications for whoever signs in next
   if (typeof recentCloudStop === 'function') recentCloudStop();   // v39.89
   try { document.documentElement.removeAttribute('data-mkn-member'); } catch(e) {}   // v37.98
   try { _fbReplies.list = []; _fbReplies.loaded = false; _fbReplies.uid = ''; pathDots({ replies: 0 });   // v38.00
@@ -36778,6 +36979,7 @@ var HELP_SYSTEM_PROMPT = [
   "- 🔒 SECRET RECIPES: in the editor, tick 🔒 Secret — the recipe (and its photo) is then kept where only your own kitchen can read it; the kitchens you link with do not see it, nor know it exists. Untick it to share it again. A 🔒 shows on its card.",
   "- 🔄 RELOAD A LINKED KITCHEN: beside a linked kitchen's name in your recipe list, 🔄 Reload reads its recipes and photos again from the start — for when something looks missing or out of date.",
   "- 💬 CHATS WITH LINKED KITCHENS: ··· More → 🏡 Kitchens and people → 💬 Chats with linked kitchens — or 💬 Chat beside a linked kitchen's name in your recipe list, or in 👥 Family Access. Every conversation, newest first, with what is new; open one to read it all and write (Enter sends, Shift+Enter starts a new line). The same conversations are also on 📬 Link requests. A red dot on ⋯ More and on ⚙️ says something new arrived.",
+  "- 🔔 CHAT NOTIFICATIONS WHEN THE APP IS CLOSED (v40.02): at the foot of 👪 Chat with family members, and of 💬 Chats with linked kitchens, tap 🔔 Notify me of new messages when the app is closed; the phone (or computer) asks whether to allow notifications — say Allow. From then on a new message shows as a notification, with who wrote it and the text and the phone's own sound, even when the app is closed; a tap on it opens that conversation. One switch for both chats, on THIS device: turn it on on each phone or computer you use. 🔕 Turn off in the same place (signing out turns it off too). The family chat: messages to everyone and to you alone; linked kitchens: messages from kitchens linked with yours (not from one still asking). Your own messages never notify you. ON AN iPHONE OR iPAD (iOS 16.4 or later) only the app on the Home Screen can: in Safari, Share → Add to Home Screen, open the app from that icon, and turn it on there. 'Notifications are blocked'? Allow them in the phone's Settings → Notifications → the app (or in the browser's settings for the site), then tap 🔔 again. While the app is open on the screen, a message chimes and shows in the app instead. The message travels encrypted through the device's own notification service (Apple, Google, Mozilla or Microsoft), which cannot read it.",
   "- ♿ ACCESSIBILITY: ⚙️ → ♿ Accessibility, on this device: 🎨 Colours for red–green colour blindness (the most common colour blindness, where reds and greens look alike, brownish): wherever a colour says something, green becomes blue and red becomes a deep orange — all right / a problem, the sync dot, Easy and Hard, the Self Test's results, delete buttons — and a notification dot turns blue inside its ring; and the recipe photos are colour-corrected, so a red tomato and a green pepper no longer look alike (they look a little different to everyone else). For the whole phone, an iPhone has its own: Settings → Accessibility → Display & Text Size → Color Filters → Red/Green Filter; Android: Settings → Accessibility → Color correction. 🟡 A yellow ring round the notification dots (on unless turned off) so a new message or request catches the eye, on ⋯ More and in ⚙️. 🌗 Theme: light, dark, or as the device. 🔔 the sound when something arrives, and 🎵 which sound.",
   "- 👉 NOTICES THAT TAKE YOU THERE: a notice at the bottom of the screen with a › at its end is a button — tap or click it (or Enter) to go where it points: a new message opens its chat; a kitchen linked or accepted shows only that kitchen's recipes; a recipe saved, imported, copied, translated or added opens it; a note from a tester opens 👑 → 📊 Households → 💬 Feedback; someone asking to add recipes, or joining, opens 👥 Family Access; a link request sent opens 📬 Link requests; a backup opens 💾 Backups; a failed sync or the AI allowance opens Sync Health; an error opens the log. The place it leads to is marked with a yellow ring for a moment. Such a notice stays up at least 6 seconds; a notice about what is already on the screen has no › and goes nowhere. On a notice with a button (Open, ↩︎ Undo, Back up now) the button does its own thing — tapping the words of an Undo notice never undoes.",
   "- 🔔 A SOUND WHEN SOMETHING ARRIVES: a message (from a linked kitchen, from your family, an answer to your note) taps twice; a request to link kitchens taps three times. Choose the sound — 🥂 Spoon on a wine glass, 🛎️ The kitchen’s service bell, 🥄 Wooden spoon on a pot, each with ▶ to hear it — in ⚙️ → ♿ Accessibility → 🎵 The sound; untick 🔔 Sound for messages and requests to mute it. On this device only. Browsers keep a page silent until it has been touched once since opening, so a message that arrives before that is not heard. On a phone it plays at the media volume; an iPhone on silent (the switch on its side) plays no sound.",
@@ -40263,6 +40465,10 @@ function privacyEntries() {
     // v39.74 — a recipe's video played inside the app (Privacy Statement 1.16)
     { who: 'Video sites (YouTube, Vimeo, Instagram, Facebook, TikTok)', when: 'only when you play a recipe\u2019s video inside the app', on: !playerExternalOnly(),
       sends: 'Nothing about you or your recipes. Your device loads the video from the site that hosts it, so that site sees its internet address and may set its own cookies, as when you open the video there. \u2699\uFE0F \u2192 \u{1F3A8} How it looks \u2192 \u201CUse external players only\u201D stops this.' },
+    // v40.02 — chat notifications when the app is closed (Privacy Statement 1.18)
+    { who: 'Your device\u2019s notification service (Apple, Google, Mozilla or Microsoft)', when: 'only on a device where you turn on chat notifications',
+      on: typeof pushState === 'function' && pushState() === 'on',
+      sends: 'Each new message in your chats, encrypted for this device so that the service cannot read it \u2014 it only delivers it. The app\u2019s own server keeps this device\u2019s notification address, with who is signed in on it and their household, until you turn notifications off or sign out.' },
     { who: 'Photo libraries (Pixabay, Pexels, Unsplash, Wikimedia Commons)', when: 'only when you search for a photo', on: true,
       sends: 'The search words, never your recipes. Your device then loads the pictures it shows from them, so they see its internet address, as any website does.' },
     { who: 'Public relay services', when: 'only when a page cannot be fetched any other way', on: true,

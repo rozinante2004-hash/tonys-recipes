@@ -85,7 +85,40 @@ async function claims(url, destination) {
   return { responded: responded, revalidated: fetched, served: served, keys: keys };
 }
 
+// v40.02 — the chat notifications: the real `push` and `notificationclick` handlers, driven with the windows the
+// browser would list, a stand-in registration (what it shows) and stand-in clients (what it opens or tells).
+async function pushCase(c) {
+  if (typeof captured.push !== 'function' || typeof captured.notificationclick !== 'function') return { error: 'no push or notificationclick handler' };
+  var shown = [], opened = [], told = [], focused = 0, waits = [], closed = false;
+  var wins = (c.clients || []).map(function(x) { return { url: x.url, visibilityState: x.visible ? 'visible' : 'hidden',
+    postMessage: function(m) { told.push(m); }, focus: function() { focused++; return Promise.resolve(this); } }; });
+  var realClients = self.clients, realReg = self.registration, realNav = self.navigator;
+  install('clients', { matchAll: function() { return Promise.resolve(wins); }, claim: function() { return Promise.resolve(); },
+                       openWindow: function(u) { opened.push(String(u)); return Promise.resolve(null); } });
+  install('registration', { showNotification: function(t, o) { shown.push({ title: t, options: o }); return Promise.resolve(); } });
+  if (c.ua) install('navigator', { userAgent: c.ua });
+  try {
+    if (c.kind === 'push') {
+      captured.push({ data: { json: function() { return c.data; }, text: function() { return JSON.stringify(c.data); } },
+                      waitUntil: function(p) { waits.push(p); } });
+    } else {
+      captured.notificationclick({ notification: { data: c.data, close: function() { closed = true; } }, waitUntil: function(p) { waits.push(p); } });
+    }
+    await Promise.all(waits);
+  } catch (e) { return { error: 'threw: ' + ((e && e.message) || e) }; }
+  finally { install('clients', realClients); install('registration', realReg); install('navigator', realNav); }
+  return { shown: shown, opened: opened, told: told, focused: focused, closed: closed };
+}
+
 realAdd('message', function(e) {
+  if (e.data && e.data.pushCases) {
+    (async function() {
+      var out = [];
+      for (var i = 0; i < e.data.pushCases.length; i++) out.push(await pushCase(e.data.pushCases[i]));
+      self.postMessage({ loadError: loadError, pushResults: out });
+    })();
+    return;
+  }
   var urls = (e.data && e.data.urls) || [];
   (async function() {
     var results = [];

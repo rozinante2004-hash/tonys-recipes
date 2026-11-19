@@ -9383,6 +9383,9 @@ window.SELF_TESTS = [
         var rows=document.querySelectorAll('#kitchenChatOverlay .kc-row');
         if(rows.length!==2 || rows[0].textContent.indexOf('Other Kitchen')===-1 || rows[0].textContent.indexOf('Try my lasagne!')===-1 || !/1 new/.test(rows[0].textContent)) throw new Error('the list: '+Array.prototype.map.call(rows, function(r){ return r.textContent; }).join(' | '));
         if(rows[1].textContent.indexOf('asked to link')===-1) throw new Error('the state of a household that asked is not said');
+        // v40.02 — 🔔 at the foot of the window, outside the part a new message draws again
+        var pslot=document.querySelector('#kitchenChatOverlay .push-slot');
+        if(!pslot || pslot.closest('#kcBody2')) throw new Error('no 🔔 notification switch at the foot of 💬 Chats with linked kitchens');
         // A thread: everything in it, read when shown, Enter sends.
         await openKitchenChats('hK2');
         var t=document.getElementById('kcMsgs').textContent;
@@ -9407,6 +9410,142 @@ window.SELF_TESTS = [
       }
     } },
 
+  { id:'chat_notifications_switch', group:'Sharing', name:'🔔 Chat notifications when the app is closed (v40.02): one switch per device at the foot of both chat windows, saying what this device can do (an iPhone: only from the Home Screen); shown only when the server can send them',
+    test: async()=>{
+      // Tony, 20 Nov 2026: "Yes, build it, show the message text, both family and linked kitchen chats."
+      var st=function(d){ return pushState(Object.assign({ can:true, perm:'default', ios:false, installed:false, on:false }, d)); };
+      var cases=[[{ can:false, ios:true, installed:false }, 'install'], [{ can:false, ios:false }, 'unable'], [{ can:false, ios:true, installed:true }, 'unable'],
+        [{ perm:'denied', on:true }, 'blocked'], [{ perm:'granted', on:true }, 'on'], [{ perm:'granted', on:false }, 'off'], [{ perm:'default', on:true }, 'off']];
+      cases.forEach(function(c){ if(st(c[0])!==c[1]) throw new Error(JSON.stringify(c[0])+' → '+st(c[0])+', not '+c[1]); });
+      if(!/onclick="pushTurnOn\(\)"/.test(pushRowHtml('off')) || !/Notify me of new messages when the app is closed/.test(pushRowHtml('off'))) throw new Error('off: no 🔔 Notify me button');
+      if(!/onclick="pushTurnOff\(\)"/.test(pushRowHtml('on')) || !/Notifications are on for this device/.test(pushRowHtml('on'))) throw new Error('on: does not say so, or no Turn off');
+      if(!/Home Screen/.test(pushRowHtml('install')) || /onclick/.test(pushRowHtml('install'))) throw new Error('an iPhone browser is not told to use the Home Screen app');
+      if(!/blocked/.test(pushRowHtml('blocked')) || /onclick/.test(pushRowHtml('blocked'))) throw new Error('blocked: not said, or a button that cannot work');
+      var real={ db:window._fbDb, user:window._fbUser, hh:window._household, health:_workerHealth, acc:null };
+      try{ real.acc=localStorage.getItem(ACCESS_STORAGE_KEY); }catch(e){}
+      try{
+        window._fbDb={ collection:function(){ return { doc:function(){ return { collection:function(){ return { where:function(){ return { onSnapshot:function(){ return function(){}; } }; }, doc:function(){ return { id:'x' }; } }; } }; } }; } };
+        window._fbUser={ uid:'uMe', email:'me@example.com', displayName:'Me' };
+        window._household={ hid:'hN', role:'viewer', name:'Note Kitchen', ownerUid:'uO', ownerName:'Olga', links:[], asking:[] };
+        localStorage.setItem(ACCESS_STORAGE_KEY, JSON.stringify([{ uid:'uB', name:'Ben', email:'ben@example.com', role:'read', hhRole:'viewer' }]));
+        _workerHealth=Object.assign({}, real.health || {}, { push:true });
+        await openFamilyChat('all');
+        var slot=document.querySelector('#familyChatOverlay .push-slot');
+        if(!slot || slot.hidden || slot.closest('#famBody')) throw new Error('no 🔔 at the foot of 👪 Chat with family members (outside the conversation)');
+        if(slot.innerHTML!==pushRowHtml()) throw new Error('the foot does not say what this device can do: '+slot.textContent);
+        renderFamilyChat();
+        slot=document.querySelector('#familyChatOverlay .push-slot');
+        if(!slot || slot.hidden || !slot.textContent.trim()) throw new Error('a new message (the conversation drawn again) took the switch away');
+        _workerHealth=Object.assign({}, real.health || {}, { push:false });
+        pushRowsRefresh();
+        if(!slot.hidden || slot.textContent.trim()) throw new Error('offered although the server cannot send notifications');
+      } finally {
+        closeFamilyChat(); _workerHealth=real.health;
+        window._fbDb=real.db; window._fbUser=real.user; window._household=real.hh;
+        try{ if(real.acc===null) localStorage.removeItem(ACCESS_STORAGE_KEY); else localStorage.setItem(ACCESS_STORAGE_KEY, real.acc); }catch(e){}
+        if(typeof famLiveStop==='function') famLiveStop();
+      }
+    } },
+  { id:'chat_notifications_announced', group:'Sharing', name:'🔔 A message sent is announced to the household’s closed apps — a family message whenever someone else is in the household, a kitchen message only to a LINKED kitchen; never during a Self Test, never when the server cannot (v40.02)',
+    test: async()=>{
+      var store={}, idn=0, asked=[];
+      var fake={ collection:function(c){ return { doc:function(h){ return { collection:function(sub){ var path=c+'/'+h+'/'+sub; return {
+          doc:function(id){ var full=path+'/'+(id||('n'+(++idn))); return { id:full.split('/').pop(), path:full }; },
+          where:function(){ return { onSnapshot:function(){ return function(){}; } }; } }; } }; } }; },
+        batch:function(){ var ops=[]; return { set:function(r,d){ ops.push([r.path, d]); }, commit:async function(){ ops.forEach(function(o){ store[o[0]]=o[1]; }); } }; } };
+      var real={ db:window._fbDb, user:window._fbUser, hh:window._household, health:_workerHealth, ann:window.pushAnnounce, pw:window.pushWorker, acc:null, running:window._selfTestRunning };
+      try{ real.acc=localStorage.getItem(ACCESS_STORAGE_KEY); }catch(e){}
+      try{
+        window._fbDb=fake;
+        window._fbUser={ uid:'uMe', email:'me@example.com', displayName:'Me' };
+        window._household={ hid:'hA', role:'viewer', name:'Ann Kitchen', ownerUid:'uO', ownerName:'Olga', links:[{ hid:'hL', name:'Linked', code:'', at:1 }], asking:[] };
+        localStorage.setItem(ACCESS_STORAGE_KEY, JSON.stringify([]));
+        // What is asked for
+        var b=pushFamilyBody({ id:'m1' });
+        if(!b || b.action!=='push-notify' || b.kind!=='family' || b.hid!=='hA' || b.id!=='m1' || Object.keys(b).length!==4) throw new Error('the family announcement: '+JSON.stringify(b));
+        window._household.ownerUid='uMe';
+        if(pushFamilyBody({ id:'m2' })!==null) throw new Error('announced with nobody else in the household');
+        window._household.ownerUid='uO';
+        var k=pushKitchenBody('hA_hL', 'hL', { id:'k1' });
+        if(!k || k.kind!=='kitchen' || k.pair!=='hA_hL' || k.id!=='k1' || k.hid) throw new Error('the kitchen announcement: '+JSON.stringify(k));
+        if(pushKitchenBody('hA_hQ', 'hQ', { id:'k2' })!==null) throw new Error('announced to a kitchen that is not linked (still asking, or blocked)');
+        if(pushFamilyBody({})!==null || pushKitchenBody('hA_hL', 'hL', {})!==null) throw new Error('announced a message without its id');
+        // famSend announces what it wrote, with the id it was written under
+        window.pushAnnounce=function(x){ asked.push(x); return true; };
+        await openFamilyChat('all');
+        document.getElementById('famIn').value='Dinner is ready';
+        if(!await famSend()) throw new Error('could not send');
+        var id=Object.keys(store).filter(function(p){ return /\/talk\//.test(p) && store[p].text==='Dinner is ready'; }).map(function(p){ return p.split('/').pop(); })[0];
+        if(asked.length!==1 || !asked[0] || asked[0].id!==id || asked[0].kind!=='family') throw new Error('famSend did not announce the message it wrote: '+JSON.stringify(asked));
+        closeFamilyChat();
+        window.pushAnnounce=real.ann;
+        // pushAnnounce: only when the server can send them, and never while the Self Test runs
+        var calls=[]; window.pushWorker=function(x){ calls.push(x); return Promise.resolve({ ok:true, status:200, d:{} }); };
+        _workerHealth=Object.assign({}, real.health || {}, { push:true });
+        if(pushAnnounce(b)!==false || calls.length) throw new Error('announced while the Self Test runs');
+        window._selfTestRunning=false;
+        var sentNow=pushAnnounce(b);
+        _workerHealth=Object.assign({}, real.health || {}, { push:false });
+        var refused=pushAnnounce(b);
+        window._selfTestRunning=real.running;
+        if(!sentNow || calls.length!==1 || calls[0]!==b) throw new Error('not handed to the server: '+JSON.stringify(calls));
+        if(refused!==false || calls.length!==1) throw new Error('asked of a server that cannot send notifications');
+        if(pushAnnounce(null)!==false) throw new Error('announced nothing');
+      } finally {
+        window._selfTestRunning=real.running; closeFamilyChat();
+        window.pushAnnounce=real.ann; window.pushWorker=real.pw; _workerHealth=real.health;
+        window._fbDb=real.db; window._fbUser=real.user; window._household=real.hh;
+        try{ if(real.acc===null) localStorage.removeItem(ACCESS_STORAGE_KEY); else localStorage.setItem(ACCESS_STORAGE_KEY, real.acc); }catch(e){}
+        if(typeof famLiveStop==='function') famLiveStop();
+      }
+    } },
+  { id:'chat_notifications_shown_and_tapped', group:'Sharing', name:'🔔 The service worker shows a chat notification (who wrote and the text) unless the app is on the screen — always on Apple’s devices — and a tap opens that conversation (v40.02)',
+    test: async()=>{
+      var probe=new Worker('tests/sw-probe.js'), msg={ title:'\u{1F46A} Dana (to everyone)', body:'Dinner at 8', tag:'mkn-fam-all', chat:'f:all', hid:'hP' };
+      var chrome='Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Mobile Safari/537.36';
+      var iphone='Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Mobile/15E148 Safari/604.1';
+      var app=location.origin+'/tonys-recipes/';
+      try{
+        var reply=await new Promise(function(res, rej){
+          var t=setTimeout(function(){ rej(new Error('sw-probe did not answer in 5s')); }, 5000);
+          probe.onmessage=function(ev){ clearTimeout(t); res(ev.data); };
+          probe.onerror=function(ev){ clearTimeout(t); rej(new Error('sw-probe failed to load: '+(ev.message||'?'))); };
+          probe.postMessage({ pushCases:[
+            { kind:'push', data:msg, ua:chrome, clients:[] },
+            { kind:'push', data:msg, ua:chrome, clients:[{ url:app, visible:true }] },
+            { kind:'push', data:msg, ua:iphone, clients:[{ url:app, visible:true }] },
+            { kind:'push', data:msg, ua:chrome, clients:[{ url:app, visible:false }] },
+            { kind:'click', data:{ chat:'f:all' }, clients:[] },
+            { kind:'click', data:{ chat:'k:hK2' }, clients:[{ url:app+'?x=1', visible:false }] },
+            { kind:'click', data:{ chat:'x:<b>' }, clients:[] }
+          ] });
+        });
+        if(reply.loadError) throw new Error('sw.js would not load: '+reply.loadError);
+        var r=reply.pushResults;
+        r.forEach(function(x, i){ if(x && x.error) throw new Error('case '+i+' '+x.error); });
+        var n=r[0].shown[0];
+        if(r[0].shown.length!==1 || n.title!==msg.title || n.options.body!=='Dinner at 8' || n.options.tag!=='mkn-fam-all' || !n.options.renotify || n.options.data.chat!=='f:all')
+          throw new Error('the app closed: not shown as sent — '+JSON.stringify(r[0].shown));
+        if(r[1].shown.length) throw new Error('shown while the app is on the screen (it chimes and shows it itself)');
+        if(r[2].shown.length!==1) throw new Error('an iPhone with the app on the screen showed nothing (Apple takes notifications away from a site that does that)');
+        if(r[3].shown.length!==1) throw new Error('the app open but out of sight: nothing shown');
+        if(r[4].opened.length!==1 || !r[4].closed || new URL(r[4].opened[0]).searchParams.get('chat')!=='f:all' || new URL(r[4].opened[0]).pathname!=='/tonys-recipes/')
+          throw new Error('a tap with the app closed does not open the app at the conversation: '+JSON.stringify(r[4]));
+        if(r[5].opened.length || r[5].focused!==1 || !r[5].told.length || r[5].told[0].type!=='mkn-open-chat' || r[5].told[0].chat!=='k:hK2')
+          throw new Error('a tap with the app open does not bring it forward at the conversation: '+JSON.stringify(r[5]));
+        if(r[6].opened.length!==1 || new URL(r[6].opened[0]).searchParams.has('chat')) throw new Error('a strange "chat" was put in the address: '+JSON.stringify(r[6].opened));
+      } finally { probe.terminate(); }
+      // …and the app opens the conversation it is told
+      var real={ f:window.openFamilyChat, k:window.openKitchenChats, user:window._fbUser, hh:window._household }, opened=[];
+      try{
+        window.openFamilyChat=function(r){ opened.push('f:'+r); }; window.openKitchenChats=function(o){ opened.push('k:'+o); };
+        window._fbUser={ uid:'uMe' }; window._household={ hid:'hP', links:[] };
+        var ok=[pushOpenChat('f:all'), pushOpenChat('f:uB'), pushOpenChat('k:hK2'), pushOpenChat('x:1'), pushOpenChat('f:a b')];
+        if(opened.join()!=='f:all,f:uB,k:hK2' || ok.join()!=='true,true,true,false,false') throw new Error('the conversations opened: '+opened.join()+' / '+ok.join());
+        window._fbUser=null;
+        if(pushOpenChat('f:all') || opened.length!==3) throw new Error('opened a conversation while signed out');
+      } finally { window.openFamilyChat=real.f; window.openKitchenChats=real.k; window._fbUser=real.user; window._household=real.hh; }
+    } },
   { id:'example_twins_removed', group:'Sync', name:'🧹 The five example recipes, twice: an untouched copy goes, the first stays — and nothing anyone changed is ever taken (v38.50)',
     test: async()=>{
       var real={ recipes:recipes, save:window.saveData, del:window.queueCloudDelete, log:window.syncLog, toast:window.toast, hh:window._household };

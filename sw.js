@@ -1,4 +1,4 @@
-// Tony's Recipes — Service Worker v5
+// Tony's Recipes — Service Worker v5 (v40.02: + chat notifications, `push` and `notificationclick` below)
 // Strategy: stale-while-revalidate for the document, cache-first for assets.
 // version.json is never cached, and the in-app update banner is what tells the
 // user a newer version has landed — see the note on the fetch handler below.
@@ -189,6 +189,41 @@ self.addEventListener('fetch', function(event) {
       });
     })
   );
+});
+
+// v40.02 (app) — CHAT NOTIFICATIONS WHEN THE APP IS CLOSED (Worker v108; Tony, 20 Nov 2026: "Yes, build it, show the
+// message text, both family and linked kitchen chats."). The server sends each new message encrypted for this device;
+// the browser opens it and hands it here: { title, body, tag, chat, hid, u }. Shown with the phone's own sound; a tap
+// opens the app at that conversation (`?chat=f:all`, `f:<uid>`, `k:<household>`), or brings the open app forward and
+// tells it. While the app is on the screen it chimes and shows the message itself, so the notification is left out —
+// except on Apple's devices, which take notifications away from a site whose message showed nothing.
+self.addEventListener('push', function(event) {
+  var d = {};
+  try { d = event.data ? event.data.json() : {}; } catch (e) { d = { body: event.data ? event.data.text() : '' }; }
+  event.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(list) {
+    var ua = (self.navigator && self.navigator.userAgent) || '';
+    var apple = /iPhone|iPad|iPod|Macintosh/.test(ua) && !/Chrome|CriOS|Chromium|Firefox|FxiOS|Edg/.test(ua);
+    var onScreen = list.some(function(c) { return c.visibilityState === 'visible'; });
+    if (onScreen && !apple) return null;
+    return self.registration.showNotification(String(d.title || '\u{1F4AC}').slice(0, 120), {
+      body: String(d.body || '').slice(0, 400), tag: String(d.tag || 'mkn-chat'), renotify: true, dir: 'auto',
+      icon: BASE + 'icons/icon-192.png', data: { chat: String(d.chat || ''), hid: String(d.hid || '') }
+    });
+  }));
+});
+self.addEventListener('notificationclick', function(event) {
+  var n = event.notification, chat = (n.data && n.data.chat) || '';
+  n.close();
+  var url = new URL(BASE, self.location.origin);
+  if (/^[fk]:[A-Za-z0-9_-]{1,80}$/.test(chat)) url.searchParams.set('chat', chat);
+  event.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(list) {
+    var open = list.filter(function(c) { try { return new URL(c.url).pathname.indexOf(BASE) === 0; } catch (e) { return false; } })[0];
+    if (open) {
+      try { open.postMessage({ type: 'mkn-open-chat', chat: chat }); } catch (e) {}
+      return open.focus();
+    }
+    return self.clients.openWindow(url.href);
+  }));
 });
 
 // Handle SKIP_WAITING message from app to activate new SW immediately

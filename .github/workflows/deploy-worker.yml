@@ -13,7 +13,7 @@ name: Deploy the Worker
 on:
   push:
     branches: ["main", "test"]
-    paths: ["cloudflare-worker.js", "worker/wrangler.jsonc", ".github/workflows/deploy-worker.yml"]
+    paths: ["cloudflare-worker.js", "worker/wrangler.jsonc", ".github/workflows/deploy-worker.yml", "tools/vapid-key.mjs"]
   workflow_dispatch:
 
 permissions:
@@ -87,6 +87,15 @@ jobs:
             | npx --yes wrangler@4 secret put USAGE_KEY --config worker/wrangler.jsonc >/dev/null
           echo "the usage watch's key is set"
 
+      # v108 — the chat notifications' key (Web Push's VAPID key pair, app v40.02): made from the Cloudflare token this job
+      # already holds, as the usage watch's key is (tools/vapid-key.mjs), so there is nothing new to keep and every deploy
+      # sets the same key. Straight into the Worker's secret VAPID_JWK; never printed.
+      - name: The chat notifications' key
+        if: steps.token.outputs.ok == 'true'
+        run: |
+          node tools/vapid-key.mjs | npx --yes wrangler@4 secret put VAPID_JWK --config worker/wrangler.jsonc >/dev/null
+          echo "the chat notifications' key is set"
+
       # v73 — where the owner's alerts go (Tony's second address, verified in
       # Cloudflare Email Routing): the GitHub secret ALERT_EMAIL becomes the
       # Worker's secret ALERT_TO. Never printed; without it, no alerts.
@@ -154,6 +163,7 @@ jobs:
               # v78 — rateLimiting is now true with the database alone; Bring! says whether KV is bound.
               echo "$h" | grep -q '"bring":true' || { echo "::error::the Worker lost its storage (BRING_KV)"; exit 1; }
               echo "$h" | grep -q '"owner":true' || { echo "::error::the Worker has no owner's address (OWNER_EMAIL)"; exit 1; }
+              echo "$h" | grep -q '"push":true' || echo "::warning::the Worker has no chat notifications' key (VAPID_JWK) — notifications when the app is closed are off"
               echo "database, storage and the owner's address connected"; exit 0
             fi
             sleep 10

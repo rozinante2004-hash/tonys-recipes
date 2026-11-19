@@ -1,4 +1,12 @@
-// Tony's Recipes — Cloudflare Worker v107
+// Tony's Recipes — Cloudflare Worker v108
+// v108: CHAT NOTIFICATIONS WHEN THE APP IS CLOSED (Tony, 20 Nov 2026: "Yes, build it, show the message text, both family
+//   and linked kitchen chats."). Web Push: `push-key` → { key } (this server's public VAPID key); `push-subscribe`
+//   { idToken, hid, sub, lang, words } keeps a device's push address for a member of that household; `push-forget`
+//   { endpoint } removes it; `push-notify` { idToken, kind: 'family', hid, id } or { kind: 'kitchen', pair, id } reads
+//   the message just sent WITH THE SENDER'S SIGN-IN (it must be theirs, from the last ten minutes) and sends it, encrypted
+//   for each device (RFC 8291) and signed (RFC 8292), to the household's other members who have it on (the one person,
+//   for a message to one person; the members checked in the database at that moment) or to the LINKED kitchen's devices.
+//   The key is the secret VAPID_JWK, made by the deploy job from the Cloudflare token (never printed). health: `push`.
 // v107: THE PAGE, VIDEO AND PHOTO FETCHES REQUIRE A SIGN-IN (the audit of 10 Nov 2026, item S1, step 2; Tony, 15 Nov:
 //   "Can you run The Worker change now instead of waiting for Sunday evening? If so, please go ahead."). The app that
 //   sends the sign-in (v39.65) went out with v39.72 on 14 Nov; SIGNED_FETCH_DEFAULT is now 'require', so a call to
@@ -509,7 +517,7 @@
 //   AI_MAX_TOKENS   – the longest answer one call may ask for (32000; the
 //                     app's largest, reading several recipes at once, asks 8000).
 
-const WORKER_VERSION = 'v107';
+const WORKER_VERSION = 'v108';
 // v105 (audit S1) — the actions that take a sign-in, and whether a call without one is still served (see the top).
 const SIGNED_ACTIONS = new Set(['fetch-url', 'facebook-fetch', 'instagram-fetch', 'fb-probe', 'video-from-url',
   'video-recipe', 'photo-fetch', 'photo-search', 'video-ticket']);
@@ -1341,6 +1349,7 @@ async function handleRequest(request, env, ctx) {
         replies: !!env.METER_DB,      // v68 — the owner answers a note in the sender's own app
         signals: !!env.METER_DB,      // v69 — the testers' apps report errors and feature counts
         survey: !!env.METER_DB,       // v71 — the end-of-beta question
+        push: !!(env.VAPID_JWK && env.METER_DB),   // v108 — chat notifications when the app is closed (Web Push)
         configured: {
           anthropic: !!env.ANTHROPIC_API_KEY,
           openverse: true,
@@ -1855,6 +1864,7 @@ async function handleRequest(request, env, ctx) {
       return sr;
     }
     if (body.action === 'survey-status' || body.action === 'survey-answer') return await surveyAction(request, env, body);   // v71
+    if (/^push-(key|subscribe|notify|forget)$/.test(String(body.action || ''))) return await pushAction(request, env, body);   // v108
 
     // ── Anthropic proxy ───────────────────────────────────────────────────────
     try {
@@ -2444,6 +2454,259 @@ async function meterMembership(claims, hid, token, env) {
               created: Number(fsValue(f.createdAt)) || null, at: Date.now() };
   _meterMembers.set(k, v);
   return v;
+}
+// ─── CHAT NOTIFICATIONS WHEN THE APP IS CLOSED (v108, app v40.02) ─────────────────────────────────────────────────
+// Tony, 20 Nov 2026: "when using the chat in "Chat with family members", is there a way to make notifications audible
+// even if the app is not running?" — "Yes, build it, show the message text, both family and linked kitchen chats."
+// Web Push, the standard every browser speaks (Apple's since iOS 16.4, for an app on the Home Screen): a device that
+// says yes gives the app an address at its browser's push service (Apple, Google, Mozilla, Microsoft); the app hands it
+// here (`push-subscribe`); a message just sent is announced (`push-notify`) to the devices of the people who may read it,
+// the phone's own sound with it. Encrypted for each device (RFC 8291, aes128gcm) — the push service carries what it
+// cannot read — and signed with this server's key (RFC 8292, VAPID). That key is the Worker's secret VAPID_JWK, made by
+// the deploy job from the Cloudflare token it already holds (as the usage watch's key is): nothing new to keep, never
+// printed. Nothing of a message is kept here: it is read from the database with the SENDER's sign-in, so only a message
+// that exists, written by them, is announced, and only to those the database rules let read it — the household (one
+// person, for a message to one person) for the family chat; the linked kitchen for a kitchen chat (a link, not a
+// request: a blocked or waiting household is told nothing). What is kept, per device: its push address and keys, who is
+// signed in on it, their household and their language (D1 `push_subs`), removed when the device turns it off, when its
+// service says the address is gone, or (kitchen chats) when the device has not said for 45 days that it is still there.
+const PUSH_HOSTS = /^(fcm\.googleapis\.com|android\.googleapis\.com|[a-z0-9-]+\.push\.apple\.com|updates\.push\.services\.mozilla\.com|push\.services\.mozilla\.com|[a-z0-9-]+\.notify\.windows\.com)$/;
+const PUSH_STALE_MS = 45 * 864e5;     // kitchen chats: a device not heard from for this long hears nothing
+const PUSH_RECENT_MS = 10 * 60e3;     // only a message written in the last ten minutes is announced
+const PUSH_MAX_DEVICES = 40;          // a household's devices one message reaches (a Worker call makes at most 50 requests)
+const PUSH_PER_PERSON = 10;           // devices one person may have it on
+const PUSH_TTL_SEC = 86400;           // a phone that is off for a day misses it (the app shows it when opened)
+const PUSH_SUBJECT = 'https://mykitchennotes.community';
+function bytesB64u(bytes) {
+  let s = '';
+  const a = new Uint8Array(bytes);
+  for (let i = 0; i < a.length; i++) s += String.fromCharCode(a[i]);
+  return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+function concatBytes(...parts) {
+  const out = new Uint8Array(parts.reduce((n, p) => n + p.length, 0));
+  let o = 0;
+  parts.forEach(p => { out.set(p, o); o += p.length; });
+  return out;
+}
+let _vapid = null;
+async function vapidKey(env) {
+  const raw = String(env.VAPID_JWK || '');
+  if (!raw) return null;
+  if (_vapid && _vapid.raw === raw) return _vapid;
+  let j;
+  try { j = JSON.parse(raw); } catch (e) { return null; }
+  if (!j || !j.d || !j.x || !j.y) return null;
+  const key = await crypto.subtle.importKey('jwk', { kty: 'EC', crv: 'P-256', d: j.d, x: j.x, y: j.y, ext: true },
+    { name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign']);
+  const pub = bytesB64u(concatBytes(new Uint8Array([4]), b64uBytes(j.x), b64uBytes(j.y)));
+  _vapid = { raw, key, pub, jwts: new Map() };
+  return _vapid;
+}
+// RFC 8292: a JWT for the push service's origin, signed ES256 (WebCrypto's ECDSA signature is the raw r‖s it asks for),
+// kept an hour for each service.
+async function vapidAuth(v, endpoint) {
+  const aud = new URL(endpoint).origin, now = Math.floor(Date.now() / 1000), kept = v.jwts.get(aud);
+  if (kept && kept.until > now) return kept.header;
+  const enc = (o) => bytesB64u(new TextEncoder().encode(JSON.stringify(o)));
+  const unsigned = enc({ typ: 'JWT', alg: 'ES256' }) + '.' + enc({ aud, exp: now + 12 * 3600, sub: PUSH_SUBJECT });
+  const sig = await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, v.key, new TextEncoder().encode(unsigned));
+  const header = 'vapid t=' + unsigned + '.' + bytesB64u(sig) + ', k=' + v.pub;
+  v.jwts.set(aud, { header, until: now + 3600 });
+  return header;
+}
+async function hkdf(salt, ikm, info, bytes) {
+  const k = await crypto.subtle.importKey('raw', ikm, 'HKDF', false, ['deriveBits']);
+  return new Uint8Array(await crypto.subtle.deriveBits({ name: 'HKDF', hash: 'SHA-256', salt, info }, k, bytes * 8));
+}
+// RFC 8291 (Message Encryption for Web Push) in RFC 8188's aes128gcm: one record, the device's keys from its subscription,
+// a one-time key pair and salt of this server's for each message.
+async function pushEncrypt(payload, p256dh, auth) {
+  const ua = b64uBytes(p256dh), secret = b64uBytes(auth);
+  if (ua.length !== 65 || ua[0] !== 4 || secret.length !== 16) throw new Error('the device\'s keys are not valid');
+  const pair = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']);
+  const as = new Uint8Array(await crypto.subtle.exportKey('raw', pair.publicKey));
+  const uaKey = await crypto.subtle.importKey('raw', ua, { name: 'ECDH', namedCurve: 'P-256' }, false, []);
+  const shared = new Uint8Array(await crypto.subtle.deriveBits({ name: 'ECDH', public: uaKey }, pair.privateKey, 256));
+  const te = new TextEncoder();
+  const ikm = await hkdf(secret, shared, concatBytes(te.encode('WebPush: info\0'), ua, as), 32);
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const cek = await hkdf(salt, ikm, te.encode('Content-Encoding: aes128gcm\0'), 16);
+  const nonce = await hkdf(salt, ikm, te.encode('Content-Encoding: nonce\0'), 12);
+  const plain = concatBytes(typeof payload === 'string' ? te.encode(payload) : payload, new Uint8Array([2]));   // the last record
+  const key = await crypto.subtle.importKey('raw', cek, 'AES-GCM', false, ['encrypt']);
+  const sealed = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv: nonce }, key, plain));
+  const head = new Uint8Array(21);
+  head.set(salt, 0);
+  new DataView(head.buffer).setUint32(16, 4096);
+  head[20] = 65;
+  return concatBytes(head, as, sealed);
+}
+async function pushDb(env) {
+  const db = env.METER_DB;
+  if (!db) return null;
+  await tableOnce(db, 'push_subs', 'CREATE TABLE IF NOT EXISTS push_subs (endpoint TEXT PRIMARY KEY, project TEXT NOT NULL, '
+    + 'uid TEXT NOT NULL, hid TEXT NOT NULL, p256dh TEXT NOT NULL, auth TEXT NOT NULL, lang TEXT, words TEXT, at INTEGER, '
+    + 'sent_at INTEGER, fails INTEGER NOT NULL DEFAULT 0)');
+  await tableOnce(db, 'push_subs_by_hid', 'CREATE INDEX IF NOT EXISTS push_subs_by_hid ON push_subs (project, hid)');
+  await tableOnce(db, 'counters', 'CREATE TABLE IF NOT EXISTS counters (k TEXT PRIMARY KEY, n INTEGER NOT NULL DEFAULT 0, until INTEGER)');
+  return db;
+}
+function pushEndpointOk(u) {
+  try {
+    const x = new URL(String(u || ''));
+    return x.protocol === 'https:' && !x.port && PUSH_HOSTS.test(x.hostname) && String(u).length <= 1000;
+  } catch (e) { return false; }
+}
+// One device: the encrypted message, and what its push service answered. 404 / 410: the address is gone (the person
+// turned notifications off in the phone's settings, or the browser dropped it) — so is its row.
+async function pushOne(env, v, row, payload) {
+  let status = 0;
+  try {
+    const body = await pushEncrypt(JSON.stringify(payload), row.p256dh, row.auth);
+    const r = await (env.__fetch || fetch)(row.endpoint, { method: 'POST', body, signal: AbortSignal.timeout(8000),
+      headers: { Authorization: await vapidAuth(v, row.endpoint), 'Content-Encoding': 'aes128gcm',
+        'Content-Type': 'application/octet-stream', TTL: String(PUSH_TTL_SEC), Urgency: 'high' } });
+    status = r.status;
+  } catch (e) { status = -1; }
+  const db = env.METER_DB;
+  try {
+    if (status === 404 || status === 410) await db.prepare('DELETE FROM push_subs WHERE endpoint = ?1').bind(row.endpoint).run();
+    else if (status >= 200 && status < 300) await db.prepare('UPDATE push_subs SET sent_at = ?2, fails = 0 WHERE endpoint = ?1').bind(row.endpoint, Date.now()).run();
+    else {   // anything else, twenty times running: the address is given up
+      await db.prepare('UPDATE push_subs SET fails = fails + 1 WHERE endpoint = ?1').bind(row.endpoint).run();
+      await db.prepare('DELETE FROM push_subs WHERE endpoint = ?1 AND fails >= 20').bind(row.endpoint).run();
+    }
+  } catch (e) {}
+  return status;
+}
+async function pushSignedIn(body, env) {
+  const s = await signedCaller(body, env);
+  if (s.resp) return s;
+  if (!s.claims) return { resp: jsonResp({ error: 'SIGN_IN: sign in first.', signIn: true }, 401) };
+  return s;
+}
+function fsDocUrl(env, project, path) {
+  return (env.__firestoreBase || 'https://firestore.googleapis.com') + '/v1/projects/' + encodeURIComponent(project)
+    + '/databases/(default)/documents/' + path.split('/').map(encodeURIComponent).join('/');
+}
+function pushWords(w) {
+  const out = {};
+  if (w && typeof w === 'object') ['all'].forEach(k => { if (typeof w[k] === 'string') out[k] = w[k].replace(/[\u0000-\u001f]/g, '').slice(0, 40); });
+  return JSON.stringify(out);
+}
+async function pushAction(request, env, body) {
+  const a = body.action;
+  const v = await vapidKey(env);
+  if (!v || !env.METER_DB) return jsonResp({ error: 'PUSH: notifications are not set up on the server.', needsConfig: true }, 503);
+  if (a === 'push-key') return jsonResp({ key: v.pub });
+  const db = await pushDb(env);
+  // Turning it off on this device — the address is what the device holds; knowing it is enough.
+  if (a === 'push-forget') {
+    const ep = String((body.sub && body.sub.endpoint) || body.endpoint || '');
+    if (!pushEndpointOk(ep)) return jsonResp({ error: 'PUSH: which device?' }, 400);
+    await db.prepare('DELETE FROM push_subs WHERE endpoint = ?1').bind(ep).run();
+    return jsonResp({ ok: true });
+  }
+  const s = await pushSignedIn(body, env);
+  if (s.resp) return s.resp;
+  const claims = s.claims, project = claims.aud, me = claims.sub, token = body.idToken;
+  if (a === 'push-subscribe') {
+    const hid = String(body.hid || '').slice(0, 80), sub = body.sub || {}, keys = sub.keys || {};
+    if (!hid || !pushEndpointOk(sub.endpoint)) return jsonResp({ error: 'PUSH: this device\'s notification address is not one this server sends to.' }, 400);
+    try { if (b64uBytes(keys.p256dh).length !== 65 || b64uBytes(keys.auth).length !== 16) throw 0; }
+    catch (e) { return jsonResp({ error: 'PUSH: this device\'s notification keys are not valid.' }, 400); }
+    let m;
+    try { m = await meterMembership(claims, hid, token, env); }
+    catch (e) { return jsonResp({ error: 'PUSH: your household could not be checked just now — try again in a moment.' }, 502); }
+    if (!m.member) return jsonResp({ error: 'PUSH: you are not in this household.' }, 403);
+    const lang = String(body.lang || '').replace(/[^a-zA-Z-]/g, '').slice(0, 12);
+    await db.prepare('INSERT INTO push_subs (endpoint, project, uid, hid, p256dh, auth, lang, words, at, fails) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 0) '
+      + 'ON CONFLICT (endpoint) DO UPDATE SET project = ?2, uid = ?3, hid = ?4, p256dh = ?5, auth = ?6, lang = ?7, words = ?8, at = ?9, fails = 0')
+      .bind(sub.endpoint, project, me, hid, String(keys.p256dh), String(keys.auth), lang, pushWords(body.words), Date.now()).run();
+    // At most ten devices a person: the ones not heard from longest go.
+    const mine = (await db.prepare('SELECT endpoint FROM push_subs WHERE project = ?1 AND uid = ?2 ORDER BY at DESC').bind(project, me).all()).results || [];
+    for (const r of mine.slice(PUSH_PER_PERSON)) await db.prepare('DELETE FROM push_subs WHERE endpoint = ?1').bind(r.endpoint).run();
+    return jsonResp({ ok: true, key: v.pub });
+  }
+  if (a !== 'push-notify') return jsonResp({ error: 'PUSH: unknown action' }, 400);
+  const kind = body.kind === 'kitchen' ? 'kitchen' : 'family', id = String(body.id || '');
+  if (!/^[A-Za-z0-9]{1,40}$/.test(id)) return jsonResp({ error: 'PUSH: which message?' }, 400);
+  let hid = '', pair = '', other = '';
+  if (kind === 'family') {
+    hid = String(body.hid || '');
+    if (!/^[A-Za-z0-9_-]{1,80}$/.test(hid)) return jsonResp({ error: 'PUSH: which household?' }, 400);
+  } else {
+    pair = String(body.pair || '');
+    if (!/^[A-Za-z0-9-]{1,80}_[A-Za-z0-9-]{1,80}$/.test(pair)) return jsonResp({ error: 'PUSH: which conversation?' }, 400);
+  }
+  const h = { Authorization: 'Bearer ' + token };
+  const read = async (path) => {
+    const r = await fsFetch(fsDocUrl(env, project, path), h);
+    if (!r.ok) return { status: r.status };
+    let f = {};
+    try { f = ((await r.json()) || {}).fields || {}; } catch (e) {}
+    return { status: 200, f };
+  };
+  let msg, rows, payloadFor;
+  try {
+    if (kind === 'family') {
+      // Who may hear of it: nobody's device unless someone else in the household has it on — asked before anything is read.
+      rows = (await db.prepare('SELECT * FROM push_subs WHERE project = ?1 AND hid = ?2 AND uid != ?3 ORDER BY at DESC LIMIT ?4')
+        .bind(project, hid, me, PUSH_MAX_DEVICES * 2).all()).results || [];
+      if (!rows.length) return jsonResp({ ok: true, sent: 0 });
+      msg = await read('households/' + hid + '/talk/' + id);
+      if (msg.status !== 200) return jsonResp({ error: 'PUSH: that message is not there.' }, 404);
+      const by = fsValue(msg.f.by), to = String(fsValue(msg.f.to) || ''), at = Number(fsValue(msg.f.at)) || 0;
+      if (by !== me) return jsonResp({ error: 'PUSH: only the one who wrote a message announces it.' }, 403);
+      if (Math.abs(Date.now() - at) > PUSH_RECENT_MS) return jsonResp({ ok: true, sent: 0, old: true });
+      if (to !== 'all') rows = rows.filter(r => r.uid === to);
+      // Still in the household — asked of the database now, with the sender's sign-in (the members are theirs to read).
+      const lr = await fsFetch(fsDocUrl(env, project, 'households/' + hid + '/members') + '?pageSize=300&mask.fieldPaths=uid', h);
+      if (!lr.ok) return jsonResp({ error: 'PUSH: the household could not be checked (' + lr.status + ').' }, 502);
+      const inIt = new Set((((await lr.json()) || {}).documents || []).map(d => String(d.name || '').split('/').pop()));
+      for (const r of rows.filter(r => !inIt.has(r.uid))) await db.prepare('DELETE FROM push_subs WHERE endpoint = ?1').bind(r.endpoint).run();
+      rows = rows.filter(r => inIt.has(r.uid));
+      const name = String(fsValue(msg.f.name) || '').slice(0, 80), text = String(fsValue(msg.f.text) || '');
+      payloadFor = (r) => {
+        let w = {}; try { w = JSON.parse(r.words || '{}') || {}; } catch (e) {}
+        return { title: '\u{1F46A} ' + name + (to === 'all' && w.all ? ' ' + w.all : ''), body: pushText(text),
+          tag: 'mkn-fam-' + (to === 'all' ? 'all' : me), chat: 'f:' + (to === 'all' ? 'all' : me), hid, u: r.uid };
+      };
+    } else {
+      msg = await read('linkTalk/' + pair + '/messages/' + id);
+      if (msg.status !== 200) return jsonResp({ error: 'PUSH: that message is not there.' }, 404);
+      const by = fsValue(msg.f.by), from = String(fsValue(msg.f.from) || ''), at = Number(fsValue(msg.f.at)) || 0;
+      if (by !== me) return jsonResp({ error: 'PUSH: only the one who wrote a message announces it.' }, 403);
+      const halves = pair.split('_');
+      if (halves.indexOf(from) === -1) return jsonResp({ error: 'PUSH: that message is not there.' }, 404);
+      if (Math.abs(Date.now() - at) > PUSH_RECENT_MS) return jsonResp({ ok: true, sent: 0, old: true });
+      other = halves[0] === from ? halves[1] : halves[0];
+      // Linked kitchens only: a household still asking, or one that was refused or blocked, is told nothing.
+      const link = await read('households/' + from + '/links/' + other);
+      if (link.status !== 200) return jsonResp({ ok: true, sent: 0, notLinked: true });
+      rows = ((await db.prepare('SELECT * FROM push_subs WHERE project = ?1 AND hid = ?2 AND at > ?3 ORDER BY at DESC LIMIT ?4')
+        .bind(project, other, Date.now() - PUSH_STALE_MS, PUSH_MAX_DEVICES).all()).results || []);
+      const name = String(fsValue(msg.f.name) || '').slice(0, 80), text = String(fsValue(msg.f.text) || '');
+      payloadFor = (r) => ({ title: '\u{1F4AC} ' + name, body: pushText(text), tag: 'mkn-kc-' + from, chat: 'k:' + from, hid: other, u: r.uid });
+    }
+  } catch (e) {
+    return jsonResp({ error: 'PUSH: the message could not be checked just now (' + String((e && e.message) || e).slice(0, 80) + ').' }, 502);
+  }
+  rows = rows.slice(0, PUSH_MAX_DEVICES);
+  if (!rows.length) return jsonResp({ ok: true, sent: 0 });
+  // Each message once (two taps, a retry): the first call that gets this far announces it.
+  const once = await db.prepare('INSERT OR IGNORE INTO counters (k, n, until) VALUES (?1, 1, ?2)')
+    .bind('push:' + project + ':' + kind + ':' + id, Date.now() + 864e5).run();
+  if (!once || !once.meta || once.meta.changes === 0) return jsonResp({ ok: true, sent: 0, already: true });
+  const answers = await Promise.all(rows.map(r => pushOne(env, v, r, payloadFor(r))));
+  const sent = answers.filter(s => s >= 200 && s < 300).length;
+  if (answers.length && !sent) console.log('[push] none of ' + answers.length + ' delivered: ' + answers.join(','));
+  return jsonResp({ ok: true, sent, devices: answers.length });
+}
+function pushText(t) {
+  t = String(t || '').replace(/\s+/g, ' ').trim();
+  return t.length > 300 ? t.slice(0, 300) + '…' : t;
 }
 let _meterReady = false;
 async function meterDb(env) {
@@ -4505,4 +4768,4 @@ export default {
   }
 };
 
-// ── END OF WORKER v107 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
+// ── END OF WORKER v108 ── If this is the last line in the Cloudflare editor, the whole file was pasted.

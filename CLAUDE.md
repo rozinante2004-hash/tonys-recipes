@@ -27,8 +27,9 @@ where.
   own `i18n/_farm_<lang>`; v39.94 at 21:40 on db945ab: the
   network Self Tests send the sign-in; v39.93 at 19:55 on 4b688fc: each farm animal in its own recorded voice,
   `docs/farm-voices.md`; Worker v107 since 15 Nov 06:12; the jobs are listed near the top of `docs/history/2026-11.md`).
-  **On Test, not released:** v40.01 — 📍 Take me there in Help answers and their Details. **Building:** chat
-  notifications when the app is closed (Web Push; family and linked-kitchen chats; the message text shown; Tony, 20 Nov).
+  **On Test, not released:** v40.01 — 📍 Take me there in Help answers and their Details; v40.02 + Worker v108 — 🔔 chat
+  notifications when the app is closed (Web Push; family and linked-kitchen chats; the message text shown; Tony, 20
+  Nov; the Worker is live for every copy at once — it only adds, nothing older is refused).
   The test copy
   (https://tonys-recipes-test.pages.dev, its own database and rules) follows `test`.
 - **The beta has had testers since Sunday 25 Oct 2026** and is **by invitation only**: the owner invites with
