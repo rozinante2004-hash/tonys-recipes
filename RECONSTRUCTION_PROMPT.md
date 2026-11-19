@@ -272,7 +272,15 @@ hidden / refuses / silent / privacy text.
     time) — `lineMoreHtml`: a row under it, colspan = the columns shown, every value in full (identifier, the
     deleted/moved/left notes, 🔑 Reset password, Recipes "counted …", the AI bar); a tap on an opened line, or its
     📋 All its details, is `show(key)` (the details panel, as a tap was before). ⊞ Expand all / ⊟ Collapse all
-    (`expandAll(on)`, `S.allLines`, `#mgExpandAll`). **The sort is kept** in `localStorage['mkn_manage_sort']`
+    (`expandAll(on)`, `S.allLines`, `#mgExpandAll`). **v39.98** (Tony: "allow the collapse of an expanded household by
+    clicking again the downwards arrow next to its name"): the ▾/▸ is a button of its own (`.mg-chev`,
+    `mknManage.lineChev(key)`, `lineSet`) — it folds or opens that line where it is, also after ⊞ Expand all
+    (`S.closed`); a tap on a folded line opens it. And ("make the email address and the identifier, in each household,
+    copy to the clipboard when clicked. Same as we have the identifier behave on the main page") `copyable(text, cls)`:
+    the opened line's identifier and owner's address, the details panel's identifier and every member's address are
+    buttons (`.mg-cp`, `data-copy`) — `mknManage.copyText(el)` copies, "✅ Copied!" in its place for 1.8 s (kept through
+    a redraw: `S.copied`); no clipboard → the text is selected and a notice says so. The closed line's owner still
+    opens the line. **The sort is kept** in `localStorage['mkn_manage_sort']`
     ('month:-1'; `sortKeep()` in `sortBy`/`sortTo`, `sortSaved()` read as manage.js loads; only keys in `SORT_KEYS`);
     a Self Test run keeps it (`_selfTestPark`/`_selfTestUnpark` → `mknManage._sortBack()`). **On a phone (≤700 px)**
     the table stays a table (`table-layout:fixed`): Household and Owner always, plus `PHONE_COLS[S.sort]` — month:

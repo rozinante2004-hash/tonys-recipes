@@ -1942,7 +1942,7 @@ window.SELF_TESTS = [
         mknManage.search('');
         mknManage.show('hA');
         var firstMember=document.querySelector('#manageOverlay .mg-panel .mg-li .mg-email');
-        if(!firstMember || firstMember.textContent!=='a@example.com') throw new Error('the owner is not listed first');
+        if(!firstMember || (firstMember.getAttribute('data-copy') || firstMember.textContent)!=='a@example.com') throw new Error('the owner is not listed first');   // v39.98 — the address is a button that copies it
         if(!/Requests waiting/.test(ov.textContent) || !/Kitchen X/.test(ov.textContent) || !/1 new household came through/.test(ov.textContent)) throw new Error('the details panel');
         document.getElementById('mgCap').value='5';
         await mknManage.saveCap();
@@ -2330,7 +2330,7 @@ window.SELF_TESTS = [
       }
     } },
 
-  { id:'management_lines', group:'Sharing', name:'📊 Households: one line each; a tap opens that line with every value, a second tap its details; ⊞ Expand all; the sort kept on the device; a phone shows Household, Owner and the sort’s own two columns (v39.88)',
+  { id:'management_lines', group:'Sharing', name:'📊 Households: one line each; a tap opens that line with every value, a second tap its details; ⊞ Expand all; the ▾ beside a name folds it again, and an identifier or address copies on a tap (v39.98); the sort kept on the device; a phone shows Household, Owner and the sort’s own two columns (v39.88)',
     test: async()=>{
       var tabBack=await _onHouseholdsTab();
       var now=Date.now(), month=new Date().toISOString().slice(0,7);
@@ -2393,6 +2393,61 @@ window.SELF_TESTS = [
         mknManage.show(null);
         document.getElementById('mgExpandAll').click();
         if(mores().length) throw new Error('Collapse all left '+mores().length+' open');
+        // 4b. v39.98 — Tony: "allow the collapse of an expanded household by clicking again the downwards arrow next to its
+        // name". The ▾ folds that line, wherever it is (no ⊟ Collapse all at the top); the ▸ opens it again.
+        rowOf('Kitchen A').click();
+        var chev=rowOf('Kitchen A').querySelector('button.mg-chev');
+        if(!chev || chev.textContent!=='▾' || chev.getAttribute('aria-expanded')!=='true') throw new Error('an opened line has no ▾ button to fold it');
+        chev.click();
+        if(mores().length || rowOf('Kitchen A').getAttribute('aria-expanded')!=='false' || mknManage._state.open) throw new Error('the ▾ did not fold the line (or opened its details): opened '+mores().length);
+        rowOf('Kitchen A').querySelector('button.mg-chev').click();
+        if(mores().length!==1 || rowOf('Kitchen A').nextElementSibling!==mores()[0] || mknManage._state.open) throw new Error('the ▸ did not open the line again');
+        // …and with every line open: only that one folds; a tap on it opens it again
+        document.getElementById('mgExpandAll').click();
+        rowOf('Kitchen B').querySelector('button.mg-chev').click();
+        if(mores().length!==2 || rowOf('Kitchen B').getAttribute('aria-expanded')!=='false' || !/Collapse all/.test(document.getElementById('mgExpandAll').textContent))
+          throw new Error('with every line open, the ▾ did not fold only that one: '+mores().length+' open');
+        rowOf('Kitchen B').click();
+        if(mores().length!==3 || mknManage._state.open) throw new Error('a tap on a folded line did not open it again');
+        // 4c. v39.98 — "make the email address and the identifier, in each household, copy to the clipboard when clicked.
+        // Same as we have the identifier behave on the main page."
+        var copied=[], realClip=navigator.clipboard && navigator.clipboard.writeText, failClip=false;
+        var fakeClip=async function(t){ if(failClip) throw new Error('NotAllowedError'); copied.push(t); };
+        try{ Object.defineProperty(navigator.clipboard, 'writeText', { value:fakeClip, configurable:true }); }catch(e){ navigator.clipboard.writeText=fakeClip; }
+        try{
+          var mA=rowOf('Kitchen A').nextElementSibling;
+          var code=mA.querySelector('button.mg-cp.mg-code'), mail=mA.querySelector('button.mg-cp.mg-email');
+          if(!code || !mail) throw new Error('the opened line’s identifier and address are not buttons to tap');
+          code.click(); await new Promise(function(r){ setTimeout(r, 40); });
+          if(copied[0]!=='MKN-AAAA-2222') throw new Error('the identifier was not copied: '+JSON.stringify(copied));
+          if(mknManage._state.open) throw new Error('a tap on the identifier opened the details too');
+          // (the window may be drawn again meanwhile, as its notes arrive: it still says so)
+          mknManage._render();
+          code=ov.querySelector('.mg-more button.mg-cp.mg-code[data-copy="MKN-AAAA-2222"]');
+          if(!code || !code.classList.contains('mg-copied')) throw new Error('drawn again, it no longer says it was copied');
+          if(getComputedStyle(code.querySelector('.mg-cpdone')).display==='none' || getComputedStyle(code.querySelector('.mg-cpt')).display!=='none')
+            throw new Error('it does not say ✅ Copied! in its place: '+getComputedStyle(code.querySelector('.mg-cpdone')).display+' / '+getComputedStyle(code.querySelector('.mg-cpt')).display);
+          mail=ov.querySelector('.mg-more button.mg-cp.mg-email[data-copy="a.very.long.address.of.someone@example.com"]');
+          mail.click(); await new Promise(function(r){ setTimeout(r, 40); });
+          if(copied[1]!=='a.very.long.address.of.someone@example.com') throw new Error('the address was not copied: '+JSON.stringify(copied));
+          // the details: its identifier and every member's address
+          mknManage.show('hA');
+          var pn=ov.querySelector('.mg-panel'), pc=pn && pn.querySelector('button.mg-cp.mg-code'), pm=pn && pn.querySelector('.mg-li button.mg-cp.mg-email');
+          if(!pc || !pm) throw new Error('the details’ identifier and members’ addresses are not buttons to tap');
+          pm.click(); await new Promise(function(r){ setTimeout(r, 40); });
+          if(copied[2]!=='a.very.long.address.of.someone@example.com' || mknManage._state.open!=='hA') throw new Error('a member’s address was not copied: '+JSON.stringify(copied));
+          // no clipboard here: the text is selected, to copy by hand
+          failClip=true;
+          var ok=await mknManage.copyText(pc);
+          var sel=String(getSelection());
+          if(ok!==false || sel!=='MKN-AAAA-2222') throw new Error('without a clipboard the identifier was not selected: '+JSON.stringify(sel));
+          getSelection().removeAllRanges();
+          mknManage.show(null);
+        } finally {
+          try{ Object.defineProperty(navigator.clipboard, 'writeText', { value:realClip, configurable:true }); }catch(e){ navigator.clipboard.writeText=realClip; }
+        }
+        document.getElementById('mgExpandAll').click();
+        if(mores().length) throw new Error('Collapse all left '+mores().length+' open after one was folded by its ▾');
         // 5. The sort is kept on this device, and read back when the page is loaded again.
         var sel=document.getElementById('mgSortBy');
         if(!sel) throw new Error('no Sort by');

@@ -21,7 +21,10 @@
             errPicked: {},   // v38.88 — the error reports ticked for 🗑 Delete selected
             survey: null, surveyError: '',   // v38.18 — 📝 the end-of-beta question
             invFilter: 'open', invited: {},   // v39.61 — ✉️ Beta invitation requests: which shown; the addresses invited before
-            lines: {}, allLines: false };   // v39.88 — the households' lines opened (one at a time), or all of them
+            lines: {}, allLines: false,    // v39.88 — the households' lines opened (one at a time), or all of them
+            closed: {},                    // v39.98 — with all of them open, the ones folded again by their ▾
+            copied: null };                // v39.98 — the address or identifier just copied (it says so a moment)
+  var _copiedT = null;
   // v39.88 — Tony, 16 Nov: "Make the sorting persistent. The sorting order selected should keep until I change it, no
   // matter if the app was restarted or updated." Kept on this device (as Hide deleted), read back when the page loads.
   var SORT_KEY = 'mkn_manage_sort';
@@ -881,7 +884,25 @@
   // v39.88 — Tony: "Present it as a compressed table of 1 line per household … Clicking a line will expand only that
   // line to present all values currently displayed. A click on this one will open the full description currently
   // triggered by clicking it. There should also be an "expend/collapse" all toggle button."
-  function lineOpen(k) { return S.allLines || !!S.lines[k]; }
+  function lineOpen(k) { return S.allLines ? !S.closed[k] : !!S.lines[k]; }
+  // v39.98 — Tony, 19 Nov 2026: "allow the collapse of an expanded household by clicking again the downwards arrow next
+  // to its name. Otherwise, in order to collapse a single household, I need to scroll all the way up and click Expand
+  // all and then collapse all." The ▾/▸ is a button of its own: it folds or opens that line, wherever it is.
+  function lineSet(k, open) {
+    if (S.allLines) { if (open) delete S.closed[k]; else S.closed[k] = true; }
+    else if (open) { S.lines = {}; S.lines[k] = true; }     // one at a time, as a tap on the line
+    else delete S.lines[k];
+  }
+  // v39.98 — Tony: "make the email address and the identifier, in each household, copy to the clipboard when clicked.
+  // Same as we have the identifier behave on the main page." Tap → copied, "✅ Copied!" for a moment in its place.
+  function copyable(text, cls) {
+    if (!text) return '<span class="' + cls + '">—</span>';
+    // (the window is drawn again when its notes arrive: what was just copied still says so)
+    var just = S.copied && S.copied.t === text && Date.now() - S.copied.at < 1800;
+    return '<button type="button" class="mg-cp ' + cls + (just ? ' mg-copied' : '') + '" dir="ltr" data-copy="' + escA(text) + '" title="Click to copy it to the clipboard"'
+      + ' aria-label="' + escA(text + ' — click to copy it to the clipboard') + '" onclick="event.stopPropagation();mknManage.copyText(this)"'
+      + ' onkeydown="event.stopPropagation()"><span class="mg-cpt">' + esc(text) + '</span><span class="mg-cpdone" aria-hidden="true">✅ Copied!</span></button>';
+  }
   function nameOf(r) { return r.name || (r.anonymised ? '(name removed after six months)' : '(no name)'); }
   function monthTone(r) {
     if (r.cap == null) return '';
@@ -897,7 +918,8 @@
       + '" tabindex="0" aria-expanded="' + open + '" data-key="' + escA(r.key) + '" onclick="mknManage.lineTap(' + jsA(r.key) + ')"'
       + ' onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();mknManage.lineTap(' + jsA(r.key) + ');}">'
       // (the name in a box of its own direction: a Hebrew name is cut at its end, not its beginning)
-      + '<td class="mg-kname"><div class="mg-ncell"><span class="mg-chev" aria-hidden="true">' + (open ? '▾' : '▸') + '</span>'
+      + '<td class="mg-kname"><div class="mg-ncell"><button type="button" class="mg-chev" aria-expanded="' + open + '" aria-label="' + (open ? 'Fold this household' : 'Open this household') + '"'
+          + ' onclick="event.stopPropagation();mknManage.lineChev(' + jsA(r.key) + ')" onkeydown="event.stopPropagation()">' + (open ? '▾' : '▸') + '</button>'
           + (r.deleted ? '<span class="mg-mark" aria-hidden="true">\u{1F5D1}</span>' : r.movedOld ? '<span class="mg-mark" aria-hidden="true">\u{1F4E6}</span>' : '')
           + '<div class="mg-1l mg-wide" dir="auto"><span class="mg-name">' + esc(nameOf(r)) + '</span></div></div></td>'
       + (multi ? '<td data-col="copy" data-label="Copy">' + one('<span class="mg-copy">' + esc(r.copy) + '</span>') + '</td>' : '')
@@ -916,13 +938,13 @@
   function lineMoreHtml(r, multi, span, beforeLabel) {
     function item(label, v) { return '<div class="mg-xi"><span class="mg-xl">' + label + '</span><span class="mg-xv">' + v + '</span></div>'; }
     return '<tr class="mg-more' + (r.deleted ? ' mg-deleted' : '') + '" data-key="' + escA(r.key) + '" onclick="mknManage.show(' + jsA(r.key) + ')"><td colspan="' + span + '">'
-      + '<div class="mg-xtop"><span class="mg-name" dir="auto">' + esc(nameOf(r)) + '</span> <span class="mg-muted mg-code">' + esc(r.code || '—') + '</span></div>'
+      + '<div class="mg-xtop"><span class="mg-name" dir="auto">' + esc(nameOf(r)) + '</span> ' + copyable(r.code, 'mg-muted mg-code') + '</div>'
       + (r.deleted ? '<div class="mg-gone">\u{1F5D1} ' + esc(deletedText(r.deleted)) + '</div>' : '')
       + (r.movedOld ? '<div class="mg-muted">\u{1F4E6} Moved to the beta \u2014 the old copy, kept until it is cleared</div>' : '')
       + (r.left && r.left.length ? '<div class="mg-muted">' + r.left.length + ' left (deleted their account)</div>' : '')
       + '<div class="mg-xgrid">'
       + (multi ? item('Copy', '<span class="mg-copy">' + esc(r.copy) + '</span>') : '')
-      + item('Owner', '<span class="mg-email">' + esc(r.owner || '—') + '</span>' + (r.owner && !r.deleted ? ' <button type="button" class="mg-btn mg-pwbtn" title="E-mails them a link to choose a new password themselves \u2014 you never see it" onclick="event.stopPropagation();mknManage.resetPw(' + jsA(r.key) + ',' + jsA(r.owner) + ')">\u{1F511} Reset password</button>' : ''))
+      + item('Owner', copyable(r.owner, 'mg-email') + (r.owner && !r.deleted ? ' <button type="button" class="mg-btn mg-pwbtn" title="E-mails them a link to choose a new password themselves \u2014 you never see it" onclick="event.stopPropagation();mknManage.resetPw(' + jsA(r.key) + ',' + jsA(r.owner) + ')">\u{1F511} Reset password</button>' : ''))
       + item('Members', String(r.members.length))
       + item('Recipes', r.recipesN ? Number(r.recipesN).toLocaleString() + (r.reportAt ? ' <span class="mg-muted">(counted ' + ago(r.reportAt) + ')</span>' : '') : '—')
       + item('AI this month', '<div class="mg-xbar">' + barHtml(r) + '</div>')
@@ -1063,7 +1085,7 @@
     if (!r) return '';
     var url = r.remote ? copyUrl(r.project) : '';
     return '<div class="mg-panel" role="region" aria-label="Household details">'
-      + '<div class="mg-ptop"><div><div class="mg-title" dir="auto">' + esc(r.name) + '</div><div class="mg-muted">' + esc(r.code || 'no identifier yet')
+      + '<div class="mg-ptop"><div><div class="mg-title" dir="auto">' + esc(r.name) + '</div><div class="mg-muted">' + (r.code ? copyable(r.code, 'mg-code') : 'no identifier yet')
       + ' · founded ' + (r.createdAt ? new Date(r.createdAt).toLocaleDateString() : '—') + (r.referredBy ? ' · came through ' + esc(r.referredBy) : '')
       + (r.remote && !r.deleted ? ' · <span class="mg-copy">' + esc(r.copy) + '</span> as of ' + ago(r.reportAt) : r.remote ? ' · <span class="mg-copy">' + esc(r.copy) + '</span>' : '') + '</div></div>'
       + '<button type="button" class="mg-btn" onclick="mknManage.show(null)" aria-label="Close the details">✕</button></div>'
@@ -1077,7 +1099,7 @@
       + (r.months.length ? '<div class="mg-muted" style="margin-top:4px;">' + r.months.map(function (m) { return mon(m.month) + ': ' + money(m.usd) + ' (' + m.calls + ' calls)'; }).join(' · ') + '</div>' : '')
       + '<div class="mg-h">' + (r.deleted ? 'Members when it was deleted' : 'Members') + '</div>'
       + r.members.sort(function (a, b) { return roleRank(a.role) - roleRank(b.role); })
-          .map(function (m) { return '<div class="mg-li"><span class="mg-email">' + esc(m.email || '\u2014') + '</span>' + (m.email && !r.deleted ? ' ' + '<button type="button" class="mg-btn mg-pwbtn" title="E-mails them a link to choose a new password themselves \u2014 you never see it" onclick="event.stopPropagation();mknManage.resetPw(' + jsA(r.key) + ',' + jsA(m.email) + ')">\u{1F511} Reset password</button>' : '') + ' <span class="mg-muted">' + esc(m.role) + ' · last opened ' + ago(m.lastSeen)
+          .map(function (m) { return '<div class="mg-li">' + copyable(m.email, 'mg-email') + (m.email && !r.deleted ? ' ' + '<button type="button" class="mg-btn mg-pwbtn" title="E-mails them a link to choose a new password themselves \u2014 you never see it" onclick="event.stopPropagation();mknManage.resetPw(' + jsA(r.key) + ',' + jsA(m.email) + ')">\u{1F511} Reset password</button>' : '') + ' <span class="mg-muted">' + esc(m.role) + ' · last opened ' + ago(m.lastSeen)
             // v37.83 — the record that they agreed to the terms (Tony).
             + ' · ' + (m.termsAt ? '\u{1F4DD} agreed to the terms' + (m.termsVersion ? ' (v' + esc(m.termsVersion) + ')' : '') + ' ' + new Date(m.termsAt).toLocaleDateString() : '<span class="mg-noterms">not yet agreed to the terms</span>')
             + '</span></div>'; }).join('')
@@ -1159,7 +1181,12 @@
     + '.mg-table.mg-hh td{padding:7px 8px;vertical-align:middle;}.mg-table.mg-hh .mg-sort{padding:9px 8px;}'
     + '.mg-1l{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}.mg-1l.mg-wide{max-width:200px;}'
     + '.mg-ncell{display:flex;align-items:baseline;min-width:0;}.mg-ncell .mg-1l{flex:1 1 auto;min-width:0;}.mg-mark{flex:none;margin-inline-end:4px;}'
-    + '.mg-chev{display:inline-block;flex:none;width:1.1em;color:var(--muted);font-size:11px;}'
+    + '.mg-chev{flex:none;width:28px;height:28px;margin:-6px 0 -6px -6px;padding:0;border:0;border-radius:6px;background:none;color:var(--muted);font-size:12px;cursor:pointer;line-height:28px;text-align:center;}'
+    + '.mg-chev:hover,.mg-chev:focus-visible{background:var(--border);color:var(--ink);}'
+    // v39.98 — an address or identifier that copies on a tap (as 🪪 on the main screen)
+    + '.mg-cp{font:inherit;color:inherit;background:none;border:0;border-bottom:1px dotted currentColor;border-radius:0;padding:0;margin:0;cursor:copy;text-align:start;max-width:100%;}'
+    + '.mg-cp:hover,.mg-cp:focus-visible{color:var(--terracotta);}.mg-cp .mg-cpdone{display:none;}'
+    + '.mg-cp.mg-copied{border-bottom-color:transparent;}.mg-cp.mg-copied .mg-cpt{display:none;}.mg-cp.mg-copied .mg-cpdone{display:inline;color:var(--green);font-weight:600;white-space:nowrap;}'
     + '.mg-thx{display:block;padding:9px 10px;font-weight:600;color:var(--heading);}'
     + '.mg-row.mg-x{background:var(--note-bg);}.mg-row.mg-x td{border-bottom-color:transparent;}'
     + '.mg-more{cursor:pointer;}.mg-more>td{background:var(--note-bg);padding:4px 12px 12px 30px !important;}'
@@ -1550,14 +1577,43 @@
     lineTap: function (k) {
       if (!k) return;
       if (lineOpen(k)) return mknManage.show(k);
-      S.lines = {}; S.lines[k] = true; render();
+      lineSet(k, true); render();   // v39.98 — also a line folded again after ⊞ Expand all
       var tr = document.querySelector('#manageOverlay .mg-row[data-key="' + String(k).replace(/["\\]/g, '') + '"]');
       if (tr && tr.focus) { try { tr.focus({ preventScroll: true }); } catch (e) {} }
     },
-    expandAll: function (on) { S.allLines = !!on; S.lines = {}; render(); },
+    expandAll: function (on) { S.allLines = !!on; S.lines = {}; S.closed = {}; render(); },
+    // v39.98 — the ▾ beside a name: folds that household (or opens it), and stays where it is
+    lineChev: function (k) {
+      if (!k) return;
+      lineSet(k, !lineOpen(k)); render();
+      var b = document.querySelector('#manageOverlay .mg-row[data-key="' + String(k).replace(/["\\]/g, '') + '"] .mg-chev');
+      if (b && b.focus) { try { b.focus({ preventScroll: true }); } catch (e) {} }
+    },
+    // v39.98 — an address or an identifier, to the clipboard (where there is none: selected, to copy by hand)
+    copyText: function (el) {
+      var t = el && el.getAttribute('data-copy');
+      if (!t) return Promise.resolve(false);
+      var done = function (ok) {
+        if (!ok) {
+          try { var rg = document.createRange(); rg.selectNodeContents(el.querySelector('.mg-cpt') || el); var sel = getSelection(); sel.removeAllRanges(); sel.addRange(rg); } catch (e) {}
+          if (typeof toast === 'function') toast('It could not be copied by itself — it is selected: copy it now.', 5000);
+          return false;
+        }
+        if (!el.classList.contains('mg-copied')) el.style.minWidth = el.getBoundingClientRect().width + 'px';   // the same size while it says so
+        el.classList.add('mg-copied'); S.copied = { t: t, at: Date.now() }; clearTimeout(_copiedT);
+        _copiedT = setTimeout(function () {
+          S.copied = null;
+          Array.prototype.forEach.call(document.querySelectorAll('#manageOverlay .mg-cp.mg-copied'), function (b) { b.classList.remove('mg-copied'); b.style.minWidth = ''; });
+          el.classList.remove('mg-copied'); el.style.minWidth = '';
+        }, 1800);
+        return true;
+      };
+      try { return navigator.clipboard.writeText(t).then(function () { return done(true); }, function () { return done(false); }); }
+      catch (e) { return Promise.resolve(done(false)); }
+    },
     _sortKey: SORT_KEY, _phoneCols: PHONE_COLS,
     // after a Self Test run: the sort as kept on this device, every line closed
-    _sortBack: function () { var k = sortSaved(); S.sort = k ? k.sort : 'month'; S.dir = k ? k.dir : -1; S.lines = {}; S.allLines = false; },
+    _sortBack: function () { var k = sortSaved(); S.sort = k ? k.sort : 'month'; S.dir = k ? k.dir : -1; S.lines = {}; S.allLines = false; S.closed = {}; },
     show: function (hid) { S.open = (hid && S.open !== hid) ? hid : null; render();
       if (S.open) { var p = document.querySelector('#manageOverlay .mg-panel'); if (p && p.scrollIntoView) p.scrollIntoView({ behavior: 'smooth', block: 'start' }); } },
     setExtra: async function (name, on) {
