@@ -21784,6 +21784,45 @@ window.SELF_TESTS = [
         try{ i18nRevertAll(); }catch(e){} i18nInstall(prevLang, prevDict);
       }
     } },
+  { id:'windows_hold_the_page', group:'UI', name:'🪟 While a window is open the page behind it holds still (a swipe or the wheel never scrolls it), and a window’s own scrolling stops at its ends; closed, the page scrolls again (v39.99)',
+    test: async()=>{
+      // Tony, 19 Nov 2026: "sometimes, for example in the "Invite testers" modal, instead of scrolling the modal, it scrolls
+      // the page behind it. This is very frustrating."
+      var made=[], H=document.documentElement, B=document.body;
+      var held=function(){ return getComputedStyle(H).overflowY==='hidden' && getComputedStyle(B).overflowY==='hidden'; };
+      var add=function(id, cls, style){ var o=document.createElement('div'); if(id) o.id=id; if(cls) o.className=cls; if(style) o.style.cssText=style;
+        o.innerHTML='<div class="ask-card" style="max-height:200px;overflow-y:auto;"><div style="height:600px;">x</div></div>'; B.appendChild(o); made.push(o); return o; };
+      try{
+        if(document.querySelector('.modal-overlay.open:not(#selfTestOverlay), #askOverlay, .calc-overlay.open, .prog-overlay.open')) return 'skipped: another window is open';
+        if(held()) throw new Error('with no window open, the page cannot scroll');
+        var kinds=[['an opened window (.modal-overlay.open)', null, 'modal-overlay open', ''], ['a question (#askOverlay)', 'askOverlay', 'modal-overlay', 'display:flex;'],
+                   ['a window shown by its style', 'stHoldStyled', 'modal-overlay', 'display:flex;z-index:1250;'], ['the calculator', null, 'calc-overlay open', ''], ['the progress window', null, 'prog-overlay open', '']];
+        for(var i=0;i<kinds.length;i++){
+          var o=add(kinds[i][1], kinds[i][2], kinds[i][3]);
+          if(!held()) throw new Error('with '+kinds[i][0]+' open, the page behind it can still scroll');
+          // the scrollbar that went is made up for (on a computer), so nothing behind the window moves sideways
+          var sbw=(getComputedStyle(H).getPropertyValue('--mkn-sbw')||'0px').trim()||'0px';
+          if(getComputedStyle(B).paddingRight!==sbw) throw new Error('the page behind '+kinds[i][0]+' moves sideways: padding '+getComputedStyle(B).paddingRight+', the scrollbar '+sbw);
+          var ow=o.getBoundingClientRect().width;
+          if(ow < H.clientWidth-2) throw new Error(kinds[i][0]+'’s shade leaves a strip of the page uncovered: '+ow+' of '+H.clientWidth+' px');
+          if(getComputedStyle(o).overscrollBehaviorY!=='contain' || getComputedStyle(o.firstChild).overscrollBehaviorY!=='contain') throw new Error(kinds[i][0]+' hands its scrolling on to the page at its ends');
+          o.remove(); made.pop();
+          if(held()) throw new Error('with '+kinds[i][0]+' closed, the page still cannot scroll');
+        }
+        // the Self Test's own window (its tests scroll the page) and the translation harvest's hidden windows do not hold it
+        var st=add('stHoldSelf', 'modal-overlay open', ''); st.id='selfTestOverlay';
+        var real=document.querySelectorAll('#selfTestOverlay').length>1;
+        if(!real && held()) throw new Error('the Self Test’s own window holds the page');
+        st.remove(); made.pop();
+        add(null, 'modal-overlay open', ''); B.classList.add('i18n-harvesting');
+        var h=held(); B.classList.remove('i18n-harvesting');
+        if(h) throw new Error('the translation harvest’s hidden windows hold the page');
+        if(!held()) throw new Error('an open window no longer holds the page after the harvest');
+        return 'held behind five kinds of window, each window’s scrolling kept to itself; let go when closed, and not by the Self Test or the harvest';
+      } finally {
+        made.forEach(function(o){ o.remove(); }); B.classList.remove('i18n-harvesting');
+      }
+    } },
   { id:'pantry_hint_translates', group:'UI', name:'🥫 The pantry’s example is in the reader’s language on its five lines, the last in another language; a text box’s own labels are translated; the hints the harvest never saw are among the phrases (v39.97)',
     test: async()=>{
       // Tony, 18 Nov 2026: "Better also translate the pantry hints as well, while you're at it and scan for other places

@@ -26,7 +26,8 @@ where.
   network Self Tests send the sign-in; v39.93 at 19:55 on 4b688fc: each farm animal in its own recorded voice,
   `docs/farm-voices.md`; Worker v107 since 15 Nov 06:12; the jobs are listed near the top of `docs/history/2026-11.md`).
   **On Test, not released:** v39.98 — 📊 Households: the ▾ beside a name folds that household again; the identifier and
-  e-mail addresses copy on a tap; release on Tony's yes. The test copy
+  e-mail addresses copy on a tap; v39.99 — an open window holds the page behind it still (Tony: Invite testers scrolled
+  the page); release on Tony's yes. The test copy
   (https://tonys-recipes-test.pages.dev, its own database and rules) follows `test`.
 - **The beta has had testers since Sunday 25 Oct 2026** and is **by invitation only**: the owner invites with
   ⚙️ → 👑 → ✉️ Invite testers (the congratulatory wording of v39.60); a tester's share button asks the owner for an

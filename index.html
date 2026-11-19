@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v39.98 -->
+<!-- Tony's Recipes Collection v39.99 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -11217,7 +11217,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v39.98';
+var APP_VERSION = 'v39.99';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -13039,6 +13039,38 @@ html.setup-first #loginScreen > * { visibility: hidden; }   /* v39.02 — a firs
 #helpDetailOverlay > * { max-height: min(85vh, 100%) !important; }
 #termsGate > *, #setupWiz > * { max-height: min(94vh, 100%) !important; }
 .modal-overlay.open { display: flex; }
+/* v39.99 — Tony, 19 Nov 2026: "sometimes, for example in the "Invite testers" modal, instead of scrolling the modal, it
+   scrolls the page behind it. This is very frustrating." The page kept scrolling under an open window: a swipe the
+   window could not use (its list at its end, or one on the dimmed edge around it) went on to the page. Now, while a
+   window is open, the page behind it holds still (both html and body, as some iPhones want), and a window's own
+   scrolling stops at its ends instead of handing the swipe on. On a computer the page's scrollbar goes while it is held:
+   the body takes its width as padding (--mkn-sbw, measured by scrollbarRoomNote), so nothing behind the window moves
+   sideways — not scrollbar-gutter, which leaves a strip down the side that the window's shade does not cover. Not for
+   the Self Test's own window (its tests scroll the page) nor the translation harvest's hidden windows. */
+html:not(:has(> body.i18n-harvesting)):has(> body .modal-overlay.open:not(#selfTestOverlay)),
+html:not(:has(> body.i18n-harvesting)):has(> body .modal-overlay[style*="display: flex"]),
+html:not(:has(> body.i18n-harvesting)):has(> body .modal-overlay[style*="display:flex"]),
+html:not(:has(> body.i18n-harvesting)):has(> body #askOverlay),
+html:not(:has(> body.i18n-harvesting)):has(> body .calc-overlay.open),
+html:not(:has(> body.i18n-harvesting)):has(> body .prog-overlay.open),
+html:not(:has(> body.i18n-harvesting)):has(> body #serviceErrorOverlay),
+html:not(:has(> body.i18n-harvesting)):has(> body #importErrorModal),
+html:not(:has(> body.i18n-harvesting)):has(> body #termsGate),
+html:not(:has(> body.i18n-harvesting)):has(> body #setupWiz),
+html:not(:has(> body.i18n-harvesting)):has(> body #tourOverlay) { overflow: hidden; overscroll-behavior: none; }
+html:not(:has(> body.i18n-harvesting)):has(> body .modal-overlay.open:not(#selfTestOverlay)) > body,
+html:not(:has(> body.i18n-harvesting)):has(> body .modal-overlay[style*="display: flex"]) > body,
+html:not(:has(> body.i18n-harvesting)):has(> body .modal-overlay[style*="display:flex"]) > body,
+html:not(:has(> body.i18n-harvesting)):has(> body #askOverlay) > body,
+html:not(:has(> body.i18n-harvesting)):has(> body .calc-overlay.open) > body,
+html:not(:has(> body.i18n-harvesting)):has(> body .prog-overlay.open) > body,
+html:not(:has(> body.i18n-harvesting)):has(> body #serviceErrorOverlay) > body,
+html:not(:has(> body.i18n-harvesting)):has(> body #importErrorModal) > body,
+html:not(:has(> body.i18n-harvesting)):has(> body #termsGate) > body,
+html:not(:has(> body.i18n-harvesting)):has(> body #setupWiz) > body,
+html:not(:has(> body.i18n-harvesting)):has(> body #tourOverlay) > body { overflow: hidden; padding-right: var(--mkn-sbw, 0px); }   /* (right in Hebrew too: Chrome and Edge keep the page's scrollbar on the right) */
+.modal-overlay, .calc-overlay, .prog-overlay, #termsGate, #setupWiz, #tourOverlay, #serviceErrorOverlay, #importErrorModal,
+.modal-overlay > *, .calc-overlay > *, .prog-overlay > *, #termsGate > *, #setupWiz > *, #serviceErrorOverlay > *, #importErrorModal > * { overscroll-behavior: contain; }
 /* v39.29 — Tony, 3 Nov 2026, a screenshot of the Self Test on his iPhone: "the Execute button is placed too low on the
    screen". The list had a fixed 55vh; with the note above it and the buttons below, the window was taller than a
    phone's room, and the part it lost was the ▶ Execute row (70 px of it in a Safari tab on an iPhone 15, 111 on an
@@ -14794,7 +14826,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.98</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.99</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -14882,7 +14914,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.98</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v39.99</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -27045,6 +27077,22 @@ function closeDrop(id){
 // scale whatever the zoom (transform: scale(1/zoom)). On a page that fits at the normal zoom nothing is touched. While
 // a fitted window is open it follows the screen (the keyboard, the browser's bars, a pan); a pinch inside it lets it go,
 // so it zooms like the rest of the page.
+// v39.99 — the page's scrollbar, measured while the page may scroll: while a window holds the page still (CSS, "an open
+// window holds the page behind it still") the scrollbar goes, and the body takes its width as padding instead.
+function scrollbarRoomNote() {
+  try {
+    var de = document.documentElement;
+    if (getComputedStyle(de).overflowY === 'hidden') return null;
+    var w = window.innerWidth - de.clientWidth;
+    w = w > 0 && w < 40 ? w : 0;
+    de.style.setProperty('--mkn-sbw', w + 'px');
+    return w;
+  } catch (e) { return null; }
+}
+window.scrollbarRoomNote = scrollbarRoomNote;
+window.addEventListener('resize', scrollbarRoomNote);
+window.addEventListener('load', scrollbarRoomNote);
+document.addEventListener('DOMContentLoaded', scrollbarRoomNote);
 function screenBox() {
   var vv = window.visualViewport;
   if (!vv) return { left: 0, top: 0, width: window.innerWidth, height: window.innerHeight, scale: 1 };

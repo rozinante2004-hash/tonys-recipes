@@ -1196,7 +1196,16 @@ with its own box kept (`own`), and `screenFitBringIn` scrolls each scrolling anc
 so the box is in its middle — never the page. `screenFitFollow` lets a keyboard fit go when `screenBox()` equals `own`
 again. `screenFitApply` sets `--fit-h` (the window's height in its own px); while fitted, the ≥1000 px ingredients
 column is `calc(var(--fit-h) * 0.72)` tall instead of 72vh and a `.view-sized` card `max-height: 100%`. Self Test
-`keyboard_keeps_the_close_in_sight`. `toggleDrop` places a menu the same way when zoomed or too
+`keyboard_keeps_the_close_in_sight`. **An open window holds the page behind it still (v39.99; Tony: "sometimes, for
+example in the "Invite testers" modal, instead of scrolling the modal, it scrolls the page behind it")**: CSS only —
+`html:has(> body .modal-overlay.open:not(#selfTestOverlay))`, a `.modal-overlay` shown by its style (display:flex),
+`#askOverlay`, `.calc-overlay.open`, `.prog-overlay.open`, `#serviceErrorOverlay`, `#importErrorModal`, `#termsGate`,
+`#setupWiz`, `#tourOverlay` (never while `body.i18n-harvesting`) → html and body `overflow: hidden` (html also
+`overscroll-behavior: none`); every overlay and its card `overscroll-behavior: contain`. The page's scrollbar goes while
+held: the body takes its width as `padding-right: var(--mkn-sbw)` (right in Hebrew too — Chrome and Edge keep the root
+scrollbar on the right), measured by `scrollbarRoomNote()` (load, resize) while the page may scroll; not
+`scrollbar-gutter`, which leaves a strip beside the window's shade (and `screenWindow` then took it for no window).
+Self Test `windows_hold_the_page`. `toggleDrop` places a menu the same way when zoomed or too
 wide. The viewport meta has `shrink-to-fit=no` (WebKit). tests/phone-fit.js also opens ten windows and menus with a
 signed-in kitchen at 320, 390 and 390 zoomed 1.25 (CDP `Emulation.setPageScaleFactor`) and requires each inside the
 visual viewport; Self Test `windows_fit_the_screen` stands in for the screen with a stubbed `screenBox`.
