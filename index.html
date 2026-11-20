@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v40.02 -->
+<!-- Tony's Recipes Collection v40.03 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -11410,7 +11410,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v40.02';
+var APP_VERSION = 'v40.03';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -15030,7 +15030,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v40.02</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v40.03</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -15118,7 +15118,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v40.02</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v40.03</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -19556,8 +19556,25 @@ async function i18nStaticGet(name) {
 }
 async function i18nReadStatic(lang) {
   var d = await i18nStaticGet(lang);
-  return (d && d.strings && typeof d.strings === 'object') ? d : null;
+  d = (d && d.strings && typeof d.strings === 'object') ? d : null;
+  if (d) _i18nShipped[lang] = d;
+  return d;
 }
+// v40.03 — Tony, on the test copy: "this button's label need to be translated to the target language, not stay in
+// English everywhere." A phrase translated by hand ships at once in this build's i18n/<lang>.json, but the shared
+// dictionary has it only after the release's language job — and a device reads the shared one whenever it is newer.
+// Whichever is read, a phrase it lacks is taken from the file shipped with the app.
+var _i18nShipped = {};
+function i18nWithShipped(strings, lang) {
+  var st = _i18nShipped[lang], out = null;
+  if (!strings || !st || !st.strings || st.strings === strings) return strings;
+  Object.keys(st.strings).forEach(function (k) {
+    var v = st.strings[k];
+    if (strings[k] === undefined && typeof v === 'string' && v) { if (!out) out = Object.assign({}, strings); out[k] = v; }
+  });
+  return out || strings;
+}
+window.i18nWithShipped = i18nWithShipped;
 var _i18nStaticIndexed = false, _i18nStaticIndex = null;
 async function i18nStaticIndex(force) {
   if (_i18nStaticIndexed && !force) return _i18nStaticIndex;
@@ -19769,9 +19786,9 @@ window.i18nSupportedLangs = i18nSupportedLangs;
 async function i18nLoadDict(lang) {
   if (lang === 'en') return {};
   var cloud = await i18nReadBest(lang);
-  if (cloud) { i18nWriteCache(lang, cloud); return cloud.strings; }
+  if (cloud) { i18nWriteCache(lang, cloud); return i18nWithShipped(cloud.strings, lang); }   // v40.03
   var local = i18nReadCache(lang);
-  return local ? local.strings : null;
+  return local ? i18nWithShipped(local.strings, lang) : null;
 }
 window.i18nReadCache = i18nReadCache; window.i18nLoadDict = i18nLoadDict;
 window.i18nWriteCloud = i18nWriteCloud; window.i18nDocId = i18nDocId;
@@ -34808,6 +34825,7 @@ function appFeatureSections(all) {
       'One cookbook for your household: invite family and friends by e-mail or with a link, and everyone sees and adds the same recipes.',
       'Choose who may change things: owners, admins, editors and viewers.',
       'Chat with the people in your household: one person at a time, or everyone at once for announcements.',
+      'Hear of a new message even when the app is closed — 🔔 at the foot of the chat window (on an iPhone, in the app on the Home Screen).',   // v40.02
       'A kitchen sound when a message or a request arrives — a spoon on a wine glass, or another; mute it in Settings.',   // v38.82
       'Link with other households you know: each sees the other’s recipes, and you can write to each other in the app.',
       'Keep your own copy of a recipe from a linked household.',
@@ -34829,7 +34847,8 @@ function appFeatureSections(all) {
       'Translate a recipe into another language.',
       'What can I make with what I have? Ideas from what is in your pantry.',
       'Find a photo for a recipe in free photo libraries.',
-      'Ask the help assistant how to do anything in the app.' ] },
+      'Ask the help assistant how to do anything in the app.',
+      'Its answers come with 📍 Take me there: one tap opens the place it describes.' ] },   // v40.01
     { icon: '\u{1F5C2}', title: 'Keep it tidy', items: [
       'Categories, diets, favourites, collections and a quick search.',
       'A collection opens with its contents — tap a recipe’s name to jump to it, and ↑ Contents to come back.',   // v39.52
@@ -36972,14 +36991,14 @@ var HELP_SYSTEM_PROMPT = [
   "- A REQUEST SENT TO YOUR E-MAIL ADDRESS shows in 📬 Link requests only once that address is CONFIRMED (an account made with e-mail and a password must confirm it from the e-mail sent to it). Not confirmed yet? The Link requests page says so (\"is NOT confirmed yet\"), sends the confirmation e-mail again, and notices by itself, when opened, that it has been confirmed.",
   "- Once linked, each household sees the other's recipes, read-only — and live: a change in their kitchen shows in yours within seconds, the changed card glowing for a moment: after its own in the main list, under that household's name, on a faint blue (hover one: 'A recipe from …'). 🏠 Kitchens ▾ in the filter bar chooses whose recipes show — tick one, several or all. 📥 Save a copy to my recipes makes one your own. Links do not chain: a third household linked to theirs is not seen. Links are listed, and removed, in ⚙️ → 🏠 My household → 👥 Family Access. ⚙️ → 🏠 My household → 🤝 Link requests through the app: blocked stops requests by identifier; requests by e-mail always arrive.",
   "- 📬 LINK REQUESTS: ⚙️ → 🏠 My household → 📬 Link requests — the number in brackets beside it is how many wait for an answer. Every request in one place: Waiting (Accept / Reject / 🚫 Block), Sent by your household (Withdraw), Linked now (Revoke access), and earlier answers. A request may carry a note, and the two households can write to each other there — the latest message shows, highlighted, with ↩ Reply; earlier ones are under 💬 Conversation. Only the household's name is shown, never a person's. Reject is for now: if they ask again — by identifier or by e-mail — their request is back under Waiting. 🚫 Block is for good, until you Unblock it under the earlier answers; they are never told, and on their side it reads “waiting”. A new message or request arrives while the app is open: a red dot (and a short notice with Open) within seconds, no reload needed. A red dot on ⚙️ leads to anything new. The switch there decides whether other households may ask through the app at all.",
-  "- 👪 CHAT WITH FAMILY MEMBERS (the people in YOUR household only): ··· More → 🏡 Kitchens and people → 👪 Chat with family members — or 💬 Chat beside a person in 👥 Family Access (someone added by address who has not signed in yet says ⏳ hasn’t signed in yet: their 💬 Chat comes once they do). 📣 Everyone in <your kitchen> is the room for announcements: everyone in the household reads it. Or choose one person: only the two of you read that conversation. Everyone in the household can write, readers too. Messages arrive live: a short notice with Open, and a red dot on ⋯ More until you have read them. Nothing is changed or deleted afterwards; deleting the household deletes them.",
+  "- 👪 CHAT WITH FAMILY MEMBERS (the people in YOUR household only): ··· More → 🏡 Kitchens and people → 👪 Chat with family members — or 💬 Chat beside a person in 👥 Family Access (someone added by address who has not signed in yet says ⏳ hasn’t signed in yet: their 💬 Chat comes once they do). 📣 Everyone in <your kitchen> is the room for announcements: everyone in the household reads it. Or choose one person: only the two of you read that conversation. Everyone in the household can write, readers too. Messages arrive live: a short notice with Open, and a red dot on ⋯ More until you have read them. Nothing is changed or deleted afterwards; deleting the household deletes them. 🔔 At the foot of the window: Notify me of new messages when the app is closed (see 🔔 CHAT NOTIFICATIONS).",
   "- 🧑‍🍳 FIRST VISIT: a one-time setup on a notebook page — your account (your e-mail and a password you make up; or 'I already have an account', or Continue offline), this device's Save button (the iPhone shortcut, the Android app in the Share menu, or the computer's browser extension — each new device asks this once; later from ⚙️ Settings), the kitchen rules, then a quick tour.",
   "- 📨 SEND A RECIPE TO ANOTHER KITCHEN: open the recipe → 📤 Share → 📨 Send to another kitchen. Via My Kitchen Notes: type their kitchen's identifier (MKN-…) — it pops up in their app, with a sound, and waits in ··· More → 🏡 Kitchens and people → 📨 Recipes sent to me. Or ✉️ Via Email (type their address: the app e-mails them its photo, your note and a button to save it — no mail program needed; your own mail is offered only if the app cannot send it), Via WhatsApp, 📤 Via another app (on a phone or a tablet: its share menu, with the link — if the phone asks for one more tap, press 📤 Open the share menu), or Copy the link: anyone with the link can open it, even without an account. It is a copy of the recipe as it is now — photo, bold words, notes and all; not your cooking log, ratings or the heart — with a note from you if you like. They tap 📥 Save to my recipes and it is theirs, no AI involved. It keeps for 4 weeks. ··· More → 🏡 Kitchens and people → 📤 Recipes I sent shows whether it was saved, copies a link again, sends it again, and takes one back — tick several (or Select all) to do it for all of them at once: ↩️ Take back, 📨 Send again (to a kitchen: it pops up in their app again for 4 more weeks, the earlier one taken back; a link: new links, good for 4 more weeks, in one message — the earlier ones keep working until they expire), 🔗 Copy the links. A kitchen that gets unwanted recipes can 🚫 Block the sender (the owner or an admin). During the closed beta, someone without an account who opens the link sees the recipe and can ask for an invitation — with their address already filled in when it came by e-mail.",
   "- ✉️ E-MAIL A RECIPE (📤 Share → ✉️ Email): type their address and press 📨 Send — the app e-mails the recipe, laid out with its photo, from your kitchen's name via My Kitchen Notes; their reply comes to your own address. Nothing to paste, and no mail program needed (signed in, your address confirmed; up to 15 e-mails a day). On a phone, 📤 Share menu hands the photo and the recipe to the mail app you pick. 📋 Copy copies it, photo and all, to paste anywhere else. (To send a recipe that another kitchen saves with one tap, use 📨 Send to another kitchen.)",
   "- 🔒 SECRET RECIPES: in the editor, tick 🔒 Secret — the recipe (and its photo) is then kept where only your own kitchen can read it; the kitchens you link with do not see it, nor know it exists. Untick it to share it again. A 🔒 shows on its card.",
   "- 🔄 RELOAD A LINKED KITCHEN: beside a linked kitchen's name in your recipe list, 🔄 Reload reads its recipes and photos again from the start — for when something looks missing or out of date.",
-  "- 💬 CHATS WITH LINKED KITCHENS: ··· More → 🏡 Kitchens and people → 💬 Chats with linked kitchens — or 💬 Chat beside a linked kitchen's name in your recipe list, or in 👥 Family Access. Every conversation, newest first, with what is new; open one to read it all and write (Enter sends, Shift+Enter starts a new line). The same conversations are also on 📬 Link requests. A red dot on ⋯ More and on ⚙️ says something new arrived.",
-  "- 🔔 CHAT NOTIFICATIONS WHEN THE APP IS CLOSED (v40.02): at the foot of 👪 Chat with family members, and of 💬 Chats with linked kitchens, tap 🔔 Notify me of new messages when the app is closed; the phone (or computer) asks whether to allow notifications — say Allow. From then on a new message shows as a notification, with who wrote it and the text and the phone's own sound, even when the app is closed; a tap on it opens that conversation. One switch for both chats, on THIS device: turn it on on each phone or computer you use. 🔕 Turn off in the same place (signing out turns it off too). The family chat: messages to everyone and to you alone; linked kitchens: messages from kitchens linked with yours (not from one still asking). Your own messages never notify you. ON AN iPHONE OR iPAD (iOS 16.4 or later) only the app on the Home Screen can: in Safari, Share → Add to Home Screen, open the app from that icon, and turn it on there. 'Notifications are blocked'? Allow them in the phone's Settings → Notifications → the app (or in the browser's settings for the site), then tap 🔔 again. While the app is open on the screen, a message chimes and shows in the app instead. The message travels encrypted through the device's own notification service (Apple, Google, Mozilla or Microsoft), which cannot read it.",
+  "- 💬 CHATS WITH LINKED KITCHENS: ··· More → 🏡 Kitchens and people → 💬 Chats with linked kitchens — or 💬 Chat beside a linked kitchen's name in your recipe list, or in 👥 Family Access. Every conversation, newest first, with what is new; open one to read it all and write (Enter sends, Shift+Enter starts a new line). The same conversations are also on 📬 Link requests. A red dot on ⋯ More and on ⚙️ says something new arrived. 🔔 At the foot of the window: notifications when the app is closed, the same switch as in 👪 Chat with family members (see 🔔 CHAT NOTIFICATIONS).",
+  "- 🔔 CHAT NOTIFICATIONS WHEN THE APP IS CLOSED (v40.02): at the foot of 👪 Chat with family members, and of 💬 Chats with linked kitchens, tap 🔔 Notify me of new messages when the app is closed; the phone (or computer) asks whether to allow notifications — say Allow. From then on a new message shows as a notification, with who wrote it and the text and the phone's own sound, even when the app is closed; a tap on it opens that conversation. One switch for both chats, on THIS device: turn it on on each phone or computer you use. 🔕 Turn off in the same place (signing out turns it off too). The family chat: messages to everyone and to you alone; linked kitchens: messages from kitchens linked with yours (not from one still asking). Your own messages never notify you. ON AN iPHONE OR iPAD (iOS 16.4 or later) only the app on the Home Screen can: in Safari, Share → Add to Home Screen, open the app from that icon, and turn it on there. 'Notifications are blocked'? Allow them in the phone's Settings → Notifications → the app (or in the browser's settings for the site), then tap 🔔 again. While the app is open on the screen, a message chimes and shows in the app instead. The notification makes the phone's own notification sound (the app's own kitchen sounds — ⚙️ → ♿ Accessibility → 🎵 The sound — play only while the app is open). Linked kitchens' messages stop reaching a device on which the app has not been opened for 45 days — open it once and they come again (the family chat keeps coming). ⚙️ → What leaves this device lists the device's notification service, and the Privacy Statement says what is kept for it. The message travels encrypted through the device's own notification service (Apple, Google, Mozilla or Microsoft), which cannot read it.",
   "- ♿ ACCESSIBILITY: ⚙️ → ♿ Accessibility, on this device: 🎨 Colours for red–green colour blindness (the most common colour blindness, where reds and greens look alike, brownish): wherever a colour says something, green becomes blue and red becomes a deep orange — all right / a problem, the sync dot, Easy and Hard, the Self Test's results, delete buttons — and a notification dot turns blue inside its ring; and the recipe photos are colour-corrected, so a red tomato and a green pepper no longer look alike (they look a little different to everyone else). For the whole phone, an iPhone has its own: Settings → Accessibility → Display & Text Size → Color Filters → Red/Green Filter; Android: Settings → Accessibility → Color correction. 🟡 A yellow ring round the notification dots (on unless turned off) so a new message or request catches the eye, on ⋯ More and in ⚙️. 🌗 Theme: light, dark, or as the device. 🔔 the sound when something arrives, and 🎵 which sound.",
   "- 👉 NOTICES THAT TAKE YOU THERE: a notice at the bottom of the screen with a › at its end is a button — tap or click it (or Enter) to go where it points: a new message opens its chat; a kitchen linked or accepted shows only that kitchen's recipes; a recipe saved, imported, copied, translated or added opens it; a note from a tester opens 👑 → 📊 Households → 💬 Feedback; someone asking to add recipes, or joining, opens 👥 Family Access; a link request sent opens 📬 Link requests; a backup opens 💾 Backups; a failed sync or the AI allowance opens Sync Health; an error opens the log. The place it leads to is marked with a yellow ring for a moment. Such a notice stays up at least 6 seconds; a notice about what is already on the screen has no › and goes nowhere. On a notice with a button (Open, ↩︎ Undo, Back up now) the button does its own thing — tapping the words of an Undo notice never undoes.",
   "- 🔔 A SOUND WHEN SOMETHING ARRIVES: a message (from a linked kitchen, from your family, an answer to your note) taps twice; a request to link kitchens taps three times. Choose the sound — 🥂 Spoon on a wine glass, 🛎️ The kitchen’s service bell, 🥄 Wooden spoon on a pot, each with ▶ to hear it — in ⚙️ → ♿ Accessibility → 🎵 The sound; untick 🔔 Sound for messages and requests to mute it. On this device only. Browsers keep a page silent until it has been touched once since opening, so a message that arrives before that is not heard. On a phone it plays at the media volume; an iPhone on silent (the switch on its side) plays no sound.",
@@ -37510,10 +37529,40 @@ function helpGoRule() {
     + list.map(function (p) { return '[GO:' + p[0] + '] ' + p[1]; }).join('\n');
 }
 // the mark of one line (a place this person has), and the line without it
-function helpGoSplit(line) {
+function helpGoSplit(line, names) {
   var m = HELP_GO_MARK.exec(String(line || '')), p = m ? helpPlace(m[1].toLowerCase()) : null;
   var text = String(line || '').replace(new RegExp(HELP_GO_MARK.source, 'gi'), '').replace(/\s+$/, '');
-  return { text: text, place: p && helpPlaceShown(p) ? p[0] : null };
+  if (m) return { text: text, place: p && helpPlaceShown(p) ? p[0] : null };
+  return { text: text, place: Array.isArray(names) ? helpPlaceInText(text, names) : null };   // v40.03 — no mark: by its name
+}
+// v40.03 — Tony (a Hebrew answer about importing from a URL, with no 📍 beside its step): "The "Take me there" button
+// should appear both in the initial Help list … and inside the Details modal". The help assistant does not always add
+// the mark — least of all in the short first answer. A step that names a menu item as the menu shows it (its emoji and
+// words in the person's language, or the English of its path) is taken to lead there. Only names that cannot be an
+// ordinary word: an emoji with its words, or at least two words.
+function helpPlaceNorm(s) {
+  return String(s || '').replace(/\*\*/g, '').replace(/[\uFE0F\u200B-\u200F\u2066-\u2069]/g, '').replace(/[\u25BE\u25B8\u203A]/g, '')
+    .replace(/\s+/g, ' ').trim().toLowerCase();
+}
+function helpPlaceNames() {
+  var out = [];
+  helpPlacesAvailable().forEach(function (p) {
+    if (p[3] === 'menu') return;
+    var el = helpPlaceItem(p), last = p[1].split('\u2192').pop(), names = [];
+    if (el) names.push(el.textContent);
+    names.push(last, last.replace(/\([^)]*\)/g, ''));
+    names.map(helpPlaceNorm).forEach(function (n) {
+      var words = n.replace(/[^\p{L}\p{N}]+/gu, ' ').trim(), emoji = /\p{Extended_Pictographic}/u.test(n);
+      if (words.length < 3 || (!emoji && (words.split(' ').length < 2 || words.length < 8))) return;
+      if (!out.some(function (x) { return x[1] === n; })) out.push([p[0], n]);
+    });
+  });
+  return out.sort(function (a, b) { return b[1].length - a[1].length; });   // the most particular name first
+}
+function helpPlaceInText(text, names) {
+  var t = helpPlaceNorm(text);
+  for (var i = 0; i < names.length; i++) if (t.indexOf(names[i][1]) !== -1) return names[i][0];
+  return null;
 }
 // Go: Help closes; the menu opens, the section unfolds, the item is shown a moment, and opened ('open') — or left shown
 // ('show': a switch or an action is never pressed for them). opts.fast: no pause (the Self Test).
@@ -37550,12 +37599,12 @@ function helpGo(id, opts) {
 // the button
 function helpGoButton(id, before) {
   var b = document.createElement('button'); b.type = 'button'; b.className = 'help-go'; b.setAttribute('data-go', id);
-  b.textContent = '\u{1F4CD} Take me there'; b.title = 'Opens it for you';
+  b.textContent = i18nPhrase('\u{1F4CD} Take me there'); b.title = i18nPhrase('Opens it for you');   // v40.03 — in their language
   b.onclick = function () { if (before) before(); helpGo(id); };
   return b;
 }
 window.HELP_PLACES = HELP_PLACES; window.helpPlace = helpPlace; window.helpPlaceItem = helpPlaceItem; window.helpPlaceShown = helpPlaceShown;
-window.helpPlacesAvailable = helpPlacesAvailable; window.helpGoRule = helpGoRule; window.helpGoSplit = helpGoSplit; window.helpGo = helpGo; window.helpGoButton = helpGoButton;
+window.helpPlacesAvailable = helpPlacesAvailable; window.helpPlaceNames = helpPlaceNames; window.helpPlaceInText = helpPlaceInText; window.helpGoRule = helpGoRule; window.helpGoSplit = helpGoSplit; window.helpGo = helpGo; window.helpGoButton = helpGoButton;
 
 function askHelpQ(q) { document.getElementById('helpInput').value = (_i18nLang !== 'en' && _i18nDict && _i18nDict[q]) || q; askHelp(); }
 
@@ -37573,8 +37622,10 @@ async function askHelp() {
     // v39.63 (audit) — 🔍 Details beside each numbered or bulleted step; an answer with no steps keeps one per line
     var stepRe=/^\s*(\d+[.)]|[-*\u2022]|\(\d+\))\s+/, hasSteps=lines.some(function(l){ return stepRe.test(l); });
     var acts=function(row){ var a=row.querySelector('.help-acts'); if(!a){ a=document.createElement('div'); a.className='help-acts'; row.appendChild(a); } return a; };
+    var names=helpPlaceNames(), gone={};   // v40.03 — a step's place by its name too; each place's button once
     lines.forEach(function(line) {
-      var go=helpGoSplit(line); line=go.text;   // v40.01 — 📍 Take me there: the step's place, its mark out of the text
+      var go=helpGoSplit(line, names); line=go.text;   // v40.01 — 📍 Take me there: the step's place, its mark out of the text
+      if(go.place && gone[go.place]) go.place=null; else if(go.place) gone[go.place]=1;
       if(!line.trim()) return;
       var row=document.createElement('div'); row.style.cssText='display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;';
       var lineText=document.createElement('div'); lineText.style.cssText='flex:1;font-size:13px;line-height:1.6;color:var(--ink);padding-top:4px;'; lineText.setAttribute('dir','auto'); lineText.setAttribute('data-no-i18n',''); lineText.innerHTML=helpLineHtml(line);
@@ -37621,7 +37672,9 @@ function showHelpDetail(topic, context, place) {
       // v40.01 — Tony: "The "Take me there" button should appear both next to the Details button and also inside the modal
       // opening in response to clicking the Details button, in the appropriate places": beside each of these steps that
       // leads to a place this person has (its mark taken out); with none, under the text for the step it came from.
-      var parts=d.trim().split('\n').map(helpGoSplit), anyGo=parts.some(function(g){ return g.place; });
+      var names=helpPlaceNames(), gone={};   // v40.03 — by its name too; each place once
+      var parts=d.trim().split('\n').map(function(l){ var g=helpGoSplit(l, names); if(g.place && gone[g.place]) g.place=null; else if(g.place) gone[g.place]=1; return g; });
+      var anyGo=parts.some(function(g){ return g.place; });
       body.style.cssText='font-size:13px;color:var(--ink);line-height:1.7;'; body.setAttribute('dir','auto'); body.setAttribute('data-no-i18n','');
       body.innerHTML='';
       parts.forEach(function(g){

@@ -1,7 +1,7 @@
 {
  "lang": "fr",
  "updatedAt": 1795129628652,
- "count": 2965,
+ "count": 2967,
  "strings": {
   "\"Add to Home Screen\"": "Ajouter à l'écran d'accueil",
   "\"Open Bring!\"": "Ouvrir Bring!",
@@ -548,6 +548,7 @@
   "Hand {1} to {2}?": "Transférer {1} à {2} ?",
   "Hard": "Difficile",
   "Hear it": "Écouter",
+  "Hear of a new message even when the app is closed — 🔔 at the foot of the chat window (on an iPhone, in the app on the Home Screen).": "Soyez prévenu d’un nouveau message même quand l’application est fermée — 🔔 en bas de la fenêtre de discussion (sur un iPhone, dans l’application de l’écran d’accueil).",
   "Hear this voice": "Écouter cette voix",
   "Help": "Aide",
   "Henrietta the hen": "Henrietta la poule",
@@ -630,6 +631,7 @@
   "It waits in ··· More → 🏡 Kitchens and people → 📨 Recipes sent to me until {1}.": "Elle patiente dans ··· Plus → 🏡 Cuisines et personnes → 📨 Recettes reçues jusqu'à {1}.",
   "Italian": "Italian",
   "Italiano": "Italiano",
+  "Its answers come with 📍 Take me there: one tap opens the place it describes.": "Ses réponses viennent avec 📍 M'y emmener : un toucher ouvre l’endroit qu’il décrit.",
   "I’ll look around by myself": "Je préfère regarder seul(e)",
   "Japanese": "Japanese",
   "Join": "Rejoindre",

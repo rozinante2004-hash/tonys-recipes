@@ -478,7 +478,18 @@ under its plain path only (a `?url=` request goes network-first).
   40 devices, payload `{ title: '👪 <name> (to everyone)' | '💬 <household>', body: ≤300 chars, tag, chat, hid, u }`,
   TTL a day, Urgency high; 404/410 deletes the row, twenty other failures too. The key: Worker secret `VAPID_JWK`, made
   by the deploy job (`tools/vapid-key.mjs`: HMAC of the Cloudflare token → a P-256 private key; the same every deploy;
-  never printed). Privacy Statement 1.18; ⚙️ → What leaves this device: the device's notification service. Self Tests
+  never printed). Privacy Statement 1.18 (what is kept and why — consent, by turning it on —, the notification
+  services as recipients, how long); ⚙️ → What leaves this device: "Your device's notification service (Apple, Google,
+  Mozilla or Microsoft)", lit only while it is on here (`privacyEntries`). HELP: the help assistant's "🔔 CHAT
+  NOTIFICATIONS WHEN THE APP IS CLOSED" line (where, Allow, what a notification shows, one switch per device, family vs
+  linked kitchens, never one's own, the iPhone's Home Screen app, blocked → the phone's settings, the app chimes itself
+  while on the screen, the phone's own sound vs the app's kitchen sounds in ⚙️ → ♿ Accessibility → 🎵 The sound, the
+  45 days, encrypted); the 👪 CHAT WITH FAMILY MEMBERS and 💬 CHATS WITH LINKED KITCHENS lines point to it (v40.03); ✨ What
+  can this app do → Cook together (v40.03): "Hear of a new message even when the app is closed — 🔔 at the foot of the chat window
+  (on an iPhone, in the app on the Home Screen)." KNOWN GAP (told to Tony, 20 Nov): the family chat checks each
+  recipient against the members list when the message is sent; a kitchen chat cannot (the sender may not read the other
+  household's members), so a person removed from a linked household who never opens the app again may still be told
+  of that link's kitchen messages until their device's 45 days are up. Self Tests
   `chat_notifications_switch`, `chat_notifications_announced`, `chat_notifications_shown_and_tapped` (the real sw.js
   handlers, through `tests/sw-probe.js`); Worker checks in `tests/worker-cors.mjs` (a separate RFC 8291 decryption).
 - **📍 Take me there in Help (v40.01).** Tony: a "Take me there" next to a Help answer's Details "and also inside the
@@ -493,7 +504,17 @@ under its plain path only (a `?url=` request goes network-first).
   steps (`.help-drow`), or under the text for the step's place when it has none. `helpGo(id, {fast})`: closes Help and
   Details, opens the menu (`toggleDrop`), unfolds the section (`settingsGroup` / `moreGroup`), outlines the item
   (`.help-here`), then `el.click()` after 900 ms for 'open'; 'show' (switches, one-tap actions) is never pressed.
-  Self Test `help_take_me_there`.
+  v40.03 (Tony: "The "Take me there" button should appear both in the initial Help list … and inside the Details
+  modal", with a Hebrew answer about importing from a URL that had none): the assistant does not always add the mark,
+  least of all in the short first answer — so a line WITHOUT a mark that names a menu item as the menu shows it is
+  taken to lead there: `helpPlaceNames()` (once per answer) = for each place this person has, the item's on-screen text
+  (in their language) and the English of its path, normalised (`helpPlaceNorm`: no ** / ▾ / variation selectors / bidi
+  marks, lower case), kept only if it cannot be an ordinary word (an emoji with its words, or two words and 8 letters),
+  longest first; `helpPlaceInText(text, names)`; `helpGoSplit(line, names)` uses it only when there is no mark (a mark for
+  a place the person lacks is not overruled). Each place's button once per answer and once per Details window. The label
+  and its title through `i18nPhrase` (in the person's language however the button is drawn).
+  HELP: the help assistant's "📍 TAKE ME THERE (v40.01)" line; ✨ What can this app do → Smart help: "Its answers come
+  with 📍 Take me there: one tap opens the place it describes." (v40.03). Self Test `help_take_me_there`.
 - **The farm sayings recorded again, and in Hebrew (v39.96).** Tony rewrote the first and last English sayings in the
   farm window ("Ouch! Quit it!", "Hands off, I'm free-range!!") and asked: "Please record again so all the recorded
   sentences match what is written". `FARM_SAYINGS_DEFAULT` holds his wording; `FARM_SOUNDS` is `sounds/farm-2/` (those
@@ -728,7 +749,11 @@ against `i18nFullCatalogue()` (24 phrases × 11 languages in v39.31, 0 missing a
 expected before the release (the owner correcting a translation), the hand edit leaves each file's header lines
 (`updatedAt`/`count`) and `i18n/index.json` as they are — the publishing job's merge of main into test rewrites those
 lines, and a change on both sides is a conflict that fails the job; a device still takes the file, its `updatedAt` being
-the one it knows (`i18nReadBest` takes a file as new as its own copy). **A path through ··· More names
+the one it knows (`i18nReadBest` takes a file as new as its own copy). **v40.03:** not always — a device whose own
+copy, or the shared one, was newer passed the file over, and a new button stayed in English on the test copy (Tony:
+"this button's label need to be translated to the target language, not stay in English everywhere"). Now, whichever
+copy is read, a phrase it lacks is taken from the file shipped with the build (`i18nLoadDict` → `i18nWithShipped`;
+`i18nReadStatic` keeps the file in `_i18nShipped`); where both have a phrase, the copy read wins. **A path through ··· More names
 its heading** (v39.33): "··· More → 🏡 Kitchens and people → 📤 Recipes I sent", in the Help and in the notices alike — the
 headings are the menu since v39.30. A sentence composed with names or a date (the "A recipe for you" question, `giftAsk`)
 goes into `I18N_EXTRA` as a shape (`{1} has sent you a recipe for “{2}”.`); Self Test `gift_question_translated` builds
@@ -1450,7 +1475,8 @@ notebook page, a Hebrew invitation link that opens the app in Hebrew.
 | `self-tests.js` | The Self Test suite (§13), loaded on first use so everyday visits do not download it. |
 | `ARCHITECTURE.md` | Deployments and connections: every component, where it lives, who deploys it, what depends on what. |
 | `manifest.json` | PWA manifest. `start_url`/`scope` = `/tonys-recipes/`. Includes a `share_target`. |
-| `sw.js` | Service worker. Stale‑while‑revalidate for **the app document only**, cache‑first for the pre‑cached assets, everything else straight to the network (see 2.3 — it used to claim every html page in scope). |
+| `sw.js` | Service worker. Stale‑while‑revalidate for **the app document only**, cache‑first for the pre‑cached assets, everything else straight to the network (see 2.3 — it used to claim every html page in scope). Since v40.02 also `push` and `notificationclick`: the chat notifications when the app is closed (2.3). |
+| `tools/vapid-key.mjs` | v40.02 — the chat notifications' VAPID key pair as a JWK, made from `CLOUDFLARE_API_TOKEN` (HMAC → a P-256 private key; the same on every run), written to stdout for `wrangler secret put VAPID_JWK` in `deploy-worker.yml`. Never printed into a log. |
 | `version.json` | `{"version": "v36.93"}` — polled to detect new deployments. Must never be cached, and must be bumped in the same commit as `index.html`. |
 | `cloudflare-worker.js` | The API proxy (deployed to Cloudflare, not served to browsers). |
 | ~~`bring-relay.html`~~ | Removed in v37.95: sending straight to a Bring! list was retired (Worker v66 answers 410); Bring!'s official import remains. |
@@ -1464,7 +1490,7 @@ notebook page, a Hebrew invitation link that opens the app in Hebrew.
 | `.github/workflows/deploy.yml` | GitHub Actions → GitHub Pages deploy on push to `main`. |
 | `.github/workflows/self-tests.yml` | Runs the Self Test suite headlessly on every push (5.6). Skips `net_*`/`stor_firebase`, and also fails the build on a test that closes the suite or strands a dialog. |
 | `tests/fixtures/multi-recipe-article.json` | A faithful sample of a real multi‑recipe article (ynet's chestnut round‑up) plus the AI answer it should produce. The messiness is the point — run‑on ingredients, per‑recipe sub‑headings, bylines — and it makes the whole collection pipeline testable without the network. |
-| `tests/sw-probe.js` | Loads the real `sw.js` in a dedicated worker with `addEventListener` stubbed, so `sw_serves_only_the_app_shell` can drive its fetch handler. Needed because the CSP has no `'unsafe-eval'` and a second service worker cannot be installed mid‑suite. |
+| `tests/sw-probe.js` | Loads the real `sw.js` in a dedicated worker with `addEventListener` stubbed, so `sw_serves_only_the_app_shell` can drive its fetch handler (and, since v40.02, `chat_notifications_shown_and_tapped` its `push` and `notificationclick` handlers: `{ pushCases }`, with stand-in windows, registration and clients). Needed because the CSP has no `'unsafe-eval'` and a second service worker cannot be installed mid‑suite. |
 | `tests/firestore-rules.test.mjs` | The published rules, checked on the Firestore emulator (`demo-rules`). |
 | `tests/e2e-sync.mjs` | End-to-end sync: owner, writer and reader devices signed in against the Firestore + Auth emulators, served by its own local server (emulator hosts added to the CSP), SDK from npm at the version the page loads. Only uses the emulator from localhost with a `demo-` project. |
 | `tests/axe-scan.js`, `tests/contrast-scan.js`, `tests/phone-chrome.js` | Accessibility (axe over the page and every dialog), colour contrast at phone width in both themes, and the phone header budget. |
@@ -1529,6 +1555,15 @@ The `share_target` lets Android/iOS "Share to app" send a URL/text; the app read
   the app document is *revalidated* rather than merely served, since cache‑first there would
   pin a device on its first‑downloaded version for ever.
 - Listens for `postMessage({type:'SKIP_WAITING'})` and calls `skipWaiting()`.
+- **`push` (v40.02, the chat notifications):** `event.data.json()` is `{ title, body, tag, chat, hid, u }` (made and
+  encrypted by the Worker, opened by the browser). Shown with `showNotification(title, { body, tag, renotify: true,
+  dir: 'auto', icon, data: { chat, hid } })` — the device's own sound — UNLESS a window of the app is visible (the app
+  chimes and shows it itself); on Apple's devices it is shown even then, because Safari takes the permission away
+  from a site whose push showed nothing.
+- **`notificationclick`:** closes it; an open window of the app gets `postMessage({ type: 'mkn-open-chat', chat })`
+  and `focus()`; otherwise `openWindow(BASE + '?chat=' + chat)` — only a `chat` of the form `f:<id>` / `k:<id>` goes
+  into the address. The app reads `?chat=` at start (and takes it out of the address) and opens that conversation
+  once the household is there (`pushOpenChat`).
 
 ---
 
@@ -1570,6 +1605,7 @@ Rules for a rebuild:
 | **Bring!** | Push ingredients to a shopping list | Worker KV `BRING_KV` (key `accessToken`), else env `BRING_TOKEN`; plus env `BRING_API_KEY`, `BRING_LIST_UUID`, `BRING_USER_UUID` — **no Bring! values in source** |
 | **GitHub Pages** | Hosting — the family's copy (`tonys-recipes`) and the site root with the sign-in pages (`rozinante2004-hash.github.io`) | n/a |
 | **Cloudflare Pages** | Hosting — the test copy (`tonys-recipes-test`) | n/a |
+| **Web Push services** (Apple `*.push.apple.com`, Google `fcm.googleapis.com`, Mozilla, Microsoft `*.notify.windows.com`) | v40.02 — deliver the chat notifications, encrypted for each device (RFC 8291), so the service cannot read them | Worker secret `VAPID_JWK` (the signing key, RFC 8292), set by `deploy-worker.yml` from `tools/vapid-key.mjs` — nothing to keep: it is made from the Cloudflare token |
 
 > **SECURITY — never put secrets in this file.** Worker v30 removed the previously hard-coded
 > Bring! bearer token, `X-BRING-API-KEY` and UUIDs; they now come from Worker env/KV only, so
@@ -1728,6 +1764,10 @@ default was committed to a public repo, so it was never a secret.
    where `configured` is a per-service boolean map derived from which env vars are set. Keep the
    reported `version` in step with the file header — it drifted to `v34` on a v36 Worker, which is
    exactly the kind of small lie §4b exists to forbid.
+8. **`push-key`, `push-subscribe`, `push-notify`, `push-forget` (Worker v108, the chat notifications)** — see the
+   v40.02 entry in §1b.8: the device's push address kept per member of a household (D1 `push_subs`),
+   a message read from Firestore with the SENDER's token and sent, encrypted, to those who may read it. `health`
+   says `push: true` when `VAPID_JWK` and the database are there; the app offers 🔔 only then.
 8. **`instagram-fetch`** `{shortcode}` — Meta made oEmbed **tokenless again on 15 Jun 2026**, so
    this calls `graph.facebook.com/v23.0/instagram_oembed` with no token. oEmbed returns the embed
    HTML, author and thumbnail — **not reliably the caption**, which is where the recipe is; a

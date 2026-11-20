@@ -1,7 +1,7 @@
 {
  "lang": "he",
  "updatedAt": 1795129628652,
- "count": 3393,
+ "count": 3395,
  "strings": {
   "\"Add to Home Screen\"": "הוספה למסך הבית",
   "\"One item away\" filter ({1}f.{2})": "פילטר \"פריט אחד חסר\" ({1}f.{2})",
@@ -691,6 +691,7 @@
   "Header has correct styling": "לכותרת יש עיצוב תקין",
   "Header renders": "הכותרת מוצגת",
   "Hear it": "השמע",
+  "Hear of a new message even when the app is closed — 🔔 at the foot of the chat window (on an iPhone, in the app on the Home Screen).": "שמעו על הודעה חדשה גם כשהאפליקציה סגורה — 🔔 בתחתית חלון הצ׳אט (באייפון, באפליקציה שבמסך הבית).",
   "Hear this voice": "השמע את הקול הזה",
   "Heavy libraries are not loaded eagerly ({1})": "ספריות כבדות לא נטענות מראש ({1})",
   "Hebrew has a real typeface, not an OS fallback": "לעברית יש גופן אמיתי, לא ברירת מחדל של המערכת",
@@ -794,6 +795,7 @@
   "It waits in ··· More → 🏡 Kitchens and people → 📨 Recipes sent to me until {1}.": "היא מחכה ב··· עוד → 🏡 מטבחים ואנשים → 📨 מתכונים שנשלחו אליי עד {1}.",
   "Italian": "איטלקי",
   "Italiano": "Italiano",
+  "Its answers come with 📍 Take me there: one tap opens the place it describes.": "התשובות שלו מגיעות עם 📍 קחו אותי לשם: הקשה אחת פותחת את המקום שהוא מתאר.",
   "I’ll look around by myself": "אני רק מסתכל/ת בינתיים",
   "Japanese": "יפני",
   "Join": "הצטרפות",

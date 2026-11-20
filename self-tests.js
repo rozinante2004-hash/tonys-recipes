@@ -21983,7 +21983,45 @@ window.SELF_TESTS = [
         showHelpDetail('Open the converter', 'how do I convert?', 'converter'); await tick(60);
         dw=document.getElementById('helpDetailOverlay');
         if(!dw || dw.querySelectorAll('.help-go[data-go="converter"]').length!==1) throw new Error('Details with no mark of their own have no Take me there for their step');
-        return HELP_PLACES.length+' places, each real; only the person’s own offered; beside the one step; Help closed, the window opened; a switch shown, not pressed; in Details too';
+        dw.remove();
+        // v40.03 — Tony (a Hebrew answer about importing from a URL had none in the first list): "The "Take me there"
+        // button should appear both in the initial Help list … and inside the Details modal". No mark: a step that names a
+        // menu item as the menu shows it leads there — once per answer; an ordinary word ("backups") is not a name.
+        window.aiCall=async function(){ return 'To import a recipe:\n1. Tap + Add Recipe ▾ → 🔗 Import from URL, paste the link.\n2. In 🔗 Import from URL press Fetch.\n3. Your backups stay on this device.'; };
+        openHelp(); document.getElementById('helpInput').value='how do I import from a URL?'; await askHelp();
+        var nrows=Array.prototype.slice.call(document.querySelectorAll('#helpAnswer > div')).filter(function(r){ return /import|Fetch|backups/i.test(r.textContent); });
+        var ngo=nrows.filter(function(r){ return r.querySelector('.help-go'); });
+        if(ngo.length!==1 || !/Tap \+ Add Recipe/.test(ngo[0].textContent) || ngo[0].querySelector('.help-go').getAttribute('data-go')!=='import-url')
+          throw new Error('a step naming 🔗 Import from URL (no mark) has no Take me there, or it is there more than once or beside a common word: '+ngo.length);
+        // …in the person's language: the menu as it shows in Hebrew, an answer in Hebrew
+        var iu=helpPlaceItem(helpPlace('import-url')), iuWas=iu.innerHTML;
+        try{
+          iu.textContent='\u{1F517} ייבוא מכתובת URL';
+          var he=helpGoSplit('טפו על + הוסיפו מתכון ▾ → \u{1F517} ייבוא מכתובת URL, הדביקו את הכתובת.', helpPlaceNames());
+          if(he.place!=='import-url') throw new Error('a Hebrew step naming the Hebrew menu item is not taken to lead there: '+he.place);
+        } finally { iu.innerHTML=iuWas; }
+        if(helpGoSplit('Keep your backups safe somewhere.', helpPlaceNames()).place) throw new Error('an ordinary word was taken for a menu item');
+        if(helpGoSplit('Open 🔗 Import from URL. [GO:households]', helpPlaceNames()).place) throw new Error('a mark for a place this person lacks was overruled by a name');
+        // …and in the Details window
+        window.aiCall=async function(){ return '1. Tap + Add Recipe ▾.\n2. Choose 🔗 Import from URL.\n3. Paste the address.'; };
+        showHelpDetail('Import from a URL', 'how do I import from a URL?', null); await tick(60);
+        dw=document.getElementById('helpDetailOverlay');
+        var dn=dw ? dw.querySelectorAll('.help-go[data-go="import-url"]') : [];
+        if(dn.length!==1 || !/Import from URL/.test(dn[0].closest('.help-drow').textContent)) throw new Error('Details: the step naming 🔗 Import from URL has no Take me there');
+        dw.remove();
+        // the label in the person's language (Tony: "not stay in English everywhere")
+        var wasLang=_i18nLang, wasDict=_i18nDict, lab;
+        try{ _i18nLang='he'; _i18nDict={ '\u{1F4CD} Take me there':'\u{1F4CD} קחו אותי לשם', 'Opens it for you':'פותח את זה בשבילכם' }; lab=helpGoButton('converter'); }
+        finally{ _i18nLang=wasLang; _i18nDict=wasDict; }
+        if(lab.textContent!=='\u{1F4CD} קחו אותי לשם' || lab.title!=='פותח את זה בשבילכם') throw new Error('the label is not in the person’s language: '+lab.textContent);
+        // …and a phrase translated by hand in this build's language file counts at once, whichever dictionary is read
+        _i18nShipped.zz={ strings:{ a:'A-shipped', b:'B-shipped', c:'' } };
+        try{
+          var own={ a:'A-shared' }, w=i18nWithShipped(own, 'zz');
+          if(w.a!=='A-shared' || w.b!=='B-shipped' || 'c' in w || own.b) throw new Error('the shipped file does not fill the gaps (only them, without changing the shared copy): '+JSON.stringify(w));
+          if(i18nWithShipped(_i18nShipped.zz.strings, 'zz')!==_i18nShipped.zz.strings || i18nWithShipped(own, 'none')!==own) throw new Error('changed what needed nothing');
+        } finally { delete _i18nShipped.zz; }
+        return HELP_PLACES.length+' places, each real; only the person’s own offered; beside the one step; Help closed, the window opened; a switch shown, not pressed; in Details too; found by its name (English and Hebrew) when unmarked; the label translated';
       } finally {
         window.aiCall=real.ai; window.isAppOwner=real.owner; window.openCalcModal=real.calc; window.cycleTheme=real.theme; window.toast=real.toast;
         var d=document.getElementById('helpDetailOverlay'); if(d) d.remove();

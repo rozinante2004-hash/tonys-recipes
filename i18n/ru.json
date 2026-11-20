@@ -1,7 +1,7 @@
 {
  "lang": "ru",
  "updatedAt": 1795129628652,
- "count": 3265,
+ "count": 3267,
  "strings": {
   "\"Add to Home Screen\"": "Добавить на главный экран",
   "\"One item away\" filter ({1}f.{2})": "Фильтр «Не хватает одного» ({1}ф.{2})",
@@ -672,6 +672,7 @@
   "Header has correct styling": "У заголовка правильные стили",
   "Header renders": "Заголовок отображается",
   "Hear it": "Послушать",
+  "Hear of a new message even when the app is closed — 🔔 at the foot of the chat window (on an iPhone, in the app on the Home Screen).": "Узнавайте о новом сообщении, даже когда приложение закрыто, — 🔔 внизу окна чата (на iPhone — в приложении на экране «Домой»).",
   "Hear this voice": "Прослушать голос",
   "Heavy libraries are not loaded eagerly ({1})": "Тяжёлые библиотеки не загружаются заранее ({1})",
   "Hebrew has a real typeface, not an OS fallback": "У иврита настоящий шрифт, а не системный запасной",
@@ -771,6 +772,7 @@
   "It waits in ··· More → 🏡 Kitchens and people → 📨 Recipes sent to me until {1}.": "Он будет ждать в ··· Ещё → 🏡 Кухни и участники → 📨 Присланные мне рецепты, пока {1}.",
   "Italian": "Итальянская",
   "Italiano": "Italiano",
+  "Its answers come with 📍 Take me there: one tap opens the place it describes.": "К его ответам прилагается 📍 Перейти туда: одно касание открывает описанное место.",
   "I’ll look around by myself": "Я сам(а) посмотрю",
   "Japanese": "Японская",
   "Join": "Присоединиться",

@@ -1,7 +1,7 @@
 {
  "lang": "hu",
  "updatedAt": 1795129628652,
- "count": 2743,
+ "count": 2745,
  "strings": {
   "\"Add to Home Screen\"": "Hozzáadás a kezdőképernyőhöz",
   "\"Open Bring!\"": "Bring! megnyitása",
@@ -503,6 +503,7 @@
   "Hand {1} to {2}?": "Átadod {1}-t {2}-nak?",
   "Hard": "Nehéz",
   "Hear it": "Meghallgatás",
+  "Hear of a new message even when the app is closed — 🔔 at the foot of the chat window (on an iPhone, in the app on the Home Screen).": "Értesülj az új üzenetről akkor is, ha az app be van zárva — 🔔 a beszélgetés ablakának alján (iPhone-on a kezdőképernyőn lévő appban).",
   "Hear this voice": "Hallgasd meg ezt a hangot",
   "Help": "Súgó",
   "Henrietta the hen": "Henrietta, a tyúk",
@@ -579,6 +580,7 @@
   "It waits in ··· More → 🏡 Kitchens and people → 📨 Recipes sent to me until {1}.": "Itt vár: ··· Továbbiak → 🏡 Konyhák és emberek → 📨 Nekem küldött receptek, amíg {1}.",
   "Italian": "Olasz",
   "Italiano": "Italiano",
+  "Its answers come with 📍 Take me there: one tap opens the place it describes.": "A válaszai mellett ott a 📍 Vigyél oda: egy koppintás megnyitja a helyet, amelyről szól.",
   "I’ll look around by myself": "Inkább körülnézek magam",
   "Japanese": "Japán",
   "Join": "Csatlakozás",

@@ -1,7 +1,7 @@
 {
  "lang": "ja",
  "updatedAt": 1795129628652,
- "count": 3270,
+ "count": 3272,
  "strings": {
   "\"Add to Home Screen\"": "ホーム画面に追加",
   "\"One item away\" filter ({1}f.{2})": "「あと1品」フィルター（{1}f.{2}）",
@@ -673,6 +673,7 @@
   "Header has correct styling": "ヘッダーのスタイルが正しい",
   "Header renders": "ヘッダーが表示される",
   "Hear it": "聞く",
+  "Hear of a new message even when the app is closed — 🔔 at the foot of the chat window (on an iPhone, in the app on the Home Screen).": "アプリを閉じていても新しいメッセージがわかります — チャット画面の下の 🔔（iPhone ではホーム画面のアプリで）。",
   "Hear this voice": "この声を聞く",
   "Heavy libraries are not loaded eagerly ({1})": "重いライブラリは最初から読み込まれない（{1}）",
   "Hebrew has a real typeface, not an OS fallback": "ヘブライ語はOSのフォールバックではなく、実際の書体を使う",
@@ -772,6 +773,7 @@
   "It waits in ··· More → 🏡 Kitchens and people → 📨 Recipes sent to me until {1}.": "{1}まで、··· その他 → 🏡 キッチンと仲間 → 📨 届いたレシピ に残ります。",
   "Italian": "イタリア料理",
   "Italiano": "Italiano",
+  "Its answers come with 📍 Take me there: one tap opens the place it describes.": "回答には 📍 そこへ移動 が付いています。タップ一回で、説明している場所が開きます。",
   "I’ll look around by myself": "まずは自分で見てみる",
   "Japanese": "日本料理",
   "Join": "参加",

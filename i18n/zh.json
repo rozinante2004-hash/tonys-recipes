@@ -1,7 +1,7 @@
 {
  "lang": "zh",
  "updatedAt": 1795129628652,
- "count": 2969,
+ "count": 2971,
  "strings": {
   "\"Add to Home Screen\"": "添加到主屏幕",
   "\"Open Bring!\"": "打开 Bring!",
@@ -548,6 +548,7 @@
   "Hand {1} to {2}?": "把{1}移交给{2}？",
   "Hard": "困难",
   "Hear it": "试听",
+  "Hear of a new message even when the app is closed — 🔔 at the foot of the chat window (on an iPhone, in the app on the Home Screen).": "即使应用已关闭，也能得知新消息——聊天窗口底部的 🔔（在 iPhone 上，需使用主屏幕上的应用）。",
   "Hear this voice": "试听这个声音",
   "Help": "帮助",
   "Henrietta the hen": "母鸡亨丽埃塔",
@@ -630,6 +631,7 @@
   "It waits in ··· More → 🏡 Kitchens and people → 📨 Recipes sent to me until {1}.": "它会留在 ··· 更多 → 🏡 厨房和成员 → 📨 别人发给我的食谱 里，直到 {1}。",
   "Italian": "意大利语",
   "Italiano": "Italiano",
+  "Its answers come with 📍 Take me there: one tap opens the place it describes.": "它的回答附有 📍 带我去那里：轻点一下，就会打开它所说的地方。",
   "I’ll look around by myself": "我先自己看看",
   "Japanese": "日语",
   "Join": "加入",
