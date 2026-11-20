@@ -279,7 +279,8 @@ hidden / refuses / silent / privacy text.
     copy to the clipboard when clicked. Same as we have the identifier behave on the main page") `copyable(text, cls)`:
     the opened line's identifier and owner's address, the details panel's identifier and every member's address are
     buttons (`.mg-cp`, `data-copy`) — `mknManage.copyText(el)` copies, "✅ Copied!" in its place for 1.8 s (kept through
-    a redraw: `S.copied`); no clipboard → the text is selected and a notice says so. The closed line's owner still
+    a redraw: `S.copied`); no clipboard → the text is selected and a notice says so — the button with that `data-copy`
+    on the screen NOW (v40.04: the window may have been drawn again while the clipboard was asked). The closed line's owner still
     opens the line. **The sort is kept** in `localStorage['mkn_manage_sort']`
     ('month:-1'; `sortKeep()` in `sortBy`/`sortTo`, `sortSaved()` read as manage.js loads; only keys in `SORT_KEYS`);
     a Self Test run keeps it (`_selfTestPark`/`_selfTestUnpark` → `mknManage._sortBack()`). **On a phone (≤700 px)**

@@ -2442,6 +2442,13 @@ window.SELF_TESTS = [
           var sel=String(getSelection());
           if(ok!==false || sel!=='MKN-AAAA-2222') throw new Error('without a clipboard the identifier was not selected: '+JSON.stringify(sel));
           getSelection().removeAllRanges();
+          // v40.04 — the window drawn again while the clipboard was asked (its notes arriving): the text on the screen
+          // now is selected, not the replaced button's (a failed check on the test copy, 20 Nov)
+          var gone=pc.cloneNode(true);
+          ok=await mknManage.copyText(gone);
+          sel=String(getSelection());
+          if(ok!==false || sel!=='MKN-AAAA-2222') throw new Error('drawn again meanwhile: the identifier on the screen was not selected: '+JSON.stringify(sel));
+          getSelection().removeAllRanges();
           mknManage.show(null);
         } finally {
           try{ Object.defineProperty(navigator.clipboard, 'writeText', { value:realClip, configurable:true }); }catch(e){ navigator.clipboard.writeText=realClip; }

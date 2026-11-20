@@ -31,7 +31,8 @@ where.
   notifications when the app is closed (Web Push; family and linked-kitchen chats; the message text shown; Tony, 20
   Nov; the Worker is live for every copy at once — it only adds, nothing older is refused). v40.03 — the Help and
   the reconstruction prompt brought up to date with both; 📍 in the first Help answer too (found by the menu item's
-  name), its label in the person's language (a phrase the shared dictionary lacks is taken from the shipped file).
+  name), its label in the person's language (a phrase the shared dictionary lacks is taken from the shipped file). v40.04 — 📊 Households'
+  copy fallback selects the on-screen text after a redraw (a Self Test that failed once on the test copy).
   The test copy
   (https://tonys-recipes-test.pages.dev, its own database and rules) follows `test`.
 - **The beta has had testers since Sunday 25 Oct 2026** and is **by invitation only**: the owner invites with

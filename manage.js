@@ -1595,8 +1595,13 @@
       if (!t) return Promise.resolve(false);
       var done = function (ok) {
         if (!ok) {
-          el.classList.remove('mg-copied'); el.style.minWidth = '';   // the text itself, not a "Copied!" from a moment ago
-          try { var rg = document.createRange(); rg.selectNodeContents(el.querySelector('.mg-cpt') || el); var sel = getSelection(); sel.removeAllRanges(); sel.addRange(rg); } catch (e) {}
+          // v40.04 — the window may have been drawn again while the clipboard was asked (its notes arriving): the text
+          // on the screen NOW is selected — a range in the replaced button selects nothing (a failed check on the test copy).
+          var cur = el.isConnected ? el : null;
+          if (!cur) Array.prototype.some.call(document.querySelectorAll('#manageOverlay .mg-cp'), function (b) { return b.getAttribute('data-copy') === t && (cur = b); });
+          cur = cur || el;
+          cur.classList.remove('mg-copied'); cur.style.minWidth = '';   // the text itself, not a "Copied!" from a moment ago
+          try { var rg = document.createRange(); rg.selectNodeContents(cur.querySelector('.mg-cpt') || cur); var sel = getSelection(); sel.removeAllRanges(); sel.addRange(rg); } catch (e) {}
           if (typeof toast === 'function') toast('It could not be copied by itself — it is selected: copy it now.', 5000);
           return false;
         }
