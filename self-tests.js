@@ -22011,9 +22011,9 @@ window.SELF_TESTS = [
         dw.remove();
         // the label in the person's language (Tony: "not stay in English everywhere")
         var wasLang=_i18nLang, wasDict=_i18nDict, lab;
-        try{ _i18nLang='he'; _i18nDict={ '\u{1F4CD} Take me there':'\u{1F4CD} קחו אותי לשם', 'Opens it for you':'פותח את זה בשבילכם' }; lab=helpGoButton('converter'); }
+        try{ _i18nLang='he'; _i18nDict={ '\u{1F4CD} Take me there':'\u{1F4CD} קח אותי לשם', 'Opens it for you':'פותח את זה בשבילכם' }; lab=helpGoButton('converter'); }
         finally{ _i18nLang=wasLang; _i18nDict=wasDict; }
-        if(lab.textContent!=='\u{1F4CD} קחו אותי לשם' || lab.title!=='פותח את זה בשבילכם') throw new Error('the label is not in the person’s language: '+lab.textContent);
+        if(lab.textContent!=='\u{1F4CD} קח אותי לשם' || lab.title!=='פותח את זה בשבילכם') throw new Error('the label is not in the person’s language: '+lab.textContent);
         // …and a phrase translated by hand in this build's language file counts at once, whichever dictionary is read
         _i18nShipped.zz={ strings:{ a:'A-shipped', b:'B-shipped', c:'' } };
         try{
