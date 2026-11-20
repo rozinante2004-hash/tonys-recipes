@@ -17,7 +17,12 @@ where.
 **Live now**
 - The family's copy (`main`, https://rozinante2004-hash.github.io/tonys-recipes/ — it forwards to the community app)
   and the community app (`beta`, https://mykitchennotes.community, Firebase project my-kitchen-notes-beta) run
-  **v40.00 + Worker v107** (released 20 Nov 2026, 01:06 Israel time, on 01370e6 — 52 button labels in rarely-opened
+  **v40.04 + Worker v108** (released 20 Nov 2026, 03:12 Israel time, on 49dee4b — v40.01: 📍 Take me there in Help
+  answers and their Details; v40.02 + Worker v108: 🔔 chat notifications when the app is closed (Web Push; family and
+  linked-kitchen chats; Privacy Statement 1.18); v40.03: 📍 in the first answer too (found by the menu item's name), its
+  label in the person's language (a phrase the shared dictionary lacks is taken from the shipped file; Hebrew "📍 קח אותי
+  לשם", Tony's wording), the Help and the reconstruction prompt brought up to date; v40.04: 📊 Households' copy fallback
+  selects the on-screen text after a redraw. v40.00 at 01:06 on 01370e6 — 52 button labels in rarely-opened
   windows translated by hand; v39.99 at 00:11 on 3eea878: an open window holds the page behind it still; v39.98: 📊 Households' ▾ folds a household, addresses and identifiers copy on a tap; v39.97 on 19 Nov at
   00:48 on 2414b8f: the pantry's example in the reader's language, a text box's own labels translated, six hints the
   harvest never saw; v39.96 on 18 Nov at 02:41 on 8e4ac76:
@@ -26,13 +31,8 @@ where.
   at 23:50 on da3f6d9: the farm sayings in other languages, a Language selector in the farm window, each language its
   own `i18n/_farm_<lang>`; v39.94 at 21:40 on db945ab: the
   network Self Tests send the sign-in; v39.93 at 19:55 on 4b688fc: each farm animal in its own recorded voice,
-  `docs/farm-voices.md`; Worker v107 since 15 Nov 06:12; the jobs are listed near the top of `docs/history/2026-11.md`).
-  **On Test, not released:** v40.01 — 📍 Take me there in Help answers and their Details; v40.02 + Worker v108 — 🔔 chat
-  notifications when the app is closed (Web Push; family and linked-kitchen chats; the message text shown; Tony, 20
-  Nov; the Worker is live for every copy at once — it only adds, nothing older is refused). v40.03 — the Help and
-  the reconstruction prompt brought up to date with both; 📍 in the first Help answer too (found by the menu item's
-  name), its label in the person's language (a phrase the shared dictionary lacks is taken from the shipped file). v40.04 — 📊 Households'
-  copy fallback selects the on-screen text after a redraw (a Self Test that failed once on the test copy).
+  `docs/farm-voices.md`; Worker v108 since 20 Nov 01:59 (from Test); the jobs are listed near the top of `docs/history/2026-11.md`).
+  **On Test, not released:** nothing.
   The test copy
   (https://tonys-recipes-test.pages.dev, its own database and rules) follows `test`.
 - **The beta has had testers since Sunday 25 Oct 2026** and is **by invitation only**: the owner invites with
