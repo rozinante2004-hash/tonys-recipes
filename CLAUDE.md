@@ -17,7 +17,13 @@ where.
 **Live now**
 - The family's copy (`main`, https://rozinante2004-hash.github.io/tonys-recipes/ — it forwards to the community app)
   and the community app (`beta`, https://mykitchennotes.community, Firebase project my-kitchen-notes-beta) run
-  **v40.04 + Worker v108** (released 20 Nov 2026, 03:12 Israel time, on 49dee4b — v40.01: 📍 Take me there in Help
+  **v40.08 + Worker v108** (released 21 Nov 2026, 13:07 Israel time, on 36ddd78 — v40.05: 🗓️ Work Planner (··· More
+  → 🧰 Tools, and 🗓️ in the select bar: AI work/quiet blocks and equipment per recipe — what a recipe needs and the
+  kitchen has not listed is added —, the kitchen's equipment asked once, Propose order, 1/2 cooks, linked kitchens'
+  recipes, ⠿ drag, 📌 pin, ✓ done, a tap shows a step, shared with the household; Privacy Statement 1.19;
+  firestore.rules gain `planner/{doc}`); v40.06: full screen with a top bar (↩︎ Undo, ✕), 🍳 Your kitchen as a button,
+  each name on its own line, Hebrew "יחידת עבודה"; v40.07: a collection's recipes chosen one by one; v40.08: a dish's
+  name opens its recipe on top of the planner, Escape closes the window on top. Before it: **v40.04** (released 20 Nov 2026, 03:12 Israel time, on 49dee4b — v40.01: 📍 Take me there in Help
   answers and their Details; v40.02 + Worker v108: 🔔 chat notifications when the app is closed (Web Push; family and
   linked-kitchen chats; Privacy Statement 1.18); v40.03: 📍 in the first answer too (found by the menu item's name), its
   label in the person's language (a phrase the shared dictionary lacks is taken from the shipped file; Hebrew "📍 קח אותי
@@ -32,13 +38,7 @@ where.
   own `i18n/_farm_<lang>`; v39.94 at 21:40 on db945ab: the
   network Self Tests send the sign-in; v39.93 at 19:55 on 4b688fc: each farm animal in its own recorded voice,
   `docs/farm-voices.md`; Worker v108 since 20 Nov 01:59 (from Test); the jobs are listed near the top of `docs/history/2026-11.md`).
-  **On Test, not released:** v40.05 — 🗓️ Work Planner (··· More → 🧰 Tools, and 🗓️ in the select bar; AI work/quiet
-  blocks and equipment per recipe — what a recipe needs and the kitchen has not listed is added —, the kitchen's equipment asked once, Propose order, 1/2 cooks, linked kitchens'
-  recipes, ⠿ drag, 📌 pin, ✓ done, a tap shows a step, shared with the household; Privacy Statement 1.19; firestore.rules gain `planner/{doc}`);
-  v40.06 — the planner full screen with a top bar (↩︎ Undo, ✕), 🍳 Your kitchen as a button, each name on its own line, Hebrew "יחידת עבודה";
-  v40.07 — a collection is never added as one dish: 📚 its recipes are listed to tick, each ticked one a dish;
-  v40.08 — a dish's name opens its recipe on top of the planner (closing returns to it); Escape closes the window on top.
-  The test copy
+  **On Test, not released:** nothing beyond v40.08. The test copy
   (https://tonys-recipes-test.pages.dev, its own database and rules) follows `test`.
 - **The beta has had testers since Sunday 25 Oct 2026** and is **by invitation only**: the owner invites with
   ⚙️ → 👑 → ✉️ Invite testers (the congratulatory wording of v39.60); a tester's share button asks the owner for an
@@ -48,7 +48,7 @@ where.
 - **Every release needs Tony's typed yes for that build**, with CI green on that commit. Then push the SHA to `main`
   AND `beta` (release-on-green.sh below), check every job (jobs-on.sh), record the release at the top of
   `docs/history/2026-11.md`, and update "Live now" here.
-- The rules were last published on 10 Nov 2026 (deploy-rules on 99558ae, success). A push to `test` that changes
+- The rules were last published on 21 Nov 2026 with the v40.08 release (deploy-rules on 36ddd78; the planner's). A push to `test` that changes
   them publishes to the test project only; a release publishes to the family's and the beta's.
 - The Self Tests: **490 pass, 0 fail, 7 skipped** (the network ones) on v39.95, locally (English and Hebrew).
 
