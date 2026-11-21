@@ -670,8 +670,9 @@ under its plain path only (a `?url=` request goes network-first).
     carries the dish's first letter when wide enough, and a tap shows "dish · step · h:mm". With two cooks after 🔀 Propose
     order a second row, "👩‍🍳 The second cook" (`.pl-lane2`, green).
   - **📋 Run sheet** (v40.11 — Tony: "a wonderful enhancement I would like to add as an option from the planner"; the
-    button beside 🔀 Propose order, greyed while a recipe is read): `planRunOpen` → `#planRunOverlay` (z-index 1300, after
-    the planner in the page; Escape → `closeM` → `planRunClose`; `closePlanner` removes it): "📋 Run sheet", "Each step in
+    button beside 🔀 Propose order, greyed while a recipe is read): `planRunOpen` → `#planRunOverlay` (v40.12: at the
+    planner's z-index 200, inserted right after `#planOverlay` in the page — over the planner, under `#viewOverlay` and the
+    windows after it; v40.11 had 1300; Escape → `closeM` → `planRunClose`; `closePlanner` removes it): "📋 Run sheet", "Each step in
     the order to do it — tick it as you go.", "Start at" (`<input type=time>`, now rounded up to five minutes the first
     time) and "Now". `planRunFill` lists `planRunSteps(planView())` — the plan as shown (proposed, or one after another):
     each block of work at its clock time (`planClock(start, minutes)`, 24-hour) with a tick box, the dish (bold), the step
@@ -679,7 +680,15 @@ under its plain path only (a `?url=` request goes network-first).
     where nobody has work for 10 minutes or more; "✓ {1} is ready" when a dish is (a multi-day dish: "🌙 {1} — the rest on
     another day"); "✓ Everything is ready" at the total (the dish that ends last has no line of its own). Ticks and the
     start are kept on the device (`PLAN_RUN_KEY` = 'mkn_planner_run': {start, ticks} — a tick's key is the dish's id, the
-    block's index and kind+length, at most 300). `planRender` fills it again when the plan changes.
+    block's index and kind+length, at most 300). `planRender` fills it again when the plan changes. v40.12 (Tony: "In the
+    run sheet, clicking a recipe title should open the relevant recipe, on top of the sheet. Closing it gets you back to the
+    sheet. Clicking the checkbox retains the existing functionality of marking the step as done."): a step is a `<div>`
+    (was a `<label>`) — the dish's name (`planRunName`: `.pl-run-name.pl-name-go`, role=button, tabindex 0, dotted
+    underline; plain bold for a dish by hand or a recipe no longer there) opens the recipe with `planOpenRecipe` (tap, Enter
+    or Space; `event.stopPropagation()` so it does not tick); the tick box marks the step done (`planRunTick`, its
+    aria-label "Mark as done"), and a tap elsewhere on the row still ticks it (`planRunRowTap`). The names in "✓ {1} is
+    ready" / "{1} — the rest on another day" are the same buttons (`planRunPhraseName`), the sentence in one `<span>` (the
+    line is a flex row: loose pieces got the gap between them). `planner_run_open` checks it.
   - **↩︎ Undo** (v40.06, in the top bar; `planRemember`, `planUndo`, `planUndoBtn`): before each change made here —
     ✕, + a dish (recipes or by hand), ⠿/↑↓ a move, 📌, ✓, 👩‍🍳 cooks, 🔀 Propose order, 🗑️ Clear the list, Save in 🍳 Your
     kitchen, ↻ — the plan is remembered (`_planUndo`: JSON of the items, cooks, proposed and equipment, as `planOut` gives
@@ -782,8 +791,12 @@ under its plain path only (a `?url=` request goes network-first).
     overlapping, a tap naming the dish and step, still so after Propose, a row for the second cook; 📋 Run sheet on top of
     the planner, the start now in fives, 17:00 → the clock times of the plan's work in order, the long break with its
     times, the dishes ready and Everything, a tick kept and still there when opened again, following the plan (a dish
-    taken off, a multi-day dish's "— the rest on another day"), closing back to the planner; the help line). Knock-out:
-    all eight fail without their code.
+    taken off, a multi-day dish's "— the rest on another day"), closing back to the planner; the help line);
+    `planner_run_open` (v40.12: a recipe and a dish by hand; the recipe's names are buttons, the hand dish's not; a tap on
+    the name opens the recipe over the run sheet — above it as Escape sees it (page order, then z-index), the run sheet
+    over the planner and the header — without ticking; closing goes back to the run sheet; Enter too; the tick box ticks,
+    a tap on the row's time undoes it, on its words ticks again; the help line). Knock-out: all nine fail without their
+    code.
   - HELP: the help assistant's "🗓️ WORK PLANNER (v40.05–v40.11)" line (v40.09 adds A MULTI-DAY RECIPE to THE AI READS;
     v40.11 adds FOLDED WAITING, 👩‍🍳 YOU and 📋 RUN SHEET before ↩︎ UNDO, one after another before proposing, days) — rewritten whole for v40.06 (Tony: "Please update
     the Help as well") in the order a person meets it: THE WINDOW (full screen, the top bar with ↩︎ Undo and ✕, the

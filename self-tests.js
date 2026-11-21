@@ -10010,7 +10010,9 @@ window.SELF_TESTS = [
         if(!rb || rb.disabled) throw new Error('no 📋 Run sheet button');
         rb.click(); await wait(30);
         var ov=document.getElementById('planRunOverlay');
-        if(!ov || !/Run sheet/.test(ov.textContent) || parseInt(getComputedStyle(ov).zIndex, 10)<=parseInt(getComputedStyle(document.getElementById('planOverlay')).zIndex, 10)) throw new Error('📋 Run sheet did not open on top of the planner');
+        // on top the way Escape sees it: the open windows in page order, then by z-index (closeTopModal → modalsOnTopOrder)
+        var inPage=function(list){ return list.slice().sort(function(a, b){ return (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) ? -1 : 1; }); };
+        if(!ov || !/Run sheet/.test(ov.textContent) || modalsOnTopOrder(inPage([ov, document.getElementById('planOverlay')])).pop()!==ov) throw new Error('📋 Run sheet did not open on top of the planner');
         if(!/^([01]\d|2[0-3]):[0-5][05]$/.test(document.getElementById('planRunStart').value)) throw new Error('the start is not now, rounded to five minutes: '+document.getElementById('planRunStart').value);
         planRunStartSet('17:00');
         v=planView();
@@ -10045,6 +10047,63 @@ window.SELF_TESTS = [
       } finally {
         closePlanner();
         window._household=real.hh; _plan=real.plan; _planReading={};
+        try{ if(real.local===null) localStorage.removeItem(PLAN_LOCAL_KEY); else localStorage.setItem(PLAN_LOCAL_KEY, real.local); }catch(e){}
+        try{ if(real.run===null) localStorage.removeItem(PLAN_RUN_KEY); else localStorage.setItem(PLAN_RUN_KEY, real.run); }catch(e){}
+      }
+    } },
+  { id:'planner_run_open', group:'Features', name:'🗓️ Work Planner 📋 Run sheet: a dish’s name opens its recipe on top of the run sheet (tap, Enter) and closing it goes back to the run sheet; the tick box — and the rest of the row — still marks the step done; a dish filled in by hand is not a link (v40.12)',
+    test: async()=>{
+      // Tony, 21 Nov 2026: "In the run sheet, clicking a recipe title should open the relevant recipe, on top of the sheet. Closing it
+      // gets you back to the sheet. Clicking the checkbox retains the existing functionality of marking the step as done."
+      var real={ plan:_plan, hh:window._household, local:null, run:null, recipes:recipes };
+      try{ real.local=localStorage.getItem(PLAN_LOCAL_KEY); real.run=localStorage.getItem(PLAN_RUN_KEY); }catch(e){}
+      var zi=function(el){ var v=parseInt(getComputedStyle(el).zIndex, 10); return isNaN(v) ? 0 : v; };
+      var above=function(x, y){ return zi(x)>zi(y) || (zi(x)===zi(y) && !!(y.compareDocumentPosition(x) & Node.DOCUMENT_POSITION_FOLLOWING)); };
+      try{
+        var r=normalizeRecipe({ id:TEST_ID_MIN+4091, name:'Self-test goulash', ingredients:['beef'], steps:['Brown', 'Simmer 90 minutes'] });
+        recipes=real.recipes.concat([r]);
+        window._household=null;
+        try{ localStorage.removeItem(PLAN_LOCAL_KEY); localStorage.setItem(PLAN_RUN_KEY, JSON.stringify({ start:'18:00', ticks:{} })); }catch(e){}
+        _plan=planClean({ res:{ asked:true }, cooks:1, items:[
+          { id:'oG', kind:'recipe', name:'Self-test goulash', rid:planRidOf(r), key:'', from:'', blocks:[{ k:'w', m:15, s:'Brown' }, { k:'q', m:90, s:'Simmer' }, { k:'w', m:5, s:'Season' }], guess:false },
+          { id:'oS', kind:'manual', name:'Self-test salad', rid:'', key:'', from:'', blocks:[{ k:'w', m:10, s:'Chop' }], guess:false } ] });
+        try{ localStorage.setItem(PLAN_LOCAL_KEY, JSON.stringify(planOut())); }catch(e){}
+        await openPlanner();
+        planRunOpen(); await wait(30);
+        var ov=document.getElementById('planRunOverlay'), pov=document.getElementById('planOverlay'), vo=document.getElementById('viewOverlay');
+        var names=ov.querySelectorAll('.pl-run-st .pl-run-name');
+        if(names.length!==2 || !/Self-test goulash/.test(names[0].textContent) || names[0].getAttribute('role')!=='button' || names[0].getAttribute('tabindex')!=='0') throw new Error('a recipe’s name in the run sheet is not a button: '+names.length);
+        if(Array.from(ov.querySelectorAll('.pl-run-st')).some(function(row){ return /Self-test salad/.test(row.textContent) && row.querySelector('.pl-run-name'); })) throw new Error('a dish filled in by hand is a link');
+        if(!ov.querySelector('.pl-run-ready .pl-run-name') && !/Everything is ready/.test(ov.textContent)) throw new Error('the run sheet’s end is missing');
+        // the name opens the recipe on top of the run sheet, and does not tick the step
+        var row=names[0].closest('.pl-run-st'), cb=row.querySelector('input[type=checkbox]');
+        names[0].click(); await wait(80);
+        if(!vo.classList.contains('open') || viewId!==TEST_ID_MIN+4091 || !above(vo, ov) || !above(ov, pov) || !document.getElementById('planRunOverlay')) throw new Error('the recipe did not open on top of the run sheet');
+        var inPage=function(list){ return list.slice().sort(function(a, b){ return (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) ? -1 : 1; }); };
+        if(modalsOnTopOrder(inPage([ov, vo, pov])).pop()!==vo || modalsOnTopOrder(inPage([ov, pov])).pop()!==ov) throw new Error('Escape would close the run sheet instead of the recipe on top of it (or the planner instead of the run sheet)');
+        if(cb.checked || Object.keys(planRunState().ticks).length) throw new Error('opening the recipe ticked the step');
+        if(!above(ov, document.querySelector('.header'))) throw new Error('the app’s header is over the run sheet');
+        closeM('viewOverlay'); await wait(30);
+        if(vo.classList.contains('open') || !document.getElementById('planRunOverlay') || !pov.classList.contains('open')) throw new Error('closing the recipe did not go back to the run sheet');
+        // Enter on the name, too
+        ov.querySelector('.pl-run-st .pl-run-name').dispatchEvent(new KeyboardEvent('keydown', { key:'Enter', bubbles:true, cancelable:true })); await wait(60);
+        if(!vo.classList.contains('open') || !document.getElementById('planRunOverlay')) throw new Error('Enter on a dish’s name does not open its recipe over the run sheet');
+        closeM('viewOverlay'); await wait(20);
+        // the tick box still marks the step done; so does a tap elsewhere on the row; a second tap undoes it
+        cb=ov.querySelector('.pl-run-st input[type=checkbox]'); row=cb.closest('.pl-run-st');
+        cb.click(); await wait(20);
+        if(!cb.checked || !row.classList.contains('pl-run-on') || Object.keys(planRunState().ticks).length!==1) throw new Error('the tick box does not mark the step done');
+        row.querySelector('.pl-run-t').click(); await wait(20);
+        if(cb.checked || row.classList.contains('pl-run-on') || Object.keys(planRunState().ticks).length) throw new Error('a tap on the row does not undo the tick');
+        row.querySelector('.pl-run-d small').click(); await wait(20);
+        if(!cb.checked) throw new Error('a tap on the step’s words does not tick it');
+        // the help assistant says so
+        var hl=(String(HELP_SYSTEM_PROMPT).split('\n').filter(function(l){ return /WORK PLANNER/.test(l); })[0] || '');
+        if(hl.indexOf('open its recipe on top of the run sheet')<0) throw new Error('the help assistant does not say a name in the run sheet opens its recipe');
+      } finally {
+        try{ closeM('viewOverlay'); }catch(e){}
+        closePlanner();
+        recipes=real.recipes; window._household=real.hh; _plan=real.plan; _planReading={};
         try{ if(real.local===null) localStorage.removeItem(PLAN_LOCAL_KEY); else localStorage.setItem(PLAN_LOCAL_KEY, real.local); }catch(e){}
         try{ if(real.run===null) localStorage.removeItem(PLAN_RUN_KEY); else localStorage.setItem(PLAN_RUN_KEY, real.run); }catch(e){}
       }
