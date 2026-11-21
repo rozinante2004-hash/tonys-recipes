@@ -9699,9 +9699,21 @@ window.SELF_TESTS = [
         Array.prototype.slice.call(rf.querySelectorAll('.pl-res-own'), 1).forEach(function(x){ x.remove(); });
         if(await planResSave()!==true || document.getElementById('planResOverlay')) throw new Error('the equipment was not saved');
         if(!_plan.res.asked || _plan.res.n.stove!==1 || _plan.res.custom.length!==1 || _plan.res.custom[0].name!=='Thermomix') throw new Error('the equipment kept: '+JSON.stringify(_plan.res));
-        // each piece by its icon, its NAME and its number (Tony, 21 Nov: "I do not understand the icons … adding titles to them or adding a legend")
-        var kitLine=body.querySelector('.pl-kit'), kit=function(id){ var c=kitLine && kitLine.querySelector('.pl-kit-item[data-res="'+id+'"]'); return c ? c.textContent.replace(/\s+/g, ' ').trim() : ''; };
-        if(kit('stove')!=='🔥 Stove burners 1' || kit('oven')!=='♨️ Ovens 1' || kit('c1')!=='🔧 Thermomix 1' || kit('sousvide')) throw new Error('🍳 Your kitchen does not name what it has: '+(kitLine && kitLine.textContent));
+        // 🍳 Your kitchen: a button in the toolbar opens the equipment window — each piece by its name and number (Tony, 21 Nov:
+        // "Please move the kitchen resources section to a pop up modal, accessible via a dedicated button")
+        var kitBtn=body.querySelector('.pl-ctl .pl-kitbtn');
+        if(!kitBtn || !/Your kitchen/.test(kitBtn.textContent) || body.querySelector('.pl-kit, .pl-kit-item')) throw new Error('no 🍳 Your kitchen button in the toolbar, or the kitchen is still drawn in the planner');
+        var kit=function(){
+          document.querySelector('#planBody .pl-kitbtn').click();
+          var f=document.getElementById('planResOverlay'), v={};
+          if(!f || /Asked once/.test(f.textContent) || !/Stove burners/.test(f.textContent)) throw new Error('🍳 Your kitchen does not open the equipment window, by name');
+          f.querySelectorAll('input[data-res]').forEach(function(i){ v[i.getAttribute('data-res')]=i.value; });
+          f.querySelectorAll('.pl-res-own').forEach(function(r){ var ins=r.querySelectorAll('input'); v['~'+ins[0].value]=ins[1].value; });
+          planResClose();
+          return v;
+        };
+        var kv=kit();
+        if(kv.stove!=='1' || kv.oven!=='1' || kv['~Thermomix']!=='1' || kv.sousvide!=='0' || document.getElementById('planResOverlay')) throw new Error('🍳 Your kitchen does not show what it has: '+JSON.stringify(kv));
         closePlanner(); await openPlanner(); body=document.getElementById('planBody');
         if(document.getElementById('planResOverlay')) throw new Error('the equipment was asked a second time');
         if(!/\+ Add recipe/.test(body.textContent) || !/Kept on this device/.test(body.textContent)) throw new Error('no + Add recipe, or does not say where the plan is kept');
@@ -9766,17 +9778,17 @@ window.SELF_TESTS = [
         if(!/"other"/.test(planPrompt(eggs)) || !/"rn"/.test(planPrompt(eggs))) throw new Error('the AI is not asked to name equipment outside the list');
         await planAddRecipes([eggs]);
         var eg=_plan.items[2];
-        if(_plan.res.n.sousvide!==1 || !body.querySelector('.pl-kit-item[data-res="sousvide"]') || !told.some(function(t){ return /Added to your kitchen/.test(t) && /Sous vide devices/.test(t); })) throw new Error('a sous vide the recipe needs was not added to the kitchen: '+JSON.stringify(_plan.res.n)+' '+told.join(' | '));
+        if(_plan.res.n.sousvide!==1 || kit().sousvide!=='1' || !told.some(function(t){ return /Added to your kitchen/.test(t) && /Sous vide devices/.test(t); })) throw new Error('a sous vide the recipe needs was not added to the kitchen: '+JSON.stringify(_plan.res.n)+' '+told.join(' | '));
         if(body.querySelector('.pl-row[data-id="'+eg.id+'"] .pl-warn')) throw new Error('warned about equipment that was just added');
         told.length=0;
         await planAddRecipes([jerky, jerky2]);
         var jk=_plan.items[3], jk2=_plan.items[4], dz=_plan.res.custom.filter(function(c){ return /^food dehydrator$/i.test(c.name); });
         if(dz.length!==1 || dz[0].name!=='Food dehydrator' || dz[0].n!==1 || dz[0].id==='c1' || planBlocks(jk.blocks)[1].r!==dz[0].id || planBlocks(jk2.blocks)[1].r!==dz[0].id) throw new Error('equipment outside the list (a food dehydrator) was not added once, for both: '+JSON.stringify(_plan.res.custom));
-        kitLine=body.querySelector('.pl-kit');
-        if(kit(dz[0].id)!=='🔧 Food dehydrator 1') throw new Error('the food dehydrator is not in 🍳 Your kitchen: '+(kitLine && kitLine.textContent));
-        if(told.length!==1 || !/Added to your kitchen: 🔧 Food dehydrator\./.test(told[0])) throw new Error('two readings that add the same equipment are not said once: '+told.join(' | '));
+        kv=kit();
+        if(kv['~Food dehydrator']!=='1') throw new Error('the food dehydrator is not in 🍳 Your kitchen: '+JSON.stringify(kv));
+        if(told.length!==1 || !/Added to your kitchen: 🔧 Food dehydrator\. Change it with 🍳 Your kitchen/.test(told[0])) throw new Error('two readings that add the same equipment are not said once: '+told.join(' | '));
         // taken away yourself in ✏️ Edit: not added back; the dish says ⚠️ instead
-        body.querySelector('.pl-kit-edit').click(); rf=document.getElementById('planResOverlay');
+        body.querySelector('.pl-kitbtn').click(); rf=document.getElementById('planResOverlay');
         rf.querySelector('input[data-res="sousvide"]').value='0';
         rf.querySelector('.pl-res-own[data-cid="'+dz[0].id+'"]').remove();
         await planResSave();
@@ -9803,13 +9815,13 @@ window.SELF_TESTS = [
         planRender();
         if(!body.querySelector('.pl-add').disabled || await planManualAdd('one too many', '5')!==false) throw new Error('more than twelve dishes');
         _plan.items=full; planRender();
-        // ✏️ Edit the equipment
-        body.querySelector('.pl-kit-edit').click();
+        // 🍳 Your kitchen: change the equipment
+        body.querySelector('.pl-kitbtn').click();
         rf=document.getElementById('planResOverlay');
         if(!rf || /Asked once/.test(rf.textContent) || rf.querySelector('input[data-res="stove"]').value!=='1') throw new Error('✏️ Edit does not open the kitchen’s equipment as it is');
         rf.querySelector('input[data-res="sousvide"]').value='1';
         await planResSave();
-        if(_plan.res.n.sousvide!==1 || !/Sous vide devices\s*1/.test((body.querySelector('.pl-kit-item[data-res="sousvide"]')||{}).textContent || '')) throw new Error('the change of equipment was not kept');
+        if(_plan.res.n.sousvide!==1 || kit().sousvide!=='1') throw new Error('the change of equipment was not kept');
         if(_plan.res.no.indexOf('sousvide')>=0) throw new Error('a sous vide given a number again is still taken away');
         // 🗑️ Clear the list — asked first; the equipment stays
         window.askConfirm=async function(o){ question=o; return false; };
@@ -9933,6 +9945,109 @@ window.SELF_TESTS = [
       } finally {
         closePlanner();
         window._household=real.hh; _plan=real.plan; _planReading={};
+        try{ if(real.local===null) localStorage.removeItem(PLAN_LOCAL_KEY); else localStorage.setItem(PLAN_LOCAL_KEY, real.local); }catch(e){}
+      }
+    } },
+  { id:'planner_undo', group:'Features', name:'🗓️ Work Planner: it fills the screen and its top bar (the title, ↩︎ Undo, ✕) stays while the rest scrolls; ↩︎ Undo puts back the last change — a dish removed, moved, pinned, marked done, the order proposed, the cooks, the list cleared, the equipment — one by one, up to 20, greyed when there is nothing to undo, while a recipe is read, and after the plan changed elsewhere; each dish’s name on a line of its own, its buttons under the chart (v40.06)',
+    test: async()=>{
+      // Tony, 21 Nov 2026: "Please move the kitchen resources section to a pop up modal, accessible via a dedicated button. Also
+      // expand the planner's modal to full screen. Also, please add an Undo button, in case something was clicked erroneously.
+      // In portrait mode, see attached, the recipe names get truncated. Please find a better way to show them while saving on
+      // vertical space."
+      var real={ plan:_plan, hh:window._household, toast:window.toast, ask:window.askConfirm, local:null };
+      try{ real.local=localStorage.getItem(PLAN_LOCAL_KEY); }catch(e){}
+      var told=[], long='Self-test slow-braised lamb shoulder with lemons and olives';
+      var dish=function(id, name, blocks){ return { id:id, kind:'manual', name:name, rid:'', key:'', from:'', blocks:blocks, guess:false }; };
+      var ids=function(){ return _plan.items.map(function(it){ return it.id; }).join(','); };
+      var item=function(id){ return _plan.items.filter(function(it){ return it.id===id; })[0]; };
+      try{
+        window._household=null; _planUndo=[];
+        window.toast=function(m){ told.push(String(m)); };
+        try{ localStorage.removeItem(PLAN_LOCAL_KEY); }catch(e){}
+        _plan=planClean({ res:{ asked:true, n:{ stove:2 } }, cooks:1, items:[
+          dish('pA', long, [{ k:'w', m:10, s:'Brown' }, { k:'q', m:60, s:'Braise' }]),
+          dish('pB', 'Rice', [{ k:'w', m:20, s:'Cook' }]),
+          dish('pC', 'Salad', [{ k:'w', m:10, s:'Chop' }]) ] });
+        try{ localStorage.setItem(PLAN_LOCAL_KEY, JSON.stringify(planOut())); }catch(e){}
+        await openPlanner();
+        var ov=document.getElementById('planOverlay'), card=ov.querySelector('.pl-card'), body=document.getElementById('planBody'), undo=document.getElementById('planUndo');
+        // the whole screen; a top bar with the title, ↩︎ Undo and ✕ that stays when the plan is scrolled
+        var cr=card.getBoundingClientRect();
+        if(Math.abs(cr.width-ov.clientWidth)>2 || Math.abs(cr.height-ov.clientHeight)>2) throw new Error('the planner does not fill the screen: '+Math.round(cr.width)+'×'+Math.round(cr.height)+' of '+ov.clientWidth+'×'+ov.clientHeight);
+        var top=card.querySelector('.pl-top'), x=top && top.querySelector('.modal-close');
+        if(!top || !x || !top.contains(undo) || !top.querySelector('#planTitle') || getComputedStyle(top).position!=='sticky') throw new Error('no top bar with the title, ↩︎ Undo and ✕');
+        body.style.paddingBottom='3000px'; card.scrollTop=card.scrollHeight; await wait(30);
+        var xr=x.getBoundingClientRect();
+        var cr2=card.getBoundingClientRect();
+        if(card.scrollTop<100 || xr.top<cr2.top-1 || xr.bottom>cr2.top+120) throw new Error('the ✕ is not in sight when the plan is scrolled down: scrolled '+Math.round(card.scrollTop)+' px, ✕ at '+Math.round(xr.top)+'–'+Math.round(xr.bottom)+' (window from '+Math.round(cr2.top)+')');
+        body.style.paddingBottom=''; card.scrollTop=0;
+        if(!undo.disabled) throw new Error('↩︎ Undo can be pressed with nothing to undo');
+        // each name on a line of its own (only the ⠿ handle beside it); the buttons and “Until here” under the chart
+        var row=body.querySelector('.pl-row[data-id="pA"]'), head=row.querySelector('.pl-head'), foot=row.querySelector('.pl-foot'), nm=row.querySelector('.pl-name');
+        if(Array.from(head.querySelectorAll('button')).some(function(b){ return !b.classList.contains('pl-drag'); })) throw new Error('buttons still share the name’s line');
+        if(!foot || !foot.querySelector('.pl-pin') || !foot.querySelector('.pl-ok') || !foot.querySelector('button[onclick^="planRemove"]') || !foot.querySelector('.pl-until')) throw new Error('the dish’s buttons and “Until here” are not on the line under its chart');
+        if(nm.textContent!==long || nm.getAttribute('title')!==long) throw new Error('the dish’s full name is not there');
+        // as narrow as a phone held upright: the name takes most of the line, and two lines rather than being cut short
+        body.style.maxWidth='340px'; await wait(20);
+        var nr=nm.getBoundingClientRect(), rw=row.getBoundingClientRect().width, lh=parseFloat(getComputedStyle(nm).lineHeight) || 17, cut=nm.scrollHeight>nm.clientHeight+2;
+        body.style.maxWidth='';
+        if(rw>345 || nr.width<0.6*rw || nr.height<1.5*lh || cut) throw new Error('at a phone’s width the name is not given its line: '+Math.round(nr.width)+' px wide, '+Math.round(nr.height)+' px high');
+        // ✕ a dish, then ↩︎ Undo: back at its place, and kept
+        await planRemove('pB');
+        if(ids()!=='pA,pC' || undo.disabled) throw new Error('✕ did not remove, or ↩︎ Undo cannot be pressed');
+        undo.click(); await wait(40);
+        if(ids()!=='pA,pB,pC' || !body.querySelector('.pl-row[data-id="pB"]') || JSON.parse(localStorage.getItem(PLAN_LOCAL_KEY)).items.length!==3) throw new Error('↩︎ Undo did not bring the dish back to its place: '+ids());
+        if(!told.some(function(t){ return /The last change was undone/.test(t); })) throw new Error('not told that the last change was undone');
+        if(!undo.disabled) throw new Error('↩︎ Undo can be pressed again with nothing left to undo');
+        // several changes, undone one by one, the newest first
+        await planMove('pC', 0); await planPin('pA'); await planDone('pB'); await planCooks(2); await planPropose();
+        if(!_plan.proposed || !item('pB').skip) throw new Error('the order was not proposed');
+        await planUndo();
+        if(_plan.proposed || item('pB').skip || _plan.cooks!==2 || ids()!=='pC,pA,pB') throw new Error('↩︎ did not undo 🔀 Propose order (only): '+ids());
+        await planUndo();
+        if(_plan.cooks!==1 || !item('pB').done) throw new Error('↩︎ did not undo the cooks (only)');
+        await planUndo();
+        if(item('pB').done || !item('pA').pin) throw new Error('↩︎ did not undo ✓ done (only)');
+        await planUndo();
+        if(item('pA').pin || ids()!=='pC,pA,pB') throw new Error('↩︎ did not undo 📌 (only): '+ids());
+        await planUndo();
+        if(ids()!=='pA,pB,pC') throw new Error('↩︎ did not undo the move: '+ids());
+        // 🗑️ Clear the list, undone
+        window.askConfirm=async function(){ return true; };
+        await planClear();
+        if(_plan.items.length) throw new Error('the list was not cleared');
+        await planUndo();
+        if(ids()!=='pA,pB,pC') throw new Error('↩︎ did not bring the cleared list back: '+ids());
+        // the equipment, changed in 🍳 Your kitchen, undone
+        body.querySelector('.pl-kitbtn').click();
+        document.getElementById('planResOverlay').querySelector('input[data-res="stove"]').value='5';
+        await planResSave();
+        if(_plan.res.n.stove!==5) throw new Error('the equipment was not changed');
+        await planUndo();
+        if(_plan.res.n.stove!==2) throw new Error('↩︎ did not undo the change of equipment');
+        // twenty at most
+        for(var k=0;k<25;k++) await planCooks(k%2 ? 1 : 2);
+        if(_planUndo.length!==20) throw new Error(_planUndo.length+' changes remembered, not 20');
+        // not while a recipe is being read
+        _planReading.pX=true; planRender();
+        if(!undo.disabled || await planUndo()!==false) throw new Error('↩︎ Undo can be pressed while a recipe is being read');
+        delete _planReading.pX; planRender();
+        if(undo.disabled) throw new Error('↩︎ Undo stays greyed after the reading');
+        // the plan changed elsewhere since (another device wrote a newer copy): what was remembered is forgotten
+        closePlanner();
+        var other=planOut(); other.at=_plan.at+5000; other.items=other.items.slice(0, 1);
+        try{ localStorage.setItem(PLAN_LOCAL_KEY, JSON.stringify(other)); }catch(e){}
+        await openPlanner();
+        if(_planUndo.length || !document.getElementById('planUndo').disabled || _plan.items.length!==1) throw new Error('↩︎ Undo could throw away a change made elsewhere');
+        // the help assistant knows all of it (Tony, 21 Nov: "Please update the Help as well")
+        var hp=String(HELP_SYSTEM_PROMPT), hl=(hp.split('\n').filter(function(l){ return /WORK PLANNER/.test(l); })[0] || '');
+        ['fills the screen', '↩︎ Undo', '↩︎ UNDO', 'up to 20', '🍳 Your kitchen button', 'a line of its own', '📌 ✓ ↻ ✕', 'יחידת עבודה', '[GO:work-planner]'].forEach(function(w){
+          if(hl.indexOf(w)<0) throw new Error('the help assistant’s Work Planner line does not say “'+w+'”');
+        });
+        if(/✏️ Edit/.test(hl)) throw new Error('the help assistant still sends people to ✏️ Edit for the equipment');
+      } finally {
+        closePlanner();
+        window._household=real.hh; window.toast=real.toast; window.askConfirm=real.ask; _plan=real.plan; _planReading={}; _planUndo=[];
         try{ if(real.local===null) localStorage.removeItem(PLAN_LOCAL_KEY); else localStorage.setItem(PLAN_LOCAL_KEY, real.local); }catch(e){}
       }
     } },
@@ -10077,7 +10192,11 @@ window.SELF_TESTS = [
         snap(Object.assign(copy(last), { items:last.items.concat([{ id:'pc', kind:'manual', name:'Cake', blocks:[{ k:'w', m:30 }] }]), at:last.at+1000, by:'uOther',
           res:{ n:{ stove:3 }, custom:[{ id:'c1', name:'Wok burner', n:1 }], asked:true } }));
         if(_plan.items.length!==3 || body.querySelectorAll('.pl-row').length!==3) throw new Error('a change by someone else did not appear in the open window');
-        if(_plan.res.n.stove!==3 || !/Stove burners\s*3/.test((body.querySelector('.pl-kit-item[data-res="stove"]')||{}).textContent || '') || !/Wok burner/.test(body.querySelector('.pl-kit').textContent)) throw new Error('someone else’s change of equipment did not appear');
+        body.querySelector('.pl-kitbtn').click();
+        var skf=document.getElementById('planResOverlay'), sk={ stove:skf ? skf.querySelector('input[data-res="stove"]').value : '', own:skf ? Array.from(skf.querySelectorAll('.pl-res-oname')).map(function(x){ return x.value; }).join(',') : '' };
+        planResClose();
+        if(_plan.res.n.stove!==3 || sk.stove!=='3' || !/Wok burner/.test(sk.own)) throw new Error('someone else’s change of equipment did not appear: '+JSON.stringify(sk));
+        if(_planUndo.length || !document.getElementById('planUndo').disabled) throw new Error('↩︎ Undo could still throw away someone else’s change');
         snap(Object.assign(copy(last), { items:[], at:last.at-1 }));
         if(_plan.items.length!==3) throw new Error('an older copy replaced the newer one');
         // opened again: the newer of the two copies

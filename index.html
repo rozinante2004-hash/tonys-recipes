@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v40.05 -->
+<!-- Tony's Recipes Collection v40.06 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -11416,7 +11416,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v40.05';
+var APP_VERSION = 'v40.06';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -14627,6 +14627,19 @@ body.banner-shown .header {
 @media (prefers-reduced-motion: reduce) { .drop-item.help-here { animation: none; } }
 /* v40.05 — 🗓️ Work Planner: each dish a Gantt line (work as blocks, quiet time as a thin line), one scale for all */
 .pl-card { max-width: 640px; width: 94%; text-align: start; max-height: 88vh; overflow-y: auto; }
+/* v40.06 — the planner fills the screen (Tony, 21 Nov 2026: "expand the planner's modal to full screen"); its top bar —
+   the title, ↩︎ Undo, ✕ — stays while the rest scrolls; on a wide screen the content keeps to 960 px in the middle */
+#planOverlay { padding: 0 !important; align-items: stretch; justify-content: stretch; }
+#planOverlay > .pl-card { width: 100%; max-width: none; height: 100%; max-height: 100% !important; margin: 0; border-radius: 0; box-shadow: none;
+  box-sizing: border-box; overscroll-behavior: contain; padding: 0 max(14px, calc((100% - 960px) / 2)) calc(18px + var(--bottom-safe, 0px)); }
+#planOverlay .pl-card > .pl-top { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 8px; background: var(--card-bg);   /* not the windows' usual sticky title (it pulls it up by the card's padding) */
+  margin: 0 0 8px; padding: max(10px, var(--top-safe, 0px)) 0 8px; border-bottom: 1px solid var(--border); }
+.pl-top .ask-title { flex: 1; min-width: 0; margin: 0; }
+.pl-undo { border: 1px solid var(--border); background: var(--card-bg); color: var(--ink); border-radius: 10px; font: inherit; font-size: 13px; font-weight: 600;
+  padding: 6px 12px; min-height: 38px; cursor: pointer; white-space: nowrap; }
+.pl-undo:disabled { opacity: 0.4; cursor: default; }
+.pl-ctl .pl-btn { min-height: 38px; padding: 6px 12px; }
+.pl-ctl { justify-content: flex-start; gap: 8px 10px; }
 .pl-intro { font-size: 12.5px; color: var(--muted); line-height: 1.5; margin: 6px 0 10px; }
 .pl-ctl { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; justify-content: space-between; margin-bottom: 10px; }
 .pl-btn { padding: 8px 14px; border-radius: 10px; border: 1px solid var(--border); background: var(--card-bg); color: var(--ink); font: inherit; font-size: 13.5px;
@@ -14640,9 +14653,13 @@ body.banner-shown .header {
 .pl-tick { position: absolute; top: 0; font-size: 10px; color: var(--muted); transform: translateX(-50%); white-space: nowrap; }
 [dir="rtl"] .pl-tick { transform: translateX(50%); }
 .pl-tick:first-child { transform: none; }
-.pl-row { padding: 8px 0; border-bottom: 1px dashed var(--border); }
-.pl-head { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
-.pl-name { flex: 1; min-width: 0; font-weight: 600; font-size: 13.5px; color: var(--heading); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pl-row { padding: 6px 0; border-bottom: 1px dashed var(--border); }
+.pl-head { display: flex; align-items: center; gap: 6px; margin-bottom: 2px; min-height: 28px; }
+/* v40.06 — the name has the line to itself (Tony: "In portrait mode … the recipe names get truncated"): up to two lines, then … */
+.pl-name { flex: 1; min-width: 0; font-weight: 600; font-size: 13.5px; line-height: 1.3; color: var(--heading); overflow: hidden; white-space: normal;
+  overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }
+.pl-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 1px; }
+.pl-btns { display: inline-flex; align-items: center; gap: 2px; }
 .pl-len { font-size: 12px; color: var(--muted); white-space: nowrap; }
 .pl-tag { font-size: 12px; }
 .pl-x { border: none; background: none; color: var(--muted); font-size: 15px; cursor: pointer; min-width: 32px; min-height: 32px; border-radius: 6px; }
@@ -14656,7 +14673,7 @@ body.banner-shown .header {
 .pl-seg.pl-w.pl-c2 { background: var(--green); }
 .pl-seg.pl-q { top: 8px; height: 2px; background: var(--warm-brown); opacity: 0.75; }
 .pl-seg.pl-x { top: 8px; height: 0; border-top: 2px dotted var(--muted); }
-.pl-until { font-size: 11.5px; color: var(--muted); margin-top: 4px; text-align: end; }
+.pl-until { font-size: 11.5px; color: var(--muted); margin: 0; text-align: end; white-space: nowrap; }
 .pl-until b { color: var(--ink); }
 .pl-empty { font-size: 13px; color: var(--muted); padding: 14px 0; text-align: center; }
 .pl-total { margin: 12px 0 8px; font-size: 14px; color: var(--ink); }
@@ -14671,13 +14688,6 @@ body.banner-shown .header {
 .pl-kq { height: 2px; background: var(--warm-brown); }
 .pl-kx { height: 0; border-top: 2px dotted var(--muted); }
 .pl-note { margin-top: 8px; font-size: 11.5px; color: var(--muted); }
-.pl-kit { font-size: 12.5px; color: var(--ink); margin: 0 0 10px; }
-.pl-kit-top { display: flex; align-items: center; gap: 8px; }
-.pl-kit-list { display: flex; flex-wrap: wrap; gap: 4px 6px; margin-top: 5px; }
-.pl-kit-item { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg);
-  color: var(--ink); white-space: nowrap; font-size: 12px; }
-.pl-kit-item b { color: var(--heading); }
-.pl-kit-edit { border: 1px solid var(--border); background: var(--card-bg); color: var(--ink); border-radius: 8px; font: inherit; font-size: 12px; padding: 3px 8px; cursor: pointer; min-height: 30px; }
 .pl-res { position: absolute; top: -11px; inset-inline-start: 0; font-size: 10px; font-style: normal; line-height: 1; pointer-events: none; }
 .pl-seg.pl-q .pl-res, .pl-seg.pl-x .pl-res { top: -14px; }
 .pl-bar { margin-top: 6px; }
@@ -14688,7 +14698,7 @@ body.banner-shown .header {
 .pl-res-name { flex: 1; min-width: 0; }
 .pl-res-row input[type=number] { width: 64px; min-height: 36px; padding: 4px 6px; border: 1px solid var(--border); border-radius: 8px; background: var(--card-bg); color: var(--ink); font: inherit; }
 .pl-res-own .pl-res-oname { flex: 1; min-width: 0; min-height: 36px; padding: 4px 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--card-bg); color: var(--ink); font: inherit; }
-.pl-drag { border: none; background: none; color: var(--muted); font-size: 16px; line-height: 1; cursor: grab; min-width: 28px; min-height: 32px; padding: 0;
+.pl-drag { border: none; background: none; color: var(--muted); font-size: 16px; line-height: 1; cursor: grab; min-width: 28px; min-height: 28px; padding: 0;
   border-radius: 6px; touch-action: none; user-select: none; -webkit-user-select: none; }
 .pl-drag:focus-visible, .pl-drag:hover { background: var(--bg); color: var(--ink); }
 .pl-row { position: relative; background: var(--card-bg); transition: transform 0.15s ease; }
@@ -15135,7 +15145,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v40.05</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v40.06</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -15223,7 +15233,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v40.05</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v40.06</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -19077,15 +19087,15 @@ var I18N_EXTRA = [
    'Every dish is taken off the plan, for everyone in your household. Your kitchen\u2019s equipment stays as it is.',
    'Every dish is taken off the plan. Your kitchen\u2019s equipment stays as it is.', 'Clear',
    'Tap the dishes you are making \u2014 linked kitchens\u2019 too \u2014 then \u{1F5D3}\uFE0F Add to the Work Planner.',
-   '\u{1F373} Your kitchen:', '\u270F\uFE0F Edit', 'Read the recipe again', 'From a linked kitchen', 'Needs {1} \u2014 your kitchen has none (counted as one).',
+   '\u{1F373} Your kitchen', '\u270F\uFE0F Edit', '\u21A9\uFE0E Undo', 'Undo the last change', 'The last change was undone.', 'Read the recipe again', 'From a linked kitchen', 'Needs {1} \u2014 your kitchen has none (counted as one).',
    'That recipe is not in the list any more.', '\u{1F373} Your kitchen\u2019s equipment',
-   'Asked once: how many of each does your kitchen have? A plan never uses more of them at the same time. You can change this later \u2014 \u{1F373} Your kitchen \u2192 \u270F\uFE0F Edit.',
+   'Asked once: how many of each does your kitchen have? A plan never uses more of them at the same time. You can change this later with \u{1F373} Your kitchen.',
    'How many of each does your kitchen have? A plan never uses more of them at the same time.', 'Other equipment', '+ Add other equipment',
    'e.g. Thermomix', 'How many', 'Remove', 'Save',
    'Stove burners', 'Ovens', 'Sous vide devices', 'Pressure or slow cookers', 'Air fryers', 'Microwaves', 'Grills', 'Stand mixers',
    'Drag to reorder', 'Pin it: \u{1F500} Propose order keeps it in its place', 'Pinned \u2014 \u{1F500} Propose order keeps it in its place. Tap to unpin.',
    'Mark as done', 'Done \u2014 tap if it is not', '\u2713 Done', 'All done.',
-   'Added to your kitchen: {1}. Change it with \u270F\uFE0F Edit if it is not right.', 'There is no room for more equipment of your own: {1} was left out.',
+   'Added to your kitchen: {1}. Change it with \u{1F373} Your kitchen if it is not right.', 'There is no room for more equipment of your own: {1} was left out.',
    'There are no recipes in the list yet. Use \u270F\uFE0F Fill in manually.'],
   ['\u{1F514} Notify me of new messages when the app is closed', '\u{1F514} Notifications are on for this device.', '\u{1F515} Turn off',   // v40.02 — chat notifications
    '\u{1F515} Notifications are blocked for this app — allow them in the phone’s (or this browser’s) settings, then come back here.',
@@ -37132,7 +37142,7 @@ var HELP_SYSTEM_PROMPT = [
   "- 🔒 SECRET RECIPES: in the editor, tick 🔒 Secret — the recipe (and its photo) is then kept where only your own kitchen can read it; the kitchens you link with do not see it, nor know it exists. Untick it to share it again. A 🔒 shows on its card.",
   "- 🔄 RELOAD A LINKED KITCHEN: beside a linked kitchen's name in your recipe list, 🔄 Reload reads its recipes and photos again from the start — for when something looks missing or out of date.",
   "- 💬 CHATS WITH LINKED KITCHENS: ··· More → 🏡 Kitchens and people → 💬 Chats with linked kitchens — or 💬 Chat beside a linked kitchen's name in your recipe list, or in 👥 Family Access. Every conversation, newest first, with what is new; open one to read it all and write (Enter sends, Shift+Enter starts a new line). The same conversations are also on 📬 Link requests. A red dot on ⋯ More and on ⚙️ says something new arrived. 🔔 At the foot of the window: notifications when the app is closed, the same switch as in 👪 Chat with family members (see 🔔 CHAT NOTIFICATIONS).",
-  "- 🗓️ WORK PLANNER (v40.05): ··· More → 🧰 Tools → 🗓️ Work Planner — for cooking several dishes at once. THE FIRST TIME it asks, once, what equipment the kitchen has: how many 🔥 stove burners, ♨️ ovens, 🌡️ sous vide devices, 🍲 pressure or slow cookers, 🍟 air fryers, ⚡ microwaves, 🍖 grills and 🥣 stand mixers, and + Add other equipment for up to six of the kitchen's own (a name and how many, e.g. Thermomix); Save (Close keeps the usual numbers — 4 burners, 1 oven, 1 microwave). It is kept for the whole household and not asked again; change it any time with 🍳 Your kitchen → ✏️ Edit in the planner. + Add recipe → 📖 Add from the recipe list (the recipe list opens in select mode: tap several — your own and, if your kitchen is linked with others, the linked kitchens' recipes too — then 🗓️ Add to the Work Planner at the bottom; ✕ Cancel goes back) or ✏️ Fill in manually (a name and the overall time — 45, or 1:30 — planned as one block of work). Also: in the recipe list, ☑ Select, tick recipes, then 🗓️ Add to the Work Planner among the select bar's actions. The AI reads each recipe once (what it found is kept for the household and used again): its steps become WORK (the cook is busy — a block) and QUIET time (simmering, baking, resting — a thin line), and which equipment each step occupies (a small 🔥, ♨️… above it — the legend under the chart names each icon shown, and 🍳 Your kitchen lists each piece by name and number); a recipe without quiet time, or one filled in by hand, is one block. ↻ beside a recipe reads it again (if it was misread). While choosing from the recipe list the search box stays at the top of the screen (it finds your recipes and linked kitchens'; ticks stay while you search). THE ORDER of the list is the order the dishes are started in: drag a dish by its ⠿ handle (or ↑ ↓ on the keyboard) to change it — the times show how long that order takes. 📌 pins a dish: 🔀 Propose order keeps it at its place and arranges the others around it (tap 📌 again to unpin). ✓ marks a dish done: it stays greyed in the timeline and the others' times do not change; the next 🔀 Propose order leaves it out (it goes last, without a timeline, and the rest is planned without it); ✓ again puts it back. Tap a block or a line in a dish's chart to see that step's name and how long it takes, above it (and its equipment); tap again, or elsewhere, to hide it. Every dish is drawn on the same scale — the longest — with ⏱ its own time, 🤝 if it comes from a linked kitchen, and 'Until here' (the time used by then; before proposing, as if cooked one after another). 🔀 Propose order arranges the dishes (except pinned ones and ones done) for the shortest total time, fitting one dish's work into another's quiet time, never using more of a piece of equipment at once than the kitchen has (two pots and one burner: the second waits); a dotted line is a dish waiting for a free cook or equipment. When the AI reads a recipe that needs equipment your kitchen has not listed — a sous vide at 0, or something outside the list such as a food dehydrator — it is added to 🍳 Your kitchen (one of it; equipment outside the list as one of your own, six at most) and a message says what was added: correct it with ✏️ Edit. What you take away yourself in ✏️ Edit (a number set to 0, one of your own removed) is not added back. ⚠️ under a dish: it needs equipment you said the kitchen has none of (counted as one — add it with ✏️ Edit if you have it). 👩‍🍳 Cooks: 1 or 2 (with two, two work blocks can run at once; the second cook's are green). ⏱ Everything: the total, and beside it how long one after another would take. ✕ removes one dish; 🗑️ Clear the list removes them all (the kitchen's equipment stays). The plan is shared with everyone in the household — anyone can add, remove or clear; signed out, it stays on this device. ≈ beside a time: the AI could not read that recipe, so it is one block of its stated time. Up to 12 dishes. [GO:work-planner] leads there.",
+  "- 🗓️ WORK PLANNER (v40.05–v40.06): ··· More → 🧰 Tools → 🗓️ Work Planner — for cooking several dishes at once: it shows each dish's work and quiet time on one chart and proposes the order that finishes soonest. THE WINDOW fills the screen; its top bar — 🗓️ Work Planner, ↩︎ Undo and ✕ — stays while you scroll. Under it: + Add recipe, 🍳 Your kitchen, and 👩‍🍳 Cooks: 1 or 2. YOUR KITCHEN'S EQUIPMENT: the first time, the planner asks once how many 🔥 stove burners, ♨️ ovens, 🌡️ sous vide devices, 🍲 pressure or slow cookers, 🍟 air fryers, ⚡ microwaves, 🍖 grills and 🥣 stand mixers the kitchen has, and + Add other equipment for up to six of its own (a name and how many, e.g. Thermomix); Save (Close keeps the usual numbers — 4 burners, 1 oven, 1 microwave). It is kept for the whole household and not asked again. To see it or change it later: the 🍳 Your kitchen button (it opens that window, each piece by name and number). When the AI reads a recipe that needs equipment the kitchen has not listed — a sous vide at 0, or something outside the list such as a food dehydrator — it is added (one of it; equipment outside the list as one of your own, six at most) and a message says what was added: correct it in 🍳 Your kitchen. What you take away yourself there (a number set to 0, one of your own removed) is not added back; a dish that needs it then shows ⚠️ (your kitchen has none — counted as one). ADDING DISHES: + Add recipe → 📖 Add from the recipe list (the recipe list opens in select mode with its search box held at the top: tap several — your own and, if your kitchen is linked with others, the linked kitchens' recipes too; ticks stay while you search — then 🗓️ Add to the Work Planner at the bottom; ✕ Cancel goes back) or ✏️ Fill in manually (a name and the overall time — 45, or 1:30 — planned as one block of work). Or, in the recipe list: ☑ Select, tick recipes, then 🗓️ Add to the Work Planner among the select bar's actions. Up to 12 dishes. THE AI READS each recipe once (what it found is kept for the household and used again): its steps become WORK (the cook is busy — a solid block) and QUIET time (simmering, baking, resting — a thin line), and which equipment each step occupies (a small 🔥, ♨️… above it; the legend under the chart names each icon shown). A recipe without quiet time, or one filled in by hand, is one block. ≈ beside a time: the AI could not read that recipe, so it is one block of its stated time. ↻ reads a recipe again (if it was misread). EACH DISH'S ROW: its full name on a line of its own (two lines at most), 🤝 if it comes from a linked kitchen, ✏️ if filled in by hand, ⏱ its own time; then its chart (every dish on the same scale); then 📌 ✓ ↻ ✕ and 'Until here' (the time used by then; before proposing, as if cooked one after another). Tap a block or a line in the chart to see that step's name and how long it takes (and its equipment), above it; tap again, or elsewhere, to hide it. THE ORDER of the list is the order the dishes are started in: drag a dish by its ⠿ handle (or ↑ ↓ on the keyboard) to change it — the times show how long that order takes. 🔀 Propose order arranges the dishes for the shortest total time, fitting one dish's work into another's quiet time and never using more of a piece of equipment at once than the kitchen has (two pots and one burner: the second waits; a dotted line is a dish waiting for a free cook or equipment). 📌 pins a dish: 🔀 Propose order keeps it at its place and arranges the others around it (tap 📌 again to unpin). ✓ marks a dish done: it stays greyed in the chart and the others' times do not change; the next 🔀 Propose order leaves it out (it goes last, without a chart, and the rest is planned without it); ✓ again puts it back. 👩‍🍳 Cooks: with two, two blocks of work can run at once (the second cook's are green). ⏱ Everything: the total, and beside it how long one after another would take. ✕ removes one dish; 🗑️ Clear the list removes them all (the kitchen's equipment stays). ↩︎ UNDO puts back the plan as it was before your last change — a dish added, removed, moved, pinned or marked done, the order proposed, the list cleared, the cooks or the equipment changed, a recipe read again; tap it again for the change before, up to 20 changes. It is greyed when there is nothing to undo, while a recipe is being read, and after someone else in the household changed the plan (undoing would throw their change away). SHARED: the plan is shared with everyone in the household — anyone can add, remove or clear; signed out, it stays on this device. In Hebrew, a block of work is called 'יחידת עבודה' (never 'גוש'). [GO:work-planner] leads there.",
   "- 🔔 CHAT NOTIFICATIONS WHEN THE APP IS CLOSED (v40.02): at the foot of 👪 Chat with family members, and of 💬 Chats with linked kitchens, tap 🔔 Notify me of new messages when the app is closed; the phone (or computer) asks whether to allow notifications — say Allow. From then on a new message shows as a notification, with who wrote it and the text and the phone's own sound, even when the app is closed; a tap on it opens that conversation. One switch for both chats, on THIS device: turn it on on each phone or computer you use. 🔕 Turn off in the same place (signing out turns it off too). The family chat: messages to everyone and to you alone; linked kitchens: messages from kitchens linked with yours (not from one still asking). Your own messages never notify you. ON AN iPHONE OR iPAD (iOS 16.4 or later) only the app on the Home Screen can: in Safari, Share → Add to Home Screen, open the app from that icon, and turn it on there. 'Notifications are blocked'? Allow them in the phone's Settings → Notifications → the app (or in the browser's settings for the site), then tap 🔔 again. While the app is open on the screen, a message chimes and shows in the app instead. The notification makes the phone's own notification sound (the app's own kitchen sounds — ⚙️ → ♿ Accessibility → 🎵 The sound — play only while the app is open). Linked kitchens' messages stop reaching a device on which the app has not been opened for 45 days — open it once and they come again (the family chat keeps coming). ⚙️ → What leaves this device lists the device's notification service, and the Privacy Statement says what is kept for it. The message travels encrypted through the device's own notification service (Apple, Google, Mozilla or Microsoft), which cannot read it.",
   "- ♿ ACCESSIBILITY: ⚙️ → ♿ Accessibility, on this device: 🎨 Colours for red–green colour blindness (the most common colour blindness, where reds and greens look alike, brownish): wherever a colour says something, green becomes blue and red becomes a deep orange — all right / a problem, the sync dot, Easy and Hard, the Self Test's results, delete buttons — and a notification dot turns blue inside its ring; and the recipe photos are colour-corrected, so a red tomato and a green pepper no longer look alike (they look a little different to everyone else). For the whole phone, an iPhone has its own: Settings → Accessibility → Display & Text Size → Color Filters → Red/Green Filter; Android: Settings → Accessibility → Color correction. 🟡 A yellow ring round the notification dots (on unless turned off) so a new message or request catches the eye, on ⋯ More and in ⚙️. 🌗 Theme: light, dark, or as the device. 🔔 the sound when something arrives, and 🎵 which sound.",
   "- 👉 NOTICES THAT TAKE YOU THERE: a notice at the bottom of the screen with a › at its end is a button — tap or click it (or Enter) to go where it points: a new message opens its chat; a kitchen linked or accepted shows only that kitchen's recipes; a recipe saved, imported, copied, translated or added opens it; a note from a tester opens 👑 → 📊 Households → 💬 Feedback; someone asking to add recipes, or joining, opens 👥 Family Access; a link request sent opens 📬 Link requests; a backup opens 💾 Backups; a failed sync or the AI allowance opens Sync Health; an error opens the log. The place it leads to is marked with a yellow ring for a moment. Such a notice stays up at least 6 seconds; a notice about what is already on the screen has no › and goes nowhere. On a notice with a button (Open, ↩︎ Undo, Back up now) the button does its own thing — tapping the words of an Undo notice never undoes.",
@@ -41384,6 +41394,7 @@ var PLAN_RES = [
 ];
 var PLAN_RES_ID = /^(stove|oven|sousvide|multicooker|airfryer|microwave|grill|mixer|c[1-6])$/;
 var _planUnsub = null, _planPicking = false, _planReading = {}, _planLinkedSel = {}, _planPickQ = null;
+var _planUndo = [], _planUndoAt = 0, PLAN_MAX_UNDO = 20;
 var _plan = planClean(null);
 var PLAN_AI_SYSTEM = 'You plan cooking time. You split a recipe’s method into the cook’s active WORK and the QUIET '
   + 'time when the food cooks or waits by itself, and say which kitchen equipment each part occupies. Answer ONLY with '
@@ -41521,6 +41532,7 @@ function planOut() {
 }
 async function planSave() {
   _plan.at = Date.now();
+  _planUndoAt = _plan.at;   // the plan as this device left it (↩︎ Undo applies while it is still so)
   var doc = planOut();
   try { localStorage.setItem(PLAN_LOCAL_KEY, JSON.stringify(doc)); } catch (e) {}
   if (!planCloud()) return 'device';
@@ -41552,7 +41564,7 @@ function planListen() {
     _planUnsub = planRef().onSnapshot(function (snap) {
       if (!snap || !snap.exists) return;
       var c = planClean(snap.data());
-      if (c.at > _plan.at) { _plan = c; try { localStorage.setItem(PLAN_LOCAL_KEY, JSON.stringify(planOut())); } catch (e) {} planRender(); planReadMissing(); }
+      if (c.at > _plan.at) { _plan = c; _planUndo = []; try { localStorage.setItem(PLAN_LOCAL_KEY, JSON.stringify(planOut())); } catch (e) {} planRender(); planReadMissing(); }
     }, function (e) { syncLog('error', 'Could not listen to the Work Planner', String((e && (e.code || e.message)) || e).slice(0, 120)); });
   } catch (e) { return false; }
   return true;
@@ -41664,7 +41676,7 @@ function planResFormSync() {
 function planResTell() {
   var f = _planFound, said = [];
   _planFound = { added: [], noRoom: [] };
-  if (f.added.length) said.push(i18nPhrase('Added to your kitchen: {1}. Change it with \u270F\uFE0F Edit if it is not right.').replace('{1}', f.added.join(', ')));
+  if (f.added.length) said.push(i18nPhrase('Added to your kitchen: {1}. Change it with \u{1F373} Your kitchen if it is not right.').replace('{1}', f.added.join(', ')));
   if (f.noRoom.length) said.push(i18nPhrase('There is no room for more equipment of your own: {1} was left out.').replace('{1}', f.noRoom.join(', ')));
   if (said.length) toast(said.join(' '), 9000);
   return said.length > 0;
@@ -41689,6 +41701,7 @@ async function planReread(id) {
   if (!it || it.kind !== 'recipe') return false;
   var r = planFindRecipe(it.rid);
   if (!r) { toast('That recipe is not in the list any more.', 5000); return false; }
+  planRemember();
   delete _plan.maps[it.key];
   it.key = planKey(r); delete _plan.maps[it.key];
   it.blocks = [];
@@ -41821,19 +41834,6 @@ function planAxisHtml(scale) {
   for (var t = 0; t <= scale; t += step) h += '<span class="pl-tick" style="inset-inline-start:' + (t / scale * 100) + '%" data-no-i18n>' + planHM(t) + '</span>';
   return '<div class="pl-axis" aria-hidden="true">' + h + '</div>';
 }
-// 🍳 Your kitchen: what it has — each piece by its icon, NAME and number (Tony, 21 Nov 2026: "I do not understand the icons
-// representing resources in my kitchen. Could you please make them clearer by adding titles to them or adding a legend or
-// something?"). The names are translated; the numbers and the kitchen's own names are not.
-function planResLineHtml() {
-  var res = planResClean(_plan.res);
-  var parts = PLAN_RES.filter(function (k) { return res.n[k.id] > 0; }).map(function (k) {
-      return '<span class="pl-kit-item" data-res="' + k.id + '"><span aria-hidden="true">' + k.e + '</span> <span>' + k.name + '</span> <b data-no-i18n>' + res.n[k.id] + '</b></span>'; })
-    .concat(res.custom.filter(function (c) { return c.n > 0; }).map(function (c) {
-      return '<span class="pl-kit-item" data-res="' + escA(c.id) + '"><span aria-hidden="true">\u{1F527}</span> <span dir="auto" data-no-i18n>' + escH(c.name) + '</span> <b data-no-i18n>' + c.n + '</b></span>'; }));
-  return '<div class="pl-kit"><div class="pl-kit-top"><span>\u{1F373} Your kitchen:</span>'
-    + ' <button type="button" class="pl-kit-edit" onclick="planResForm(false)">✏️ Edit</button></div>'
-    + '<div class="pl-kit-list">' + (parts.length ? parts.join('') : '<span data-no-i18n>—</span>') + '</div></div>';
-}
 // The legend names each piece of equipment whose icon is drawn on the chart
 function planResLegendHtml(rows, res) {
   var seen = [];
@@ -41867,31 +41867,34 @@ function planRender() {
     return '<div class="pl-row' + (it.done ? ' pl-done' : '') + (r.off ? ' pl-off' : '') + (it.pin ? ' pl-pinned' : '') + '" data-id="' + escA(it.id) + '">'
       + '<div class="pl-head">'
       + (r.off ? '' : '<button type="button" class="pl-drag" aria-label="Drag to reorder" title="Drag to reorder" onpointerdown="planDragStart(event,' + jsA(it.id) + ')" onkeydown="planDragKey(event,' + jsA(it.id) + ')">⠿</button>')
-      + '<span class="pl-name" dir="auto" data-no-i18n>' + escH(it.name) + '</span>'
-      + (it.done ? '<span class="pl-donetag">✓ Done</span>' : '')
-      + (reading ? '' : '<span class="pl-len" data-no-i18n>⏱ ' + planHM(r.len) + (it.guess ? ' ≈' : '') + '</span>')
+      + '<span class="pl-name" dir="auto" data-no-i18n title="' + escA(it.name) + '">' + escH(it.name) + '</span>'
       + (it.kind === 'manual' ? '<span class="pl-tag">✏️</span>' : '')
       + (/^L/.test(it.rid || '') ? '<span class="pl-tag" title="' + escA(i18nPhrase('From a linked kitchen') + (it.from ? ': ' + it.from : '')) + '" data-no-i18n>\u{1F91D}</span>' : '')
+      + (it.done ? '<span class="pl-donetag">✓ Done</span>' : '')
+      + (reading ? '' : '<span class="pl-len" data-no-i18n>⏱ ' + planHM(r.len) + (it.guess ? ' ≈' : '') + '</span>')
+      + '</div>'
+      + bar
+      + short.map(function (id) {
+          return '<div class="pl-warn" data-no-i18n>⚠️ ' + escH(i18nPhrase('Needs {1} — your kitchen has none (counted as one).').replace('{1}', planResEmoji(id) + ' ' + planResName(id, res))) + '</div>';
+        }).join('')
+      + '<div class="pl-foot"><span class="pl-btns">'
       + (r.off ? '' : '<button type="button" class="pl-x pl-pin' + (it.pin ? ' on' : '') + '" aria-pressed="' + !!it.pin + '" onclick="planPin(' + jsA(it.id) + ')" title="'
         + (it.pin ? 'Pinned — 🔀 Propose order keeps it in its place. Tap to unpin.' : 'Pin it: 🔀 Propose order keeps it in its place') + '">📌</button>')
       + '<button type="button" class="pl-x pl-ok' + (it.done ? ' on' : '') + '" aria-pressed="' + !!it.done + '" onclick="planDone(' + jsA(it.id) + ')" title="'
         + (it.done ? 'Done — tap if it is not' : 'Mark as done') + '">✓</button>'
       + (it.kind === 'recipe' && !reading && !r.off && !it.done ? '<button type="button" class="pl-x" onclick="planReread(' + jsA(it.id) + ')" aria-label="Read the recipe again" title="Read the recipe again">↻</button>' : '')
-      + '<button type="button" class="pl-x" onclick="planRemove(' + jsA(it.id) + ')" aria-label="Remove from the plan" title="Remove from the plan">✕</button></div>'
-      + bar
-      + short.map(function (id) {
-          return '<div class="pl-warn" data-no-i18n>⚠️ ' + escH(i18nPhrase('Needs {1} — your kitchen has none (counted as one).').replace('{1}', planResEmoji(id) + ' ' + planResName(id, res))) + '</div>';
-        }).join('')
-      + (reading || r.off ? '' : '<div class="pl-until"><span>Until here:</span> <b data-no-i18n>' + planHM(r.until) + '</b></div>')
-      + '</div>';
+      + '<button type="button" class="pl-x" onclick="planRemove(' + jsA(it.id) + ')" aria-label="Remove from the plan" title="Remove from the plan">✕</button></span>'
+      + (reading || r.off ? '' : '<span class="pl-until"><span>Until here:</span> <b data-no-i18n>' + planHM(r.until) + '</b></span>')
+      + '</div></div>';
   }).join('');
   body.style.setProperty('--pl-step', (planStep(v.scale) / v.scale * 100).toFixed(3) + '%');
-  body.innerHTML = '<div class="pl-ctl">'
+  body.innerHTML = (n ? '' : '<div class="pl-intro">Note down the dishes you are making, then Propose order: one dish’s work is fitted into another’s quiet time.</div>')
+    + '<div class="pl-ctl">'
     + '<button type="button" class="pl-btn pl-add" onclick="planAddMenu()"' + (n >= PLAN_MAX_ITEMS ? ' disabled title="Twelve dishes at most"' : '') + '>+ Add recipe</button>'
+    + '<button type="button" class="pl-btn pl-kitbtn" onclick="planResForm(false)">\u{1F373} Your kitchen</button>'
     + '<span class="pl-cooks" role="group" aria-label="Cooks"><span>\u{1F469}‍\u{1F373} Cooks:</span>'
     + [1, 2].map(function (k) { return '<button type="button" class="pl-ck' + (_plan.cooks === k ? ' on' : '') + '" aria-pressed="' + (_plan.cooks === k) + '" onclick="planCooks(' + k + ')" data-no-i18n>' + k + '</button>'; }).join('')
     + '</span></div>'
-    + planResLineHtml()
     + (n ? planAxisHtml(v.scale) + '<div class="pl-rows">' + rows + '</div>'
          : '<div class="pl-empty">No dishes yet — tap + Add recipe to begin.</div>')
     + (n && allDone ? '<div class="pl-total">✓ <span>All done.</span></div>' : '')
@@ -41906,6 +41909,37 @@ function planRender() {
          + (_plan.cooks === 2 && v.proposed ? '<span class="pl-li"><span class="pl-key pl-kw2"></span><span>The second cook</span></span>' : '')
          + planResLegendHtml(v.rows, res) + '</div>' : '')
     + '<div class="pl-note">' + (planCloud() ? 'Shared with everyone in your household.' : 'Kept on this device (sign in to share it with your household).') + '</div>';
+  planUndoBtn();
+}
+// ── ↩︎ Undo (Tony, 21 Nov 2026: "please add an Undo button, in case something was clicked erroneously") ──
+// Each change made here is remembered first — the dishes, their order, 📌, ✓, the cooks, whether the order was proposed,
+// the kitchen's equipment — up to 20 of them; ↩︎ Undo puts back the plan as it was before the last one. A reading the AI
+// made is kept (it is not a change to undo). Forgotten when someone else in the household changes the plan: their copy
+// replaces this one, and undoing would throw their change away.
+function planRemember() {
+  try { _planUndo.push(JSON.stringify({ items: planOut().items, cooks: _plan.cooks, proposed: !!_plan.proposed, res: planResOut(_plan.res) })); }
+  catch (e) { return false; }
+  if (_planUndo.length > PLAN_MAX_UNDO) _planUndo.shift();
+  planUndoBtn();
+  return true;
+}
+function planUndoBtn() {
+  var b = document.getElementById('planUndo');
+  if (b) b.disabled = !_planUndo.length || Object.keys(_planReading).length > 0;   // not while a recipe is being read
+  return b ? !b.disabled : false;
+}
+async function planUndo() {
+  if (!_planUndo.length || Object.keys(_planReading).length) return false;
+  var d = null;
+  try { d = JSON.parse(_planUndo.pop()); } catch (e) {}
+  if (!d) { planUndoBtn(); return false; }
+  var c = planClean({ items: d.items, cooks: d.cooks, proposed: d.proposed, res: d.res });
+  _plan.items = c.items; _plan.cooks = c.cooks; _plan.proposed = c.proposed; _plan.res = c.res;
+  planSegTip(null);
+  planRender();
+  await planSave();
+  toast('The last change was undone.');
+  return true;
 }
 // ── what the person does ──
 async function openPlanner() {
@@ -41914,9 +41948,9 @@ async function openPlanner() {
     ov = document.createElement('div');
     ov.id = 'planOverlay'; ov.className = 'modal-overlay open';
     ov.innerHTML = '<div class="ask-card pl-card" role="dialog" aria-modal="true" aria-labelledby="planTitle">'
-      + '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><div class="ask-title" id="planTitle" style="margin:0;">\u{1F5D3}️ Work Planner</div>'
-      + '<button type="button" class="modal-close" style="position:relative;top:auto;right:auto;" aria-label="Close" onclick="closePlanner()">✕</button></div>'
-      + '<div class="pl-intro">Note down the dishes you are making, then Propose order: one dish’s work is fitted into another’s quiet time.</div>'
+      + '<div class="pl-top"><div class="ask-title" id="planTitle">\u{1F5D3}️ Work Planner</div>'
+      + '<button type="button" class="pl-undo" id="planUndo" onclick="planUndo()" disabled title="Undo the last change">\u21A9\uFE0E Undo</button>'
+      + '<button type="button" class="modal-close" style="position:relative;top:auto;right:auto;flex:none;" aria-label="Close" onclick="closePlanner()">✕</button></div>'
       + '<div id="planBody"><div class="pl-empty">⏳ Opening the plan…</div></div></div>';
     ov.onclick = function (e) {
       if (e.target === ov) return closePlanner();
@@ -41925,6 +41959,7 @@ async function openPlanner() {
     document.body.appendChild(ov);
   }
   await planLoad();
+  if (_plan.at !== _planUndoAt) _planUndo = [];   // changed elsewhere since: what was remembered no longer applies
   planRender();
   planListen();
   planReadMissing();
@@ -41966,6 +42001,7 @@ async function planManualAdd(name, time) {
   if (!name) { if (why) why.textContent = 'Give the dish a name.'; if (nEl) nEl.focus(); return false; }
   if (!m) { if (why) why.textContent = 'How long does it take? Write it in minutes.'; if (tEl) tEl.focus(); return false; }
   if (_plan.items.length >= PLAN_MAX_ITEMS) { toast('Twelve dishes at most.', 5000); return false; }
+  planRemember();
   _plan.items.push({ id: 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), kind: 'manual', name: name.slice(0, 120), rid: '', key: '', from: '', blocks: [{ k: 'w', m: m, s: '' }], guess: false });
   _plan.proposed = false;
   var a = document.getElementById('planAddOverlay'); if (a) a.remove();
@@ -41975,7 +42011,7 @@ async function planManualAdd(name, time) {
 }
 // list: recipes — this kitchen's, or a linked kitchen's marked with _planHid (and _planFrom, its name)
 async function planAddRecipes(list) {
-  var added = [], skipped = 0;
+  var added = [], skipped = 0, kept = planRemember();
   (list || []).forEach(function (r) {
     if (!r) return;
     var rid = r._planHid ? 'L' + r._planHid + ':' + String(r.uid || r.id) : String(r.uid || r.id);
@@ -41988,7 +42024,7 @@ async function planAddRecipes(list) {
   });
   var notAdded = skipped === 1 ? 'One was already in the plan (or there was no room for it).' : 'Some were already in the plan, or there was no room for them.';
   if (skipped) toast(notAdded, 6000);
-  if (!added.length) { planRender(); return 0; }
+  if (!added.length) { if (kept) _planUndo.pop(); planRender(); return 0; }
   _plan.proposed = false;
   planRender();
   await planSave();
@@ -42087,6 +42123,7 @@ async function planMove(id, to) {
   if (from < 0 || from >= n) return false;   // a dish left out of the plan is not moved
   to = Math.max(0, Math.min(n - 1, Math.round(Number(to) || 0)));
   if (to === from) return false;
+  planRemember();
   var it = _plan.items.splice(from, 1)[0];
   _plan.items.splice(to, 0, it);
   planRender();
@@ -42145,6 +42182,7 @@ async function planDragKey(ev, id) {
 async function planPin(id) {
   var it = _plan.items.filter(function (x) { return x.id === id; })[0];
   if (!it) return false;
+  planRemember();
   it.pin = !it.pin;
   planRender();
   await planSave();
@@ -42155,6 +42193,7 @@ async function planPin(id) {
 async function planDone(id) {
   var it = _plan.items.filter(function (x) { return x.id === id; })[0];
   if (!it) return false;
+  planRemember();
   it.done = !it.done;
   if (!it.done) it.skip = false;   // back in the plan
   planRender();
@@ -42177,6 +42216,7 @@ function planSegTip(el) {
   return tip.textContent;
 }
 async function planRemove(id) {
+  if (_plan.items.some(function (it) { return it.id === id; })) planRemember();
   _plan.items = _plan.items.filter(function (it) { return it.id !== id; });
   delete _planReading[id];
   _plan.proposed = false;
@@ -42185,6 +42225,7 @@ async function planRemove(id) {
   return true;
 }
 async function planCooks(k) {
+  if ((k === 2 ? 2 : 1) !== _plan.cooks) planRemember();
   _plan.cooks = k === 2 ? 2 : 1;
   planRender();
   await planSave();
@@ -42193,6 +42234,7 @@ async function planCooks(k) {
 async function planPropose() {
   var todo = _plan.items.filter(function (it) { return !it.done; }), off = _plan.items.filter(function (it) { return it.done; });
   if (_plan.items.length < 2 || !todo.length) return false;
+  planRemember();
   // 📌 a pinned dish keeps its place in the order; a dish marked ✓ done is not planned any more (it goes last, without a timeline)
   var s = planSchedule(todo, _plan.cooks, _plan.res, { pins: todo.map(function (it) { return !!it.pin; }) });
   if (s.order && s.order.length === todo.length) todo = s.order.map(function (i) { return todo[i]; });
@@ -42209,6 +42251,7 @@ async function planClear() {
   var what = planCloud() ? 'Every dish is taken off the plan, for everyone in your household. Your kitchen’s equipment stays as it is.'
                          : 'Every dish is taken off the plan. Your kitchen’s equipment stays as it is.';
   if (await askConfirm({ icon: '\u{1F5D1}️', title: 'Clear the list?', message: what, okLabel: 'Clear', danger: true }) !== true) return false;
+  planRemember();
   _plan.items = []; _plan.proposed = false; _planReading = {};
   planRender();
   await planSave();
@@ -42230,7 +42273,7 @@ function planResForm(first) {
   var res = planResClean(_plan.res);
   var ov = document.createElement('div');
   ov.id = 'planResOverlay'; ov.className = 'modal-overlay open'; ov.style.zIndex = '1300';
-  var intro = first ? 'Asked once: how many of each does your kitchen have? A plan never uses more of them at the same time. You can change this later — \u{1F373} Your kitchen → ✏️ Edit.'
+  var intro = first ? 'Asked once: how many of each does your kitchen have? A plan never uses more of them at the same time. You can change this later with \u{1F373} Your kitchen.'
                     : 'How many of each does your kitchen have? A plan never uses more of them at the same time.';
   ov.innerHTML = '<div class="ask-card pl-addcard pl-rescard" role="dialog" aria-modal="true" aria-labelledby="planResTitle">'
     + '<div class="ask-title" id="planResTitle">\u{1F373} Your kitchen’s equipment</div>'
@@ -42268,6 +42311,7 @@ async function planResSave() {
     return { id: row.getAttribute('data-cid'), name: ins[0].value, n: Math.max(0, Math.min(20, Math.round(Number(ins[1].value) || 0))) };
   });
   var was = planResClean(_plan.res);
+  planRemember();
   _plan.res = planResDeclined(was, planResClean({ n: n, custom: custom, asked: true, no: was.no }));
   planResForget(was.custom.filter(function (c) { return !_plan.res.custom.some(function (x) { return x.id === c.id; }); }).map(function (c) { return c.id; }));
   ov.remove();
@@ -42318,7 +42362,7 @@ window.planSchedule = planSchedule; window.planBlocks = planBlocks; window.planM
 window.planSave = planSave; window.planLoad = planLoad; window.planRead = planRead; window.planHM = planHM; window.planKey = planKey;
 window.planReread = planReread; window.planResForm = planResForm; window.planResSave = planResSave; window.planResClose = planResClose;
 window.planMove = planMove; window.planDragStart = planDragStart; window.planDragKey = planDragKey; window.planPin = planPin; window.planDone = planDone;
-window.planSegTip = planSegTip; window.planResFound = planResFound; window.planResTell = planResTell; window.planResAddOther = planResAddOther; window.planResOtherBtn = planResOtherBtn; window.linkedCardTap = linkedCardTap; window.planResClean = planResClean;
+window.planSegTip = planSegTip; window.planUndo = planUndo; window.planRemember = planRemember; window.planResFound = planResFound; window.planResTell = planResTell; window.planResAddOther = planResAddOther; window.planResOtherBtn = planResOtherBtn; window.linkedCardTap = linkedCardTap; window.planResClean = planResClean;
 
 function openCalcModal() {
   // Build category buttons

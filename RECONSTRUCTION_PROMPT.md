@@ -529,18 +529,28 @@ under its plain path only (a `?url=` request goes network-first).
   from joined kitchens as well, not only from my own kitchen."
   - **Where:** ··· More → 🧰 Tools → 🗓️ Work Planner (`openPlanner`; the Tools heading's title "The Work Planner and the
     measurement converter"). One window, `#planOverlay` / `#planBody`, drawn by `planRender` from `planView()`.
+  - **v40.06 — the screen to itself.** Tony, 21 Nov 2026, from his iPhone screenshot: "In order to save on screen space, Please move the kitchen resources section to a pop up modal, accessible via a dedicated button. Also expand the planner's modal to full screen. Also, please add an Undo button, in case something was clicked erroneously. In portrait mode, see attached, the recipe names get truncated. Please find a better way to show them while saving on vertical space. Please change the translation from גוש עבודה to יחידת עבודה."
+    The window FILLS THE SCREEN (`#planOverlay` without padding; its card 100% × 100%, no corners; on a wide screen the
+    content keeps to 960 px in the middle — `padding-inline: max(14px, calc((100% - 960px) / 2))`). Its TOP BAR
+    (`.pl-top`: 🗓️ Work Planner, ↩︎ Undo `#planUndo`, ✕) stays while the rest scrolls — written as
+    `#planOverlay .pl-card > .pl-top`, because the windows' usual sticky title (`.modal-overlay > .ask-card >
+    div:first-child:has(> .modal-close)`) is more specific and pulls it up by the card's padding (top -22px: the bar's top
+    padding gone, its ✕ at the screen's edge). Under it the toolbar: + Add recipe, **🍳 Your kitchen** (`.pl-kitbtn` →
+    `planResForm(false)`: the equipment window, each piece by name and number — the chips that took four lines of the
+    planner are gone, `planResLineHtml` with them), 👩‍🍳 Cooks 1 2. The introduction ("Note down the dishes…") only while
+    the plan is empty.
   - **🍳 The kitchen's equipment — asked once** (`planResForm(true)` the first time the planner opens, while the plan's
     `res.asked` is false; `#planResOverlay`): how many 🔥 Stove burners (4), ♨️ Ovens (1), 🌡️ Sous vide devices (0), 🍲
     Pressure or slow cookers (0), 🍟 Air fryers (0), ⚡ Microwaves (1), 🍖 Grills (0), 🥣 Stand mixers (0) — `PLAN_RES`,
     the numbers in brackets offered first — and + Add other equipment: up to six of the kitchen's own (`c1`…`c6`, a name
-    ≤40 and a number). Shown in the planner as "🍳 Your kitchen:" with ✏️ Edit and, under it, one chip per piece it has —
-    icon, NAME and number ("🔥 Stove burners 2", "🔧 Thermomix 1"; `planResLineHtml`); the legend under the chart names
-    each equipment icon drawn on the bars (`planResLegendHtml`). (Tony, 21 Nov: "I do not understand the icons
-    representing resources in my kitchen. Could you please make them clearer by adding titles to them or adding a legend
-    or something?" — the first version showed the icons and numbers alone.) Save (`planResSave`); Close (`planResClose`) keeps the numbers as they are — the question is not
+    ≤40 and a number). Opened from the planner's 🍳 Your kitchen button (v40.06; until then a line of chips — icon, NAME
+    and number — with ✏️ Edit, which took too much room); the legend under the chart names each equipment icon drawn on
+    the bars (`planResLegendHtml`). (Tony, 21 Nov: "I do not understand the icons representing resources in my kitchen.
+    Could you please make them clearer by adding titles to them or adding a legend or something?" — the first version
+    showed the icons and numbers alone.) Save (`planResSave`); Close (`planResClose`) keeps the numbers as they are — the question is not
     asked again either way. Kept in the plan (`res = {n, custom, asked, no}`, `planResClean` makes sure of it: 0–20, a bad
-    number → the usual one), so it is the household's: someone else in it is not asked. Shown as "🍳 Your kitchen: 🔥 4 ·
-    ♨️ 1 · ⚡ 1 · 🔧 Thermomix 1" with ✏️ Edit (`planResForm(false)`). 🗑️ Clear the list never touches it.
+    number → the usual one), so it is the household's: someone else in it is not asked. Changed with 🍳 Your kitchen
+    (`planResForm(false)`). 🗑️ Clear the list never touches it.
   - **+ Add recipe** (`planAddMenu`, its own small window `#planAddOverlay`): 📖 Add from the recipe list / ✏️ Fill in
     manually / Close. **From the recipe list** (`planPickStart`): the planner closes, the recipe list goes into select
     mode with the select bar showing only 🗓️ Add to the Work Planner (`#selectBar.plan-pick`: `.sel-plan` shown,
@@ -585,16 +595,30 @@ under its plain path only (a `?url=` request goes network-first).
     what was added shows in it at once (`planResFormSync`), so saving it does not take it away again. If the AI cannot answer:
     one block of the recipe's `prep` time (or 30 min), marked ≈, a toast, logged. While reading: "⏳ Reading the recipe…"
     in its row, and 🔀 Propose order waits.
-  - **The rows (a Gantt chart):** each dish a row: its name, ⏱ its own time (≈ if guessed), ✏️ for one by hand, 🤝 for a
-    linked kitchen's, ↻, ✕ (`planRemove`); a bar with WORK as solid blocks and QUIET time as a thin line, a small 🔥 / ♨️ /
+  - **The rows (a Gantt chart):** each dish a row of three lines (v40.06 — Tony: "In portrait mode … the recipe names get
+    truncated"): (1) `.pl-head`: ⠿, the NAME with the line to itself (two lines at most — `-webkit-line-clamp: 2` — then
+    …; the whole name in its `title`), ✏️ for one by hand, 🤝 for a linked kitchen's, ✓ Done, ⏱ its own time (≈ if
+    guessed); (2) the bar; (3) `.pl-foot`: 📌 ✓ ↻ ✕ (`planRemove`) at the start and "Until here" at the end. Three lines
+    as before (the buttons used to share the name's line and left it a few letters — "Mus…" — on a phone held upright),
+    so no more height, and each row's padding is 6 px. The bar with WORK as solid blocks and QUIET time as a thin line, a small 🔥 / ♨️ /
     🌡️… above a block that occupies equipment, positioned with `inset-inline-start` (so it mirrors in right-to-left
-    languages); faint lines under the axis's ticks (`--pl-step`, 270deg in RTL); "Until here: h:mm" after each; ⚠️
+    languages); faint lines under the axis's ticks (`--pl-step`, 270deg in RTL); ⚠️
     "Needs 🌡️ Sous vide devices — your kitchen has none (counted as one)." when it needs equipment the kitchen has 0 of
     (`planShort`) — since a reading adds what is missing, that is equipment you set to 0 yourself. **As written** (before proposing): every dish from 0, the scale = the longest dish, "Until here" = the
     time used one after another by the end of that dish, ⏱ Everything = their sum "(one after another)". **Proposed:** the
     rows in the order they start, the scale = the total, "Until here" = when that dish is ready, ⏱ Everything = the
     total, and beside it "One after another: h:mm". A dish waiting for a free cook or equipment is a dotted segment.
     Legend: Work · Quiet time · Waiting · The second cook (green).
+  - **↩︎ Undo** (v40.06, in the top bar; `planRemember`, `planUndo`, `planUndoBtn`): before each change made here —
+    ✕, + a dish (recipes or by hand), ⠿/↑↓ a move, 📌, ✓, 👩‍🍳 cooks, 🔀 Propose order, 🗑️ Clear the list, Save in 🍳 Your
+    kitchen, ↻ — the plan is remembered (`_planUndo`: JSON of the items, cooks, proposed and equipment, as `planOut` gives
+    them; at most `PLAN_MAX_UNDO` = 20, the oldest dropped); ↩︎ Undo puts the last one back through `planClean`, saves,
+    and says "The last change was undone." Adding recipes that were all already there takes its memory back. The kept
+    readings (`maps`) are not undone — a reading is not a change. Greyed with nothing to undo, and while a recipe is
+    being read. FORGOTTEN when the plan changed elsewhere: the listener taking someone else's newer copy empties it, and
+    so does opening the planner when the plan's `at` is not the one this device last saved (`_planUndoAt`, set in
+    `planSave`) — undoing then would throw their change away. The button's label is the app's "↩︎ Undo" (already
+    translated); "Undo the last change" is its title.
   - **🔀 Propose order** (`planPropose` → `planSchedule(todo, cooks, res, { pins })`, then the list takes the order found —
     `s.order`; dishes done are left out, see "By hand" below): quiet time needs no cook; work needs one
     (of 1 or 2); a block with `r` needs one of that equipment free (the kitchen's number; 0 counts as one and is
@@ -665,14 +689,28 @@ under its plain path only (a `?url=` request goes network-first).
     kitchens with the ticks kept, Cancel and ☑ back to the plan, 🗓️ among the ordinary select bar's actions, an empty
     list), `planner_shared` (a stand-in database: the
     household's document with the equipment, the newer copy wins, someone else's change — dishes and equipment — appears,
-    a refused save, clearing keeps the equipment, the listener stops, the household wipe). Knock-out: all four fail
-    without their code.
-  - HELP: the help assistant's "🗓️ WORK PLANNER (v40.05)" line; `HELP_PLACES` 'work-planner' (📍 Take me there opens
+    a refused save, clearing keeps the equipment, the listener stops, the household wipe; someone else's change empties
+    ↩︎ Undo), `planner_undo` (v40.06: the window fills the screen, its top bar with the title, ↩︎ Undo and ✕ stays when
+    scrolled to the end; each name on its own line with only the handle beside it, two lines at 340 px rather than cut;
+    the buttons and "Until here" under the bar; ✕ then ↩︎ — back at its place, kept, said; move, 📌, ✓, cooks, Propose
+    undone one by one, newest first; Clear the list and the equipment undone; 20 at most; greyed while reading; forgotten
+    when another device saved a newer copy). Knock-out: all six fail without their code.
+  - HELP: the help assistant's "🗓️ WORK PLANNER (v40.05–v40.06)" line — rewritten whole for v40.06 (Tony: "Please update
+    the Help as well") in the order a person meets it: THE WINDOW (full screen, the top bar with ↩︎ Undo and ✕, the
+    toolbar), YOUR KITCHEN'S EQUIPMENT (asked once, the 🍳 Your kitchen button, what a reading adds, what you took away),
+    ADDING DISHES, THE AI READS, EACH DISH'S ROW, THE ORDER (drag, Propose, 📌, ✓, cooks, totals, Clear), ↩︎ UNDO, SHARED;
+    the button labels written exactly as on screen, so `helpGlossary` gives a non-English answer the person's own labels;
+    and "In Hebrew, a block of work is called 'יחידת עבודה' (never 'גוש')". `planner_undo` checks the line says each of
+    these (and no longer sends anyone to ✏️ Edit for the equipment); `HELP_PLACES` 'work-planner' (📍 Take me there opens
     it); ✨ What can this app do → Cook: "Cooking several dishes at once? The 🗓️ Work Planner fits one dish’s work into
     another’s quiet time and shows when everything will be ready." Privacy Statement 1.19: the plan — dishes, readings
     and the kitchen's equipment — is household content, and a recipe's name and method (with the kitchen's own
     equipment names) go to Anthropic once to read its work, quiet time and equipment.
-  - **Translating it:** 71 phrases by hand in all 11 languages. Two traps met: a ternary inside `toast(...)` or an
+  - **Translating it:** 75 phrases by hand in all 11 languages (v40.06: "🍳 Your kitchen", "Undo the last change", "The
+    last change was undone.", the first question's and the "Added to your kitchen" message's endings now name 🍳 Your
+    kitchen; "↩︎ Undo" filled in for Hungarian and Portuguese). Hebrew: a work block is "יחידת עבודה" (Tony, 21 Nov:
+    "Please change the translation from גוש עבודה to יחידת עבודה") — feminine, so "יחידת עבודה אחת"; no "גוש" is left
+    in he.json. Two traps met: a ternary inside `toast(...)` or an
     `askConfirm` message makes the harvest store "{1}A{2}B" as one junk phrase — put the choice in a variable first; and
     a phrase with a clock time ("1:30") is taken for a date and never translated (`i18nLooksLikeDate`) — the examples
     say "45 or 90" instead. A placeholder or text with numbers is looked up with the numbers as slots ("e.g. {1} or
