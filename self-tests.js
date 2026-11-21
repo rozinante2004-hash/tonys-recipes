@@ -10051,7 +10051,7 @@ window.SELF_TESTS = [
         try{ if(real.local===null) localStorage.removeItem(PLAN_LOCAL_KEY); else localStorage.setItem(PLAN_LOCAL_KEY, real.local); }catch(e){}
       }
     } },
-  { id:'planner_pick', group:'Features', name:'🗓️ Work Planner: 📖 Add from the recipe list opens the list to tick several — linked kitchens’ recipes too — then 🗓️ Add to the Work Planner brings them in; ✕ Cancel or ☑ again goes back to the plan; 🗓️ is also among the select bar’s actions; a collection is never one dish — its recipes are listed to tick, one or several, each brought in as a dish (v40.07); an empty list says to fill in by hand (v40.05)',
+  { id:'planner_pick', group:'Features', name:'🗓️ Work Planner: 📖 Add from the recipe list opens the list to tick several — linked kitchens’ recipes too — then 🗓️ Add to the Work Planner brings them in; ✕ Cancel or ☑ again goes back to the plan; 🗓️ is also among the select bar’s actions; a collection is never one dish — its recipes are listed to tick, one or several, each brought in as a dish (v40.07); a dish’s name opens its recipe on top of the planner, and closing it returns to the planner (v40.08); an empty list says to fill in by hand (v40.05)',
     test: async()=>{
       var real={ plan:_plan, hh:window._household, user:window._fbUser, ai:window.aiCall, toast:window.toast, rec:recipes, local:null,
         f:[showFavOnly, showClipsOnly, showNoPhotoOnly, showRecentOnly, showOneAwayOnly, showCollectionsOnly], cats:Array.from(activeCategories), diets:Array.from(activeDiets),
@@ -10165,6 +10165,46 @@ window.SELF_TESTS = [
         boxes()[1].click(); await planPartsAdd(); await settle();
         var ls=_plan.items[_plan.items.length-1];
         if(ls.name!=='Self-test linked stew' || ls.rid!=='LhLnk:lk9#'+recipeParts(lcol)[1].uid || ls.from!=='Linked Test Kitchen' || planFindRecipe(ls.rid)!==recipeParts(lcol)[1]) throw new Error('the linked kitchen’s collection recipe: '+JSON.stringify(ls));
+        // a dish's name opens its recipe on top of the planner; closed, the planner is there as it was (Tony, 21 Nov: "When clicking
+        // a recipe name in the planner, open the recipe on top of the planner. Once closed, return to the planner")
+        var zi=function(el){ var v=parseInt(getComputedStyle(el).zIndex, 10); return isNaN(v) ? 0 : v; };
+        var soup=_plan.items.filter(function(it){ return it.name==='Self-test soup'; })[0], nmEl=document.querySelector('#planBody .pl-row[data-id="'+soup.id+'"] .pl-name');
+        if(!nmEl || nmEl.getAttribute('role')!=='button' || nmEl.getAttribute('tabindex')!=='0') throw new Error('a dish’s name does not open its recipe');
+        var itemsBefore=JSON.stringify(_plan.items.map(function(it){ return it.id; }));
+        nmEl.click(); await wait(80);
+        var vo=document.getElementById('viewOverlay'), pov=document.getElementById('planOverlay');
+        var above=function(x, y){ return zi(x)>zi(y) || (zi(x)===zi(y) && !!(y.compareDocumentPosition(x) & Node.DOCUMENT_POSITION_FOLLOWING)); };   // x drawn over y
+        if(!vo.classList.contains('open') || viewId!==TEST_ID_MIN+4061 || !pov || !pov.classList.contains('open') || !above(vo, pov)) throw new Error('the recipe did not open on top of the planner');
+        if(!above(pov, document.querySelector('.header')) || !above(document.getElementById('editOverlay'), pov)) throw new Error('the planner is under the app’s header, or over the recipe’s own windows');
+        if(modalsOnTopOrder([pov, vo]).pop()!==vo) throw new Error('Escape would close the planner instead of the recipe on top of it');
+        closeM('viewOverlay'); await wait(30);
+        if(vo.classList.contains('open') || !document.getElementById('planOverlay') || !document.getElementById('planOverlay').classList.contains('open') || JSON.stringify(_plan.items.map(function(it){ return it.id; }))!==itemsBefore) throw new Error('closing the recipe did not go back to the planner as it was');
+        // Enter on the name, too
+        document.querySelector('#planBody .pl-row[data-id="'+soup.id+'"] .pl-name').dispatchEvent(new KeyboardEvent('keydown', { key:'Enter', bubbles:true, cancelable:true })); await wait(60);
+        if(!vo.classList.contains('open')) throw new Error('Enter on a dish’s name does not open its recipe');
+        closeM('viewOverlay');
+        // a recipe of a collection: the collection, at that recipe
+        var dz=_plan.items.filter(function(it){ return it.name==='Self-test dessert'; })[0];
+        if(planOpenRecipe(dz.id)!==true) throw new Error('a collection’s recipe did not open');
+        await wait(150);
+        var dpart=vo.querySelector('[data-coll-part="2"]');
+        if(!vo.classList.contains('open') || viewId!==TEST_ID_MIN+4064 || !dpart || !/Self-test dessert/.test(dpart.textContent) || dpart.getBoundingClientRect().top<-2 || dpart.getBoundingClientRect().top>innerHeight*0.6) throw new Error('a collection’s recipe did not open the collection at that recipe');
+        closeM('viewOverlay');
+        // a linked kitchen's: in its read-only window, on top too
+        planOpenRecipe(ls.id); await wait(80);
+        var lvo=document.getElementById('linkedViewOverlay');
+        if(!lvo.classList.contains('open') || !above(lvo, document.getElementById('planOverlay')) || !/Self-test linked menu/.test(lvo.textContent)) throw new Error('a linked kitchen’s recipe did not open on top of the planner');
+        closeM('linkedViewOverlay');
+        if(!document.getElementById('planOverlay').classList.contains('open')) throw new Error('the planner was gone after the linked kitchen’s recipe closed');
+        // a dish filled in by hand has no recipe to open
+        await planManualAdd('Self-test bread by hand', '30');
+        var bh=_plan.items[_plan.items.length-1];
+        if(document.querySelector('#planBody .pl-row[data-id="'+bh.id+'"] .pl-name[role="button"]') || planOpenRecipe(bh.id)!==false) throw new Error('a dish filled in by hand offers a recipe to open');
+        // closed the way Escape closes a window: properly — and shown again the next time
+        closeM('planOverlay');
+        if(document.getElementById('planOverlay')) throw new Error('the planner was only hidden, not closed');
+        await openPlanner();
+        if(!document.getElementById('planOverlay').classList.contains('open')) throw new Error('the planner did not show again');
         // nothing to choose from
         recipes=[]; delete _linkCache.hLnk;
         if(planPickStart()!==false || _planPicking || !document.getElementById('planOverlay') || !told.some(function(t){ return /Fill in manually/.test(t); })) throw new Error('an empty list was opened for choosing');

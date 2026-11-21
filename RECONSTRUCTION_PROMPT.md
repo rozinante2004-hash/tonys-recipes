@@ -610,7 +610,20 @@ under its plain path only (a `?url=` request goes network-first).
     …; the whole name in its `title`), ✏️ for one by hand, 🤝 for a linked kitchen's, ✓ Done, ⏱ its own time (≈ if
     guessed); (2) the bar; (3) `.pl-foot`: 📌 ✓ ↻ ✕ (`planRemove`) at the start and "Until here" at the end. Three lines
     as before (the buttons used to share the name's line and left it a few letters — "Mus…" — on a phone held upright),
-    so no more height, and each row's padding is 6 px. The bar with WORK as solid blocks and QUIET time as a thin line, a small 🔥 / ♨️ /
+    so no more height, and each row's padding is 6 px. **The name opens the recipe** (v40.08 — Tony, 21 Nov 2026: "When clicking a recipe name in the planner, open the recipe on top of the planner. Once closed, return to the planner"): for a
+    dish from a recipe still there (`planFindRecipe`), `.pl-name-go` (role="button", tabindex 0, a dotted underline; tap,
+    Enter or Space) → `planOpenRecipe`: one's own in the recipe window (`openView`), a linked kitchen's in its read-only
+    window (`openLinkedRecipeObj`), a recipe of a collection opens the collection scrolled to that recipe
+    (`[data-coll-part="i"]`); gone → "That recipe is not in the list any more."; a dish by hand is not a link. The
+    planner stays open under it: `#planOverlay` is inserted just BEFORE `#viewOverlay` in the page (`openPlanner`) —
+    windows of the same z-index (200) stack in page order, so the recipe windows and all the recipe opens (they come after
+    it) are drawn above the planner, while the planner still covers the app's sticky header (also 200, earlier). (A first
+    try gave the planner z-index 199: the header then showed over it.) Closing the recipe (✕, Escape, a tap beside it)
+    leaves the planner as it was. Escape closes the window ON TOP: `closeTopModal` orders the open windows by z-index and
+    then page order (`modalsOnTopOrder`) — page order alone would have closed a later-made window under a higher one.
+    `closeM` closes the planner's own windows their way (`closePlanner`, `planResClose`, `planPartsClose`, removing
+    `#planAddOverlay`) — Escape used to only hide them, and a hidden planner stayed hidden at the next opening (it now
+    always adds `open`). The bar with WORK as solid blocks and QUIET time as a thin line, a small 🔥 / ♨️ /
     🌡️… above a block that occupies equipment, positioned with `inset-inline-start` (so it mirrors in right-to-left
     languages); faint lines under the axis's ticks (`--pl-step`, 270deg in RTL); ⚠️
     "Needs 🌡️ Sous vide devices — your kitchen has none (counted as one)." when it needs equipment the kitchen has 0 of
@@ -700,7 +713,10 @@ under its plain path only (a `?url=` request goes network-first).
     list), `planner_shared` (a stand-in database: the
     household's document with the equipment, the newer copy wins, someone else's change — dishes and equipment — appears,
     a refused save, clearing keeps the equipment, the listener stops, the household wipe; someone else's change empties
-    ↩︎ Undo), `planner_undo` (v40.06: the window fills the screen, its top bar with the title, ↩︎ Undo and ✕ stays when
+    ↩︎ Undo), `planner_pick` also checks (v40.07–v40.08) a collection's recipes offered, ticked, greyed and cancelled, and a dish's name
+    opening its recipe above the planner (above the header too, under the recipe's own windows) — own, a collection's at
+    its recipe, a linked kitchen's — Enter on the name, closing back to the planner as it was, a dish by hand not a link,
+    and the planner closed properly the way Escape closes; `planner_undo` (v40.06: the window fills the screen, its top bar with the title, ↩︎ Undo and ✕ stays when
     scrolled to the end; each name on its own line with only the handle beside it, two lines at 340 px rather than cut;
     the buttons and "Until here" under the bar; ✕ then ↩︎ — back at its place, kept, said; move, 📌, ✓, cooks, Propose
     undone one by one, newest first; Clear the list and the equipment undone; 20 at most; greyed while reading; forgotten

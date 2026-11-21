@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v40.07 -->
+<!-- Tony's Recipes Collection v40.08 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -11416,7 +11416,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v40.07';
+var APP_VERSION = 'v40.08';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -14658,6 +14658,8 @@ body.banner-shown .header {
 /* v40.06 — the name has the line to itself (Tony: "In portrait mode … the recipe names get truncated"): up to two lines, then … */
 .pl-name { flex: 1; min-width: 0; font-weight: 600; font-size: 13.5px; line-height: 1.3; color: var(--heading); overflow: hidden; white-space: normal;
   overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }
+.pl-name-go { cursor: pointer; text-decoration: underline dotted; text-decoration-color: var(--muted); text-underline-offset: 3px; border-radius: 4px; }
+.pl-name-go:hover, .pl-name-go:focus-visible { color: var(--terracotta); text-decoration-color: currentColor; }
 .pl-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 1px; }
 .pl-btns { display: inline-flex; align-items: center; gap: 2px; }
 .pl-len { font-size: 12px; color: var(--muted); white-space: nowrap; }
@@ -15154,7 +15156,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v40.07</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v40.08</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -15242,7 +15244,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v40.07</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v40.08</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -22438,9 +22440,18 @@ function closeTopModal() {
       return cs.position === 'fixed' && cs.display !== 'none' && cs.visibility !== 'hidden';
     });
   if (!open.length) return false;
-  closeM(open[open.length - 1].id); // last in DOM order sits on top
+  open = modalsOnTopOrder(open);
+  closeM(open[open.length - 1].id); // the one on top: the highest z-index, then the last in DOM order
   return true;
 }
+// v40.08 — the windows in the order they are stacked, the top one last: by z-index, and in DOM order where it is the same.
+// (Windows of the same z-index are stacked in DOM order; a window with a higher one is above whatever its place.)
+function modalsOnTopOrder(els) {
+  var z = function (el) { var v = parseInt(window.getComputedStyle(el).zIndex, 10); return isNaN(v) ? 0 : v; };
+  return els.map(function (el, i) { return { el: el, z: z(el), i: i }; })
+    .sort(function (a, b) { return a.z - b.z || a.i - b.i; }).map(function (x) { return x.el; });
+}
+window.modalsOnTopOrder = modalsOnTopOrder;
 window.closeTopModal = closeTopModal;
 
 document.addEventListener('keydown', function(e) {
@@ -27631,6 +27642,13 @@ function closeM(id){
   }
   // v39.34 — the translation editor keeps what is not shared yet, and says so as it closes.
   if (id === 'i18nOverlay' && typeof i18nEdClosed === 'function' && !window._i18nEdQuietClose) setTimeout(i18nEdClosed, 0);
+  // v40.08 — the Work Planner's windows are made when opened and close their own way (Escape used to only hide them: the
+  // planner then stayed hidden the next time it was opened)
+  if (id === 'planOverlay' && typeof closePlanner === 'function') { closePlanner(); return; }
+  if (id === 'planResOverlay' && typeof planResClose === 'function') { planResClose(); return; }
+  if (id === 'planPartsOverlay' && typeof planPartsClose === 'function') { planPartsClose(); return; }
+  if (id === 'planAddOverlay') { var pa = document.getElementById(id); if (pa) pa.remove(); return; }
+  if (!document.getElementById(id)) return;
   document.getElementById(id).classList.remove('open');
   releaseFocus(id);   // 5c.1b — hand focus back to whatever opened THIS one (v36.65)
   if (id === 'playerOverlay') playerStop();   // v39.72 — a closed player plays nothing
@@ -37152,7 +37170,7 @@ var HELP_SYSTEM_PROMPT = [
   "- 🔒 SECRET RECIPES: in the editor, tick 🔒 Secret — the recipe (and its photo) is then kept where only your own kitchen can read it; the kitchens you link with do not see it, nor know it exists. Untick it to share it again. A 🔒 shows on its card.",
   "- 🔄 RELOAD A LINKED KITCHEN: beside a linked kitchen's name in your recipe list, 🔄 Reload reads its recipes and photos again from the start — for when something looks missing or out of date.",
   "- 💬 CHATS WITH LINKED KITCHENS: ··· More → 🏡 Kitchens and people → 💬 Chats with linked kitchens — or 💬 Chat beside a linked kitchen's name in your recipe list, or in 👥 Family Access. Every conversation, newest first, with what is new; open one to read it all and write (Enter sends, Shift+Enter starts a new line). The same conversations are also on 📬 Link requests. A red dot on ⋯ More and on ⚙️ says something new arrived. 🔔 At the foot of the window: notifications when the app is closed, the same switch as in 👪 Chat with family members (see 🔔 CHAT NOTIFICATIONS).",
-  "- 🗓️ WORK PLANNER (v40.05–v40.07): ··· More → 🧰 Tools → 🗓️ Work Planner — for cooking several dishes at once: it shows each dish's work and quiet time on one chart and proposes the order that finishes soonest. THE WINDOW fills the screen; its top bar — 🗓️ Work Planner, ↩︎ Undo and ✕ — stays while you scroll. Under it: + Add recipe, 🍳 Your kitchen, and 👩‍🍳 Cooks: 1 or 2. YOUR KITCHEN'S EQUIPMENT: the first time, the planner asks once how many 🔥 stove burners, ♨️ ovens, 🌡️ sous vide devices, 🍲 pressure or slow cookers, 🍟 air fryers, ⚡ microwaves, 🍖 grills and 🥣 stand mixers the kitchen has, and + Add other equipment for up to six of its own (a name and how many, e.g. Thermomix); Save (Close keeps the usual numbers — 4 burners, 1 oven, 1 microwave). It is kept for the whole household and not asked again. To see it or change it later: the 🍳 Your kitchen button (it opens that window, each piece by name and number). When the AI reads a recipe that needs equipment the kitchen has not listed — a sous vide at 0, or something outside the list such as a food dehydrator — it is added (one of it; equipment outside the list as one of your own, six at most) and a message says what was added: correct it in 🍳 Your kitchen. What you take away yourself there (a number set to 0, one of your own removed) is not added back; a dish that needs it then shows ⚠️ (your kitchen has none — counted as one). ADDING DISHES: + Add recipe → 📖 Add from the recipe list (the recipe list opens in select mode with its search box held at the top: tap several — your own and, if your kitchen is linked with others, the linked kitchens' recipes too; ticks stay while you search — then 🗓️ Add to the Work Planner at the bottom; ✕ Cancel goes back) or ✏️ Fill in manually (a name and the overall time — 45, or 1:30 — planned as one block of work). Or, in the recipe list: ☑ Select, tick recipes, then 🗓️ Add to the Work Planner among the select bar's actions. A COLLECTION is never added as one dish: a window, 📚 Which recipes from the collection?, lists its recipes to tick — one or several (a recipe already in the plan cannot be ticked) — and 🗓️ Add to the Work Planner brings each ticked recipe in as a dish of its own; Cancel adds none of them. Up to 12 dishes. THE AI READS each recipe once (what it found is kept for the household and used again): its steps become WORK (the cook is busy — a solid block) and QUIET time (simmering, baking, resting — a thin line), and which equipment each step occupies (a small 🔥, ♨️… above it; the legend under the chart names each icon shown). A recipe without quiet time, or one filled in by hand, is one block. ≈ beside a time: the AI could not read that recipe, so it is one block of its stated time. ↻ reads a recipe again (if it was misread). EACH DISH'S ROW: its full name on a line of its own (two lines at most), 🤝 if it comes from a linked kitchen, ✏️ if filled in by hand, ⏱ its own time; then its chart (every dish on the same scale); then 📌 ✓ ↻ ✕ and 'Until here' (the time used by then; before proposing, as if cooked one after another). Tap a block or a line in the chart to see that step's name and how long it takes (and its equipment), above it; tap again, or elsewhere, to hide it. THE ORDER of the list is the order the dishes are started in: drag a dish by its ⠿ handle (or ↑ ↓ on the keyboard) to change it — the times show how long that order takes. 🔀 Propose order arranges the dishes for the shortest total time, fitting one dish's work into another's quiet time and never using more of a piece of equipment at once than the kitchen has (two pots and one burner: the second waits; a dotted line is a dish waiting for a free cook or equipment). 📌 pins a dish: 🔀 Propose order keeps it at its place and arranges the others around it (tap 📌 again to unpin). ✓ marks a dish done: it stays greyed in the chart and the others' times do not change; the next 🔀 Propose order leaves it out (it goes last, without a chart, and the rest is planned without it); ✓ again puts it back. 👩‍🍳 Cooks: with two, two blocks of work can run at once (the second cook's are green). ⏱ Everything: the total, and beside it how long one after another would take. ✕ removes one dish; 🗑️ Clear the list removes them all (the kitchen's equipment stays). ↩︎ UNDO puts back the plan as it was before your last change — a dish added, removed, moved, pinned or marked done, the order proposed, the list cleared, the cooks or the equipment changed, a recipe read again; tap it again for the change before, up to 20 changes. It is greyed when there is nothing to undo, while a recipe is being read, and after someone else in the household changed the plan (undoing would throw their change away). SHARED: the plan is shared with everyone in the household — anyone can add, remove or clear; signed out, it stays on this device. In Hebrew, a block of work is called 'יחידת עבודה' (never 'גוש'). [GO:work-planner] leads there.",
+  "- 🗓️ WORK PLANNER (v40.05–v40.08): ··· More → 🧰 Tools → 🗓️ Work Planner — for cooking several dishes at once: it shows each dish's work and quiet time on one chart and proposes the order that finishes soonest. THE WINDOW fills the screen; its top bar — 🗓️ Work Planner, ↩︎ Undo and ✕ — stays while you scroll. Under it: + Add recipe, 🍳 Your kitchen, and 👩‍🍳 Cooks: 1 or 2. YOUR KITCHEN'S EQUIPMENT: the first time, the planner asks once how many 🔥 stove burners, ♨️ ovens, 🌡️ sous vide devices, 🍲 pressure or slow cookers, 🍟 air fryers, ⚡ microwaves, 🍖 grills and 🥣 stand mixers the kitchen has, and + Add other equipment for up to six of its own (a name and how many, e.g. Thermomix); Save (Close keeps the usual numbers — 4 burners, 1 oven, 1 microwave). It is kept for the whole household and not asked again. To see it or change it later: the 🍳 Your kitchen button (it opens that window, each piece by name and number). When the AI reads a recipe that needs equipment the kitchen has not listed — a sous vide at 0, or something outside the list such as a food dehydrator — it is added (one of it; equipment outside the list as one of your own, six at most) and a message says what was added: correct it in 🍳 Your kitchen. What you take away yourself there (a number set to 0, one of your own removed) is not added back; a dish that needs it then shows ⚠️ (your kitchen has none — counted as one). ADDING DISHES: + Add recipe → 📖 Add from the recipe list (the recipe list opens in select mode with its search box held at the top: tap several — your own and, if your kitchen is linked with others, the linked kitchens' recipes too; ticks stay while you search — then 🗓️ Add to the Work Planner at the bottom; ✕ Cancel goes back) or ✏️ Fill in manually (a name and the overall time — 45, or 1:30 — planned as one block of work). Or, in the recipe list: ☑ Select, tick recipes, then 🗓️ Add to the Work Planner among the select bar's actions. A COLLECTION is never added as one dish: a window, 📚 Which recipes from the collection?, lists its recipes to tick — one or several (a recipe already in the plan cannot be ticked) — and 🗓️ Add to the Work Planner brings each ticked recipe in as a dish of its own; Cancel adds none of them. Up to 12 dishes. THE AI READS each recipe once (what it found is kept for the household and used again): its steps become WORK (the cook is busy — a solid block) and QUIET time (simmering, baking, resting — a thin line), and which equipment each step occupies (a small 🔥, ♨️… above it; the legend under the chart names each icon shown). A recipe without quiet time, or one filled in by hand, is one block. ≈ beside a time: the AI could not read that recipe, so it is one block of its stated time. ↻ reads a recipe again (if it was misread). EACH DISH'S ROW: its full name on a line of its own (two lines at most — tap the name to open that recipe on top of the planner; close it and you are back in the planner, as you left it; a dish filled in by hand has no recipe to open), 🤝 if it comes from a linked kitchen, ✏️ if filled in by hand, ⏱ its own time; then its chart (every dish on the same scale); then 📌 ✓ ↻ ✕ and 'Until here' (the time used by then; before proposing, as if cooked one after another). Tap a block or a line in the chart to see that step's name and how long it takes (and its equipment), above it; tap again, or elsewhere, to hide it. THE ORDER of the list is the order the dishes are started in: drag a dish by its ⠿ handle (or ↑ ↓ on the keyboard) to change it — the times show how long that order takes. 🔀 Propose order arranges the dishes for the shortest total time, fitting one dish's work into another's quiet time and never using more of a piece of equipment at once than the kitchen has (two pots and one burner: the second waits; a dotted line is a dish waiting for a free cook or equipment). 📌 pins a dish: 🔀 Propose order keeps it at its place and arranges the others around it (tap 📌 again to unpin). ✓ marks a dish done: it stays greyed in the chart and the others' times do not change; the next 🔀 Propose order leaves it out (it goes last, without a chart, and the rest is planned without it); ✓ again puts it back. 👩‍🍳 Cooks: with two, two blocks of work can run at once (the second cook's are green). ⏱ Everything: the total, and beside it how long one after another would take. ✕ removes one dish; 🗑️ Clear the list removes them all (the kitchen's equipment stays). ↩︎ UNDO puts back the plan as it was before your last change — a dish added, removed, moved, pinned or marked done, the order proposed, the list cleared, the cooks or the equipment changed, a recipe read again; tap it again for the change before, up to 20 changes. It is greyed when there is nothing to undo, while a recipe is being read, and after someone else in the household changed the plan (undoing would throw their change away). SHARED: the plan is shared with everyone in the household — anyone can add, remove or clear; signed out, it stays on this device. In Hebrew, a block of work is called 'יחידת עבודה' (never 'גוש'). [GO:work-planner] leads there.",
   "- 🔔 CHAT NOTIFICATIONS WHEN THE APP IS CLOSED (v40.02): at the foot of 👪 Chat with family members, and of 💬 Chats with linked kitchens, tap 🔔 Notify me of new messages when the app is closed; the phone (or computer) asks whether to allow notifications — say Allow. From then on a new message shows as a notification, with who wrote it and the text and the phone's own sound, even when the app is closed; a tap on it opens that conversation. One switch for both chats, on THIS device: turn it on on each phone or computer you use. 🔕 Turn off in the same place (signing out turns it off too). The family chat: messages to everyone and to you alone; linked kitchens: messages from kitchens linked with yours (not from one still asking). Your own messages never notify you. ON AN iPHONE OR iPAD (iOS 16.4 or later) only the app on the Home Screen can: in Safari, Share → Add to Home Screen, open the app from that icon, and turn it on there. 'Notifications are blocked'? Allow them in the phone's Settings → Notifications → the app (or in the browser's settings for the site), then tap 🔔 again. While the app is open on the screen, a message chimes and shows in the app instead. The notification makes the phone's own notification sound (the app's own kitchen sounds — ⚙️ → ♿ Accessibility → 🎵 The sound — play only while the app is open). Linked kitchens' messages stop reaching a device on which the app has not been opened for 45 days — open it once and they come again (the family chat keeps coming). ⚙️ → What leaves this device lists the device's notification service, and the Privacy Statement says what is kept for it. The message travels encrypted through the device's own notification service (Apple, Google, Mozilla or Microsoft), which cannot read it.",
   "- ♿ ACCESSIBILITY: ⚙️ → ♿ Accessibility, on this device: 🎨 Colours for red–green colour blindness (the most common colour blindness, where reds and greens look alike, brownish): wherever a colour says something, green becomes blue and red becomes a deep orange — all right / a problem, the sync dot, Easy and Hard, the Self Test's results, delete buttons — and a notification dot turns blue inside its ring; and the recipe photos are colour-corrected, so a red tomato and a green pepper no longer look alike (they look a little different to everyone else). For the whole phone, an iPhone has its own: Settings → Accessibility → Display & Text Size → Color Filters → Red/Green Filter; Android: Settings → Accessibility → Color correction. 🟡 A yellow ring round the notification dots (on unless turned off) so a new message or request catches the eye, on ⋯ More and in ⚙️. 🌗 Theme: light, dark, or as the device. 🔔 the sound when something arrives, and 🎵 which sound.",
   "- 👉 NOTICES THAT TAKE YOU THERE: a notice at the bottom of the screen with a › at its end is a button — tap or click it (or Enter) to go where it points: a new message opens its chat; a kitchen linked or accepted shows only that kitchen's recipes; a recipe saved, imported, copied, translated or added opens it; a note from a tester opens 👑 → 📊 Households → 💬 Feedback; someone asking to add recipes, or joining, opens 👥 Family Access; a link request sent opens 📬 Link requests; a backup opens 💾 Backups; a failed sync or the AI allowance opens Sync Health; an error opens the log. The place it leads to is marked with a yellow ring for a moment. Such a notice stays up at least 6 seconds; a notice about what is already on the screen has no › and goes nowhere. On a notice with a button (Open, ↩︎ Undo, Back up now) the button does its own thing — tapping the words of an Undo notice never undoes.",
@@ -41880,7 +41898,9 @@ function planRender() {
     return '<div class="pl-row' + (it.done ? ' pl-done' : '') + (r.off ? ' pl-off' : '') + (it.pin ? ' pl-pinned' : '') + '" data-id="' + escA(it.id) + '">'
       + '<div class="pl-head">'
       + (r.off ? '' : '<button type="button" class="pl-drag" aria-label="Drag to reorder" title="Drag to reorder" onpointerdown="planDragStart(event,' + jsA(it.id) + ')" onkeydown="planDragKey(event,' + jsA(it.id) + ')">⠿</button>')
-      + '<span class="pl-name" dir="auto" data-no-i18n title="' + escA(it.name) + '">' + escH(it.name) + '</span>'
+      + (it.kind === 'recipe' && planFindRecipe(it.rid)   // v40.08 — the name opens its recipe, on top of the planner
+          ? '<span class="pl-name pl-name-go" role="button" tabindex="0" dir="auto" data-no-i18n title="' + escA(it.name) + '" onclick="planOpenRecipe(' + jsA(it.id) + ')" onkeydown="planNameKey(event,' + jsA(it.id) + ')">' + escH(it.name) + '</span>'
+          : '<span class="pl-name" dir="auto" data-no-i18n title="' + escA(it.name) + '">' + escH(it.name) + '</span>')
       + (it.kind === 'manual' ? '<span class="pl-tag">✏️</span>' : '')
       + (/^L/.test(it.rid || '') ? '<span class="pl-tag" title="' + escA(i18nPhrase('From a linked kitchen') + (it.from ? ': ' + it.from : '')) + '" data-no-i18n>\u{1F91D}</span>' : '')
       + (it.done ? '<span class="pl-donetag">✓ Done</span>' : '')
@@ -41969,8 +41989,14 @@ async function openPlanner() {
       if (e.target === ov) return closePlanner();
       if (!(e.target.closest && e.target.closest('.pl-seg'))) planSegTip(null);
     };
-    document.body.appendChild(ov);
+    // v40.08 — placed just before the recipe window: windows of the same level (200) stack in the page's order, so a recipe
+    // opened from the planner — and all it opens, which come after it in the page — is drawn above the planner, while the
+    // planner still covers the app's header (also 200, earlier in the page). (Its own small windows are 1300.) Lowering the
+    // planner to 199 put the header over it.
+    var vw = document.getElementById('viewOverlay');
+    if (vw && vw.parentNode) vw.parentNode.insertBefore(ov, vw); else document.body.appendChild(ov);
   }
+  ov.classList.add('open');   // v40.08 — shown, even if something hid it without closing it
   await planLoad();
   if (_plan.at !== _planUndoAt) _planUndo = [];   // changed elsewhere since: what was remembered no longer applies
   planRender();
@@ -42281,6 +42307,33 @@ async function planDone(id) {
   await planSave();
   return it.done;
 }
+// v40.08 — a dish's name opens its recipe ON TOP of the planner (Tony, 21 Nov 2026: "When clicking a recipe name in the
+// planner, open the recipe on top of the planner. Once closed, return to the planner"). The planner stays open under it
+// (it sits in the page before the recipe windows — openPlanner); closing the recipe shows the planner again, as it was. One's own
+// recipe opens in the recipe window (openView), a linked kitchen's in its read-only window (openLinkedRecipeObj); a
+// recipe of a collection opens the collection at that recipe. A dish filled in by hand has no recipe to open.
+function planOpenRecipe(id) {
+  var it = _plan.items.filter(function (x) { return x.id === id; })[0];
+  if (!it || it.kind !== 'recipe') return false;
+  var rid = String(it.rid || ''), m = /^L([A-Za-z0-9]{1,64}):(.+)$/.exec(rid), whole = m ? m[2] : rid, hash = whole.indexOf('#');
+  var r = planFindRecipe(hash > 0 ? (m ? 'L' + m[1] + ':' : '') + whole.slice(0, hash) : rid);   // the recipe, or the collection it is in
+  if (!r) { toast('That recipe is not in the list any more.', 5000); return false; }
+  planSegTip(null);
+  if (m) openLinkedRecipeObj(r, m[1]); else openView(r.id);
+  if (hash > 0) {
+    var pi = -1, want = whole.slice(hash + 1);
+    recipeParts(r).forEach(function (p, i) { if (p && String(p.uid) === want) pi = i; });
+    var ov = document.getElementById(m ? 'linkedViewOverlay' : 'viewOverlay');
+    var part = pi >= 0 && ov ? ov.querySelector('[data-coll-part="' + pi + '"]') : null;
+    if (part) setTimeout(function () { try { part.scrollIntoView({ block: 'start' }); } catch (e) { part.scrollIntoView(); } }, 60);
+  }
+  return true;
+}
+function planNameKey(ev, id) {
+  if (!ev || (ev.key !== 'Enter' && ev.key !== ' ')) return false;
+  ev.preventDefault();
+  return planOpenRecipe(id);
+}
 // A tap on a block or a line: the step's name and how long it takes, above it (another tap, or a tap elsewhere, hides it)
 function planSegTip(el) {
   var body = document.getElementById('planBody'), had = el && el._planTip && el._planTip.parentNode;
@@ -42443,7 +42496,7 @@ window.planSchedule = planSchedule; window.planBlocks = planBlocks; window.planM
 window.planSave = planSave; window.planLoad = planLoad; window.planRead = planRead; window.planHM = planHM; window.planKey = planKey;
 window.planReread = planReread; window.planResForm = planResForm; window.planResSave = planResSave; window.planResClose = planResClose;
 window.planMove = planMove; window.planDragStart = planDragStart; window.planDragKey = planDragKey; window.planPin = planPin; window.planDone = planDone;
-window.planSegTip = planSegTip; window.planPartsChoose = planPartsChoose; window.planPartsAdd = planPartsAdd; window.planPartsClose = planPartsClose; window.planPartsSync = planPartsSync; window.planFindRecipe = planFindRecipe; window.planUndo = planUndo; window.planRemember = planRemember; window.planResFound = planResFound; window.planResTell = planResTell; window.planResAddOther = planResAddOther; window.planResOtherBtn = planResOtherBtn; window.linkedCardTap = linkedCardTap; window.planResClean = planResClean;
+window.planSegTip = planSegTip; window.planOpenRecipe = planOpenRecipe; window.planNameKey = planNameKey; window.planPartsChoose = planPartsChoose; window.planPartsAdd = planPartsAdd; window.planPartsClose = planPartsClose; window.planPartsSync = planPartsSync; window.planFindRecipe = planFindRecipe; window.planUndo = planUndo; window.planRemember = planRemember; window.planResFound = planResFound; window.planResTell = planResTell; window.planResAddOther = planResAddOther; window.planResOtherBtn = planResOtherBtn; window.linkedCardTap = linkedCardTap; window.planResClean = planResClean;
 
 function openCalcModal() {
   // Build category buttons
