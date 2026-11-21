@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v40.10 -->
+<!-- Tony's Recipes Collection v40.11 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -11416,7 +11416,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v40.10';
+var APP_VERSION = 'v40.11';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -14669,8 +14669,37 @@ body.banner-shown .header {
 .pl-x:hover, .pl-x:focus-visible { background: var(--bg); color: var(--danger); }
 .pl-bar { position: relative; height: 18px; border-radius: 3px;   /* a faint line under each tick of the axis (--pl-step: one tick's width) */
   background: repeating-linear-gradient(90deg, var(--border) 0 1px, transparent 1px var(--pl-step, 25%)); }
-[dir="rtl"] .pl-bar { background: repeating-linear-gradient(270deg, var(--border) 0 1px, transparent 1px var(--pl-step, 25%)); }
+[dir="rtl"] .pl-bar { background: none; }
 .pl-bar.pl-reading { background: none; font-size: 12px; color: var(--muted); height: auto; line-height: 18px; }
+/* v40.11 — the chart's own lines and folds (the axis is not one even scale when the waiting is folded) */
+.pl-bar:not(.pl-reading) { background: none; }
+.pl-gl { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--border); pointer-events: none; }
+.pl-fold { position: absolute; top: -2px; bottom: -2px; pointer-events: none; border-inline: 1px dashed var(--warm-brown); opacity: 0.55;
+  background: repeating-linear-gradient(135deg, var(--border) 0 4px, transparent 4px 8px); }
+.pl-foldlab { position: absolute; top: 0; font-size: 10px; font-weight: 700; color: var(--muted); transform: translateX(-50%); white-space: nowrap; }
+[dir="rtl"] .pl-foldlab { transform: translateX(50%); }
+.pl-tick.pl-tick-end { transform: none; padding-inline-start: 2px; }
+[dir="rtl"] .pl-tick.pl-tick-end { transform: none; }
+.pl-lane { margin: 2px -6px 4px; padding: 6px 6px 8px; border-radius: 10px; background: var(--bg); }
+.pl-lane-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 13px; font-weight: 700; color: var(--heading); }
+.pl-lane-note { font-size: 11.5px; font-weight: 500; color: var(--muted); }
+.pl-ini { position: absolute; inset-inline-start: 3px; top: 0; font-size: 10px; line-height: 16px; color: #fff; font-weight: 700; pointer-events: none; }
+.pl-runcard { max-height: 88vh; overflow-y: auto; }
+.pl-runtop { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.pl-runx { min-width: 40px; padding: 4px 10px; flex: none; font-size: 15px; }
+.pl-runstart { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 8px 0 6px; font-size: 13.5px; color: var(--ink); }
+.pl-runstart input[type=time] { min-height: 36px; padding: 4px 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--card-bg); color: var(--ink); font: inherit; font-weight: 700; }
+.pl-runstart .pl-btn { min-height: 36px; padding: 4px 12px; }
+.pl-run-st { display: flex; align-items: flex-start; gap: 8px; padding: 7px 0; border-bottom: 1px dashed var(--border); font-size: 13.5px; color: var(--ink); cursor: pointer; }
+.pl-run-st input { width: 18px; height: 18px; margin: 1px 0 0; flex: none; accent-color: var(--green); }
+.pl-run-t { flex: none; width: 46px; font-weight: 800; color: var(--terracotta); font-variant-numeric: tabular-nums; }
+.pl-run-d { flex: 1; min-width: 0; line-height: 1.35; }
+.pl-run-d small { color: var(--muted); }
+.pl-run-on .pl-run-d { color: var(--muted); text-decoration: line-through; }
+.pl-run-wait { padding: 5px 0 5px 54px; font-size: 12px; font-style: italic; color: var(--muted); border-bottom: 1px dashed var(--border); }
+[dir="rtl"] .pl-run-wait { padding: 5px 54px 5px 0; }
+.pl-run-ready { display: flex; gap: 8px; padding: 7px 0; font-size: 13px; color: var(--green); font-weight: 600; border-bottom: 1px dashed var(--border); }
+.pl-run-all { font-weight: 800; border-bottom: none; }
 .pl-seg { position: absolute; display: block; box-sizing: border-box; }
 .pl-seg.pl-w { top: 1px; height: 16px; background: var(--terracotta-fill); border-radius: 3px; }
 .pl-seg.pl-w.pl-c2 { background: var(--green); }
@@ -15157,7 +15186,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v40.10</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v40.11</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -15245,7 +15274,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v40.10</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v40.11</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -19101,6 +19130,9 @@ var I18N_EXTRA = [
    'Tap the dishes you are making \u2014 linked kitchens\u2019 too \u2014 then \u{1F5D3}\uFE0F Add to the Work Planner.',
    '\u{1F4DA} Which recipes from the collection?', 'A collection is not one dish: tick the recipes from it that you are making.', 'Already in the plan', 'Cancel',
    'Then, on another day: {1} \u2014 not planned here.',
+   'one day', '{1} days', '{1} h', '\u{1F469}\u200D\u{1F373} You', '\u{1F469}\u200D\u{1F373} The second cook', 'One thing at a time',
+   '\u{1F4CB} Run sheet', 'Each step in the order to do it \u2014 tick it as you go.', 'Start at', 'Now', 'Nothing to do until {1} ({2})',
+   '{1} is ready', '{1} \u2014 the rest on another day', 'Everything is ready',
    '\u{1F373} Your kitchen', '\u270F\uFE0F Edit', '\u21A9\uFE0E Undo', 'Undo the last change', 'The last change was undone.', 'Read the recipe again', 'From a linked kitchen', 'Needs {1} \u2014 your kitchen has none (counted as one).',
    'That recipe is not in the list any more.', '\u{1F373} Your kitchen\u2019s equipment',
    'Asked once: how many of each does your kitchen have? A plan never uses more of them at the same time. You can change this later with \u{1F373} Your kitchen.',
@@ -27654,6 +27686,7 @@ function closeM(id){
   if (id === 'planOverlay' && typeof closePlanner === 'function') { closePlanner(); return; }
   if (id === 'planResOverlay' && typeof planResClose === 'function') { planResClose(); return; }
   if (id === 'planPartsOverlay' && typeof planPartsClose === 'function') { planPartsClose(); return; }
+  if (id === 'planRunOverlay' && typeof planRunClose === 'function') { planRunClose(); return; }
   if (id === 'planAddOverlay') { var pa = document.getElementById(id); if (pa) pa.remove(); return; }
   if (!document.getElementById(id)) return;
   document.getElementById(id).classList.remove('open');
@@ -37177,7 +37210,7 @@ var HELP_SYSTEM_PROMPT = [
   "- 🔒 SECRET RECIPES: in the editor, tick 🔒 Secret — the recipe (and its photo) is then kept where only your own kitchen can read it; the kitchens you link with do not see it, nor know it exists. Untick it to share it again. A 🔒 shows on its card.",
   "- 🔄 RELOAD A LINKED KITCHEN: beside a linked kitchen's name in your recipe list, 🔄 Reload reads its recipes and photos again from the start — for when something looks missing or out of date.",
   "- 💬 CHATS WITH LINKED KITCHENS: ··· More → 🏡 Kitchens and people → 💬 Chats with linked kitchens — or 💬 Chat beside a linked kitchen's name in your recipe list, or in 👥 Family Access. Every conversation, newest first, with what is new; open one to read it all and write (Enter sends, Shift+Enter starts a new line). The same conversations are also on 📬 Link requests. A red dot on ⋯ More and on ⚙️ says something new arrived. 🔔 At the foot of the window: notifications when the app is closed, the same switch as in 👪 Chat with family members (see 🔔 CHAT NOTIFICATIONS).",
-  "- 🗓️ WORK PLANNER (v40.05–v40.09): ··· More → 🧰 Tools → 🗓️ Work Planner — for cooking several dishes at once: it shows each dish's work and quiet time on one chart and proposes the order that finishes soonest. THE WINDOW fills the screen; its top bar — 🗓️ Work Planner, ↩︎ Undo and ✕ — stays while you scroll. Under it: + Add recipe, 🍳 Your kitchen, and 👩‍🍳 Cooks: 1 or 2. YOUR KITCHEN'S EQUIPMENT: the first time, the planner asks once how many 🔥 stove burners, ♨️ ovens, 🌡️ sous vide devices, 🍲 pressure or slow cookers, 🍟 air fryers, ⚡ microwaves, 🍖 grills and 🥣 stand mixers the kitchen has, and + Add other equipment for up to six of its own (a name and how many, e.g. Thermomix); Save (Close keeps the usual numbers — 4 burners, 1 oven, 1 microwave). It is kept for the whole household and not asked again. To see it or change it later: the 🍳 Your kitchen button (it opens that window, each piece by name and number). When the AI reads a recipe that needs equipment the kitchen has not listed — a sous vide at 0, or something outside the list such as a food dehydrator — it is added (one of it; equipment outside the list as one of your own, six at most) and a message says what was added: correct it in 🍳 Your kitchen. What you take away yourself there (a number set to 0, one of your own removed) is not added back; a dish that needs it then shows ⚠️ (your kitchen has none — counted as one). ADDING DISHES: + Add recipe → 📖 Add from the recipe list (the recipe list opens in select mode with its search box held at the top: tap several — your own and, if your kitchen is linked with others, the linked kitchens' recipes too; ticks stay while you search — then 🗓️ Add to the Work Planner at the bottom; ✕ Cancel goes back) or ✏️ Fill in manually (a name and the overall time — 45, or 1:30 — planned as one block of work). Or, in the recipe list: ☑ Select, tick recipes, then 🗓️ Add to the Work Planner among the select bar's actions. A COLLECTION is never added as one dish: a window, 📚 Which recipes from the collection?, lists its recipes to tick — one or several (a recipe already in the plan cannot be ticked) — and 🗓️ Add to the Work Planner brings each ticked recipe in as a dish of its own; Cancel adds none of them. Up to 12 dishes. THE AI READS each recipe once (what it found is kept for the household and used again): its steps become WORK (the cook is busy — a solid block) and QUIET time (simmering, baking, resting — a thin line), and which equipment each step occupies (a small 🔥, ♨️… above it; the legend under the chart names each icon shown). A recipe without quiet time, or one filled in by hand, is one block. A MULTI-DAY RECIPE (marinating, brining or curing overnight or for days, an overnight rise…) is planned only up to its first step that waits for another day: its chart, its ⏱ time (with 🌙), the scale every dish is drawn on, 'Until here', ⏱ Everything and 🔀 Propose order count only that part; under its chart '🌙 Then, on another day: …' says what comes after (the waiting step and how long, + the time of the rest) — not planned here. (A quiet step the AI marks as waiting until another day, or any quiet step of 12 hours or more; a slow cooker on low for 8 hours the same day is not one.) ≈ beside a time: the AI could not read that recipe, so it is one block of its stated time. ↻ reads a recipe again (if it was misread). EACH DISH'S ROW: its full name on a line of its own (two lines at most — tap the name to open that recipe on top of the planner; close it and you are back in the planner, as you left it; a dish filled in by hand has no recipe to open), 🤝 if it comes from a linked kitchen, ✏️ if filled in by hand, ⏱ its own time; then its chart (every dish on the same scale); then 📌 ✓ ↻ ✕ and 'Until here' (the time used by then; before proposing, as if cooked one after another). Tap a block or a line in the chart to see that step's name and how long it takes (and its equipment), above it; tap again, or elsewhere, to hide it. THE ORDER of the list is the order the dishes are started in: drag a dish by its ⠿ handle (or ↑ ↓ on the keyboard) to change it — the times show how long that order takes. 🔀 Propose order arranges the dishes for the shortest total time, fitting one dish's work into another's quiet time and never using more of a piece of equipment at once than the kitchen has (two pots and one burner: the second waits; a dotted line is a dish waiting for a free cook or equipment). 📌 pins a dish: 🔀 Propose order keeps it at its place and arranges the others around it (tap 📌 again to unpin). ✓ marks a dish done: it stays greyed in the chart and the others' times do not change; the next 🔀 Propose order leaves it out (it goes last, without a chart, and the rest is planned without it); ✓ again puts it back. 👩‍🍳 Cooks: with two, two blocks of work can run at once (the second cook's are green). ⏱ Everything: the total, and beside it how long one after another would take. ✕ removes one dish; 🗑️ Clear the list removes them all (the kitchen's equipment stays). ↩︎ UNDO puts back the plan as it was before your last change — a dish added, removed, moved, pinned or marked done, the order proposed, the list cleared, the cooks or the equipment changed, a recipe read again; tap it again for the change before, up to 20 changes. It is greyed when there is nothing to undo, while a recipe is being read, and after someone else in the household changed the plan (undoing would throw their change away). SHARED: the plan is shared with everyone in the household — anyone can add, remove or clear; signed out, it stays on this device. In Hebrew, a block of work is called 'יחידת עבודה' (never 'גוש'). [GO:work-planner] leads there.",
+  "- 🗓️ WORK PLANNER (v40.05–v40.11): ··· More → 🧰 Tools → 🗓️ Work Planner — for cooking several dishes at once: it shows each dish's work and quiet time on one chart and proposes the order that finishes soonest. THE WINDOW fills the screen; its top bar — 🗓️ Work Planner, ↩︎ Undo and ✕ — stays while you scroll. Under it: + Add recipe, 🍳 Your kitchen, and 👩‍🍳 Cooks: 1 or 2. YOUR KITCHEN'S EQUIPMENT: the first time, the planner asks once how many 🔥 stove burners, ♨️ ovens, 🌡️ sous vide devices, 🍲 pressure or slow cookers, 🍟 air fryers, ⚡ microwaves, 🍖 grills and 🥣 stand mixers the kitchen has, and + Add other equipment for up to six of its own (a name and how many, e.g. Thermomix); Save (Close keeps the usual numbers — 4 burners, 1 oven, 1 microwave). It is kept for the whole household and not asked again. To see it or change it later: the 🍳 Your kitchen button (it opens that window, each piece by name and number). When the AI reads a recipe that needs equipment the kitchen has not listed — a sous vide at 0, or something outside the list such as a food dehydrator — it is added (one of it; equipment outside the list as one of your own, six at most) and a message says what was added: correct it in 🍳 Your kitchen. What you take away yourself there (a number set to 0, one of your own removed) is not added back; a dish that needs it then shows ⚠️ (your kitchen has none — counted as one). ADDING DISHES: + Add recipe → 📖 Add from the recipe list (the recipe list opens in select mode with its search box held at the top: tap several — your own and, if your kitchen is linked with others, the linked kitchens' recipes too; ticks stay while you search — then 🗓️ Add to the Work Planner at the bottom; ✕ Cancel goes back) or ✏️ Fill in manually (a name and the overall time — 45, or 1:30 — planned as one block of work). Or, in the recipe list: ☑ Select, tick recipes, then 🗓️ Add to the Work Planner among the select bar's actions. A COLLECTION is never added as one dish: a window, 📚 Which recipes from the collection?, lists its recipes to tick — one or several (a recipe already in the plan cannot be ticked) — and 🗓️ Add to the Work Planner brings each ticked recipe in as a dish of its own; Cancel adds none of them. Up to 12 dishes. THE AI READS each recipe once (what it found is kept for the household and used again): its steps become WORK (the cook is busy — a solid block) and QUIET time (simmering, baking, resting — a thin line), and which equipment each step occupies (a small 🔥, ♨️… above it; the legend under the chart names each icon shown). A recipe without quiet time, or one filled in by hand, is one block. A MULTI-DAY RECIPE (marinating, brining or curing overnight or for days, an overnight rise…) is planned only up to its first step that waits for another day: its chart, its ⏱ time (with 🌙), the scale every dish is drawn on, 'Until here', ⏱ Everything and 🔀 Propose order count only that part; under its chart '🌙 Then, on another day: …' says what comes after (the waiting step and how long — in days when it is a day or more, '8 days' — + the time of the rest) — not planned here. The AI leaves out the time a finished dish only keeps (a week in the fridge). (A quiet step the AI marks as waiting until another day, or any quiet step of 12 hours or more; a slow cooker on low for 8 hours the same day is not one.) ≈ beside a time: the AI could not read that recipe, so it is one block of its stated time. ↻ reads a recipe again (if it was misread). EACH DISH'S ROW: its full name on a line of its own (two lines at most — tap the name to open that recipe on top of the planner; close it and you are back in the planner, as you left it; a dish filled in by hand has no recipe to open), 🤝 if it comes from a linked kitchen, ✏️ if filled in by hand, ⏱ its own time; then its chart (every dish on the same scale; before 🔀 Propose order the dishes are drawn one after another in the list's order, as one cook would make them); then 📌 ✓ ↻ ✕ and 'Until here' (the time used by then; before proposing, as if cooked one after another). Tap a block or a line in the chart to see that step's name and how long it takes (and its equipment), above it; tap again, or elsewhere, to hide it. THE ORDER of the list is the order the dishes are started in: drag a dish by its ⠿ handle (or ↑ ↓ on the keyboard) to change it — the times show how long that order takes. 🔀 Propose order arranges the dishes for the shortest total time, fitting one dish's work into another's quiet time and never using more of a piece of equipment at once than the kitchen has (two pots and one burner: the second waits; a dotted line is a dish waiting for a free cook or equipment). 📌 pins a dish: 🔀 Propose order keeps it at its place and arranges the others around it (tap 📌 again to unpin). ✓ marks a dish done: it stays greyed in the chart and the others' times do not change; the next 🔀 Propose order leaves it out (it goes last, without a chart, and the rest is planned without it); ✓ again puts it back. 👩‍🍳 Cooks: with two, two blocks of work can run at once (the second cook's are green). ⏱ Everything: the total, and beside it how long one after another would take. ✕ removes one dish; 🗑️ Clear the list removes them all (the kitchen's equipment stays). FOLDED WAITING: a stretch of 20 minutes or more in which nobody has anything to do (everything simmering, baking or resting) is folded into a narrow striped band, with its length written above it ('≈ 1:55') and the time after it on the axis — so a soup that simmers for hours does not shrink the other dishes to slivers; the rest of the chart keeps one true scale, and every dish keeps its place in time. 👩‍🍳 YOU: the row above the dishes holds all the work in one line — it shows you do one thing at a time (with two cooks, after 🔀 Propose order, a row for the second cook too); tap a block to see the dish and the step. 📋 RUN SHEET (the button beside 🔀 Propose order): the plan as a list of steps in the order to do them, at clock times from 'Start at' (now, or a time you choose; 'Now' sets it again) — each step's dish, how long and its equipment, '⏳ Nothing to do until …' where there is a break, '✓ … is ready' when a dish is, a multi-day dish's '— the rest on another day', and '✓ Everything is ready'; tick each step as you go (the ticks are kept on this device); it follows the plan when the plan changes. ↩︎ UNDO puts back the plan as it was before your last change — a dish added, removed, moved, pinned or marked done, the order proposed, the list cleared, the cooks or the equipment changed, a recipe read again; tap it again for the change before, up to 20 changes. It is greyed when there is nothing to undo, while a recipe is being read, and after someone else in the household changed the plan (undoing would throw their change away). SHARED: the plan is shared with everyone in the household — anyone can add, remove or clear; signed out, it stays on this device. In Hebrew, a block of work is called 'יחידת עבודה' (never 'גוש'). [GO:work-planner] leads there.",
   "- 🔔 CHAT NOTIFICATIONS WHEN THE APP IS CLOSED (v40.02): at the foot of 👪 Chat with family members, and of 💬 Chats with linked kitchens, tap 🔔 Notify me of new messages when the app is closed; the phone (or computer) asks whether to allow notifications — say Allow. From then on a new message shows as a notification, with who wrote it and the text and the phone's own sound, even when the app is closed; a tap on it opens that conversation. One switch for both chats, on THIS device: turn it on on each phone or computer you use. 🔕 Turn off in the same place (signing out turns it off too). The family chat: messages to everyone and to you alone; linked kitchens: messages from kitchens linked with yours (not from one still asking). Your own messages never notify you. ON AN iPHONE OR iPAD (iOS 16.4 or later) only the app on the Home Screen can: in Safari, Share → Add to Home Screen, open the app from that icon, and turn it on there. 'Notifications are blocked'? Allow them in the phone's Settings → Notifications → the app (or in the browser's settings for the site), then tap 🔔 again. While the app is open on the screen, a message chimes and shows in the app instead. The notification makes the phone's own notification sound (the app's own kitchen sounds — ⚙️ → ♿ Accessibility → 🎵 The sound — play only while the app is open). Linked kitchens' messages stop reaching a device on which the app has not been opened for 45 days — open it once and they come again (the family chat keeps coming). ⚙️ → What leaves this device lists the device's notification service, and the Privacy Statement says what is kept for it. The message travels encrypted through the device's own notification service (Apple, Google, Mozilla or Microsoft), which cannot read it.",
   "- ♿ ACCESSIBILITY: ⚙️ → ♿ Accessibility, on this device: 🎨 Colours for red–green colour blindness (the most common colour blindness, where reds and greens look alike, brownish): wherever a colour says something, green becomes blue and red becomes a deep orange — all right / a problem, the sync dot, Easy and Hard, the Self Test's results, delete buttons — and a notification dot turns blue inside its ring; and the recipe photos are colour-corrected, so a red tomato and a green pepper no longer look alike (they look a little different to everyone else). For the whole phone, an iPhone has its own: Settings → Accessibility → Display & Text Size → Color Filters → Red/Green Filter; Android: Settings → Accessibility → Color correction. 🟡 A yellow ring round the notification dots (on unless turned off) so a new message or request catches the eye, on ⋯ More and in ⚙️. 🌗 Theme: light, dark, or as the device. 🔔 the sound when something arrives, and 🎵 which sound.",
   "- 👉 NOTICES THAT TAKE YOU THERE: a notice at the bottom of the screen with a › at its end is a button — tap or click it (or Enter) to go where it points: a new message opens its chat; a kitchen linked or accepted shows only that kitchen's recipes; a recipe saved, imported, copied, translated or added opens it; a note from a tester opens 👑 → 📊 Households → 💬 Feedback; someone asking to add recipes, or joining, opens 👥 Family Access; a link request sent opens 📬 Link requests; a backup opens 💾 Backups; a failed sync or the AI allowance opens Sync Health; an error opens the log. The place it leads to is marked with a yellow ring for a moment. Such a notice stays up at least 6 seconds; a notice about what is already on the screen has no › and goes nowhere. On a notice with a button (Open, ↩︎ Undo, Back up now) the button does its own thing — tapping the words of an Undo notice never undoes.",
@@ -41457,7 +41490,7 @@ function planBlocks(list) {
     var k = String(b.k || b.kind || '').toLowerCase().charAt(0) === 'q' ? 'q' : 'w';
     var m = Math.round(Number(b.m != null ? b.m : b.min));
     if (!(m >= 1)) return;
-    var most = k === 'q' ? PLAN_QUIET_MAX : 1440;   // v40.09 — quiet time up to a week (a brine of two days keeps its length)
+    var most = k === 'q' ? PLAN_QUIET_MAX : 1440;   // quiet time up to 30 days (v40.09: a week; v40.11: 30), work up to a day
     m = Math.min(m, most);
     var r = PLAN_RES_ID.test(String(b.r || '')) ? String(b.r) : '';
     var s = String(b.s || '').replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, 60);
@@ -41477,7 +41510,15 @@ function planBlocks(list) {
 // or brining overnight, curing, rising overnight…), or any quiet block of PLAN_STOP_MIN (12 hours) or more (a reading
 // made before the mark). What comes from it on is said under the dish's chart and is in nothing else: not its time, the
 // scale, Until here, the totals, 🔀 Propose order or the equipment it is warned about.
-var PLAN_STOP_MIN = 720, PLAN_QUIET_MAX = 10080;
+var PLAN_STOP_MIN = 720, PLAN_QUIET_MAX = 43200;   // v40.11 — a cure of 8 days, a brine of 10: up to 30 days (was a week)
+// v40.11 — a time of a day or more in days ("8 days", "7 days 6 h"), not 192:00 (Tony's pork belly showed 168:00)
+function planDur(m) {
+  m = Math.max(0, Math.round(m || 0));
+  if (m < 1440) return planHM(m);
+  var d = Math.floor(m / 1440), h = Math.round((m - d * 1440) / 60);
+  if (h === 24) { d++; h = 0; }
+  return (d === 1 ? i18nPhrase('one day') : i18nPhrase('{1} days').replace('{1}', d)) + (h ? ' ' + i18nPhrase('{1} h').replace('{1}', h) : '');
+}
 function planIsStop(b) { return !!b && b.k === 'q' && (!!b.d || b.m >= PLAN_STOP_MIN); }
 function planToday(list) {
   var all = planBlocks(list), at = -1;
@@ -41548,7 +41589,9 @@ function planPrompt(r) {
     + 'at most 3 words, in the language with the code "' + ((typeof i18nLang === 'function' && i18nLang()) || 'en') + '".\n'
     + 'A quiet block that waits until ANOTHER DAY — marinating, brining or curing overnight or for days, a dough rising or a '
     + 'dish chilling overnight, soaking beans overnight — gets "d":1; cooking that ends the same day (a slow cooker on low '
-    + 'for 8 hours) does not.\n'
+    + 'for 8 hours) does not. A wait of days is its whole time in minutes (a week: 10080; 10 days: 14400).\n'
+    + 'Leave out the time the finished dish only keeps or is stored (keeps a week in the fridge, freezes for a month) and '
+    + 'serving — the method ends when the dish is ready.\n'
     + 'No "r" for work at the counter, or for resting, chilling or marinating away from these. Moving to other equipment '
     + 'starts a new block (searing on the stove, then roasting in the oven).\n'
     + 'Answer exactly like: {"blocks":[{"k":"w","m":15,"s":"Chop the vegetables"},{"k":"w","m":8,"s":"Fry the onion","r":"stove"},'
@@ -41877,20 +41920,102 @@ function planView() {
     // the list as it stands (proposed, or dragged since): started in its order, timed together
     var s = planSchedule(items, _plan.cooks, _plan.res, { fixed: true });
     var rows = items.map(function (it, j) { var sg = s.segs[j] || []; return { it: it, segs: sg, start: sg.length ? sg[0].a : 0, until: s.ends[j] || 0, len: lens[j] }; });
-    return { rows: rows.concat(offRows), total: s.total, scale: Math.max(s.total, 1), seq: seq, proposed: true, planned: items.length };
+    return planFold({ rows: rows.concat(offRows), total: s.total, scale: Math.max(s.total, 1), seq: seq, proposed: true, planned: items.length });
   }
+  // v40.11 — before proposing, the dishes one after another in the list's order (as "Until here" counts them), so the
+  // chart is always something one cook could do (Tony saw work of four dishes "progressing at the same time" when every
+  // dish was drawn from 0:00)
   var acc = 0;
-  return { rows: items.map(function (it, j) {
-      var t = 0, sg = planToday(it.blocks).now.map(function (b) { var x = { k: b.k, a: t, b: t + b.m, s: b.s, c: 0 }; if (b.r) x.r = b.r; t += b.m; return x; });
+  return planFold({ rows: items.map(function (it, j) {
+      var start = acc, t = acc, sg = planToday(it.blocks).now.map(function (b) { var x = { k: b.k, a: t, b: t + b.m, s: b.s, c: 0 }; if (b.r) x.r = b.r; t += b.m; return x; });
       acc += lens[j];
-      return { it: it, segs: sg, start: 0, until: acc, len: lens[j] };
-    }).concat(offRows), total: seq, scale: Math.max.apply(null, lens.concat([1])), seq: seq, proposed: false, planned: items.length };
+      return { it: it, segs: sg, start: start, until: acc, len: lens[j] };
+    }).concat(offRows), total: seq, scale: Math.max(seq, 1), seq: seq, proposed: false, planned: items.length });
+}
+// ── v40.11 — FOLD THE WAITING (Tony, 21 Nov 2026, of a planner where a soup's 2½ hours of simmering left the other dishes
+// "barely visible": "We need to find a way to scale the recipes only to the work that is going to take place today"; he
+// chose the fold). Every stretch of PLAN_FOLD_MIN minutes or more in which NOBODY has work — everything simmering, baking,
+// resting — is drawn as a narrow striped band with its length written on the axis ("≈ 1:55"); the rest keeps one true
+// scale, and every dish keeps its place in time, so 🔀 Propose order still shows one dish's work inside another's quiet
+// time. The bands together take at most 36% of the width (14% each).
+var PLAN_FOLD_MIN = 20;
+function planFoldCuts(rows, total) {
+  var work = [];
+  rows.forEach(function (r) { if (!r.off) (r.segs || []).forEach(function (g) { if (g.k === 'w') work.push([g.a, g.b]); }); });
+  if (!work.length) return [];
+  work.sort(function (a, b) { return a[0] - b[0]; });
+  var cuts = [], busy = 0;
+  work.forEach(function (w) { if (w[0] - busy >= PLAN_FOLD_MIN) cuts.push({ a: busy, b: w[0] }); busy = Math.max(busy, w[1]); });
+  if (total - busy >= PLAN_FOLD_MIN) cuts.push({ a: busy, b: total });
+  return cuts;
+}
+// The x of a minute, in % of the chart's width
+function planScaleMap(total, cuts) {
+  total = Math.max(total, 1);
+  var folded = cuts.reduce(function (n, c) { return n + (c.b - c.a); }, 0), open = total - folded;
+  if (!cuts.length || open <= 0) return { x: function (t) { return Math.max(0, Math.min(100, t / total * 100)); }, cuts: [], band: 0, open: total };
+  var band = Math.min(14, 36 / cuts.length), per = (100 - band * cuts.length) / open;
+  var x = function (t) {
+    var acc = 0, p = 0;
+    for (var i = 0; i < cuts.length; i++) {
+      var c = cuts[i];
+      if (t <= c.a) return acc + (t - p) * per;
+      acc += (c.a - p) * per;
+      if (t < c.b) return acc + (t - c.a) / (c.b - c.a) * band;
+      acc += band; p = c.b;
+    }
+    return Math.min(100, acc + (t - p) * per);
+  };
+  cuts.forEach(function (c) { c.x0 = x(c.a); c.x1 = x(c.b); });
+  return { x: x, cuts: cuts, band: band, open: open };
+}
+function planFold(v) {
+  v.map = planScaleMap(v.scale, planFoldCuts(v.rows, v.scale));
+  // the axis: 0, the time each fold ends (when there is work again), and the usual steps where there is room
+  var m = v.map, step = planStep(m.open), ticks = [{ t: 0, x: 0, end: false }];
+  m.cuts.forEach(function (c) { if (c.b < v.scale) ticks.push({ t: c.b, x: c.x1, end: true }); });
+  for (var t = step; t <= v.scale; t += step) {
+    if (m.cuts.some(function (c) { return t > c.a && t < c.b; })) continue;
+    var xx = m.x(t);
+    if (ticks.some(function (k) { return Math.abs(k.x - xx) < 9; })) continue;
+    if (m.cuts.some(function (c) { return xx > c.x0 - 5 && xx < c.x1 + 9; })) continue;   // room for a fold's label and the time after it
+    ticks.push({ t: t, x: xx, end: false });
+  }
+  v.ticks = ticks.sort(function (a, b) { return a.x - b.x; });
+  return v;
 }
 function planStep(scale) { return scale <= 60 ? 15 : scale <= 180 ? 30 : scale <= 480 ? 60 : 120; }
-function planAxisHtml(scale) {
-  var step = planStep(scale), h = '';
-  for (var t = 0; t <= scale; t += step) h += '<span class="pl-tick" style="inset-inline-start:' + (t / scale * 100) + '%" data-no-i18n>' + planHM(t) + '</span>';
+function planAxisHtml(v) {
+  var h = (v.ticks || []).map(function (k) {
+    return '<span class="pl-tick' + (k.end ? ' pl-tick-end' : '') + '" style="inset-inline-start:' + k.x.toFixed(3) + '%" data-no-i18n>' + planHM(k.t) + '</span>';
+  }).join('') + v.map.cuts.map(function (c) {
+    return '<span class="pl-foldlab" style="inset-inline-start:' + ((c.x0 + c.x1) / 2).toFixed(3) + '%" data-no-i18n>≈ ' + planHM(c.b - c.a) + '</span>';
+  }).join('');
   return '<div class="pl-axis" aria-hidden="true">' + h + '</div>';
+}
+// What goes under a chart's blocks: the folds (striped) and a faint line under each of the axis's times
+function planBarBack(v) {
+  return v.map.cuts.map(function (c) { return '<span class="pl-fold" aria-hidden="true" style="inset-inline-start:' + c.x0.toFixed(3) + '%;width:' + (c.x1 - c.x0).toFixed(3) + '%"></span>'; }).join('')
+    + (v.ticks || []).map(function (k) { return k.x > 0 ? '<i class="pl-gl" aria-hidden="true" style="inset-inline-start:' + k.x.toFixed(3) + '%"></i>' : ''; }).join('');
+}
+// ── v40.11 — 👩‍🍳 YOU: one row above the dishes with all the work, so it shows that one cook does one thing at a time
+// (Tony: "I see activities in different recipes progressing at the same time. How would it work in real life?"). With two
+// cooks (after 🔀 Propose order) a row for the second cook too. A tap on a block shows the dish, the step and its time.
+function planLanesHtml(v) {
+  var lanes = [0], work = [];
+  if (_plan.cooks === 2 && v.proposed) lanes.push(1);
+  v.rows.forEach(function (r) { if (!r.off) (r.segs || []).forEach(function (g) { if (g.k === 'w') work.push({ g: g, it: r.it }); }); });
+  return lanes.map(function (c) {
+    var segs = work.filter(function (w) { return (w.g.c || 0) === c; }).map(function (w) {
+      var g = w.g, x0 = v.map.x(g.a), wd = Math.max(0.6, v.map.x(g.b) - x0), nm = String(w.it.name || '');
+      var tip = nm + ' · ' + (g.s || i18nPhrase('Work')) + ' · ' + planHM(g.b - g.a);
+      return '<span class="pl-seg pl-w' + (c ? ' pl-c2' : '') + '" data-no-i18n style="inset-inline-start:' + x0.toFixed(3) + '%;width:' + wd.toFixed(3)
+        + '%" title="' + escA(tip) + '" data-tip="' + escA(tip) + '" onclick="planSegTip(this)">'
+        + (wd >= 4 ? '<b class="pl-ini" aria-hidden="true">' + escH(Array.from(nm.trim())[0] || '') + '</b>' : '') + '</span>';
+    }).join('');
+    return '<div class="pl-lane' + (c ? ' pl-lane2' : '') + '"><div class="pl-lane-head">' + (c ? '<span>\u{1F469}‍\u{1F373} The second cook</span>' : '<span>\u{1F469}‍\u{1F373} You</span>')
+      + '<span class="pl-lane-note">One thing at a time</span></div><div class="pl-bar pl-lanebar">' + planBarBack(v) + segs + '</div></div>';
+  }).join('');
 }
 // The legend names each piece of equipment whose icon is drawn on the chart
 function planResLegendHtml(rows, res) {
@@ -41910,14 +42035,14 @@ function planRender() {
   var rows = v.rows.map(function (r) {
     var it = r.it, reading = !r.off && (!!_planReading[it.id] || !planBlocks(it.blocks).length);
     var bar = r.off ? '' : reading ? '<div class="pl-bar pl-reading">⏳ Reading the recipe…</div>'
-      : '<div class="pl-bar">' + r.segs.map(function (g) {
-          var w = Math.max(0.6, (g.b - g.a) / v.scale * 100);
+      : '<div class="pl-bar">' + planBarBack(v) + r.segs.map(function (g) {
+          var x0 = v.map.x(g.a), w = Math.max(0.6, v.map.x(g.b) - x0);
           var label = (g.k === 'w' ? (_plan.cooks === 2 ? (g.c ? '👩‍🍳 2' : '👩‍🍳 1') + ' · ' : '') : g.k === 'q' ? '\u{1F4A4} ' : '⏸ ')
             + (g.r ? planResEmoji(g.r) + ' ' + planResName(g.r, res) + ' · ' : '') + (g.s ? g.s + ' · ' : '') + planHM(g.b - g.a);
           // a tap shows the step's name and how long it takes above it (planSegTip)
           var tip = (g.s || i18nPhrase(g.k === 'w' ? 'Work' : g.k === 'q' ? 'Quiet time' : 'Waiting')) + ' · ' + planHM(g.b - g.a)
             + (g.r ? ' · ' + planResEmoji(g.r) + ' ' + planResName(g.r, res) : '') + (g.k === 'w' && _plan.cooks === 2 ? ' · 👩‍🍳 ' + (g.c ? 2 : 1) : '');
-          return '<span class="pl-seg pl-' + g.k + (g.c ? ' pl-c2' : '') + '" data-no-i18n style="inset-inline-start:' + (g.a / v.scale * 100).toFixed(3)
+          return '<span class="pl-seg pl-' + g.k + (g.c ? ' pl-c2' : '') + '" data-no-i18n style="inset-inline-start:' + x0.toFixed(3)
             + '%;width:' + w.toFixed(3) + '%" title="' + escA(label) + '" data-tip="' + escA(tip) + '" onclick="planSegTip(this)">'
             + (g.r && w >= 3.5 ? '<i class="pl-res" aria-hidden="true">' + planResEmoji(g.r) + '</i>' : '') + '</span>';
         }).join('') + '</div>';
@@ -41936,7 +42061,7 @@ function planRender() {
       + '</div>'
       + bar
       + (later.length ? '<div class="pl-later" data-no-i18n>\u{1F319} ' + escH(i18nPhrase('Then, on another day: {1} — not planned here.').replace('{1}',
-          (later[0].s || i18nPhrase('Quiet time')) + ' · ' + planHM(later[0].m) + (laterRest ? ' + ' + planHM(laterRest) : ''))) + '</div>' : '')
+          (later[0].s || i18nPhrase('Quiet time')) + ' · ' + planDur(later[0].m) + (laterRest ? ' + ' + planDur(laterRest) : ''))) + '</div>' : '')
       + short.map(function (id) {
           return '<div class="pl-warn" data-no-i18n>⚠️ ' + escH(i18nPhrase('Needs {1} — your kitchen has none (counted as one).').replace('{1}', planResEmoji(id) + ' ' + planResName(id, res))) + '</div>';
         }).join('')
@@ -41950,7 +42075,7 @@ function planRender() {
       + (reading || r.off ? '' : '<span class="pl-until"><span>Until here:</span> <b data-no-i18n>' + planHM(r.until) + '</b></span>')
       + '</div></div>';
   }).join('');
-  body.style.setProperty('--pl-step', (planStep(v.scale) / v.scale * 100).toFixed(3) + '%');
+  var reading = v.rows.some(function (r) { return !r.off && (!!_planReading[r.it.id] || !planBlocks(r.it.blocks).length); });
   body.innerHTML = (n ? '' : '<div class="pl-intro">Note down the dishes you are making, then Propose order: one dish’s work is fitted into another’s quiet time.</div>')
     + '<div class="pl-ctl">'
     + '<button type="button" class="pl-btn pl-add" onclick="planAddMenu()"' + (n >= PLAN_MAX_ITEMS ? ' disabled title="Twelve dishes at most"' : '') + '>+ Add recipe</button>'
@@ -41958,7 +42083,7 @@ function planRender() {
     + '<span class="pl-cooks" role="group" aria-label="Cooks"><span>\u{1F469}‍\u{1F373} Cooks:</span>'
     + [1, 2].map(function (k) { return '<button type="button" class="pl-ck' + (_plan.cooks === k ? ' on' : '') + '" aria-pressed="' + (_plan.cooks === k) + '" onclick="planCooks(' + k + ')" data-no-i18n>' + k + '</button>'; }).join('')
     + '</span></div>'
-    + (n ? planAxisHtml(v.scale) + '<div class="pl-rows">' + rows + '</div>'
+    + (n ? planAxisHtml(v) + (v.planned >= 2 && !reading ? planLanesHtml(v) : '') + '<div class="pl-rows">' + rows + '</div>'
          : '<div class="pl-empty">No dishes yet — tap + Add recipe to begin.</div>')
     + (n && allDone ? '<div class="pl-total">✓ <span>All done.</span></div>' : '')
     + (n && v.planned && !allDone ? '<div class="pl-total">⏱ <span>Everything:</span> <b data-no-i18n>' + planHM(v.total) + '</b>'
@@ -41966,6 +42091,7 @@ function planRender() {
          + (!v.proposed && v.planned > 1 ? ' <span class="pl-seq"><span>(one after another)</span></span>' : '') + '</div>' : '')
     + '<div class="pl-acts">'
     + '<button type="button" class="pl-btn pl-go" onclick="planPropose()"' + (n < 2 || busy || !_plan.items.some(function (it) { return !it.done; }) ? ' disabled' : '') + '>\u{1F500} Propose order</button>'
+    + (n ? '<button type="button" class="pl-btn pl-runbtn" onclick="planRunOpen()"' + (!v.planned || reading ? ' disabled' : '') + '>\u{1F4CB} Run sheet</button>' : '')
     + (n ? '<button type="button" class="pl-btn" onclick="planClear()">\u{1F5D1}️ Clear the list</button>' : '') + '</div>'
     + (n ? '<div class="pl-legend"><span class="pl-li"><span class="pl-key pl-kw"></span><span>Work</span></span><span class="pl-li"><span class="pl-key pl-kq"></span><span>Quiet time</span></span>'
          + (v.proposed ? '<span class="pl-li"><span class="pl-key pl-kx"></span><span>Waiting</span></span>' : '')
@@ -41973,7 +42099,114 @@ function planRender() {
          + planResLegendHtml(v.rows, res) + '</div>' : '')
     + '<div class="pl-note">' + (planCloud() ? 'Shared with everyone in your household.' : 'Kept on this device (sign in to share it with your household).') + '</div>';
   planUndoBtn();
+  if (document.getElementById('planRunOverlay')) planRunFill();   // the run sheet follows the plan
 }
+// ── v40.11 — 📋 RUN SHEET (Tony, 21 Nov 2026: "a wonderful enhancement I would like to add as an option from the planner").
+// The plan as shown — proposed, or one after another — as the list of steps to do, in time order, at clock times from a
+// start (now, rounded up to five minutes, or a time chosen): each step of work with its dish, how long, its equipment and,
+// with two cooks, whose it is; "⏳ Nothing to do until …" where nobody has work for 10 minutes or more; "✓ … is ready"
+// when a dish is; a multi-day dish says the rest is on another day; "✓ Everything is ready" last. Tick a step as you go:
+// the ticks and the start are kept on this device (PLAN_RUN_KEY).
+var PLAN_RUN_KEY = 'mkn_planner_run';
+function planRunState() {
+  var d = null;
+  try { d = JSON.parse(localStorage.getItem(PLAN_RUN_KEY) || 'null'); } catch (e) { d = null; }
+  d = d && typeof d === 'object' ? d : {};
+  return { start: /^([01]\d|2[0-3]):[0-5]\d$/.test(String(d.start || '')) ? d.start : '', ticks: d.ticks && typeof d.ticks === 'object' ? d.ticks : {} };
+}
+function planRunSave(st) {
+  var keep = {}, n = 0;
+  Object.keys(st.ticks || {}).forEach(function (k) { if (st.ticks[k] && n < 300) { keep[k] = 1; n++; } });
+  try { localStorage.setItem(PLAN_RUN_KEY, JSON.stringify({ start: st.start || '', ticks: keep })); } catch (e) { return false; }
+  return true;
+}
+function planRunNowHM() {
+  var d = new Date(), m = d.getHours() * 60 + d.getMinutes();
+  m = Math.ceil(m / 5) * 5 % 1440;
+  return ('0' + Math.floor(m / 60)).slice(-2) + ':' + ('0' + (m % 60)).slice(-2);
+}
+function planClock(startHM, t) {
+  var p = String(startHM || '00:00').split(':'), m = ((+p[0] || 0) * 60 + (+p[1] || 0) + Math.round(t || 0)) % 1440;
+  return ('0' + Math.floor(m / 60)).slice(-2) + ':' + ('0' + (m % 60)).slice(-2);
+}
+// The steps of the plan as shown, in time order
+function planRunSteps(v) {
+  var ev = [];
+  v.rows.forEach(function (r) {
+    if (r.off || !r.segs || !r.segs.length) return;
+    r.segs.forEach(function (g, i) { if (g.k === 'w') ev.push({ kind: 'step', t: g.a, end: g.b, it: r.it, g: g, key: r.it.id + ':' + i + ':' + g.k + (g.b - g.a) }); });
+    var end = r.until != null ? r.until : r.segs[r.segs.length - 1].b;
+    ev.push({ kind: 'ready', t: end, it: r.it, later: planToday(r.it.blocks).later.length > 0 });
+  });
+  ev.sort(function (a, b) { return a.t - b.t || (a.kind === 'ready' ? 1 : 0) - (b.kind === 'ready' ? 1 : 0) || ((a.g && a.g.c) || 0) - ((b.g && b.g.c) || 0); });
+  return ev;
+}
+function planRunOpen() {
+  var v = planView();
+  if (!v.planned) return null;
+  var old = document.getElementById('planRunOverlay'); if (old) old.remove();
+  var st = planRunState();
+  if (!st.start) { st.start = planRunNowHM(); planRunSave(st); }
+  var ov = document.createElement('div');
+  ov.id = 'planRunOverlay'; ov.className = 'modal-overlay open'; ov.style.zIndex = '1300';
+  ov.innerHTML = '<div class="ask-card pl-addcard pl-runcard" role="dialog" aria-modal="true" aria-labelledby="planRunTitle">'
+    + '<div class="pl-runtop"><div class="ask-title" id="planRunTitle">\u{1F4CB} Run sheet</div>'
+    + '<button type="button" class="pl-btn pl-runx" onclick="planRunClose()" aria-label="Close" title="Close">✕</button></div>'
+    + '<div class="pl-hint">Each step in the order to do it — tick it as you go.</div>'
+    + '<div class="pl-runstart"><label for="planRunStart">Start at</label> <input type="time" id="planRunStart" value="' + escA(st.start) + '" onchange="planRunStartSet(this.value)">'
+    + ' <button type="button" class="pl-btn" onclick="planRunNow()">Now</button></div>'
+    + '<div id="planRunBody"></div></div>';
+  ov.onclick = function (e) { if (e.target === ov) planRunClose(); };
+  document.body.appendChild(ov);
+  planRunFill();
+  return ov;
+}
+function planRunFill() {
+  var box = document.getElementById('planRunBody');
+  if (!box) return '';
+  var v = planView(), st = planRunState(), res = planResClean(_plan.res), ev = planRunSteps(v), free = 0, last = 0, h = '';
+  ev.forEach(function (e) {
+    if (e.kind === 'step') {
+      if (e.t - free >= 10 && e.t > 0) h += '<div class="pl-run-wait" data-no-i18n>⏳ ' + escH(i18nPhrase('Nothing to do until {1} ({2})').replace('{1}', planClock(st.start, e.t)).replace('{2}', planHM(e.t - free))) + '</div>';
+      free = Math.max(free, e.end);
+      var g = e.g, on = !!st.ticks[e.key];
+      h += '<label class="pl-run-st' + (on ? ' pl-run-on' : '') + '"><span class="pl-run-t" data-no-i18n>' + planClock(st.start, e.t) + '</span>'
+        + '<input type="checkbox" data-k="' + escA(e.key) + '"' + (on ? ' checked' : '') + ' onchange="planRunTick(this)">'
+        + '<span class="pl-run-d" data-no-i18n><b dir="auto">' + escH(e.it.name) + '</b> — <span dir="auto">' + escH(g.s || i18nPhrase('Work')) + '</span>'
+        + ' <small>· ' + planHM(g.b - g.a) + (g.r ? ' · ' + planResEmoji(g.r) + ' ' + escH(planResName(g.r, res)) : '')
+        + (_plan.cooks === 2 && v.proposed ? ' · \u{1F469}\u200D\u{1F373} ' + (g.c ? 2 : 1) : '') + '</small></span></label>';
+    } else if (e.later || e.t < v.total || ev.filter(function (x) { return x.kind === 'ready'; }).length === 1) {
+      h += '<div class="pl-run-ready" data-no-i18n><span class="pl-run-t">' + planClock(st.start, e.t) + '</span>'
+        + (e.later ? '\u{1F319} ' + escH(i18nPhrase('{1} — the rest on another day').replace('{1}', e.it.name))
+                   : '✓ ' + escH(i18nPhrase('{1} is ready').replace('{1}', e.it.name))) + '</div>';
+    }
+    last = Math.max(last, e.t);
+  });
+  if (ev.filter(function (x) { return x.kind === 'ready'; }).length > 1)
+    h += '<div class="pl-run-ready pl-run-all" data-no-i18n><span class="pl-run-t">' + planClock(st.start, v.total) + '</span>✓ ' + escH(i18nPhrase('Everything is ready')) + '</div>';
+  box.innerHTML = h;
+  return box.textContent;
+}
+function planRunTick(el) {
+  var st = planRunState(), k = el && el.getAttribute('data-k');
+  if (!k) return false;
+  if (el.checked) st.ticks[k] = 1; else delete st.ticks[k];
+  planRunSave(st);
+  var row = el.closest('.pl-run-st'); if (row) row.classList.toggle('pl-run-on', !!el.checked);
+  return true;
+}
+function planRunStartSet(hm) {
+  var st = planRunState();
+  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(String(hm || ''))) return false;
+  st.start = hm; planRunSave(st); planRunFill();
+  return true;
+}
+function planRunNow() {
+  var hm = planRunNowHM(), i = document.getElementById('planRunStart');
+  if (i) i.value = hm;
+  return planRunStartSet(hm);
+}
+function planRunClose() { var ov = document.getElementById('planRunOverlay'); if (ov) ov.remove(); return true; }
 // ── ↩︎ Undo (Tony, 21 Nov 2026: "please add an Undo button, in case something was clicked erroneously") ──
 // Each change made here is remembered first — the dishes, their order, 📌, ✓, the cooks, whether the order was proposed,
 // the kitchen's equipment — up to 20 of them; ↩︎ Undo puts back the plan as it was before the last one. A reading the AI
@@ -42037,7 +42270,7 @@ async function openPlanner() {
   return ov;
 }
 function closePlanner() {
-  ['planOverlay', 'planAddOverlay', 'planResOverlay', 'planPartsOverlay'].forEach(function (id) { var o = document.getElementById(id); if (o) o.remove(); });
+  ['planOverlay', 'planAddOverlay', 'planResOverlay', 'planPartsOverlay', 'planRunOverlay'].forEach(function (id) { var o = document.getElementById(id); if (o) o.remove(); });
   planStopListening();
 }
 function planAddMenu() {

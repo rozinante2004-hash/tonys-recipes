@@ -43,7 +43,10 @@ where.
   not planned here." under its chart; the rest of the dishes are scaled to that first part. v40.10 — Hebrew: the app
   speaks of itself in the masculine singular (⏳ קורא את המתכון…): the translator's rule 7a, and eleven lines (+ two slips)
   ready in `i18n/he.json` and `tools/he-plural-overrides.json` — they show only once he-plural.yml writes the central
-  Hebrew (Tony's yes needed: it changes every copy at once). The test copy
+  Hebrew — WRITTEN 21 Nov 19:32 on Tony's yes (every copy shows them now). v40.11 — 🗓️ the waiting folded (≥ 20 min when
+  nobody has work → a striped band "≈ 1:55"), a 👩‍🍳 You row (all the work, one thing at a time), the dishes one after
+  another before 🔀 Propose order, 📋 Run sheet (steps at clock times, ticks), long waits read whole and written in days,
+  storage time left out. The test copy
   (https://tonys-recipes-test.pages.dev, its own database and rules) follows `test`.
 - **The beta has had testers since Sunday 25 Oct 2026** and is **by invitation only**: the owner invites with
   ⚙️ → 👑 → ✉️ Invite testers (the congratulatory wording of v39.60); a tester's share button asks the owner for an

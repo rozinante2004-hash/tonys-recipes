@@ -585,7 +585,7 @@ under its plain path only (a `?url=` request goes network-first).
     none for counter work or resting), and `"d":1` on a quiet block that waits until ANOTHER DAY (v40.09: marinating,
     brining or curing overnight or for days, a dough rising or a dish chilling overnight, soaking beans overnight — not
     cooking that ends the same day, such as a slow cooker on low for 8 hours). `planBlocks` makes sure of the answer:
-    whole minutes 1–1440 for work and 1–10080 (a week) for quiet time, `r` only a known id, `d` kept only on a quiet block,
+    whole minutes 1–1440 for work and 1–43200 (30 days; v40.09: a week) for quiet time, `r` only a known id, `d` kept only on a quiet block,
     neighbours of a kind on the same equipment (and the same `d`) joined, at most 20, and a dish that starts quiet starts with a minute of
     work. The reading is kept in the plan's `maps` under `planKey(r)` ('r' + a hash of uid, name and method — a changed
     method is read again; the kitchen's own equipment is no longer part of it, since a reading now adds to it), at most
@@ -628,9 +628,11 @@ under its plain path only (a `?url=` request goes network-first).
     `#planAddOverlay`) — Escape used to only hide them, and a hidden planner stayed hidden at the next opening (it now
     always adds `open`). The bar with WORK as solid blocks and QUIET time as a thin line, a small 🔥 / ♨️ /
     🌡️… above a block that occupies equipment, positioned with `inset-inline-start` (so it mirrors in right-to-left
-    languages); faint lines under the axis's ticks (`--pl-step`, 270deg in RTL); ⚠️
+    languages); a faint line under each of the axis's times (`.pl-gl`, v40.11 — the scale is not even once folded); ⚠️
     "Needs 🌡️ Sous vide devices — your kitchen has none (counted as one)." when it needs equipment the kitchen has 0 of
-    (`planShort`) — since a reading adds what is missing, that is equipment you set to 0 yourself. **As written** (before proposing): every dish from 0, the scale = the longest dish, "Until here" = the
+    (`planShort`) — since a reading adds what is missing, that is equipment you set to 0 yourself. **As written** (before proposing): v40.11 — the dishes ONE AFTER ANOTHER in the list's order (each starts where
+    the one above ends; until v40.10 every dish was drawn from 0:00, and Tony asked "I see activities in different recipes
+    progressing at the same time. How would it work in real life?"), the scale = their sum, "Until here" = the
     time used one after another by the end of that dish, ⏱ Everything = their sum "(one after another)". **Proposed:** the
     rows in the order they start, the scale = the total, "Until here" = when that dish is ready, ⏱ Everything = the
     total, and beside it "One after another: h:mm". A dish waiting for a free cook or equipment is a dotted segment.
@@ -647,8 +649,37 @@ under its plain path only (a `?url=` request goes network-first).
     needing an oven the kitchen set to 0 is not warned about). The blocks themselves are kept whole (in the plan and in
     `maps`, with `d`). The row shows ⏱ h:mm 🌙, and under its chart `.pl-later` (small, muted, italic): "🌙 Then, on another
     day: {1} — not planned here." — {1} = the stop's name ("Quiet time" when it has none) · its time + the time of all that
-    comes after it ("Brine · 24:00 + 3:30"). Not on a dish being read or one done and left out (`pl-off`). A dish that
-    begins with a stop plans its minute of work only.
+    comes after it ("Brine · one day + 3:30"; v40.11 — `planDur`: a day or more in days, "8 days", "7 days 6 h"). Not on a
+    dish being read or one done and left out (`pl-off`). A dish that begins with a stop plans its minute of work only.
+    v40.11 — the AI is told a wait of days is its whole time in minutes (a week 10080, 10 days 14400) and to leave out the
+    time a finished dish only keeps or is stored (Tony's hummus had "174:14" after its soak — a week in the fridge read as
+    cooking; his corned beef's 10-day brine came back as 4:00; his pork belly's 8-day cure was cut to a week).
+  - **The waiting folded** (v40.11 — Tony, of a soup simmering 2½ hours beside short dishes: "the other recipes' blocks
+    are barely visible. We need to find a way to scale the recipes only to the work that is going to take place today";
+    of three proposals he chose this one). `planFoldCuts(rows, total)`: every stretch of `PLAN_FOLD_MIN` = 20 minutes or
+    more in which no dish (left-out ones aside) has WORK, including one at the end; `planScaleMap(total, cuts)`: each fold
+    is drawn `band` = min(14, 36 / folds)% wide, the rest shares what is left on one even scale (`x(t)` in %); `planFold(v)`
+    adds both to the view, and the axis's times (`v.ticks`): 0, the time each fold ends (`.pl-tick-end`, written from that
+    point onwards so it does not cover the fold's label), and the usual steps (`planStep` of the unfolded minutes) where
+    there is room (9% apart, clear of a fold). The axis writes each fold's length at its middle (`.pl-foldlab`, "≈ 1:55");
+    every dish's bar draws the folds striped (`.pl-fold`) and the times' lines (`planBarBack`). Blocks are placed with
+    `x(a)` and `x(b) - x(a)` (at least 0.6%). Every dish keeps its place in time, so 🔀 Propose order still shows one dish's
+    work inside another's quiet time; a tap's bubble is placed from the block's own style, as before.
+  - **👩‍🍳 You** (v40.11, `planLanesHtml`; from two planned dishes, not while reading): a row (`.pl-lane`, not a `.pl-row`)
+    above the dishes with ALL the work on the same scale and folds — "One thing at a time"; each block (`.pl-seg pl-w`)
+    carries the dish's first letter when wide enough, and a tap shows "dish · step · h:mm". With two cooks after 🔀 Propose
+    order a second row, "👩‍🍳 The second cook" (`.pl-lane2`, green).
+  - **📋 Run sheet** (v40.11 — Tony: "a wonderful enhancement I would like to add as an option from the planner"; the
+    button beside 🔀 Propose order, greyed while a recipe is read): `planRunOpen` → `#planRunOverlay` (z-index 1300, after
+    the planner in the page; Escape → `closeM` → `planRunClose`; `closePlanner` removes it): "📋 Run sheet", "Each step in
+    the order to do it — tick it as you go.", "Start at" (`<input type=time>`, now rounded up to five minutes the first
+    time) and "Now". `planRunFill` lists `planRunSteps(planView())` — the plan as shown (proposed, or one after another):
+    each block of work at its clock time (`planClock(start, minutes)`, 24-hour) with a tick box, the dish (bold), the step
+    ("Work" when it has no name), · h:mm, · its equipment, · 👩‍🍳 1/2 with two cooks; "⏳ Nothing to do until {1} ({2})"
+    where nobody has work for 10 minutes or more; "✓ {1} is ready" when a dish is (a multi-day dish: "🌙 {1} — the rest on
+    another day"); "✓ Everything is ready" at the total (the dish that ends last has no line of its own). Ticks and the
+    start are kept on the device (`PLAN_RUN_KEY` = 'mkn_planner_run': {start, ticks} — a tick's key is the dish's id, the
+    block's index and kind+length, at most 300). `planRender` fills it again when the plan changes.
   - **↩︎ Undo** (v40.06, in the top bar; `planRemember`, `planUndo`, `planUndoBtn`): before each change made here —
     ✕, + a dish (recipes or by hand), ⠿/↑↓ a move, 📌, ✓, 👩‍🍳 cooks, 🔀 Propose order, 🗑️ Clear the list, Save in 🍳 Your
     kitchen, ↻ — the plan is remembered (`_planUndo`: JSON of the items, cooks, proposed and equipment, as `planOut` gives
@@ -744,8 +775,17 @@ under its plain path only (a `?url=` request goes network-first).
     out, the prompt asking for `"d":1`, and a reading's `d` kept in `maps`); `planner_order` also checks `d` kept apart
     and quiet time up to a week, `planToday` with a marked stop, 12 hours unmarked (a stop) and 10 hours (not), a dish
     beginning with a stop, `planLen`, the schedule and `planShort` of the first day only, and `d` through
-    `planBlocksOut`/`planClean`. Knock-out: all seven fail without their code.
-  - HELP: the help assistant's "🗓️ WORK PLANNER (v40.05–v40.09)" line (v40.09 adds A MULTI-DAY RECIPE to THE AI READS) — rewritten whole for v40.06 (Tony: "Please update
+    `planBlocksOut`/`planClean`; `planner_fold_run` (v40.11: the fold's arithmetic — 90 minutes folded, 19 not, the end, a
+    dish left out, x() on 135 minutes, four folds at 9% each, even without folds; `planDur`; the AI's storage and 14400
+    rules; a pork belly, a soup simmering 150 minutes and a corned beef: one after another (0, 15, 209), the fold 33–183
+    "≈ 2:30", "3:03" after it, the band 14% in each chart, 15 minutes at 15×86/89%; 👩‍🍳 You with the five blocks never
+    overlapping, a tap naming the dish and step, still so after Propose, a row for the second cook; 📋 Run sheet on top of
+    the planner, the start now in fives, 17:00 → the clock times of the plan's work in order, the long break with its
+    times, the dishes ready and Everything, a tick kept and still there when opened again, following the plan (a dish
+    taken off, a multi-day dish's "— the rest on another day"), closing back to the planner; the help line). Knock-out:
+    all eight fail without their code.
+  - HELP: the help assistant's "🗓️ WORK PLANNER (v40.05–v40.11)" line (v40.09 adds A MULTI-DAY RECIPE to THE AI READS;
+    v40.11 adds FOLDED WAITING, 👩‍🍳 YOU and 📋 RUN SHEET before ↩︎ UNDO, one after another before proposing, days) — rewritten whole for v40.06 (Tony: "Please update
     the Help as well") in the order a person meets it: THE WINDOW (full screen, the top bar with ↩︎ Undo and ✕, the
     toolbar), YOUR KITCHEN'S EQUIPMENT (asked once, the 🍳 Your kitchen button, what a reading adds, what you took away),
     ADDING DISHES, THE AI READS, EACH DISH'S ROW, THE ORDER (drag, Propose, 📌, ✓, cooks, totals, Clear), ↩︎ UNDO, SHARED;
@@ -756,7 +796,10 @@ under its plain path only (a `?url=` request goes network-first).
     another’s quiet time and shows when everything will be ready." Privacy Statement 1.19: the plan — dishes, readings
     and the kitchen's equipment — is household content, and a recipe's name and method (with the kitchen's own
     equipment names) go to Anthropic once to read its work, quiet time and equipment.
-  - **Translating it:** 79 phrases by hand in all 11 languages (v40.09: "Then, on another day: {1} — not planned here.";
+  - **Translating it:** 93 phrases by hand in all 11 languages (v40.11: "one day", "{1} days", "{1} h", "👩‍🍳 You",
+    "👩‍🍳 The second cook", "One thing at a time", "📋 Run sheet" (Hebrew "📋 רשימת השלבים"), its hint, "Start at", "Now",
+    "Nothing to do until {1} ({2})", "{1} is ready" (Hebrew "מוכן: {1}" — a dish's name may be feminine), "{1} — the rest
+    on another day", "Everything is ready"; v40.09: "Then, on another day: {1} — not planned here.";
     v40.07: the three of 📚 Which recipes from the collection?; v40.06: "🍳 Your kitchen", "Undo the last change", "The
     last change was undone.", the first question's and the "Added to your kitchen" message's endings now name 🍳 Your
     kitchen; "↩︎ Undo" filled in for Hungarian and Portuguese). Hebrew: a work block is "יחידת עבודה" (Tony, 21 Nov:

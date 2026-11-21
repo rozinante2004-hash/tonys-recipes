@@ -9644,8 +9644,9 @@ window.SELF_TESTS = [
       // part of the multi-day recipe up until the first multi-day stop (marination, brining, etc.) and scale the other recipes
       // according to this part only. Do indicate that there are other parts, but do not take them into account when planning.")
       var strD=function(list){ return list.map(function(x){ return x.k+x.m+(x.r||'')+(x.d ? 'd' : ''); }).join(' '); };
-      b=strD(planBlocks([W(10), Q(30), { k:'q', m:600, d:1 }, Q(20), { k:'w', m:5, d:1 }, Q(20000)]));
-      if(b!=='w10 q30 q600d q20 w5 q10080') throw new Error('a quiet step for another day is not kept apart (or quiet time is not up to a week): '+b);
+      b=strD(planBlocks([W(10), Q(30), { k:'q', m:600, d:1 }, Q(20), { k:'w', m:5, d:1 }, Q(50000)]));
+      if(b!=='w10 q30 q600d q20 w5 q43200') throw new Error('a quiet step for another day is not kept apart (or quiet time is not up to 30 days): '+b);
+      if(strD(planBlocks([{ k:'q', m:11520, s:'Cure', d:1 }]))!=='w1 q11520d') throw new Error('a cure of 8 days lost its length (v40.11)');
       var DQ=function(m, s, r){ var x={ k:'q', m:m, s:s, d:1 }; if(r) x.r=r; return x; };
       var turkey={ blocks:[W(20), DQ(1440, 'Brine'), W(30), Q(180,'oven')] }, salad={ blocks:[W(15)] };
       var td=planToday(turkey.blocks);
@@ -9680,7 +9681,7 @@ window.SELF_TESTS = [
         });
       });
     } },
-  { id:'planner_window', group:'Features', name:'🗓️ Work Planner window: the kitchen’s equipment asked once (kept, ✏️ Edit; what a recipe needs and the kitchen has not listed is added and said, what you took away is not), + Add recipe (a recipe read by the AI once, a dish filled in by hand as one block), a row per dish scaled to the longest, “Until here” after each, the total; 🔀 Propose order, 1 or 2 cooks, ↻, ✕, 🗑️ Clear the list (the equipment stays); kept on the device (v40.05)',
+  { id:'planner_window', group:'Features', name:'🗓️ Work Planner window: the kitchen’s equipment asked once (kept, ✏️ Edit; what a recipe needs and the kitchen has not listed is added and said, what you took away is not), + Add recipe (a recipe read by the AI once, a dish filled in by hand as one block), a row per dish (one after another until proposed, the waiting folded — v40.11), “Until here” after each, the total; 🔀 Propose order, 1 or 2 cooks, ↻, ✕, 🗑️ Clear the list (the equipment stays); kept on the device (v40.05)',
     test: async()=>{
       var real={ plan:_plan, hh:window._household, ai:window.aiCall, toast:window.toast, ask:window.askConfirm, local:null };
       try{ real.local=localStorage.getItem(PLAN_LOCAL_KEY); }catch(e){}
@@ -9760,7 +9761,10 @@ window.SELF_TESTS = [
         if(rows.length!==2) throw new Error(rows.length+' rows for 2 dishes');
         var w=function(el){ return parseFloat(el.style.width); };
         var segS=rows[0].querySelectorAll('.pl-seg'), segL=rows[1].querySelectorAll('.pl-seg');
-        if(segS.length!==3 || Math.abs(w(segS[1])-90/115*100)>0.01 || Math.abs(w(segL[0])-20/115*100)>0.01) throw new Error('the rows are not scaled to the longest dish');
+        // v40.11 — one after another (the salad after the stew), and the 90 minutes when nobody has work folded into a band of 14%
+        var lft=function(el){ return parseFloat(el.style.insetInlineStart); }, per=86/45;
+        if(segS.length!==3 || Math.abs(w(segS[0])-20*per)>0.01 || Math.abs(w(segS[1])-14)>0.01 || Math.abs(w(segL[0])-20*per)>0.01 || Math.abs(lft(segL[0])-(25*per+14))>0.01) throw new Error('the rows are not one after another on the folded scale: '+[w(segS[0]), w(segS[1]), w(segL[0]), lft(segL[0])].join());
+        if(!body.querySelector('.pl-axis .pl-foldlab') || body.querySelector('.pl-axis .pl-foldlab').textContent!=='≈ 1:30') throw new Error('the fold does not say how long it is');
         if(!segS[1].classList.contains('pl-q') || !segS[0].classList.contains('pl-w')) throw new Error('work and quiet time are not told apart');
         if(!segS[1].querySelector('.pl-res') || !/🔥/.test(segS[1].title) || segS[2].querySelector('.pl-res')) throw new Error('the burner a block occupies is not shown on it');
         var lg=body.querySelector('.pl-legend .pl-li[data-res="stove"]');
@@ -9775,7 +9779,7 @@ window.SELF_TESTS = [
         if(!_plan.proposed || body.querySelector('.pl-total b').textContent!=='1:55' || until!=='1:55 0:40') throw new Error('proposed: Everything '+body.querySelector('.pl-total b').textContent+', Until here '+until);
         if(!/One after another:\s*2:15/.test(body.querySelector('.pl-total').textContent)) throw new Error('the time one after another is not shown beside it');
         var salSeg=body.querySelectorAll('.pl-row')[1].querySelector('.pl-seg');
-        if(Math.abs(parseFloat(salSeg.style.insetInlineStart)-20/115*100)>0.01) throw new Error('the salad is not drawn in the stew’s quiet time');
+        if(Math.abs(parseFloat(salSeg.style.insetInlineStart)-20*86/45)>0.01) throw new Error('the salad is not drawn in the stew’s quiet time');
         // 2 cooks
         await planCooks(2);
         if(_plan.cooks!==2 || !body.querySelector('.pl-c2') || !/The second cook/.test(body.textContent)) throw new Error('the second cook is not shown');
@@ -9903,10 +9907,10 @@ window.SELF_TESTS = [
         if(/\u{1F319}/u.test(sR.querySelector('.pl-len').textContent) || sR.querySelector('.pl-later')) throw new Error('a dish of one day is said to go on');
         // its chart is its first day; the salad is drawn against that, not against two days
         var w=function(el){ return parseFloat(el.style.width); }, segT=tR.querySelectorAll('.pl-bar .pl-seg'), segS=sR.querySelectorAll('.pl-bar .pl-seg');
-        if(segT.length!==1 || Math.abs(w(segT[0])-100)>0.01 || segS.length!==1 || Math.abs(w(segS[0])-75)>0.01) throw new Error('the rows are not scaled to the turkey’s first day: '+segT.length+' block(s) of the turkey, '+(segT[0] && w(segT[0]))+'% and the salad '+(segS[0] && w(segS[0]))+'%');
+        if(segT.length!==1 || Math.abs(w(segT[0])-20/35*100)>0.01 || segS.length!==1 || Math.abs(w(segS[0])-15/35*100)>0.01 || Math.abs(parseFloat(segS[0].style.insetInlineStart)-20/35*100)>0.01) throw new Error('the rows are not scaled to the turkey’s first day: '+segT.length+' block(s) of the turkey, '+(segT[0] && w(segT[0]))+'% and the salad '+(segS[0] && w(segS[0]))+'%');
         // what comes after: said under its chart
         var note=tR.querySelector('.pl-later');
-        if(!note || !/Brine/.test(note.textContent) || !/24:00/.test(note.textContent) || !/\+ 3:30/.test(note.textContent) || !/not planned/.test(note.textContent)) throw new Error('what comes after is not said under its chart: '+(note && note.textContent));
+        if(!note || !/Brine/.test(note.textContent) || !/one day/.test(note.textContent) || !/\+ 3:30/.test(note.textContent) || !/not planned/.test(note.textContent)) throw new Error('what comes after is not said under its chart: '+(note && note.textContent));
         if(note.compareDocumentPosition(tR.querySelector('.pl-bar')) & Node.DOCUMENT_POSITION_FOLLOWING) throw new Error('the note is above the chart');
         // the roast of another day needs an oven the kitchen has none of — not warned about today
         if(tR.querySelector('.pl-warn')) throw new Error('the equipment of another day is warned about: '+tR.querySelector('.pl-warn').textContent);
@@ -9934,6 +9938,115 @@ window.SELF_TESTS = [
         closePlanner();
         window._household=real.hh; window.aiCall=real.ai; _plan=real.plan; _planReading={};
         try{ if(real.local===null) localStorage.removeItem(PLAN_LOCAL_KEY); else localStorage.setItem(PLAN_LOCAL_KEY, real.local); }catch(e){}
+      }
+    } },
+  { id:'planner_fold_run', group:'Features', name:'🗓️ Work Planner: the waiting folded — 20 minutes or more when nobody has work is a narrow striped band with its length (≈ 2:30) and the time after it, the rest on one true scale; before 🔀 Propose order the dishes one after another; 👩‍🍳 You: all the work in one row, one thing at a time (the second cook’s row with two); 📋 Run sheet: the steps in time order at clock times, “Nothing to do until …”, each dish ready, ticks kept, it follows the plan; a day or more in days; the AI leaves out storage time (v40.11)',
+    test: async()=>{
+      // Tony, 21 Nov 2026, of a soup that simmers 2½ hours beside short dishes: "the other recipes' blocks are barely visible" — he
+      // chose the fold; then: "I see activities in different recipes progressing at the same time. How would it work in real life?"
+      // (👩‍🍳 You, and one after another before proposing); and of the run sheet: "a wonderful enhancement I would like to add as
+      // an option from the planner"
+      var real={ plan:_plan, hh:window._household, local:null, run:null };
+      try{ real.local=localStorage.getItem(PLAN_LOCAL_KEY); real.run=localStorage.getItem(PLAN_RUN_KEY); }catch(e){}
+      var dish=function(id, name, blocks){ return { id:id, kind:'manual', name:name, rid:'', key:'', from:'', blocks:blocks, guess:false }; };
+      var near=function(a, b){ return Math.abs(a-b)<0.01; };
+      var nonOverlap=function(segs){ var a=Array.from(segs).map(function(g){ return [parseFloat(g.style.insetInlineStart), parseFloat(g.style.width)]; }).sort(function(x, y){ return x[0]-y[0]; });
+        for(var i=1;i<a.length;i++) if(a[i][0] < a[i-1][0]+a[i-1][1]-0.01) return false; return true; };
+      try{
+        // the arithmetic of the fold
+        var cuts=planFoldCuts([{ segs:[{ k:'w', a:0, b:20 }, { k:'q', a:20, b:110 }, { k:'w', a:110, b:115 }] }, { segs:[{ k:'w', a:115, b:135 }] }], 135);
+        if(cuts.length!==1 || cuts[0].a!==20 || cuts[0].b!==110) throw new Error('the waiting to fold: '+JSON.stringify(cuts));
+        if(planFoldCuts([{ segs:[{ k:'w', a:0, b:10 }, { k:'q', a:10, b:29 }, { k:'w', a:29, b:35 }] }], 35).length) throw new Error('19 minutes of waiting were folded');
+        if(planFoldCuts([{ segs:[{ k:'w', a:0, b:10 }, { k:'q', a:10, b:60 }] }, { off:true, segs:[{ k:'w', a:20, b:30 }] }], 60).length!==1) throw new Error('the waiting at the end, or a dish left out, counted wrong');
+        var m=planScaleMap(135, cuts);
+        if(!near(m.band, 14) || !near(m.x(20), 20*86/45) || !near(m.x(65), 20*86/45+7) || !near(m.x(110), 20*86/45+14) || !near(m.x(135), 100)) throw new Error('the folded scale: '+[m.x(20), m.x(65), m.x(110), m.x(135)].join());
+        var m4=planScaleMap(400, [{ a:10, b:60 }, { a:70, b:120 }, { a:130, b:180 }, { a:190, b:390 }]);
+        if(!near(m4.band, 9) || !near(m4.x(400), 100)) throw new Error('four folds take more than 36% of the width');
+        if(!near(planScaleMap(80, []).x(40), 50)) throw new Error('without a fold the scale is not even');
+        // a day or more, in days
+        [[30,'0:30'],[719,'11:59'],[1440,'one day'],[1440*7+360,'7 days 6 h'],[14400,'10 days'],[2870,'2 days']].forEach(function(c){
+          if(planDur(c[0])!==c[1]) throw new Error(c[0]+' minutes written '+planDur(c[0])+', not '+c[1]);
+        });
+        // the AI: no storage time; a wait of days its whole length
+        var pp=planPrompt({ name:'Self-test pickles', servings:'4', ingredients:['cucumbers'], steps:['Brine 10 days', 'Keeps a month'] });
+        if(pp.indexOf('Leave out the time the finished dish only keeps')<0 || pp.indexOf('14400')<0) throw new Error('the AI is not told to leave out storage time, or to give a wait of days its whole length');
+        // the planner: a pork belly, a soup that simmers 2½ hours, a corned beef
+        window._household=null;
+        try{ localStorage.removeItem(PLAN_LOCAL_KEY); localStorage.removeItem(PLAN_RUN_KEY); }catch(e){}
+        _plan=planClean({ res:{ asked:true }, cooks:1, items:[
+          dish('fP', 'Self-test pork belly', [{ k:'w', m:15, s:'Rub with salt' }]),
+          dish('fS', 'Self-test soup', [{ k:'w', m:18, s:'Brown the beef', r:'stove' }, { k:'q', m:150, s:'Simmer', r:'stove' }, { k:'w', m:12, s:'Herbs and lime' }, { k:'q', m:14, s:'Rest' }]),
+          dish('fC', 'Self-test corned beef', [{ k:'w', m:4, s:'Rinse' }, { k:'q', m:12, s:'Boil', r:'stove' }, { k:'w', m:4, s:'Skim', r:'stove' }, { k:'q', m:10, s:'Simmer', r:'stove' }]) ] });
+        try{ localStorage.setItem(PLAN_LOCAL_KEY, JSON.stringify(planOut())); }catch(e){}
+        await openPlanner();
+        var body=document.getElementById('planBody'), row=function(id){ return body.querySelector('.pl-row[data-id="'+id+'"]'); }, Wd=function(el){ return parseFloat(el.style.width); };
+        // before proposing: one after another, in the list's order
+        var v=planView(), starts=v.rows.map(function(r){ return r.segs[0].a; }).join();
+        if(starts!=='0,15,209') throw new Error('before proposing, the dishes do not follow one another: '+starts);
+        if(v.map.cuts.length!==1 || v.map.cuts[0].a!==33 || v.map.cuts[0].b!==183) throw new Error('the soup’s simmering is not folded: '+JSON.stringify(v.map.cuts));
+        var lab=body.querySelector('.pl-axis .pl-foldlab'), endT=body.querySelector('.pl-axis .pl-tick-end');
+        if(!lab || lab.textContent!=='≈ 2:30') throw new Error('the fold does not say how long it is: '+(lab && lab.textContent));
+        if(!endT || endT.textContent!=='3:03') throw new Error('the time after the fold is not on the axis: '+(endT && endT.textContent));
+        if(row('fS').querySelectorAll('.pl-fold').length!==1 || !near(Wd(row('fS').querySelector('.pl-fold')), 14)) throw new Error('the fold is not drawn in each dish’s chart');
+        if(!near(Wd(row('fP').querySelector('.pl-seg')), 15*86/89)) throw new Error('the pork belly’s 15 minutes are not on the unfolded scale: '+Wd(row('fP').querySelector('.pl-seg')));
+        // 👩‍🍳 You: all the work, one thing at a time
+        var lane=body.querySelector('.pl-lane'), ls=lane ? lane.querySelectorAll('.pl-seg') : [];
+        if(!lane || !/You/.test(lane.textContent) || ls.length!==5 || !nonOverlap(ls)) throw new Error('the 👩‍🍳 You row does not hold all the work, one thing at a time: '+ls.length);
+        if(body.querySelector('.pl-lane2')) throw new Error('a second cook’s row with one cook');
+        ls[1].click(); await wait(20);
+        var tip=body.querySelector('.pl-tip');
+        if(!tip || !/Self-test soup/.test(tip.textContent) || !/Brown the beef/.test(tip.textContent) || !/0:18/.test(tip.textContent)) throw new Error('a tap on a block of 👩‍🍳 You does not name the dish and the step: '+(tip && tip.textContent));
+        planSegTip(null);
+        // proposed: still one thing at a time; with two cooks, a second row
+        await planPropose();
+        ls=body.querySelectorAll('.pl-lane .pl-seg');
+        if(ls.length!==5 || !nonOverlap(ls)) throw new Error('after 🔀 Propose order the cook does two things at once');
+        await planCooks(2);
+        var l2=body.querySelector('.pl-lane2');
+        if(!l2 || !/second cook/.test(l2.textContent) || body.querySelectorAll('.pl-lane .pl-seg').length!==5) throw new Error('no row for the second cook, or the work not shared between the rows');
+        await planCooks(1);
+        // 📋 Run sheet
+        var rb=body.querySelector('.pl-runbtn');
+        if(!rb || rb.disabled) throw new Error('no 📋 Run sheet button');
+        rb.click(); await wait(30);
+        var ov=document.getElementById('planRunOverlay');
+        if(!ov || !/Run sheet/.test(ov.textContent) || parseInt(getComputedStyle(ov).zIndex, 10)<=parseInt(getComputedStyle(document.getElementById('planOverlay')).zIndex, 10)) throw new Error('📋 Run sheet did not open on top of the planner');
+        if(!/^([01]\d|2[0-3]):[0-5][05]$/.test(document.getElementById('planRunStart').value)) throw new Error('the start is not now, rounded to five minutes: '+document.getElementById('planRunStart').value);
+        planRunStartSet('17:00');
+        v=planView();
+        var steps=Array.from(ov.querySelectorAll('.pl-run-st')), times=steps.map(function(l){ return l.querySelector('.pl-run-t').textContent; });
+        var work=[]; v.rows.forEach(function(r){ r.segs.forEach(function(g){ if(g.k==='w') work.push(g); }); }); work.sort(function(a, b){ return a.a-b.a; });
+        if(steps.length!==5 || times[0]!=='17:00' || times.join()!==work.map(function(g){ return planClock('17:00', g.a); }).join()) throw new Error('the steps are not in time order at clock times: '+times.join());
+        if(times.join()!==times.slice().sort().join()) throw new Error('the run sheet is not in time order');
+        // the long break: from the end of the work before the soup's herbs, until them
+        var herbs=work.filter(function(g){ return g.s==='Herbs and lime'; })[0], before=Math.max.apply(null, work.filter(function(g){ return g.a<herbs.a; }).map(function(g){ return g.b; }));
+        var waitTxt=Array.from(ov.querySelectorAll('.pl-run-wait')).map(function(x){ return x.textContent; }).join(' | ');
+        if(waitTxt.indexOf('Nothing to do until '+planClock('17:00', herbs.a)+' ('+planHM(herbs.a-before)+')')<0) throw new Error('the break is not said: '+waitTxt);
+        var ready=Array.from(ov.querySelectorAll('.pl-run-ready')).map(function(x){ return x.textContent; }).join(' | ');
+        if(!/Self-test pork belly is ready/.test(ready) || !/Self-test corned beef is ready/.test(ready) || ready.indexOf(planClock('17:00', v.total)+'✓ Everything is ready')<0) throw new Error('the dishes being ready are not said: '+ready);
+        // a tick is kept
+        var cb=steps[0].querySelector('input[type=checkbox]'); cb.checked=true; cb.dispatchEvent(new Event('change', { bubbles:true }));
+        if(!steps[0].classList.contains('pl-run-on') || Object.keys(planRunState().ticks).length!==1) throw new Error('a tick is not kept');
+        planRunClose(); planRunOpen(); ov=document.getElementById('planRunOverlay');
+        if(!ov.querySelector('.pl-run-st input:checked') || document.getElementById('planRunStart').value!=='17:00') throw new Error('the tick or the start was lost when the run sheet opened again');
+        // it follows the plan: the pork belly taken off; a multi-day dish says the rest is on another day
+        await planRemove('fP');
+        if(/pork belly/.test(ov.textContent)) throw new Error('the run sheet does not follow the plan');
+        _plan.items.push(dish('fT', 'Self-test turkey', [{ k:'w', m:20, s:'Make the brine' }, { k:'q', m:1440, s:'Brine', d:1 }, { k:'w', m:30, s:'Roast' }])); planRender();
+        if(!/Self-test turkey — the rest on another day/.test(ov.textContent) || /Roast/.test(ov.textContent)) throw new Error('a multi-day dish in the run sheet: '+ov.textContent.slice(0, 200));
+        // ✕ and Escape close it the planner's way; the planner stays
+        closeM('planRunOverlay');
+        if(document.getElementById('planRunOverlay') || !document.getElementById('planOverlay').classList.contains('open')) throw new Error('closing the run sheet did not leave the planner as it was');
+        // the help assistant knows all this
+        var hl=(String(HELP_SYSTEM_PROMPT).split('\n').filter(function(l){ return /WORK PLANNER/.test(l); })[0] || '');
+        ['FOLDED WAITING', '≈ 1:55', '👩‍🍳 YOU', 'one thing at a time', '📋 RUN SHEET', 'Start at', 'Nothing to do until', 'one after another in the list\'s order', "'8 days'"].forEach(function(w){
+          if(hl.indexOf(w)<0) throw new Error('the help assistant’s Work Planner line does not say “'+w+'”');
+        });
+      } finally {
+        closePlanner();
+        window._household=real.hh; _plan=real.plan; _planReading={};
+        try{ if(real.local===null) localStorage.removeItem(PLAN_LOCAL_KEY); else localStorage.setItem(PLAN_LOCAL_KEY, real.local); }catch(e){}
+        try{ if(real.run===null) localStorage.removeItem(PLAN_RUN_KEY); else localStorage.setItem(PLAN_RUN_KEY, real.run); }catch(e){}
       }
     } },
   { id:'planner_arrange', group:'Features', name:'🗓️ Work Planner by hand: ⠿ drag a dish (or ↑ ↓) to change the order the dishes are started in and see how long that takes; 📌 a pinned dish keeps its place when 🔀 Propose order arranges the rest; ✓ a dish done stays greyed in the timeline, and the next Propose leaves it out; a tap on a block or line shows that step’s name and time (v40.05)',
