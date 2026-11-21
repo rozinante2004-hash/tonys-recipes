@@ -1,7 +1,7 @@
 {
  "lang": "es",
  "updatedAt": 1795259288207,
- "count": 3044,
+ "count": 3045,
  "strings": {
   "\"Add to Home Screen\"": "Añadir a pantalla de inicio",
   "\"Open Bring!\"": "Abrir Bring!",
@@ -1508,6 +1508,7 @@
   "Their voice": "Su voz",
   "Then open the link in that e-mail, and come back here.": "Luego abre el enlace de ese correo y vuelve aquí.",
   "Then reload the app": "Luego recarga la app",
+  "Then, on another day: {1} — not planned here.": "Luego, otro día: {1} — no se planifica aquí.",
   "There are changes on this device not yet sent — sync first, then switch.": "Hay cambios en este dispositivo sin enviar — sincroniza primero y luego cambia.",
   "There are changes on this device not yet sent — sync first.": "Hay cambios en este dispositivo sin enviar — sincroniza primero.",
   "There are no collections yet — use “New collection”": "Todavía no hay colecciones — usa “Nueva colección”",

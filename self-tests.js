@@ -9573,7 +9573,7 @@ window.SELF_TESTS = [
       if(planBlocks(many).length!==20 || planBlocks('nonsense').length!==0) throw new Error('more than 20 blocks kept, or junk taken as blocks');
       function valid(items, cooks, s, what, res){
         items.forEach(function(it, j){
-          var want=planBlocks(it.blocks).map(function(x){ return x.k+x.m+(x.r||''); }).join(' ');
+          var want=planToday(it.blocks).now.map(function(x){ return x.k+x.m+(x.r||''); }).join(' ');
           var got=s.segs[j].filter(function(g){ return g.k!=='x'; }).map(function(g){ return g.k+(g.b-g.a)+(g.r||''); }).join(' ');
           if(got!==want) throw new Error(what+': dish '+(j+1)+' out of its own order — '+got+' (written: '+want+')');
           for(var i=1;i<s.segs[j].length;i++) if(s.segs[j][i].a!==s.segs[j][i-1].b) throw new Error(what+': dish '+(j+1)+' has a hole in its row');
@@ -9640,6 +9640,27 @@ window.SELF_TESTS = [
       var own=planResClean({ n:{}, custom:[{ id:'c1', name:'Thermomix', n:1 }], asked:true });
       var T1={ blocks:[W(2), Q(20,'c1')] }, T2={ blocks:[W(2), Q(20,'c1')] }, T3={ blocks:[W(2), Q(20,'c2')] }, T4={ blocks:[W(2), Q(20,'c2')] };
       if(planSchedule([T1, T2], 1, own).total!==42 || planSchedule([T3, T4], 1, own).total!==24) throw new Error('the kitchen’s own equipment: '+planSchedule([T1, T2], 1, own).total+' / '+planSchedule([T3, T4], 1, own).total);
+      // v40.09 — a multi-day dish is planned up to its first step that waits for another day (Tony, 21 Nov 2026: "only display the
+      // part of the multi-day recipe up until the first multi-day stop (marination, brining, etc.) and scale the other recipes
+      // according to this part only. Do indicate that there are other parts, but do not take them into account when planning.")
+      var strD=function(list){ return list.map(function(x){ return x.k+x.m+(x.r||'')+(x.d ? 'd' : ''); }).join(' '); };
+      b=strD(planBlocks([W(10), Q(30), { k:'q', m:600, d:1 }, Q(20), { k:'w', m:5, d:1 }, Q(20000)]));
+      if(b!=='w10 q30 q600d q20 w5 q10080') throw new Error('a quiet step for another day is not kept apart (or quiet time is not up to a week): '+b);
+      var DQ=function(m, s, r){ var x={ k:'q', m:m, s:s, d:1 }; if(r) x.r=r; return x; };
+      var turkey={ blocks:[W(20), DQ(1440, 'Brine'), W(30), Q(180,'oven')] }, salad={ blocks:[W(15)] };
+      var td=planToday(turkey.blocks);
+      if(strD(td.now)!=='w20' || strD(td.later)!=='q1440d w30 q180oven') throw new Error('the turkey’s first day: '+strD(td.now)+' · later: '+strD(td.later));
+      if(strD(planToday([W(5), Q(720), W(5)]).now)!=='w5') throw new Error('12 hours of quiet time (a reading without the mark) is not a stop');
+      if(planToday([W(5), Q(600, 'stove'), W(5)]).later.length) throw new Error('10 hours of slow cooking the same day was taken for another day');
+      if(strD(planToday([W(5), DQ(60, 'Chill overnight'), W(5)]).now)!=='w5') throw new Error('a step the AI marked as waiting for another day is not a stop');
+      if(strD(planToday([DQ(1440, 'Soak')]).now)!=='w1') throw new Error('a dish that begins by waiting for another day: '+strD(planToday([DQ(1440)]).now));
+      if(planLen(turkey)!==20 || planLen(salad)!==15) throw new Error('the turkey’s time is '+planLen(turkey)+' minutes, not its first day’s 20');
+      var md=planSchedule([turkey, salad], 1, kit({ oven:0 }));
+      valid([turkey, salad], 1, md, 'the turkey and the salad');
+      if(md.total!==35 || md.short.length) throw new Error('the turkey (20 on its first day) and the salad (15): '+md.total+' minutes'+(md.short.length ? ', and the oven of another day is missed' : ''));
+      if(planShort(turkey, kit({ oven:0 })).length || planShort({ blocks:[W(5), Q(60,'oven'), DQ(1440, 'Rest')] }, kit({ oven:0 })).join()!=='oven') throw new Error('the equipment warned about is not that of the first day');
+      var back=planClean(JSON.parse(JSON.stringify({ items:[{ id:'x1', name:'Turkey', blocks:planBlocksOut(turkey.blocks) }] }))).items[0].blocks;
+      if(strD(back)!=='w20 q1440d w30 q180oven') throw new Error('the mark for another day is not kept: '+strD(back));
       // many dishes, made up: always a true plan, never longer than one after another, never shorter than the work
       var seed=7, rnd=function(){ seed=(seed*1103515245+12345)&0x7fffffff; return seed/0x7fffffff; }, eq=['', 'stove', 'oven', ''];
       var dishes=[]; for(var d=0; d<9; d++){ var bl=[], n=1+Math.floor(rnd()*5); for(var k=0;k<n;k++) bl.push(k%2 ? Q(5+Math.floor(rnd()*60), eq[Math.floor(rnd()*4)]) : W(1+Math.floor(rnd()*25), rnd()<0.3 ? 'stove' : '')); dishes.push({ blocks:bl }); }
@@ -9651,7 +9672,7 @@ window.SELF_TESTS = [
             if(sc.order[1]!==1) throw new Error(what+': the pinned dish was moved');
             valid(c[0], cooks, sc, what, res);
             var lens=c[0].map(planLen), seq=lens.reduce(function(a, x){ return a+x; }, 0);
-            var work=c[0].reduce(function(a, it){ return a+planBlocks(it.blocks).filter(function(x){ return x.k==='w'; }).reduce(function(q, x){ return q+x.m; }, 0); }, 0);
+            var work=c[0].reduce(function(a, it){ return a+planToday(it.blocks).now.filter(function(x){ return x.k==='w'; }).reduce(function(q, x){ return q+x.m; }, 0); }, 0);
             if(sc.total<Math.max.apply(null, lens) || sc.total<Math.ceil(work/cooks)) throw new Error(what+': '+sc.total+' minutes is shorter than possible');
             if(cooks===1 && sc.total>seq) throw new Error(what+': longer than cooking one after another');
             if(JSON.stringify(planSchedule(c[0], cooks, res, { pins:c[0].map(function(x, i){ return i===1; }) }))!==JSON.stringify(sc)) throw new Error(what+': a second Propose gives another order');
@@ -9854,6 +9875,64 @@ window.SELF_TESTS = [
       } finally {
         closePlanner();
         window._household=real.hh; window.aiCall=real.ai; window.toast=real.toast; window.askConfirm=real.ask; _plan=real.plan; _planReading={};
+        try{ if(real.local===null) localStorage.removeItem(PLAN_LOCAL_KEY); else localStorage.setItem(PLAN_LOCAL_KEY, real.local); }catch(e){}
+      }
+    } },
+  { id:'planner_multiday', group:'Features', name:'🗓️ Work Planner: a multi-day recipe (brining, marinating or curing overnight, an overnight rise…) is planned only up to its first step that waits for another day — its chart, its ⏱ time (with 🌙), the scale every dish is drawn on, Until here, the total, 🔀 Propose order and the equipment warned about; what comes after is said under its chart and not planned; the AI marks such a step (v40.09)',
+    test: async()=>{
+      // Tony, 21 Nov 2026: "When adding a multi-day recipe, do not scale all recipes according to it, as it displays the other
+      // recipes as very small chunks of work. Instead, only display the part of the multi-day recipe up until the first multi-day
+      // stop (marination, brining, etc.) and scale the other recipes according to this part only. Do indicate that there are
+      // other parts, but do not take them into account when planning."
+      var real={ plan:_plan, hh:window._household, ai:window.aiCall, local:null };
+      try{ real.local=localStorage.getItem(PLAN_LOCAL_KEY); }catch(e){}
+      var dish=function(id, name, blocks){ return { id:id, kind:'manual', name:name, rid:'', key:'', from:'', blocks:blocks, guess:false }; };
+      try{
+        window._household=null;
+        try{ localStorage.removeItem(PLAN_LOCAL_KEY); }catch(e){}
+        _plan=planClean({ res:{ asked:true, n:{ oven:0 } }, cooks:1, items:[
+          dish('mT', 'Self-test turkey', [{ k:'w', m:20, s:'Make the brine' }, { k:'q', m:1440, s:'Brine', d:1 }, { k:'w', m:30, s:'Dry and season' }, { k:'q', m:180, s:'Roast', r:'oven' }]),
+          dish('mS', 'Self-test salad', [{ k:'w', m:15, s:'Chop' }]) ] });
+        try{ localStorage.setItem(PLAN_LOCAL_KEY, JSON.stringify(planOut())); }catch(e){}
+        await openPlanner();
+        var body=document.getElementById('planBody'), row=function(id){ return body.querySelector('.pl-row[data-id="'+id+'"]'); };
+        var tR=row('mT'), sR=row('mS');
+        if(!tR || !sR) throw new Error('the two dishes are not shown');
+        var len=tR.querySelector('.pl-len').textContent;
+        if(!/0:20/.test(len) || !/\u{1F319}/u.test(len)) throw new Error('the turkey’s time is not that of its first day, with 🌙: '+len);
+        if(/\u{1F319}/u.test(sR.querySelector('.pl-len').textContent) || sR.querySelector('.pl-later')) throw new Error('a dish of one day is said to go on');
+        // its chart is its first day; the salad is drawn against that, not against two days
+        var w=function(el){ return parseFloat(el.style.width); }, segT=tR.querySelectorAll('.pl-bar .pl-seg'), segS=sR.querySelectorAll('.pl-bar .pl-seg');
+        if(segT.length!==1 || Math.abs(w(segT[0])-100)>0.01 || segS.length!==1 || Math.abs(w(segS[0])-75)>0.01) throw new Error('the rows are not scaled to the turkey’s first day: '+segT.length+' block(s) of the turkey, '+(segT[0] && w(segT[0]))+'% and the salad '+(segS[0] && w(segS[0]))+'%');
+        // what comes after: said under its chart
+        var note=tR.querySelector('.pl-later');
+        if(!note || !/Brine/.test(note.textContent) || !/24:00/.test(note.textContent) || !/\+ 3:30/.test(note.textContent) || !/not planned/.test(note.textContent)) throw new Error('what comes after is not said under its chart: '+(note && note.textContent));
+        if(note.compareDocumentPosition(tR.querySelector('.pl-bar')) & Node.DOCUMENT_POSITION_FOLLOWING) throw new Error('the note is above the chart');
+        // the roast of another day needs an oven the kitchen has none of — not warned about today
+        if(tR.querySelector('.pl-warn')) throw new Error('the equipment of another day is warned about: '+tR.querySelector('.pl-warn').textContent);
+        var until=Array.from(body.querySelectorAll('.pl-until b')).map(function(x){ return x.textContent; }).join(' ');
+        if(until!=='0:20 0:35' || body.querySelector('.pl-total b').textContent!=='0:35') throw new Error('Until here / Everything as written: '+until+' / '+body.querySelector('.pl-total b').textContent);
+        await planPropose();
+        if(!_plan.proposed || body.querySelector('.pl-total b').textContent!=='0:35') throw new Error('🔀 Propose order counts another day: '+body.querySelector('.pl-total b').textContent);
+        // a dish done and left out: no note
+        await planDone('mT'); await planPropose();
+        if(row('mT').querySelector('.pl-later')) throw new Error('a dish done and left out still says what comes after');
+        // the AI marks a step that waits until another day; the mark is kept with the reading and in the plan
+        if(!/"d":1/.test(planPrompt({ name:'Self-test pickles', servings:'4', ingredients:['cucumbers'], steps:['Brine overnight'] }))) throw new Error('the AI is not asked to mark a step for another day');
+        window.aiCall=async function(){ return '{"blocks":[{"k":"w","m":15,"s":"Mix the marinade"},{"k":"q","m":720,"s":"Marinate overnight","d":1},{"k":"w","m":10,"s":"Grill","r":"grill"}]}'; };
+        var it={ id:'mM', kind:'recipe', name:'Self-test kebab', rid:'', key:'rselftestmd', from:'', blocks:[], guess:false };
+        _plan.items.push(it);
+        if(await planRead(it, { name:'Self-test kebab', ingredients:['lamb'], steps:['Marinate overnight', 'Grill'] })!=='read') throw new Error('the reading failed');
+        var kept=planOut().maps.rselftestmd;
+        if(!it.blocks[1] || !it.blocks[1].d || !kept || !kept.b[1].d || planLen(it)!==15) throw new Error('the mark for another day is not kept with the reading: '+JSON.stringify(kept));
+        // the help assistant knows it
+        var hl=(String(HELP_SYSTEM_PROMPT).split('\n').filter(function(l){ return /WORK PLANNER/.test(l); })[0] || '');
+        ['MULTI-DAY RECIPE', '🌙 Then, on another day', 'not planned here', '12 hours'].forEach(function(w){
+          if(hl.indexOf(w)<0) throw new Error('the help assistant’s Work Planner line does not say “'+w+'”');
+        });
+      } finally {
+        closePlanner();
+        window._household=real.hh; window.aiCall=real.ai; _plan=real.plan; _planReading={};
         try{ if(real.local===null) localStorage.removeItem(PLAN_LOCAL_KEY); else localStorage.setItem(PLAN_LOCAL_KEY, real.local); }catch(e){}
       }
     } },

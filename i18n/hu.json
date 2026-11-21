@@ -1,7 +1,7 @@
 {
  "lang": "hu",
  "updatedAt": 1795259288207,
- "count": 2824,
+ "count": 2825,
  "strings": {
   "\"Add to Home Screen\"": "Hozzáadás a kezdőképernyőhöz",
   "\"Open Bring!\"": "Bring! megnyitása",
@@ -1389,6 +1389,7 @@
   "Their request is refused and nothing more from them reaches you. They are not told: on their side it stays “waiting”. You can unblock them here at any time.": "A kérésüket elutasítjuk, és tőlük többé semmi nem jut el hozzád. Erről nem kapnak értesítést: az ő oldalukon továbbra is „várakozás” látszik. Bármikor feloldhatod itt a blokkolásukat.",
   "Their voice": "Az ő hangjuk",
   "Then open the link in that e-mail, and come back here.": "Aztán nyisd meg a linket abban az e-mailben, és gyere vissza ide.",
+  "Then, on another day: {1} — not planned here.": "Utána, egy másik napon: {1} — itt nincs betervezve.",
   "There are changes on this device not yet sent — sync first, then switch.": "Vannak még el nem küldött módosítások ezen az eszközön — előbb szinkronizálj, aztán válts.",
   "There are changes on this device not yet sent — sync first.": "Vannak még el nem küldött módosítások ezen az eszközön — előbb szinkronizálj.",
   "There are no collections yet — use “New collection”": "Még nincsenek gyűjtemények — használd az „Új gyűjtemény” gombot",

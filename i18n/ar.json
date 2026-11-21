@@ -1,7 +1,7 @@
 {
  "lang": "ar",
  "updatedAt": 1795259288207,
- "count": 3047,
+ "count": 3048,
  "strings": {
   "\"Add to Home Screen\"": "إضافة إلى الشاشة الرئيسية",
   "\"Open Bring!\"": "فتح Bring!",
@@ -1508,6 +1508,7 @@
   "Their voice": "صوتهم",
   "Then open the link in that e-mail, and come back here.": "ثم افتح الرابط الموجود في تلك الرسالة، وارجع إلى هنا.",
   "Then reload the app": "ثم أعد تحميل التطبيق",
+  "Then, on another day: {1} — not planned here.": "ثم، في يوم آخر: {1} — غير مُدرَج في الخطة هنا.",
   "There are changes on this device not yet sent — sync first, then switch.": "هناك تغييرات على هذا الجهاز لم تُرسَل بعد — زامن أولاً، ثم بدّل.",
   "There are changes on this device not yet sent — sync first.": "هناك تغييرات على هذا الجهاز لم تُرسَل بعد — زامن أولاً.",
   "There are no collections yet — use “New collection”": "لا توجد مجموعات بعد — استخدم \"مجموعة جديدة\"",

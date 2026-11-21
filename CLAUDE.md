@@ -38,7 +38,9 @@ where.
   own `i18n/_farm_<lang>`; v39.94 at 21:40 on db945ab: the
   network Self Tests send the sign-in; v39.93 at 19:55 on 4b688fc: each farm animal in its own recorded voice,
   `docs/farm-voices.md`; Worker v108 since 20 Nov 01:59 (from Test); the jobs are listed near the top of `docs/history/2026-11.md`).
-  **On Test, not released:** nothing beyond v40.08. The test copy
+  **On Test, not released:** v40.09 — 🗓️ Work Planner: a multi-day recipe is planned only up to its first step that
+  waits for another day (marked `"d":1` by the AI, or quiet ≥ 12 h); its ⏱ shows 🌙 and "🌙 Then, on another day: … —
+  not planned here." under its chart; the rest of the dishes are scaled to that first part. The test copy
   (https://tonys-recipes-test.pages.dev, its own database and rules) follows `test`.
 - **The beta has had testers since Sunday 25 Oct 2026** and is **by invitation only**: the owner invites with
   ⚙️ → 👑 → ✉️ Invite testers (the congratulatory wording of v39.60); a tester's share button asks the owner for an

@@ -1,7 +1,7 @@
 {
  "lang": "ru",
  "updatedAt": 1795259288207,
- "count": 3345,
+ "count": 3346,
  "strings": {
   "\"Add to Home Screen\"": "Добавить на главный экран",
   "\"One item away\" filter ({1}f.{2})": "Фильтр «Не хватает одного» ({1}ф.{2})",
@@ -1757,6 +1757,7 @@
   "Their voice": "Их голос",
   "Then open the link in that e-mail, and come back here.": "Затем откройте ссылку из этого письма и возвращайтесь сюда.",
   "Then reload the app": "Потом перезапустите приложение",
+  "Then, on another day: {1} — not planned here.": "Потом, в другой день: {1} — здесь не планируется.",
   "There are changes on this device not yet sent — sync first, then switch.": "На этом устройстве есть неотправленные изменения — сначала синхронизируйте, потом переключайтесь.",
   "There are changes on this device not yet sent — sync first.": "На этом устройстве есть неотправленные изменения — сначала синхронизируйте.",
   "There are no collections yet — use “New collection”": "Пока нет ни одной коллекции — нажмите «Новая коллекция»",

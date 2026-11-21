@@ -582,8 +582,11 @@ under its plain path only (a `?url=` request goes network-first).
     by name, and that equipment outside the list is `"r":"other"` with `"rn"`: its name in ≤3 words in the app's language): the method in its order as blocks `{k:'w'|'q', m, s, r?}` — WORK (the cook is busy: chopping, mixing, frying
     while stirring…) and QUIET (it cooks or waits by itself: simmering, baking, resting, rising, chilling…), and `r` the
     equipment the block occupies for its whole time (a pot simmering: stove; frying: stove too, as work; roasting: oven;
-    none for counter work or resting). `planBlocks` makes sure of the answer: whole minutes 1–1440, `r` only a known id,
-    neighbours of a kind on the same equipment joined, at most 20, and a dish that starts quiet starts with a minute of
+    none for counter work or resting), and `"d":1` on a quiet block that waits until ANOTHER DAY (v40.09: marinating,
+    brining or curing overnight or for days, a dough rising or a dish chilling overnight, soaking beans overnight — not
+    cooking that ends the same day, such as a slow cooker on low for 8 hours). `planBlocks` makes sure of the answer:
+    whole minutes 1–1440 for work and 1–10080 (a week) for quiet time, `r` only a known id, `d` kept only on a quiet block,
+    neighbours of a kind on the same equipment (and the same `d`) joined, at most 20, and a dish that starts quiet starts with a minute of
     work. The reading is kept in the plan's `maps` under `planKey(r)` ('r' + a hash of uid, name and method — a changed
     method is read again; the kitchen's own equipment is no longer part of it, since a reading now adds to it), at most
     80, newest kept, so the AI is never asked twice for the same recipe. ↻ beside a recipe (`planReread`) reads it again.
@@ -632,6 +635,20 @@ under its plain path only (a `?url=` request goes network-first).
     rows in the order they start, the scale = the total, "Until here" = when that dish is ready, ⏱ Everything = the
     total, and beside it "One after another: h:mm". A dish waiting for a free cook or equipment is a dotted segment.
     Legend: Work · Quiet time · Waiting · The second cook (green).
+  - **A multi-day recipe is planned only up to its first stop for another day** (v40.09 — Tony, 21 Nov 2026: "When adding a
+    multi-day recipe, do not scale all recipes according to it, as it displays the other recipes as very small chunks of
+    work. Instead, only display the part of the multi-day recipe up until the first multi-day stop (marination, brining,
+    etc.) and scale the other recipes according to this part only. Do indicate that there are other parts, but do not take
+    them into account when planning."). A STOP (`planIsStop`): a quiet block marked `d`, or any quiet block of
+    `PLAN_STOP_MIN` = 720 minutes (12 hours) or more — readings made before the mark, and a block the AI forgot to mark.
+    `planToday(blocks)` = { now: the blocks before the first stop, later: the stop and all after it }. Only `now` is in
+    anything planned: `planLen` (⏱ its time, the scale as written), `planSchedule`'s jobs (🔀 Propose order, the total,
+    Until here, the scale proposed), the as-written chart, and `planShort` (the ⚠️ equipment line — a roast of the next day
+    needing an oven the kitchen set to 0 is not warned about). The blocks themselves are kept whole (in the plan and in
+    `maps`, with `d`). The row shows ⏱ h:mm 🌙, and under its chart `.pl-later` (small, muted, italic): "🌙 Then, on another
+    day: {1} — not planned here." — {1} = the stop's name ("Quiet time" when it has none) · its time + the time of all that
+    comes after it ("Brine · 24:00 + 3:30"). Not on a dish being read or one done and left out (`pl-off`). A dish that
+    begins with a stop plans its minute of work only.
   - **↩︎ Undo** (v40.06, in the top bar; `planRemember`, `planUndo`, `planUndoBtn`): before each change made here —
     ✕, + a dish (recipes or by hand), ⠿/↑↓ a move, 📌, ✓, 👩‍🍳 cooks, 🔀 Propose order, 🗑️ Clear the list, Save in 🍳 Your
     kitchen, ↻ — the plan is remembered (`_planUndo`: JSON of the items, cooks, proposed and equipment, as `planOut` gives
@@ -720,8 +737,15 @@ under its plain path only (a `?url=` request goes network-first).
     scrolled to the end; each name on its own line with only the handle beside it, two lines at 340 px rather than cut;
     the buttons and "Until here" under the bar; ✕ then ↩︎ — back at its place, kept, said; move, 📌, ✓, cooks, Propose
     undone one by one, newest first; Clear the list and the equipment undone; 20 at most; greyed while reading; forgotten
-    when another device saved a newer copy). Knock-out: all six fail without their code.
-  - HELP: the help assistant's "🗓️ WORK PLANNER (v40.05–v40.06)" line — rewritten whole for v40.06 (Tony: "Please update
+    when another device saved a newer copy); `planner_multiday` (v40.09: a turkey — 20 minutes of work, a brine of a day
+    marked `d`, 30 of work, 3 hours in the oven — and a salad of 15: the turkey's ⏱ 0:20 🌙 with one block at 100% and the
+    salad at 75%, the note under the chart naming "Brine", "24:00", "+ 3:30" and "not planned", no ⚠️ for the oven of the
+    next day at 0, Until here 0:20 0:35 and Everything 0:35 as written and proposed, no note on the turkey done and left
+    out, the prompt asking for `"d":1`, and a reading's `d` kept in `maps`); `planner_order` also checks `d` kept apart
+    and quiet time up to a week, `planToday` with a marked stop, 12 hours unmarked (a stop) and 10 hours (not), a dish
+    beginning with a stop, `planLen`, the schedule and `planShort` of the first day only, and `d` through
+    `planBlocksOut`/`planClean`. Knock-out: all seven fail without their code.
+  - HELP: the help assistant's "🗓️ WORK PLANNER (v40.05–v40.09)" line (v40.09 adds A MULTI-DAY RECIPE to THE AI READS) — rewritten whole for v40.06 (Tony: "Please update
     the Help as well") in the order a person meets it: THE WINDOW (full screen, the top bar with ↩︎ Undo and ✕, the
     toolbar), YOUR KITCHEN'S EQUIPMENT (asked once, the 🍳 Your kitchen button, what a reading adds, what you took away),
     ADDING DISHES, THE AI READS, EACH DISH'S ROW, THE ORDER (drag, Propose, 📌, ✓, cooks, totals, Clear), ↩︎ UNDO, SHARED;
@@ -732,7 +756,8 @@ under its plain path only (a `?url=` request goes network-first).
     another’s quiet time and shows when everything will be ready." Privacy Statement 1.19: the plan — dishes, readings
     and the kitchen's equipment — is household content, and a recipe's name and method (with the kitchen's own
     equipment names) go to Anthropic once to read its work, quiet time and equipment.
-  - **Translating it:** 75 phrases by hand in all 11 languages (v40.06: "🍳 Your kitchen", "Undo the last change", "The
+  - **Translating it:** 79 phrases by hand in all 11 languages (v40.09: "Then, on another day: {1} — not planned here.";
+    v40.07: the three of 📚 Which recipes from the collection?; v40.06: "🍳 Your kitchen", "Undo the last change", "The
     last change was undone.", the first question's and the "Added to your kitchen" message's endings now name 🍳 Your
     kitchen; "↩︎ Undo" filled in for Hungarian and Portuguese). Hebrew: a work block is "יחידת עבודה" (Tony, 21 Nov:
     "Please change the translation from גוש עבודה to יחידת עבודה") — feminine, so "יחידת עבודה אחת"; no "גוש" is left

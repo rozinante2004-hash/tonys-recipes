@@ -1,7 +1,7 @@
 {
  "lang": "zh",
  "updatedAt": 1795259288207,
- "count": 3049,
+ "count": 3050,
  "strings": {
   "\"Add to Home Screen\"": "添加到主屏幕",
   "\"Open Bring!\"": "打开 Bring!",
@@ -1508,6 +1508,7 @@
   "Their voice": "他们的声音",
   "Then open the link in that e-mail, and come back here.": "然后打开那封邮件里的链接，再回到这里。",
   "Then reload the app": "然后重新加载应用",
+  "Then, on another day: {1} — not planned here.": "之后，在另一天：{1} — 不在此处计划。",
   "There are changes on this device not yet sent — sync first, then switch.": "此设备上有尚未发送的更改——请先同步，再切换。",
   "There are changes on this device not yet sent — sync first.": "此设备上有尚未发送的更改——请先同步。",
   "There are no collections yet — use “New collection”": "还没有收藏夹 — 点击“新建收藏夹”",

@@ -1,7 +1,7 @@
 {
  "lang": "pt",
  "updatedAt": 1795259288207,
- "count": 2811,
+ "count": 2812,
  "strings": {
   "\"Add to Home Screen\"": "Adicionar à tela inicial",
   "\"Open Bring!\"": "Abrir Bring!",
@@ -1385,6 +1385,7 @@
   "Their request is refused and nothing more from them reaches you. They are not told: on their side it stays “waiting”. You can unblock them here at any time.": "O pedido deles é recusado e nada mais chega até você. Eles não são avisados: do lado deles, continua como “aguardando”. Você pode desbloqueá-los aqui a qualquer momento.",
   "Their voice": "A voz deles",
   "Then open the link in that e-mail, and come back here.": "Depois abra o link desse e-mail e volte aqui.",
+  "Then, on another day: {1} — not planned here.": "Depois, em outro dia: {1} — não planejado aqui.",
   "There are changes on this device not yet sent — sync first, then switch.": "Há alterações neste dispositivo ainda não enviadas — sincronize antes de trocar.",
   "There are changes on this device not yet sent — sync first.": "Há alterações neste dispositivo ainda não enviadas — sincronize primeiro.",
   "There are no collections yet — use “New collection”": "Ainda não há coleções — use “Nova coleção”",

@@ -1,7 +1,7 @@
 {
  "lang": "ja",
  "updatedAt": 1795259288207,
- "count": 3350,
+ "count": 3351,
  "strings": {
   "\"Add to Home Screen\"": "ホーム画面に追加",
   "\"One item away\" filter ({1}f.{2})": "「あと1品」フィルター（{1}f.{2}）",
@@ -1760,6 +1760,7 @@
   "Their voice": "その声",
   "Then open the link in that e-mail, and come back here.": "そのメールのリンクを開いたら、ここに戻ってきてください。",
   "Then reload the app": "アプリを再読み込みしてください",
+  "Then, on another day: {1} — not planned here.": "その後、別の日に：{1} — ここでは計画に含めません。",
   "There are changes on this device not yet sent — sync first, then switch.": "この端末にまだ送信されていない変更があります。先に同期してから切り替えてください。",
   "There are changes on this device not yet sent — sync first.": "この端末にまだ送信されていない変更があります。先に同期してください。",
   "There are no collections yet — use “New collection”": "まだコレクションがありません — 「新しいコレクション」を使ってください",
