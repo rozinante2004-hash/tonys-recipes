@@ -1,7 +1,7 @@
 {
  "lang": "ja",
  "updatedAt": 1795137603205,
- "count": 3347,
+ "count": 3350,
  "strings": {
   "\"Add to Home Screen\"": "ホーム画面に追加",
   "\"One item away\" filter ({1}f.{2})": "「あと1品」フィルター（{1}f.{2}）",
@@ -56,6 +56,7 @@
   "A collection": "コレクション",
   "A collection can be split, and one recipe lifted out (v{1})": "コレクションは分割でき、レシピを1つだけ取り出せる（v{1}）",
   "A collection cannot be added to itself": "コレクションを自分自身に追加することはできません",
+  "A collection is not one dish: tick the recipes from it that you are making.": "コレクションは一品の料理ではありません。作るレシピにチェックを入れてください。",
   "A collection keeps its recipes in parts, and only there (v{1})": "コレクション内のレシピはパートごとに保持され、それ以外の場所には存在しない（v{1}）",
   "A collection meeting a duplicate loses nothing (v{1})": "コレクションが重複と出会っても失われるものはない（v{1}）",
   "A collection needs a name": "コレクションには名前が必要です",
@@ -174,6 +175,7 @@
   "All recipes already have diet tags!": "すべてのレシピに食事タグが付いています！",
   "All {1} passed": "{1}件すべて成功",
   "Already gone": "すでに削除済み",
+  "Already in the plan": "すでにプランにあります",
   "Already invited by Gmail from this device: {1}.": "この端末ではすでにGmailから招待済み：{1}",
   "Already invited from this device: {1}.": "このデバイスから招待済み: {1}",
   "Also sync imported chats": "インポートしたチャットも同期する",
@@ -3029,6 +3031,7 @@
   "📚 Collection imported — {1} recipes in “{2}”": "📚 コレクションをインポートしました — 「{2}」に{1}件のレシピ",
   "📚 Collections": "📚 コレクション",
   "📚 New collection": "📚 新しいコレクション",
+  "📚 Which recipes from the collection?": "📚 コレクションのどのレシピにしますか？",
   "📚 {1} recipes": "📚 {1}件のレシピ",
   "📚 {1} recipes found — filling the form with the first": "📚 {1}件のレシピが見つかりました — 最初の1件でフォームを入力します",
   "📚 {1} recipes in this collection": "📚 このコレクションには{1}件のレシピがあります",

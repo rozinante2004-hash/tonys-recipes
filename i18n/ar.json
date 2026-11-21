@@ -1,7 +1,7 @@
 {
  "lang": "ar",
  "updatedAt": 1795137603205,
- "count": 3044,
+ "count": 3047,
  "strings": {
   "\"Add to Home Screen\"": "إضافة إلى الشاشة الرئيسية",
   "\"Open Bring!\"": "فتح Bring!",
@@ -46,6 +46,7 @@
   "A brand-new one, just for your kitchen — not your e-mail’s password. 🤫": "كلمة سر جديدة خاصة بمطبخك فقط — مش كلمة سر إيميلك. 🤫",
   "A collection": "مجموعة",
   "A collection cannot be added to itself": "لا يمكن إضافة مجموعة إلى نفسها",
+  "A collection is not one dish: tick the recipes from it that you are making.": "المجموعة ليست طبقًا واحدًا: حدّد منها الوصفات التي تُعدّها.",
   "A collection needs a name": "يجب أن يكون للمجموعة اسم",
   "A collection opens with its contents — tap a recipe’s name to jump to it, and ↑ Contents to come back.": "تفتح المجموعة على محتوياتها — اضغط على اسم وصفة للانتقال إليها، و↑ المحتويات للعودة.",
   "A dated snapshot is written here automatically, at most once a week, and the newest {1} are kept.": "تُكتب هنا نسخة مؤرَّخة تلقائيًا، بحد أقصى مرة واحدة أسبوعيًا، ويُحتفظ بأحدث {1}.",
@@ -121,6 +122,7 @@
   "All done.": "تم كل شيء.",
   "All recipes already have diet tags!": "كل الوصفات لديها تصنيفات غذائية بالفعل!",
   "Already gone": "اختفت بالفعل",
+  "Already in the plan": "موجودة بالفعل في الخطة",
   "Already invited by Gmail from this device: {1}.": "تمت الدعوة من قبل عبر Gmail من هذا الجهاز: {1}.",
   "Already invited from this device: {1}.": "تمت الدعوة مسبقًا من هذا الجهاز: {1}.",
   "Also sync imported chats": "مزامنة المحادثات المستوردة أيضاً",
@@ -2727,6 +2729,7 @@
   "📚 Collection imported — {1} recipes in “{2}”": "📚 تم استيراد المجموعة — {1} وصفة في \"{2}\"",
   "📚 Collections": "📚 المجموعات",
   "📚 New collection": "📚 مجموعة جديدة",
+  "📚 Which recipes from the collection?": "📚 أي وصفات من المجموعة؟",
   "📚 {1} recipes": "📚 {1} وصفة",
   "📚 {1} recipes found — filling the form with the first": "📚 تم العثور على {1} وصفة — جاري تعبئة النموذج بالأولى",
   "📚 {1} recipes in this collection": "📚 {1} وصفة في هذه المجموعة",

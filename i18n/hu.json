@@ -1,7 +1,7 @@
 {
  "lang": "hu",
  "updatedAt": 1795137603205,
- "count": 2821,
+ "count": 2824,
  "strings": {
   "\"Add to Home Screen\"": "Hozzáadás a kezdőképernyőhöz",
   "\"Open Bring!\"": "Bring! megnyitása",
@@ -44,6 +44,7 @@
   "A brand-new one, just for your kitchen — not your e-mail’s password. 🤫": "Egy vadonatúj jelszó, csak a konyhádhoz — ne az e-mail jelszavad legyen. 🤫",
   "A collection": "Egy gyűjtemény",
   "A collection cannot be added to itself": "Egy gyűjtemény nem adható hozzá saját magához",
+  "A collection is not one dish: tick the recipes from it that you are making.": "Egy gyűjtemény nem egyetlen fogás: jelöld be belőle azokat a recepteket, amelyeket elkészítesz.",
   "A collection needs a name": "A gyűjteménynek névre van szüksége",
   "A collection opens with its contents — tap a recipe’s name to jump to it, and ↑ Contents to come back.": "A gyűjtemény a tartalomjegyzékével nyílik meg — koppints egy recept nevére, hogy odaugorj, és a ↑ Tartalom gombbal térhetsz vissza.",
   "A different one each time": "Minden alkalommal más",
@@ -118,6 +119,7 @@
   "All done.": "Minden kész.",
   "All recipes already have diet tags!": "Minden receptnek van már diétacímkéje!",
   "Already gone": "Már törölve",
+  "Already in the plan": "Már a tervben van",
   "Already invited by Gmail from this device: {1}.": "Már meghívva Gmailből erről az eszközről: {1}.",
   "Already invited from this device: {1}.": "Már meghívva erről az eszközről: {1}.",
   "Also sync imported chats": "Az importált csevegések szinkronizálása is",
@@ -2518,6 +2520,7 @@
   "📚 Collection imported — {1} recipes in “{2}”": "📚 Gyűjtemény importálva — {1} recept ebben: „{2}”",
   "📚 Collections": "📚 Gyűjtemények",
   "📚 New collection": "📚 Új gyűjtemény",
+  "📚 Which recipes from the collection?": "📚 Mely receptek a gyűjteményből?",
   "📚 {1} recipes": "📚 {1} recept",
   "📚 {1} recipes found — filling the form with the first": "📚 {1} recept található — az űrlap az elsővel töltődik ki",
   "📚 {1} recipes in this collection": "📚 {1} recept ebben a gyűjteményben",

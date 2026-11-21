@@ -566,7 +566,17 @@ under its plain path only (a `?url=` request goes network-first).
     `planPickDone`: nothing ticked → "No recipes selected", select mode stays). **By hand** (`planManualForm`,
     `planManualAdd`): a name and the overall time ("45", "1:30", "1 h 30 min", "2 שעות" — `planMinutes`), one block of
     work; refused with "Give the dish a name." / "How long does it take? Write it in minutes." Twelve dishes at most; the
-    same recipe once. A collection is planned as all its recipes (each one's method under its name, `planStepsText`).
+    same recipe once. **A COLLECTION IS NEVER ONE DISH** (v40.07 — Tony, 21 Nov 2026: "When adding recipes to the planner from a collection, do not add the entire collection but rather open a list of the recipes in the collection and allow the user to select which of the recipes in the collection should be added (there may be more than 1). It makes no sense adding a collection to the planer, only individual recipes"): `planAddRecipes` takes the collections out of
+    what it was given and opens **📚 Which recipes from the collection?** (`planPartsChoose`, `#planPartsOverlay`): "A
+    collection is not one dish: tick the recipes from it that you are making.", then per collection its name (🤝 if a
+    linked kitchen's) and one tick box per recipe (its part), none ticked at first; a recipe already in the plan is shown
+    greyed, "Already in the plan", and cannot be ticked; 🗓️ Add to the Work Planner (only with one ticked —
+    `planPartsSync`) brings each ticked recipe in as a dish of its own (`planPartsAdd` → `planAddRecipes` again, with
+    `_planPartOf`), Cancel adds none. The other recipes chosen with it are read meanwhile. A collection's recipe has the
+    `rid` '<collection uid>#<part uid>' (a linked kitchen's 'L<household>:<collection uid>#<part uid>'; parts keep their
+    own uid — `normalizePart` — and a uid is a UUID, so '#' cannot be in it), and `planFindRecipe` finds the collection,
+    then the part — so ↻ and reading work on it as on any recipe. (`planStepsText` still reads a whole collection's
+    method, for a plan made before v40.07.) Rids are kept up to 200 characters.
   - **The AI reads a recipe once** (`planRead`; `AI_MODEL_SMALL`, `PLAN_AI_SYSTEM`, 900 tokens, `planPrompt`: the name,
     servings, the number of ingredients, the numbered method, and the equipment ids with what each is, the kitchen's own
     by name, and that equipment outside the list is `"r":"other"` with `"rn"`: its name in ≤3 words in the app's language): the method in its order as blocks `{k:'w'|'q', m, s, r?}` — WORK (the cook is busy: chopping, mixing, frying

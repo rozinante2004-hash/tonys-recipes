@@ -35,7 +35,8 @@ where.
   **On Test, not released:** v40.05 — 🗓️ Work Planner (··· More → 🧰 Tools, and 🗓️ in the select bar; AI work/quiet
   blocks and equipment per recipe — what a recipe needs and the kitchen has not listed is added —, the kitchen's equipment asked once, Propose order, 1/2 cooks, linked kitchens'
   recipes, ⠿ drag, 📌 pin, ✓ done, a tap shows a step, shared with the household; Privacy Statement 1.19; firestore.rules gain `planner/{doc}`);
-  v40.06 — the planner full screen with a top bar (↩︎ Undo, ✕), 🍳 Your kitchen as a button, each name on its own line, Hebrew "יחידת עבודה".
+  v40.06 — the planner full screen with a top bar (↩︎ Undo, ✕), 🍳 Your kitchen as a button, each name on its own line, Hebrew "יחידת עבודה";
+  v40.07 — a collection is never added as one dish: 📚 its recipes are listed to tick, each ticked one a dish.
   The test copy
   (https://tonys-recipes-test.pages.dev, its own database and rules) follows `test`.
 - **The beta has had testers since Sunday 25 Oct 2026** and is **by invitation only**: the owner invites with

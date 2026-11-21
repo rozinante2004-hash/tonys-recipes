@@ -10051,7 +10051,7 @@ window.SELF_TESTS = [
         try{ if(real.local===null) localStorage.removeItem(PLAN_LOCAL_KEY); else localStorage.setItem(PLAN_LOCAL_KEY, real.local); }catch(e){}
       }
     } },
-  { id:'planner_pick', group:'Features', name:'🗓️ Work Planner: 📖 Add from the recipe list opens the list to tick several — linked kitchens’ recipes too — then 🗓️ Add to the Work Planner brings them in; ✕ Cancel or ☑ again goes back to the plan; 🗓️ is also among the select bar’s actions; an empty list says to fill in by hand (v40.05)',
+  { id:'planner_pick', group:'Features', name:'🗓️ Work Planner: 📖 Add from the recipe list opens the list to tick several — linked kitchens’ recipes too — then 🗓️ Add to the Work Planner brings them in; ✕ Cancel or ☑ again goes back to the plan; 🗓️ is also among the select bar’s actions; a collection is never one dish — its recipes are listed to tick, one or several, each brought in as a dish (v40.07); an empty list says to fill in by hand (v40.05)',
     test: async()=>{
       var real={ plan:_plan, hh:window._household, user:window._fbUser, ai:window.aiCall, toast:window.toast, rec:recipes, local:null,
         f:[showFavOnly, showClipsOnly, showNoPhotoOnly, showRecentOnly, showOneAwayOnly, showCollectionsOnly], cats:Array.from(activeCategories), diets:Array.from(activeDiets),
@@ -10130,6 +10130,41 @@ window.SELF_TESTS = [
         toggleRecipeSelect(ev, TEST_ID_MIN+4063);
         act.click(); await settle();
         if(selectMode || !document.getElementById('planOverlay') || inPlan()!=='Self-test soup, Self-test rice, Self-test linked soup, Self-test cake') throw new Error('the select bar’s 🗓️ did not bring the recipe in: '+inPlan());
+        // 📚 a collection is never one dish: its recipes are listed to tick (Tony, 21 Nov: "When adding recipes to the planner from
+        // a collection, do not add the entire collection but rather open a list of the recipes in the collection and allow the
+        // user to select which of the recipes in the collection should be added (there may be more than 1)")
+        var col=normalizeRecipe({ id:TEST_ID_MIN+4064, name:'Self-test dinner party', parts:[
+          { name:'Self-test starter', ingredients:['bread'], steps:['Toast 5 minutes'] },
+          { name:'Self-test main', ingredients:['fish'], steps:['Bake 30 minutes'] },
+          { name:'Self-test dessert', ingredients:['fruit'], steps:['Chill 60 minutes'] } ] });
+        recipes.push(col); closePlanner(); renderGrid();
+        toggleSelectMode(); await wait(20);
+        toggleRecipeSelect(ev, TEST_ID_MIN+4064);
+        var n0=_plan.items.length, a0=asked;
+        document.getElementById('selPlanAdd').click(); await settle();
+        var po=document.getElementById('planPartsOverlay'), boxes=function(){ return Array.from(document.querySelectorAll('#planPartsOverlay input[type=checkbox]')); };
+        if(!document.getElementById('planOverlay') || !po || _plan.items.length!==n0 || asked!==a0) throw new Error('the collection was added as one dish, or its recipes were not offered: '+inPlan());
+        if(boxes().length!==3 || boxes().some(function(b){ return b.checked; }) || !document.getElementById('planPartsAdd').disabled || !/Self-test dinner party/.test(po.textContent) || !/Self-test dessert/.test(po.textContent)) throw new Error('the collection’s recipes are not listed to tick (none ticked at first)');
+        boxes()[0].click(); boxes()[2].click();
+        if(document.getElementById('planPartsAdd').disabled) throw new Error('🗓️ Add to the Work Planner cannot be pressed with two ticked');
+        document.getElementById('planPartsAdd').click(); await settle();
+        var added=_plan.items.slice(n0), pr=recipeParts(col);
+        if(document.getElementById('planPartsOverlay') || added.map(function(it){ return it.name; }).join(', ')!=='Self-test starter, Self-test dessert' || asked!==a0+2 || added.some(function(it){ return planLen(it)!==35; })) throw new Error('the ticked recipes were not brought in, each a dish of its own: '+inPlan()+' ('+(asked-a0)+' read)');
+        if(added[0].rid!==String(col.uid || col.id)+'#'+pr[0].uid || planFindRecipe(added[0].rid)!==pr[0] || planFindRecipe(added[1].rid)!==pr[2]) throw new Error('a collection’s recipe cannot be found again (↻): '+added[0].rid);
+        // again: the ones in the plan cannot be ticked; Cancel adds nothing
+        await planAddRecipes([col]);
+        if(!boxes()[0].disabled || boxes()[1].disabled || !boxes()[2].disabled || !/Already in the plan/.test(document.getElementById('planPartsOverlay').textContent)) throw new Error('a recipe already in the plan can be ticked again');
+        boxes()[1].click();
+        Array.from(document.querySelectorAll('#planPartsOverlay .pl-acts .pl-btn')).filter(function(b){ return /Cancel/.test(b.textContent); })[0].click(); await wait(30);
+        if(document.getElementById('planPartsOverlay') || _plan.items.length!==n0+2) throw new Error('Cancel brought a recipe in');
+        // a linked kitchen's collection: its recipes too, marked as theirs
+        var lcol=normalizeRecipe({ id:9, uid:'lk9', name:'Self-test linked menu', parts:[{ name:'Self-test linked salad', ingredients:['leaves'], steps:['Toss'] }, { name:'Self-test linked stew', ingredients:['beef'], steps:['Simmer 90 minutes'] }] });
+        _linkCache.hLnk.list.push(lcol);
+        await planAddRecipes([Object.assign({}, lcol, { _planHid:'hLnk', _planFrom:'Linked Test Kitchen' })]);
+        if(!document.querySelector('#planPartsOverlay .pl-parts-head .pl-tag[title*="Linked Test Kitchen"]') || boxes().length!==2) throw new Error('the linked kitchen’s collection is not offered, marked as theirs');
+        boxes()[1].click(); await planPartsAdd(); await settle();
+        var ls=_plan.items[_plan.items.length-1];
+        if(ls.name!=='Self-test linked stew' || ls.rid!=='LhLnk:lk9#'+recipeParts(lcol)[1].uid || ls.from!=='Linked Test Kitchen' || planFindRecipe(ls.rid)!==recipeParts(lcol)[1]) throw new Error('the linked kitchen’s collection recipe: '+JSON.stringify(ls));
         // nothing to choose from
         recipes=[]; delete _linkCache.hLnk;
         if(planPickStart()!==false || _planPicking || !document.getElementById('planOverlay') || !told.some(function(t){ return /Fill in manually/.test(t); })) throw new Error('an empty list was opened for choosing');

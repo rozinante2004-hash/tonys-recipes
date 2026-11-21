@@ -1,7 +1,7 @@
 {
  "lang": "he",
  "updatedAt": 1795137603205,
- "count": 3470,
+ "count": 3473,
  "strings": {
   "\"Add to Home Screen\"": "הוספה למסך הבית",
   "\"One item away\" filter ({1}f.{2})": "פילטר \"פריט אחד חסר\" ({1}f.{2})",
@@ -57,6 +57,7 @@
   "A collection": "אוסף",
   "A collection can be split, and one recipe lifted out (v{1})": "אפשר לפצל אוסף ולהוציא ממנו מתכון אחד (v{1})",
   "A collection cannot be added to itself": "אי אפשר להוסיף אוסף לעצמו",
+  "A collection is not one dish: tick the recipes from it that you are making.": "אוסף אינו מנה אחת: סמנו את המתכונים ממנו שאתם מכינים.",
   "A collection keeps its recipes in parts, and only there (v{1})": "אוסף שומר את המתכונים שלו בחלקים, ורק שם (v{1})",
   "A collection meeting a duplicate loses nothing (v{1})": "אוסף שנתקל בכפילות לא מאבד כלום (v{1})",
   "A collection needs a name": "לאוסף צריך שם",
@@ -178,6 +179,7 @@
   "All recipes already have diet tags!": "לכל המתכונים כבר יש תגי דיאטה!",
   "All {1} passed": "כל {1} עברו בהצלחה",
   "Already gone": "כבר נמחק",
+  "Already in the plan": "כבר בתוכנית",
   "Already invited by Gmail from this device: {1}.": "כבר הוזמן/ה דרך Gmail ממכשיר זה: {1}.",
   "Already invited from this device: {1}.": "כבר הוזמנו מהמכשיר הזה: {1}.",
   "Also sync imported chats": "סנכרון גם של צ'אטים מיובאים",
@@ -3148,6 +3150,7 @@
   "📚 Collection imported — {1} recipes in “{2}”": "📚 האוסף יובא — {1} מתכונים ב-\"{2}\"",
   "📚 Collections": "📚 אוספים",
   "📚 New collection": "📚 אוסף חדש",
+  "📚 Which recipes from the collection?": "📚 אילו מתכונים מהאוסף?",
   "📚 {1} recipes": "📚 {1} מתכונים",
   "📚 {1} recipes found — filling the form with the first": "📚 נמצאו {1} מתכונים — ממלא את הטופס עם הראשון",
   "📚 {1} recipes in this collection": "📚 {1} מתכונים באוסף הזה",

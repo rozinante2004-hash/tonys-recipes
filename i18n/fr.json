@@ -1,7 +1,7 @@
 {
  "lang": "fr",
  "updatedAt": 1795137603205,
- "count": 3042,
+ "count": 3045,
  "strings": {
   "\"Add to Home Screen\"": "Ajouter à l'écran d'accueil",
   "\"Open Bring!\"": "Ouvrir Bring!",
@@ -46,6 +46,7 @@
   "A brand-new one, just for your kitchen — not your e-mail’s password. 🤫": "Un nouveau mot de passe, juste pour votre cuisine — pas celui de votre e-mail. 🤫",
   "A collection": "Une collection",
   "A collection cannot be added to itself": "Une collection ne peut pas s'ajouter elle-même",
+  "A collection is not one dish: tick the recipes from it that you are making.": "Une collection n’est pas un seul plat : cochez les recettes que vous en préparez.",
   "A collection needs a name": "Une collection a besoin d'un nom",
   "A collection opens with its contents — tap a recipe’s name to jump to it, and ↑ Contents to come back.": "Une collection s’ouvre sur son sommaire — touchez le nom d’une recette pour y aller, et ↑ Sommaire pour revenir.",
   "A dated snapshot is written here automatically, at most once a week, and the newest {1} are kept.": "Un instantané daté est enregistré ici automatiquement, au plus une fois par semaine, et les {1} plus récents sont conservés.",
@@ -121,6 +122,7 @@
   "All done.": "Tout est prêt.",
   "All recipes already have diet tags!": "Toutes les recettes ont déjà des étiquettes de régime !",
   "Already gone": "Déjà supprimée",
+  "Already in the plan": "Déjà dans le plan",
   "Already invited by Gmail from this device: {1}.": "Déjà invité·e par Gmail depuis cet appareil : {1}.",
   "Already invited from this device: {1}.": "Déjà invité depuis cet appareil : {1}.",
   "Also sync imported chats": "Synchroniser aussi les discussions importées",
@@ -2725,6 +2727,7 @@
   "📚 Collection imported — {1} recipes in “{2}”": "📚 Collection importée — {1} recettes dans « {2} »",
   "📚 Collections": "📚 Collections",
   "📚 New collection": "📚 Nouvelle collection",
+  "📚 Which recipes from the collection?": "📚 Quelles recettes de la collection ?",
   "📚 {1} recipes": "📚 {1} recettes",
   "📚 {1} recipes found — filling the form with the first": "📚 {1} recettes trouvées — remplissage du formulaire avec la première",
   "📚 {1} recipes in this collection": "📚 {1} recettes dans cette collection",

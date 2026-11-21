@@ -1,7 +1,7 @@
 {
  "lang": "ru",
  "updatedAt": 1795137603205,
- "count": 3342,
+ "count": 3345,
  "strings": {
   "\"Add to Home Screen\"": "Добавить на главный экран",
   "\"One item away\" filter ({1}f.{2})": "Фильтр «Не хватает одного» ({1}ф.{2})",
@@ -56,6 +56,7 @@
   "A collection": "Подборка",
   "A collection can be split, and one recipe lifted out (v{1})": "Коллекцию можно разделить, а один рецепт — вынести отдельно (v{1})",
   "A collection cannot be added to itself": "Коллекцию нельзя добавить саму в себя",
+  "A collection is not one dish: tick the recipes from it that you are making.": "Коллекция — это не одно блюдо: отметьте рецепты из неё, которые вы готовите.",
   "A collection keeps its recipes in parts, and only there (v{1})": "Коллекция хранит свои рецепты по частям, и только там (v{1})",
   "A collection meeting a duplicate loses nothing (v{1})": "Коллекция при встрече с дубликатом ничего не теряет (v{1})",
   "A collection needs a name": "Коллекции нужно имя",
@@ -172,6 +173,7 @@
   "All recipes already have diet tags!": "У всех рецептов уже есть теги диеты!",
   "All {1} passed": "Все {1} пройдены",
   "Already gone": "Уже удалено",
+  "Already in the plan": "Уже в плане",
   "Already invited by Gmail from this device: {1}.": "Уже приглашены через Gmail с этого устройства: {1}.",
   "Already invited from this device: {1}.": "Уже приглашено с этого устройства: {1}.",
   "Also sync imported chats": "Синхронизировать и импортированные чаты",
@@ -3024,6 +3026,7 @@
   "📚 Collection imported — {1} recipes in “{2}”": "📚 Коллекция импортирована — {1} рецептов в «{2}»",
   "📚 Collections": "📚 Коллекции",
   "📚 New collection": "📚 Новая коллекция",
+  "📚 Which recipes from the collection?": "📚 Какие рецепты из коллекции?",
   "📚 {1} recipes": "📚 {1} рецептов",
   "📚 {1} recipes found — filling the form with the first": "📚 Найдено {1} рецептов — заполняем форму первым",
   "📚 {1} recipes in this collection": "📚 {1} рецептов в этой коллекции",

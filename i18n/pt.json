@@ -1,7 +1,7 @@
 {
  "lang": "pt",
  "updatedAt": 1795137603205,
- "count": 2808,
+ "count": 2811,
  "strings": {
   "\"Add to Home Screen\"": "Adicionar à tela inicial",
   "\"Open Bring!\"": "Abrir Bring!",
@@ -42,6 +42,7 @@
   "A brand-new one, just for your kitchen — not your e-mail’s password. 🤫": "Uma nova, só para a sua cozinha — não a senha do seu e-mail. 🤫",
   "A collection": "Uma coleção",
   "A collection cannot be added to itself": "Uma coleção não pode ser adicionada a si mesma",
+  "A collection is not one dish: tick the recipes from it that you are making.": "Uma coleção não é um prato só: marque as receitas dela que você vai preparar.",
   "A collection needs a name": "Uma coleção precisa de um nome",
   "A collection opens with its contents — tap a recipe’s name to jump to it, and ↑ Contents to come back.": "Uma coleção abre com o índice — toque no nome de uma receita para ir até ela, e ↑ Índice para voltar.",
   "A different one each time": "Uma diferente a cada vez",
@@ -115,6 +116,7 @@
   "All done.": "Tudo pronto.",
   "All recipes already have diet tags!": "Todas as receitas já têm marcações de dieta!",
   "Already gone": "Já foi excluída",
+  "Already in the plan": "Já está no plano",
   "Already invited by Gmail from this device: {1}.": "Já convidado pelo Gmail neste dispositivo: {1}.",
   "Already invited from this device: {1}.": "Já convidado a partir deste dispositivo: {1}.",
   "Also sync imported chats": "Sincronizar também as conversas importadas",
@@ -2506,6 +2508,7 @@
   "📚 Collection imported — {1} recipes in “{2}”": "📚 Coleção importada — {1} receitas em “{2}”",
   "📚 Collections": "📚 Coleções",
   "📚 New collection": "📚 Nova coleção",
+  "📚 Which recipes from the collection?": "📚 Quais receitas da coleção?",
   "📚 {1} recipes": "📚 {1} receitas",
   "📚 {1} recipes found — filling the form with the first": "📚 {1} receitas encontradas — preenchendo o formulário com a primeira",
   "📚 {1} recipes in this collection": "📚 {1} receitas nesta coleção",
