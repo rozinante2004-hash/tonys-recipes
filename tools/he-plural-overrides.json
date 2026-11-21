@@ -500,7 +500,7 @@
   "to": "להשתמש בזה כשמנהל/ת {1} כבר חבר/ה ב-My Kitchen Notes: זה קופץ לו/לה באפליקציה. אם עדיין לא חבר/ה, זה מחכה עד שיצטרפו עם הכתובת הזו — כדאי לספר להם גם למטה."
  },
  "Your change was not accepted by the household’s recipes — your account may not add or change them. It is kept on this device. The household’s owner can see your role in 👥 Family Access: Read + Write or Full access can change recipes.": {
-  "from": "השינוי שלכם לא התקבל במתכוני משק הבית — ייתכן שהחשבון שלכם לא יכול להוסיף או לשנות אותם. השינוי נשמר במכשיר הזה בלבד. בעל/ת משק הבית יכולים לראות את התפקיד שלכם ב-👥 ניהול משק בית: הרשאת קריאה וכתיבה או גישה מלאה מאפשרות לשנות מתכונים.",
+  "from": "השינוי שלכם לא התקבל במתכוני משק הבית — ייתכן שהחשבון שלכם לא יכול להוסיף או לשנות אותם. השינוי נשמר במכשיר הזה בלבד. מנהל/ת משק הבית יכולים לראות את התפקיד שלכם ב-👥 ניהול משק בית: הרשאת קריאה וכתיבה או גישה מלאה מאפשרות לשנות מתכונים.",
   "to": "השינוי שלכם לא התקבל במתכוני משק הבית — ייתכן שהחשבון שלכם לא יכול להוסיף או לשנות אותם. השינוי נשמר במכשיר הזה בלבד. מנהל/ת משק הבית יכול/ה לראות את התפקיד שלכם ב-👥 ניהול משק בית: הרשאת קריאה וכתיבה או גישה מלאה מאפשרות לשנות מתכונים."
  },
  "How much of the free daily allowances (Cloudflare) is used, and anything paused right now (the app's owner only).": {
@@ -650,5 +650,57 @@
  "Deployments are for the owner of this app.": {
   "from": "ארכיטקטורה - לאדמין בלבד",
   "to": "ארכיטקטורה - למנהל האפליקציה בלבד"
+ },
+ "Finishing the {1} translation": {
+  "from": "מסיימים את התרגום ל{1}",
+  "to": "מסיים את התרגום ל{1}"
+ },
+ "Getting ready…": {
+  "from": "מתכוננים…",
+  "to": "מתכונן…"
+ },
+ "Trying every route from our server…": {
+  "from": "בודקים כל נתיב מהשרת שלנו…",
+  "to": "בודק כל נתיב מהשרת שלנו…"
+ },
+ "⏳ Getting the newest version of the app first…": {
+  "from": "⏳ מביאים קודם את הגרסה החדשה ביותר של האפליקציה…",
+  "to": "⏳ מביא קודם את הגרסה החדשה ביותר של האפליקציה…"
+ },
+ "⏳ Opening the plan…": {
+  "from": "⏳ פותחים את התוכנית…",
+  "to": "⏳ פותח את התוכנית…"
+ },
+ "⏳ Opening your household…": {
+  "from": "⏳ פותחים את משק הבית שלכם…",
+  "to": "⏳ פותח את משק הבית שלכם…"
+ },
+ "⏳ Reading the recipe…": {
+  "from": "⏳ קוראים את המתכון…",
+  "to": "⏳ קורא את המתכון…"
+ },
+ "⏳ Setting the table…": {
+  "from": "⏳ עורכים את השולחן…",
+  "to": "⏳ עורך את השולחן…"
+ },
+ "⏳ Signing in automatically in {1} seconds…": {
+  "from": "⏳ מתחברים אוטומטית בעוד {1} שניות…",
+  "to": "⏳ מתחבר אוטומטית בעוד {1} שניות…"
+ },
+ "⏳ Turning on…": {
+  "from": "⏳ מפעילים…",
+  "to": "⏳ מפעיל…"
+ },
+ "🔄 Reading their recipes again…": {
+  "from": "🔄 קוראים את המתכונים שלהם מחדש…",
+  "to": "🔄 קורא את המתכונים שלהם מחדש…"
+ },
+ "Sends {1} an e-mail with a link to choose a new password (from this copy’s sign-in service — it may land in spam). You never see their password. If they sign in with Google, they do not need it: their password is Google’s.": {
+  "from": "שולח ל-{1} מייל עם קישור לבחירת סיסמה חדשה (משירות ההתחברות של עותק זה — ייתכן שיגיע לדואר זבל). אתם לעולם לא רואה את הסיסמה שלהם. אם הם מתחברים עם Google, הם לא צריכים אותה: הסיסמה שלהם היא של Google.",
+  "to": "שולח ל-{1} מייל עם קישור לבחירת סיסמה חדשה (משירות ההתחברות של עותק זה — ייתכן שיגיע לדואר זבל). אתם לעולם לא רואים את הסיסמה שלהם. אם הם מתחברים עם Google, הם לא צריכים אותה: הסיסמה שלהם היא של Google."
+ },
+ "🔒 Your recipes are stored in {1} Google account (Firebase cloud).{2} Nothing is kept on this app's servers — though some features do send a recipe through them. {3}.": {
+  "from": "🔒 המתכונים שלכם נשמרים בחשבון {1} שלכם ב-Google (עננן Firebase).{2} שום דבר לא נשמר בשרתי האפליקציה — אבל חלק מהתכונות שולחות מתכון דרכם. {3}.",
+  "to": "🔒 המתכונים שלכם נשמרים בחשבון {1} שלכם ב-Google (ענן Firebase).{2} שום דבר לא נשמר בשרתי האפליקציה — אבל חלק מהתכונות שולחות מתכון דרכם. {3}."
  }
 }

@@ -18675,13 +18675,15 @@ window.SELF_TESTS = [
       } finally { window._fbUser=realUser; window.fetch=realFetch; _workerHealth=realHealth; }
     } },
 
-  { id:'i18n_prompt_hebrew_plural', group:'Features', name:'The AI is told to write Hebrew in the plural, and to call the app\u2019s owner “מנהל האפליקציה” — only Hebrew (v39.66, v39.70)',
+  { id:'i18n_prompt_hebrew_plural', group:'Features', name:'The AI is told to write Hebrew in the plural, to call the app\u2019s owner “מנהל האפליקציה”, and to let the app speak of itself in the masculine singular (“קורא את המתכון…”) — only Hebrew (v39.66, v39.70, v40.10)',
     test: async()=>{
       // Tony: "Plural". The central Hebrew is rewritten to the plural (.github/workflows/he-plural.yml); without this
       // rule every release's new phrases came back in the masculine singular from the AI.
       var he=i18nPrompt('he', ['Send the request']), fr=i18nPrompt('fr', ['Send the request']);
       if(!/HEBREW: address the reader in the PLURAL/.test(he)) throw new Error('the Hebrew prompt does not ask for the plural');
       if(he.indexOf('לחצו')===-1 || he.indexOf('שלכם')===-1) throw new Error('the Hebrew prompt gives no plural examples');
+      // v40.10 — Tony: "when the app is referring to itself, like when it reads a recipe, it should use the single male form"
+      if(he.indexOf('MASCULINE SINGULAR present')===-1 || he.indexOf('קורא את המתכון')===-1 || he.indexOf('not קוראים')===-1) throw new Error('the Hebrew prompt does not say the app speaks of itself in the masculine singular');
       // v39.70 — Tony: the app's owner is "מנהל האפליקציה", as the 👑 button says, never בעל האפליקציה.
       if(he.indexOf('is always מנהל האפליקציה')===-1 || he.indexOf('never בעל האפליקציה')===-1) throw new Error('the Hebrew prompt does not name the app\u2019s owner \u201cמנהל האפליקציה\u201d');
       if(fr.indexOf('מנהל האפליקציה')!==-1) throw new Error('the Hebrew app-owner rule is given to another language');

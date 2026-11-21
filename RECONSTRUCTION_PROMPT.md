@@ -1220,6 +1220,11 @@ invitation-only (unless adding to the tester's household)."
   no token is refused — so `workerSignIn` (v39.87) waits, while `window._fbAuth` exists and `_fbAuthSettled` is not
   yet set (a link shared into the app is fetched as the app opens), up to 10 s, once only if Firebase never answers; the Worker variable `SIGNED_FETCH=accept` serves such calls again (the way back, no code
   change). `health` → `signedFetch: { version, required }`.
+- **The app speaks of itself in the masculine singular (v40.10).** Tony: "when the app is referring to itself, like when
+  it reads a recipe, it should use the single male form: קורא את המתכון and not the plural one." A status of the app
+  (⏳ קורא את המתכון…, פותח, מביא, מתכונן, מתחבר, מפעיל, בודק) — never קוראים; the reader is still addressed in the
+  plural. Rule 7a of `i18nPrompt` says so; the lines that were plural are reviewed fixes in
+  `tools/he-plural-overrides.json`, written to the central Hebrew by he-plural.yml.
 - **Hebrew in the plural (v39.66, audit U6).** The interface's Hebrew addresses the reader in the plural (Tony's
   choice). `i18nPrompt` tells the AI so for Hebrew only (rule 7a). `tools/he-address-form.mjs` rewrites existing
   phrases from reviewed tables (slash forms anywhere; commands only at a clause's start; `שלך → שלכם` and the other

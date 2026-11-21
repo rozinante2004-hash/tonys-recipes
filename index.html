@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v40.09 -->
+<!-- Tony's Recipes Collection v40.10 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -11416,7 +11416,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v40.09';
+var APP_VERSION = 'v40.10';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -15157,7 +15157,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v40.09</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v40.10</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -15245,7 +15245,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v40.09</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v40.10</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -19997,6 +19997,11 @@ function i18nPrompt(lang, batch) {
       + '"him/her" slash form. Commands and buttons that tell the reader to act use the plural imperative '
       + '(לחצו, הקישו, בחרו, שמרו, שלחו, נסו); "your" is שלכם, "you" is אתם / לכם / אתכם. A label that names a thing '
       + 'or a state stays a noun or an adjective (שמירה, נשמר). '
+      // v40.10 — Tony, 21 Nov 2026: "In the Hebrew translation, when the app is referring to itself, like when it reads a
+      // recipe, it should use the single male form: קורא את המתכון and not the plural one."
+      + 'When a line says what the APP itself is doing — a status such as "Reading the recipe…", "Opening…", "Getting '
+      + 'ready…" — the app speaks of itself in the MASCULINE SINGULAR present (⏳ קורא את המתכון…, פותח, מתכונן), never '
+      + 'the plural (not קוראים, not פותחים). '
       // v39.70 — Tony, 11 Nov 2026: "All should be referred to as "מנהל האפליקציה". Although I am indeed the App's owner,
       // in this capacity I should be referred to as the App's manager." (The menu's 👑 button already said so.)
       + 'The app\'s owner (the app\'s owner, the owner of the app, 👑 App owner, the owner\'s tools) is always '
