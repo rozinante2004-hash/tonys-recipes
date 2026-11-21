@@ -32,7 +32,9 @@ where.
   own `i18n/_farm_<lang>`; v39.94 at 21:40 on db945ab: the
   network Self Tests send the sign-in; v39.93 at 19:55 on 4b688fc: each farm animal in its own recorded voice,
   `docs/farm-voices.md`; Worker v108 since 20 Nov 01:59 (from Test); the jobs are listed near the top of `docs/history/2026-11.md`).
-  **On Test, not released:** nothing.
+  **On Test, not released:** v40.05 — 🗓️ Work Planner (··· More → 🧰 Tools, and 🗓️ in the select bar; AI work/quiet
+  blocks and equipment per recipe — what a recipe needs and the kitchen has not listed is added —, the kitchen's equipment asked once, Propose order, 1/2 cooks, linked kitchens'
+  recipes, ⠿ drag, 📌 pin, ✓ done, a tap shows a step, shared with the household; Privacy Statement 1.19; firestore.rules gain `planner/{doc}`).
   The test copy
   (https://tonys-recipes-test.pages.dev, its own database and rules) follows `test`.
 - **The beta has had testers since Sunday 25 Oct 2026** and is **by invitation only**: the owner invites with

@@ -494,6 +494,32 @@ await check('the owner deletes a 1-to-1 message he cannot read, and its id (dele
 await check('…and reads what was written to him by its id',   getDoc(doc(max, 'households/L5/talk/g1')), true);
 await check('…but not nora\'s message to otto, by its id',    famSend(nora, 'g3', famMsg('nora', 'otto')).then(() => getDoc(doc(max, 'households/L5/talk/g3'))), false);
 
+// v40.05 — the Work Planner: households/<hid>/planner/current, written by anyone in the household (readers too).
+const plan = (by, extra) => Object.assign({ items: [{ id: 'p1', kind: 'manual', name: 'Soup', blocks: [{ k: 'w', m: 20, s: '' }] }],
+  cooks: 1, proposed: false, by, at: 7, maps: {} }, extra || {});
+await check('v40.05: otto (a reader) writes the household\'s plan',  setDoc(doc(otto, 'households/L5/planner/current'), plan('otto')), true);
+await check('…and everyone in L5 reads it',                     Promise.all([getDoc(doc(max, 'households/L5/planner/current')), getDoc(doc(nora, 'households/L5/planner/current'))]), true);
+await check('…nora changes it (two cooks, proposed)',           setDoc(doc(nora, 'households/L5/planner/current'), plan('nora', { cooks: 2, proposed: true })), true);
+await check('…not in someone else\'s name',                     setDoc(doc(nora, 'households/L5/planner/current'), plan('max')), false);
+await check('…not under another name than current',             setDoc(doc(nora, 'households/L5/planner/other'), plan('nora')), false);
+await check('…not three cooks',                                 setDoc(doc(nora, 'households/L5/planner/current'), plan('nora', { cooks: 3 })), false);
+await check('…not more than 12 dishes',                         setDoc(doc(nora, 'households/L5/planner/current'), plan('nora', { items: Array.from({ length: 13 }, (x, i) => ({ id: 'p' + i })) })), false);
+await check('…not with anything else in it',                    setDoc(doc(nora, 'households/L5/planner/current'), plan('nora', { phone: '1' })), false);
+// …and the kitchen's equipment, asked once and kept with the plan
+const kit = (n, custom) => ({ n: n || { stove: 4, oven: 1 }, custom: custom || [{ id: 'c1', name: 'Wok burner', n: 1 }], asked: true });
+await check('…with the kitchen\'s equipment',                    setDoc(doc(otto, 'households/L5/planner/current'), plan('otto', { res: kit() })), true);
+await check('…not seven pieces of its own',                     setDoc(doc(otto, 'households/L5/planner/current'), plan('otto', { res: kit(null, Array.from({ length: 7 }, (x, i) => ({ id: 'c' + i, name: 'x', n: 1 }))) })), false);
+await check('…not anything else under equipment',               setDoc(doc(otto, 'households/L5/planner/current'), plan('otto', { res: Object.assign(kit(), { note: 'x' }) })), false);
+await check('…not equipment that is not a map',                 setDoc(doc(otto, 'households/L5/planner/current'), plan('otto', { res: 'four burners' })), false);
+await check('…with what the household took away itself',      setDoc(doc(otto, 'households/L5/planner/current'), plan('otto', { res: Object.assign(kit(), { no: ['sousvide', '~food dehydrator'] }) })), true);
+await check('…not more than 20 of those',                       setDoc(doc(otto, 'households/L5/planner/current'), plan('otto', { res: Object.assign(kit(), { no: Array.from({ length: 21 }, (x, i) => '~x' + i) }) })), false);
+await check('…a list of them, not one',                         setDoc(doc(otto, 'households/L5/planner/current'), plan('otto', { res: Object.assign(kit(), { no: 'sousvide' }) })), false);
+await check('a stranger neither reads nor writes it',           Promise.all([getDoc(doc(carol, 'households/L5/planner/current'))]), false);
+await check('…nor writes it',                                   setDoc(doc(carol, 'households/L5/planner/current'), plan('carol')), false);
+await check('another household (lena\'s) does not read it',   getDoc(doc(lena, 'households/L5/planner/current')), false);
+await check('a reader does not delete it',                      deleteDoc(doc(otto, 'households/L5/planner/current')), false);
+await check('the owner deletes it (deleting the household)',    deleteDoc(doc(max, 'households/L5/planner/current')), true);
+
 const unlink = (db) => { const b = writeBatch(db);
   b.delete(doc(db, 'households/L1/links/L2')); b.delete(doc(db, 'households/L2/links/L1')); return b.commit(); };
 await check('a reader cannot remove the link',               unlink(hank), false);

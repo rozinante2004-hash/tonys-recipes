@@ -383,6 +383,29 @@ service cloud.firestore {
         allow update: if false;
         allow delete: if atLeast(hid, 'owner') || beingDeleted(hid);
       }
+      // v40.05 — the 🗓️ Work Planner (Tony, 20 Nov 2026: the plan "Shared with my household"): the dishes the household
+      // is about to cook and the order proposed for them. Everyone in it plans, readers too (planning is not editing
+      // recipes). One document, `planner/current` = { items (≤ 12), cooks (1 or 2), proposed, by (the writer), at,
+      // maps (≤ 80: the work and quiet blocks the AI read in each recipe, kept so it is not asked twice), res (the kitchen's
+      // equipment — how many burners, ovens, sous vide devices… and up to 6 of its own; asked once, never cleared; `no`
+      // ≤ 20: what the household took away itself, so a recipe's reading does not add it back) }.
+      match /planner/{doc} {
+        allow read: if isMember(hid) || beingDeleted(hid);
+        allow create, update: if isMember(hid) && doc == 'current'
+          && request.resource.data.keys().hasOnly(['items', 'cooks', 'proposed', 'by', 'at', 'maps', 'res'])
+          && (!('res' in request.resource.data) || (request.resource.data.res is map
+              && request.resource.data.res.keys().hasOnly(['n', 'custom', 'asked', 'no'])
+              && (!('no' in request.resource.data.res) || (request.resource.data.res.no is list && request.resource.data.res.no.size() <= 20))
+              && (!('n' in request.resource.data.res) || (request.resource.data.res.n is map && request.resource.data.res.n.size() <= 12))
+              && (!('custom' in request.resource.data.res) || (request.resource.data.res.custom is list && request.resource.data.res.custom.size() <= 6))))
+          && request.resource.data.by == request.auth.uid
+          && request.resource.data.items is list && request.resource.data.items.size() <= 12
+          && request.resource.data.cooks in [1, 2]
+          && request.resource.data.proposed is bool
+          && request.resource.data.at is int
+          && request.resource.data.maps is map && request.resource.data.maps.size() <= 80;
+        allow delete: if atLeast(hid, 'admin') || beingDeleted(hid);
+      }
       match /talkIds/{id} {
         allow read: if isMember(hid) || beingDeleted(hid);
         allow create: if isMember(hid) && request.resource.data.keys().size() == 0

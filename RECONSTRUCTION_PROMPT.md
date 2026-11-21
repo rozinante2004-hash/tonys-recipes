@@ -179,7 +179,8 @@ Each household is its own space; nothing is guarded by e-mails typed into the ru
   - `members/<uid>` — `{uid, email, name, role: owner|admin|editor|viewer, lastSeen, termsAt,
     termsVersion}`; a member may update only their own `lastSeen`/`termsAt`/`termsVersion`.
   - `recipes/`, `photos/`, `chats/`, `state/` (e.g. `state/move`), `requests/<uid>` (a viewer asks to
-    write), `requestLog/<otherHid>` (link history: accepted|rejected|blocked|revoked), `links/<otherHid>`.
+    write), `requestLog/<otherHid>` (link history: accepted|rejected|blocked|revoked), `links/<otherHid>`,
+    `planner/current` (v40.05: the household's 🗓️ Work Planner — one document, below in 1b.8).
 - Top level: `codes/<MKN-XXXX-XXXX>` = {hid, at} (identifier; 31-letter alphabet without O/0/I/1/L;
   never changes once given; anyone signed in may look one up), `homes/<uid>` = {hid} (lets a rule
   find someone's household), `linkRequests/<id>`, `linkTalk/<a>_<b>/messages`, `invites/<code>`
@@ -516,6 +517,167 @@ under its plain path only (a `?url=` request goes network-first).
   and its title through `i18nPhrase` (in the person's language however the button is drawn).
   HELP: the help assistant's "📍 TAKE ME THERE (v40.01)" line; ✨ What can this app do → Smart help: "Its answers come
   with 📍 Take me there: one tap opens the place it describes." (v40.03). Self Test `help_take_me_there`.
+- **🗓️ Work Planner (v40.05).** Tony, 20 Nov 2026: "a Work Planner, located under More... The planner will suggest the
+  best order of cooking several dishes / recipes, exploiting "quiet time" in some recipes to advance others. For example,
+  if a recipe has a simmering step that takes 30 minutes, then a preparation step, from another recipe, could be fitted
+  in that time." His answers: the AI reads each recipe (what it found is kept and used again); Propose order aims for the
+  shortest total time only; a switch for 1 or 2 cooks; the plan is shared with the household. Then, the same evening:
+  "Please also consider resources like number of stoves. This should be a 1-time question, to be kept and remembered.
+  Also number of sous vids and other, similar resources … please add to the Select option on the main screen the option
+  to "Add to work planner" … an option, in the planner, to clear the list, remove all or specific recipes … The
+  resources, like stoves and others, should not be cleared, but they should be editable … Please allow selecting recipes
+  from joined kitchens as well, not only from my own kitchen."
+  - **Where:** ··· More → 🧰 Tools → 🗓️ Work Planner (`openPlanner`; the Tools heading's title "The Work Planner and the
+    measurement converter"). One window, `#planOverlay` / `#planBody`, drawn by `planRender` from `planView()`.
+  - **🍳 The kitchen's equipment — asked once** (`planResForm(true)` the first time the planner opens, while the plan's
+    `res.asked` is false; `#planResOverlay`): how many 🔥 Stove burners (4), ♨️ Ovens (1), 🌡️ Sous vide devices (0), 🍲
+    Pressure or slow cookers (0), 🍟 Air fryers (0), ⚡ Microwaves (1), 🍖 Grills (0), 🥣 Stand mixers (0) — `PLAN_RES`,
+    the numbers in brackets offered first — and + Add other equipment: up to six of the kitchen's own (`c1`…`c6`, a name
+    ≤40 and a number). Shown in the planner as "🍳 Your kitchen:" with ✏️ Edit and, under it, one chip per piece it has —
+    icon, NAME and number ("🔥 Stove burners 2", "🔧 Thermomix 1"; `planResLineHtml`); the legend under the chart names
+    each equipment icon drawn on the bars (`planResLegendHtml`). (Tony, 21 Nov: "I do not understand the icons
+    representing resources in my kitchen. Could you please make them clearer by adding titles to them or adding a legend
+    or something?" — the first version showed the icons and numbers alone.) Save (`planResSave`); Close (`planResClose`) keeps the numbers as they are — the question is not
+    asked again either way. Kept in the plan (`res = {n, custom, asked, no}`, `planResClean` makes sure of it: 0–20, a bad
+    number → the usual one), so it is the household's: someone else in it is not asked. Shown as "🍳 Your kitchen: 🔥 4 ·
+    ♨️ 1 · ⚡ 1 · 🔧 Thermomix 1" with ✏️ Edit (`planResForm(false)`). 🗑️ Clear the list never touches it.
+  - **+ Add recipe** (`planAddMenu`, its own small window `#planAddOverlay`): 📖 Add from the recipe list / ✏️ Fill in
+    manually / Close. **From the recipe list** (`planPickStart`): the planner closes, the recipe list goes into select
+    mode with the select bar showing only 🗓️ Add to the Work Planner (`#selectBar.plan-pick`: `.sel-plan` shown,
+    `.sel-grid` hidden). While choosing (`_planPicking`), the LINKED KITCHENS' cards stay in the list (`linkedInAllOn`;
+    ordinary select mode hides them, its other actions being for one's own recipes) and a tap ticks them
+    (`linkedCardTap` → `_planLinkedSel`, the card `.selected`) instead of opening them; the count adds them. Then that
+    button (`planPickDone`) → the planner opens again with them (a linked one: `rid` 'L<household>:<uid>', `from` its
+    kitchen's name, 🤝 on its row). ✕ Cancel, or ☑ Select again, goes back to the planner (`planPickEnd(true)`, from
+    `cancelSelectMode` / `toggleSelectMode`). Own recipes are looked up in `recipes` itself (`let recipes` is NOT on
+    `window` — a first draft looked in `window.recipes` and would have added nothing). Nothing to choose from (no
+    recipes, no linked kitchen's): "There are no recipes in the list yet. Use ✏️ Fill in manually." **From the main
+    screen:** ☑ Select → tick → 🗓️ Add to the Work Planner among the select bar's actions (`#selPlanAdd` →
+    `planPickDone`: nothing ticked → "No recipes selected", select mode stays). **By hand** (`planManualForm`,
+    `planManualAdd`): a name and the overall time ("45", "1:30", "1 h 30 min", "2 שעות" — `planMinutes`), one block of
+    work; refused with "Give the dish a name." / "How long does it take? Write it in minutes." Twelve dishes at most; the
+    same recipe once. A collection is planned as all its recipes (each one's method under its name, `planStepsText`).
+  - **The AI reads a recipe once** (`planRead`; `AI_MODEL_SMALL`, `PLAN_AI_SYSTEM`, 900 tokens, `planPrompt`: the name,
+    servings, the number of ingredients, the numbered method, and the equipment ids with what each is, the kitchen's own
+    by name, and that equipment outside the list is `"r":"other"` with `"rn"`: its name in ≤3 words in the app's language): the method in its order as blocks `{k:'w'|'q', m, s, r?}` — WORK (the cook is busy: chopping, mixing, frying
+    while stirring…) and QUIET (it cooks or waits by itself: simmering, baking, resting, rising, chilling…), and `r` the
+    equipment the block occupies for its whole time (a pot simmering: stove; frying: stove too, as work; roasting: oven;
+    none for counter work or resting). `planBlocks` makes sure of the answer: whole minutes 1–1440, `r` only a known id,
+    neighbours of a kind on the same equipment joined, at most 20, and a dish that starts quiet starts with a minute of
+    work. The reading is kept in the plan's `maps` under `planKey(r)` ('r' + a hash of uid, name and method — a changed
+    method is read again; the kitchen's own equipment is no longer part of it, since a reading now adds to it), at most
+    80, newest kept, so the AI is never asked twice for the same recipe. ↻ beside a recipe (`planReread`) reads it again.
+  - **What a recipe needs is added to 🍳 Your kitchen** (`planResFound`, before `planBlocks`; Tony, 21 Nov 2026: "When
+    scanning the recipes, do you check for the resources they require. (e.g. Food dehydrator, sous vide, stove, etc.) and
+    add them to the resources list at the top (if they are not there)? If not, then please do."): a block on usual
+    equipment the kitchen has 0 of → it gets 1; `"r":"other"` → its `rn` becomes one of the kitchen's own (`n` 1, the
+    first free `c1`…`c6`, preferring one no dish or kept reading points to — `planResFreeId`), or the one by that name
+    already there (case and spaces aside; set to 0 → 1); a name that is one of the usual ones ("stove") is that one; no
+    room for a seventh → left out. The block then points to it. Said ONCE after the batch of readings (`planResTell`, from
+    `planAddRecipes`, `planReadMissing`, `planReread`): "Added to your kitchen: 🌡️ Sous vide devices, 🔧 Food dehydrator.
+    Change it with ✏️ Edit if it is not right." / "There is no room for more equipment of your own: {1} was left out."
+    WHAT YOU TOOK AWAY YOURSELF is not added back: `res.no` (≤20) holds what ✏️ Edit took away — a usual one set from
+    above 0 to 0 (its id), one of your own removed or set to 0 ('~' + its name in lower case) — `planResDeclined`; a
+    number above 0 again takes it off. Such a dish shows the ⚠️ line instead. One of your own removed: the dishes stop
+    pointing to it and the readings that used it are dropped, to be read afresh next time (`planResForget` — its `c` id
+    may go to another piece). Adding does not count as answering the one-time question (`asked` stays as it was), and if
+    the equipment window is open meanwhile — its first question, when the recipes came from ☑ Select on the main screen —
+    what was added shows in it at once (`planResFormSync`), so saving it does not take it away again. If the AI cannot answer:
+    one block of the recipe's `prep` time (or 30 min), marked ≈, a toast, logged. While reading: "⏳ Reading the recipe…"
+    in its row, and 🔀 Propose order waits.
+  - **The rows (a Gantt chart):** each dish a row: its name, ⏱ its own time (≈ if guessed), ✏️ for one by hand, 🤝 for a
+    linked kitchen's, ↻, ✕ (`planRemove`); a bar with WORK as solid blocks and QUIET time as a thin line, a small 🔥 / ♨️ /
+    🌡️… above a block that occupies equipment, positioned with `inset-inline-start` (so it mirrors in right-to-left
+    languages); faint lines under the axis's ticks (`--pl-step`, 270deg in RTL); "Until here: h:mm" after each; ⚠️
+    "Needs 🌡️ Sous vide devices — your kitchen has none (counted as one)." when it needs equipment the kitchen has 0 of
+    (`planShort`) — since a reading adds what is missing, that is equipment you set to 0 yourself. **As written** (before proposing): every dish from 0, the scale = the longest dish, "Until here" = the
+    time used one after another by the end of that dish, ⏱ Everything = their sum "(one after another)". **Proposed:** the
+    rows in the order they start, the scale = the total, "Until here" = when that dish is ready, ⏱ Everything = the
+    total, and beside it "One after another: h:mm". A dish waiting for a free cook or equipment is a dotted segment.
+    Legend: Work · Quiet time · Waiting · The second cook (green).
+  - **🔀 Propose order** (`planPropose` → `planSchedule(todo, cooks, res, { pins })`, then the list takes the order found —
+    `s.order`; dishes done are left out, see "By hand" below): quiet time needs no cook; work needs one
+    (of 1 or 2); a block with `r` needs one of that equipment free (the kitchen's number; 0 counts as one and is
+    returned in `short`; a removed own piece limits nothing). At each moment the earliest block that can start, starts;
+    of those that can start then, the dish first in the order of priority (cook and equipment units: the one free
+    earliest). Every priority order is tried for up to 7 dishes (5,040 orders); more dishes: the longest first, the most
+    quiet time first, as written, and 4,000 seeded shuffles. The best: the shortest total, then the least waiting, then
+    the first found — so the same plan gives the same answer. Checked: A (10 work, 30 quiet, 5 work) and B (20 work),
+    written B first → 45 min, B in A's quiet time; A and C (60 work): 75 min with one cook (A waits 30), 60 with two; two
+    pots of 30 min simmering: 65 min with one burner (the second waits), 40 with two; frying 10 and simmering 30 on one
+    burner: 42; two roasts of 60 min: 130 with one oven, 80 with two. Adding or removing a dish takes the plan back to "as
+    written".
+  - **By hand (21 Nov).** Tony: "1. Ability to drag and drop (reorder) the recipes 2. Ability to pin a recipe, so the planner
+    would have to consider it's location in the list without being able to change it 3. A search box at the top of the
+    recipe picker (seme as on the main page) 4. When clicking a section in the graph (either block or line) the name and
+    duration of the relevant step will appear above it. Also, please add the ability to mark a recipe as completed." His
+    answers: a pin keeps the dish's place in the order; a dish done stays in the timeline, greyed, the others' times not
+    changing — and then: "If I mark a recipe as Done and also click the "Propose Order" button, the planner should not
+    consider the Done recipe in the planning"; the picker stays the main list, its search box held at the top.
+    - **The list's order is the order the dishes are STARTED in** (`planSchedule`: a dish begins only after the one above it
+      began, and never earlier than it; `began`). Proposed, the rows are the list itself (no sorting by start time);
+      `planView` times the list as it stands (`{ fixed: true }`), so after a drag the times show that order.
+    - **⠿ drag** (`planDragStart`: pointer events on the handle, `touch-action: none`; the row follows the finger, the
+      others make room, `planMove(id, to)` on letting go; keyboard ↑ / ↓ on the handle, `planDragKey`, focus kept). A
+      plain move: the user may move a pinned dish too.
+    - **📌 pin** (`planPin`, `it.pin`): 🔀 Propose order tries only orders that keep pinned dishes at their places
+      (`opts.pins`; the free dishes are permuted into the free places — `place`).
+    - **✓ done** (`planDone`, `it.done`): greyed and ticked (`.pl-done`), still in the timeline, everyone else's times as
+      they were. 🔀 Propose order plans only the dishes not done and marks the done ones `skip`: they come last
+      (`planTidy`), without a bar, handle, pin or ↻ (`.pl-off`), out of the times and the total. ✓ again clears both.
+      Everything done: "✓ All done." and Propose cannot be pressed.
+    - **A tap on a block or a line** (`planSegTip`): the step's name — or Work / Quiet time / Waiting — and its time (and
+      its equipment, and the cook when there are two) in a bubble above it (`.pl-tip`, centred on the segment, kept inside
+      the bar at the ends, mirrored in RTL); another tap, or a tap elsewhere in the window, hides it. The thin lines get a
+      18 px tall invisible tap area (`::after`).
+    - **Search while choosing:** `headerSlidePx()` is 0 while `_planPicking` — the header and its search box stay at the
+      top of the screen (on a phone it otherwise slides away as the list scrolls); the page goes to the top when choosing
+      starts; the search finds this kitchen's and the linked kitchens' recipes, ticks are kept while searching, and what was
+      in the search box before choosing is put back after (`_planPickQ`).
+  - **👩‍🍳 Cooks: 1 / 2** (`planCooks`): with two, two work blocks may run at once; the second cook's blocks are green.
+  - **🗑️ Clear the list** (`planClear`): asks first ("Every dish is taken off the plan, for everyone in your household.
+    Your kitchen’s equipment stays as it is."); the dishes go, the equipment and the kept readings stay. ✕ removes one.
+  - **Shared with the household:** `households/<hid>/planner/current` = { items (≤12: {id, kind recipe|manual, name, rid,
+    key, from, blocks, guess, pin, done, skip}), cooks 1|2, proposed, by (the writer's uid), at (ms), maps (≤80), res {n, custom (≤6),
+    asked, no (≤20)} }; a copy on the device (`mkn_planner`). Saved at each change (`planSave`: the device first, then the
+    household; a refused save says "The plan could not be shared with your household just now — it is kept on this
+    device." and is logged); read at opening (`planLoad`: the newer of the two by `at`); while the window is open a
+    listener (`planListen`) takes a NEWER copy from someone else and redraws (its own save coming back has the same `at`
+    and is ignored); closing stops it. A copy from the cloud is made sure of (`planClean`). Signed out: on this device
+    only ("Kept on this device (sign in to share it with your household)."). Rules: any member writes (readers too —
+    planning is not editing recipes), only that one document, only those keys, `by` = the writer, ≤12 items, ≤80
+    readings, `res` a map of only n (≤12) / custom (a list ≤6) / asked / no (a list ≤20); admins delete; deleting the household takes it
+    (`householdWipe` kinds include 'planner'). Rules tests: 20 in `tests/firestore-households-rules.test.mjs`.
+  - Self Tests: `planner_order` (times read, blocks and their equipment made sure of, the scheduler's plans always true —
+    each dish in its own order, no cook doing two things, never more of a piece of equipment than the kitchen has, no dish
+    beginning before the one above it, the total right — and shortest on the cases above, with and without equipment, the
+    list as it stands, pinned dishes kept at their places, 6 and 9 made-up dishes with one pinned, the same answer twice;
+    it found the two-cook case where a dish began before the one above it was waiting for a burner), `planner_window` (the equipment asked once and kept, ✏️ Edit, the window end to end on the device with a
+    stand-in AI: read once with the small model and told the equipment, the marks on the blocks, scaled to the longest,
+    Until here, propose, 2 cooks, ↻, the same recipe twice, kept readings, what a recipe needs added to the kitchen — a
+    sous vide at 0, a food dehydrator named by the AI, the same name from two recipes once, said in one message — and what
+    ✏️ Edit took away not added back, with ⚠️ on the dish, readings while the first question is open shown in it, ≈ when the AI fails,
+    kept on the device, twelve at most, Clear the list asks and keeps the equipment, closing the first question),
+    `planner_arrange` (a drag by real pointer events on the handle — the rows follow and make room, the order is kept and
+    timed as it stands —, ↓ on the handle, 📌 kept by Propose, ✓ done keeps everyone's times, Propose leaves it out, ✓ again,
+    all done, the tap bubble on a line and a block, hidden by a second tap or a tap elsewhere), `planner_pick` (the select
+    bar while choosing, a linked kitchen's card ticked and brought in, the search box held at the top and searching both
+    kitchens with the ticks kept, Cancel and ☑ back to the plan, 🗓️ among the ordinary select bar's actions, an empty
+    list), `planner_shared` (a stand-in database: the
+    household's document with the equipment, the newer copy wins, someone else's change — dishes and equipment — appears,
+    a refused save, clearing keeps the equipment, the listener stops, the household wipe). Knock-out: all four fail
+    without their code.
+  - HELP: the help assistant's "🗓️ WORK PLANNER (v40.05)" line; `HELP_PLACES` 'work-planner' (📍 Take me there opens
+    it); ✨ What can this app do → Cook: "Cooking several dishes at once? The 🗓️ Work Planner fits one dish’s work into
+    another’s quiet time and shows when everything will be ready." Privacy Statement 1.19: the plan — dishes, readings
+    and the kitchen's equipment — is household content, and a recipe's name and method (with the kitchen's own
+    equipment names) go to Anthropic once to read its work, quiet time and equipment.
+  - **Translating it:** 71 phrases by hand in all 11 languages. Two traps met: a ternary inside `toast(...)` or an
+    `askConfirm` message makes the harvest store "{1}A{2}B" as one junk phrase — put the choice in a variable first; and
+    a phrase with a clock time ("1:30") is taken for a date and never translated (`i18nLooksLikeDate`) — the examples
+    say "45 or 90" instead. A placeholder or text with numbers is looked up with the numbers as slots ("e.g. {1} or
+    {2}"), so that is the key to list and translate. Text built in code (the ⚠️ line, a title) goes through
+    `i18nPhrase` with a `{1}` template and is marked `data-no-i18n`.
 - **The farm sayings recorded again, and in Hebrew (v39.96).** Tony rewrote the first and last English sayings in the
   farm window ("Ouch! Quit it!", "Hands off, I'm free-range!!") and asked: "Please record again so all the recorded
   sentences match what is written". `FARM_SAYINGS_DEFAULT` holds his wording; `FARM_SOUNDS` is `sounds/farm-2/` (those
@@ -2771,6 +2933,8 @@ lines accept `amount — name` / `amount - name` separators. Editing preserves `
   reads those buttons' labels and the Ask window's lines and fails when the prompt does not say them.
   **v39.43:** `help_names_every_menu_item` — every item of ⚙️ / ··· More / + Add Recipe / 📁 Files & backup and every
   button under an open recipe must be named in the prompt (read off the app), so a new feature cannot go unexplained.
+- **🗓️ Work Planner reading** (`planRead`, v40.05): a recipe's method split into work and quiet blocks, with the
+  equipment each occupies, once per recipe (kept in the household's plan), `AI_MODEL_SMALL` — see 1b.8.
 - **`extractJSON(raw)`**: robustly pulls JSON out of a possibly chatty AI reply (strips code
   fences, finds the first balanced `[...]`/`{...}`).
 

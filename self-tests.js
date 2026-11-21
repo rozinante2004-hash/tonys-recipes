@@ -1534,7 +1534,7 @@ window.SELF_TESTS = [
       if(!head || !grid) throw new Error('no header line or no grid');
       if(!head.querySelector('#selectedCount') || !/cancelSelectMode/.test((head.querySelector('button')||{}).getAttribute ? head.querySelector('button').getAttribute('onclick') : '')) throw new Error('the count and Cancel are not on the header line');
       var acts=grid.querySelectorAll('button');
-      if(acts.length!==7) throw new Error('expected 7 actions in the grid, found '+acts.length);
+      if(acts.length!==8) throw new Error('expected 8 actions in the grid, found '+acts.length);   // v40.05 — 🗓️ Add to the Work Planner
       var wasOn=!!selectMode;
       if(wasOn) cancelSelectMode();
       toggleSelectMode();
@@ -9553,6 +9553,558 @@ window.SELF_TESTS = [
         if(pushOpenChat('f:all') || opened.length!==3) throw new Error('opened a conversation while signed out');
       } finally { window.openFamilyChat=real.f; window.openKitchenChats=real.k; window._fbUser=real.user; window._household=real.hh; }
     } },
+  { id:'planner_order', group:'Features', name:'🗓️ Work Planner: each dish’s work and quiet time stay in their order; 🔀 Propose order finds the shortest total — one dish’s work fitted into another’s quiet time, never more burners, ovens or other equipment at once than the kitchen has, a dish that waits drawn dotted, a second cook when chosen; a time read from 45, 1:30, “1 h 30 min” or “2 שעות” (v40.05)',
+    test: async()=>{
+      // Tony, 20 Nov 2026: "if a recipe has a simmering step that takes 30 minutes, then a preparation step, from another
+      // recipe, could be fitted in that time" — and: "Please also consider resources like number of stoves … Also number
+      // of sous vids and other, similar resources"
+      var W=function(m, r){ return r ? { k:'w', m:m, r:r } : { k:'w', m:m }; }, Q=function(m, r){ return r ? { k:'q', m:m, r:r } : { k:'q', m:m }; };
+      [['45',45],['1:30',90],['1 h 30 min',90],['45 min',45],['1.5 hours',90],['2 שעות',120],['20 דקות',20],['חצי שעה',30],['soon',0],['0',0],['5000',0]].forEach(function(c){
+        var got=planMinutes(c[0]); if(got!==c[1]) throw new Error('“'+c[0]+'” read as '+got+' minutes, not '+c[1]);
+      });
+      if(planHM(0)!=='0:00' || planHM(75)!=='1:15' || planHM(600)!=='10:00') throw new Error('h:mm written as '+planHM(75));
+      // blocks: neighbours of a kind on the same equipment joined, nothing below a minute, at most a day, quiet first → a minute of work first
+      var str=function(list){ return list.map(function(x){ return x.k+x.m+(x.r||''); }).join(' '); };
+      var b=str(planBlocks([Q(10), { kind:'quiet', min:5 }, W(0), W(-3), { k:'w', m:'7' }, W(3), null, 'x', W(2000)]));
+      if(b!=='w1 q15 w1440') throw new Error('the blocks made sure of: '+b);
+      b=str(planBlocks([W(5), W(5,'stove'), W(3,'stove'), Q(10,'bogus'), Q(20,'oven'), Q(5,'c2')]));
+      if(b!=='w5 w8stove q10 q20oven q5c2') throw new Error('the equipment of the blocks: '+b);
+      var many=[]; for(var i=0;i<30;i++) many.push(i%2 ? Q(5) : W(5));
+      if(planBlocks(many).length!==20 || planBlocks('nonsense').length!==0) throw new Error('more than 20 blocks kept, or junk taken as blocks');
+      function valid(items, cooks, s, what, res){
+        items.forEach(function(it, j){
+          var want=planBlocks(it.blocks).map(function(x){ return x.k+x.m+(x.r||''); }).join(' ');
+          var got=s.segs[j].filter(function(g){ return g.k!=='x'; }).map(function(g){ return g.k+(g.b-g.a)+(g.r||''); }).join(' ');
+          if(got!==want) throw new Error(what+': dish '+(j+1)+' out of its own order — '+got+' (written: '+want+')');
+          for(var i=1;i<s.segs[j].length;i++) if(s.segs[j][i].a!==s.segs[j][i-1].b) throw new Error(what+': dish '+(j+1)+' has a hole in its row');
+          s.segs[j].forEach(function(g, i){ var nx=s.segs[j][i+1]; if(g.k==='x' && (!nx || (nx.k!=='w' && !nx.r))) throw new Error(what+': a wait for nothing'); });
+          if(s.ends[j]!==s.segs[j][s.segs[j].length-1].b) throw new Error(what+': dish '+(j+1)+' ends at the wrong time');
+        });
+        var all=[]; s.segs.forEach(function(sg){ sg.forEach(function(g){ if(g.k!=='x') all.push(g); }); });
+        all.forEach(function(g, i){
+          if(g.k==='w' && !(g.c>=0 && g.c<cooks)) throw new Error(what+': work given to cook '+g.c);
+          all.slice(i+1).forEach(function(h){ if(g.k==='w' && h.k==='w' && h.c===g.c && h.a<g.b && g.a<h.b) throw new Error(what+': one cook doing two things at once ('+g.a+'–'+g.b+' and '+h.a+'–'+h.b+')'); });
+          if(g.r && res){
+            var cap=Math.max(1, res.n[g.r]!=null ? res.n[g.r] : 99), at=all.filter(function(h){ return h.r===g.r && h.a<=g.a && g.a<h.b; }).length;
+            if(at>cap) throw new Error(what+': '+at+' blocks on '+g.r+' at '+g.a+' with '+cap+' in the kitchen');
+          }
+        });
+        if(s.total!==Math.max.apply(null, s.ends.concat([0]))) throw new Error(what+': the total is not when the last dish is ready');
+        // the dishes begin in the order the plan gives (s.order), never one before the dish above it
+        var begins=s.order.map(function(j){ var g=s.segs[j].filter(function(x){ return x.k!=='x'; })[0]; return g ? g.a : 0; });
+        for(var b2=1;b2<begins.length;b2++) if(begins[b2]<begins[b2-1]) throw new Error(what+': dish '+(s.order[b2]+1)+' begins before the one above it in the order');
+        if(s.order.slice().sort(function(a, b){ return a-b; }).join()!==items.map(function(x, i){ return i; }).join()) throw new Error(what+': the order is not of these dishes: '+s.order.join());
+      }
+      var A={ blocks:[W(10), Q(30), W(5)] }, B={ blocks:[W(20)] }, C={ blocks:[W(60)] };
+      var s=planSchedule([B, A], 1);   // written B first — the shortest starts A, so B is done in A's quiet time
+      valid([B, A], 1, s, 'A and B');
+      if(s.total!==45) throw new Error('A (10 work, 30 quiet, 5 work) and B (20 work) take '+s.total+' minutes, not 45');
+      var la=s.segs[1].map(function(g){ return g.k+g.a+'-'+g.b; }).join(' '), lb=s.segs[0].map(function(g){ return g.k+g.a+'-'+g.b; }).join(' ');
+      if(la!=='w0-10 q10-40 w40-45' || lb!=='w10-30') throw new Error('A: '+la+' · B: '+lb);
+      var s1=planSchedule([A, C], 1), s2=planSchedule([A, C], 2);
+      valid([A, C], 1, s1, 'one cook'); valid([A, C], 2, s2, 'two cooks');
+      if(s1.total!==75 || s1.waits!==30) throw new Error('one cook, A and C (60 work): '+s1.total+' minutes and '+s1.waits+' waiting, not 75 and 30');
+      if(!s1.segs[0].some(function(g){ return g.k==='x' && g.a===40 && g.b===70; })) throw new Error('A’s wait for the cook (40–70) is not drawn');
+      if(s2.total!==60 || s2.waits!==0) throw new Error('two cooks, A and C: '+s2.total+' minutes, not 60');
+      // the list as it stands (after a drag): B first takes 65; 📌 a pinned dish keeps its place when the rest are arranged
+      var f1=planSchedule([B, A], 1, null, { fixed:true });
+      valid([B, A], 1, f1, 'B then A, as the list stands');
+      if(f1.total!==65 || f1.order.join()!=='0,1') throw new Error('B then A, as the list stands: '+f1.total+' minutes, order '+f1.order.join()+' (not 65, 0,1)');
+      if(s.order.join()!=='1,0') throw new Error('the order proposed for B and A is '+s.order.join()+', not A first');
+      var pB=planSchedule([B, A], 1, null, { pins:[true, false] });
+      if(pB.total!==65 || pB.order.join()!=='0,1') throw new Error('B pinned first: '+pB.total+' minutes, order '+pB.order.join());
+      var Z={ blocks:[W(5)] }, Y={ blocks:[W(20)] }, pZ=planSchedule([A, Y, Z], 1, null, { pins:[false, false, true] }), fZ=planSchedule([A, Y, Z], 1);
+      valid([A, Y, Z], 1, pZ, 'Z pinned third'); valid([A, Y, Z], 1, fZ, 'A, Y and Z');
+      if(fZ.total!==45 || pZ.order[2]!==2) throw new Error('a pinned dish was moved: '+pZ.order.join()+' (free: '+fZ.total+')');
+      var pZ0=planSchedule([Z, A, Y], 1, null, { pins:[true, false, false] });
+      if(pZ0.order[0]!==0 || pZ0.total!==50) throw new Error('Z pinned first: order '+pZ0.order.join()+', '+pZ0.total+' minutes (not first, 50)');
+      // the equipment: two pots to simmer, one burner → the second waits for it; two burners → side by side
+      var kit=function(n){ return planResClean({ n:n, asked:true }); };
+      var P1={ blocks:[W(5), Q(30,'stove')] }, P2={ blocks:[W(5), Q(30,'stove')] };
+      var e1=planSchedule([P1, P2], 1, kit({ stove:1 })), e2=planSchedule([P1, P2], 1, kit({ stove:2 }));
+      valid([P1, P2], 1, e1, 'one burner', kit({ stove:1 })); valid([P1, P2], 1, e2, 'two burners', kit({ stove:2 }));
+      if(e1.total!==65 || e2.total!==40) throw new Error('two pots of 30 minutes: '+e1.total+' with one burner (not 65), '+e2.total+' with two (not 40)');
+      if(!e1.segs.some(function(sg){ return sg.some(function(g){ return g.k==='x' && g.b===35; }); })) throw new Error('the pot waiting for the burner is not drawn');
+      // frying (work on a burner) and simmering share the one burner
+      var F={ blocks:[W(10,'stove')] }, S={ blocks:[W(2), Q(30,'stove')] }, e3=planSchedule([F, S], 1, kit({ stove:1 }));
+      valid([F, S], 1, e3, 'frying and simmering', kit({ stove:1 }));
+      if(e3.total!==42) throw new Error('frying 10 and simmering 30 on one burner: '+e3.total+' minutes, not 42');
+      // two roasts, one oven or two; none — counted as one, and said
+      var R1={ blocks:[W(10), Q(60,'oven')] }, R2={ blocks:[W(10), Q(60,'oven')] };
+      var o1=planSchedule([R1, R2], 1, kit({ oven:1 })), o2=planSchedule([R1, R2], 1, kit({ oven:2 })), o0=planSchedule([R1, R2], 1, kit({ oven:0 }));
+      valid([R1, R2], 1, o1, 'one oven', kit({ oven:1 }));
+      if(o1.total!==130 || o2.total!==80 || o0.total!==130) throw new Error('two roasts: '+o1.total+'/'+o2.total+'/'+o0.total+' with 1/2/0 ovens, not 130/80/130');
+      if(o0.short.join()!=='oven' || o1.short.length) throw new Error('no oven is not said: '+JSON.stringify(o0.short));
+      if(planShort({ blocks:[W(5), Q(45,'sousvide')] }, kit({ sousvide:0 })).join()!=='sousvide' || planShort({ blocks:[W(5), Q(45,'sousvide')] }, kit({ sousvide:1 })).length) throw new Error('a dish needing a sous vide the kitchen lacks is not told');
+      // the kitchen's own equipment counts too; one no longer listed limits nothing
+      var own=planResClean({ n:{}, custom:[{ id:'c1', name:'Thermomix', n:1 }], asked:true });
+      var T1={ blocks:[W(2), Q(20,'c1')] }, T2={ blocks:[W(2), Q(20,'c1')] }, T3={ blocks:[W(2), Q(20,'c2')] }, T4={ blocks:[W(2), Q(20,'c2')] };
+      if(planSchedule([T1, T2], 1, own).total!==42 || planSchedule([T3, T4], 1, own).total!==24) throw new Error('the kitchen’s own equipment: '+planSchedule([T1, T2], 1, own).total+' / '+planSchedule([T3, T4], 1, own).total);
+      // many dishes, made up: always a true plan, never longer than one after another, never shorter than the work
+      var seed=7, rnd=function(){ seed=(seed*1103515245+12345)&0x7fffffff; return seed/0x7fffffff; }, eq=['', 'stove', 'oven', ''];
+      var dishes=[]; for(var d=0; d<9; d++){ var bl=[], n=1+Math.floor(rnd()*5); for(var k=0;k<n;k++) bl.push(k%2 ? Q(5+Math.floor(rnd()*60), eq[Math.floor(rnd()*4)]) : W(1+Math.floor(rnd()*25), rnd()<0.3 ? 'stove' : '')); dishes.push({ blocks:bl }); }
+      var small=kit({ stove:2, oven:1 });
+      [[dishes.slice(0, 6), '6 dishes'], [dishes, '9 dishes']].forEach(function(c){
+        [1, 2].forEach(function(cooks){
+          [null, small].forEach(function(res){
+            var sc=planSchedule(c[0], cooks, res, { pins:c[0].map(function(x, i){ return i===1; }) }), what=c[1]+', '+cooks+' cook(s)'+(res ? ', 2 burners and an oven' : '')+', the second pinned';
+            if(sc.order[1]!==1) throw new Error(what+': the pinned dish was moved');
+            valid(c[0], cooks, sc, what, res);
+            var lens=c[0].map(planLen), seq=lens.reduce(function(a, x){ return a+x; }, 0);
+            var work=c[0].reduce(function(a, it){ return a+planBlocks(it.blocks).filter(function(x){ return x.k==='w'; }).reduce(function(q, x){ return q+x.m; }, 0); }, 0);
+            if(sc.total<Math.max.apply(null, lens) || sc.total<Math.ceil(work/cooks)) throw new Error(what+': '+sc.total+' minutes is shorter than possible');
+            if(cooks===1 && sc.total>seq) throw new Error(what+': longer than cooking one after another');
+            if(JSON.stringify(planSchedule(c[0], cooks, res, { pins:c[0].map(function(x, i){ return i===1; }) }))!==JSON.stringify(sc)) throw new Error(what+': a second Propose gives another order');
+          });
+        });
+      });
+    } },
+  { id:'planner_window', group:'Features', name:'🗓️ Work Planner window: the kitchen’s equipment asked once (kept, ✏️ Edit; what a recipe needs and the kitchen has not listed is added and said, what you took away is not), + Add recipe (a recipe read by the AI once, a dish filled in by hand as one block), a row per dish scaled to the longest, “Until here” after each, the total; 🔀 Propose order, 1 or 2 cooks, ↻, ✕, 🗑️ Clear the list (the equipment stays); kept on the device (v40.05)',
+    test: async()=>{
+      var real={ plan:_plan, hh:window._household, ai:window.aiCall, toast:window.toast, ask:window.askConfirm, local:null };
+      try{ real.local=localStorage.getItem(PLAN_LOCAL_KEY); }catch(e){}
+      var asked=[], told=[], question=null;
+      var stew=normalizeRecipe({ id:TEST_ID_MIN+4051, name:'Self-test beef stew', servings:'4', ingredients:['1 kg beef'], steps:['Brown the beef', 'Simmer 90 minutes', 'Season'] });
+      var bread=normalizeRecipe({ id:TEST_ID_MIN+4052, name:'Self-test bread', prep:'40 min', ingredients:['flour'], steps:['Knead', 'Bake'] });
+      var eggs=normalizeRecipe({ id:TEST_ID_MIN+4053, name:'Self-test eggs', ingredients:['eggs'], steps:['Cook sous vide 45 minutes'] });
+      var eggs2=normalizeRecipe({ id:TEST_ID_MIN+4056, name:'Self-test eggs 2', ingredients:['eggs'], steps:['Cook sous vide 60 minutes'] });
+      var jerky=normalizeRecipe({ id:TEST_ID_MIN+4054, name:'Self-test jerky', ingredients:['beef'], steps:['Slice', 'Dry 4 hours'] });
+      var jerky2=normalizeRecipe({ id:TEST_ID_MIN+4055, name:'Self-test jerky 2', ingredients:['beef'], steps:['Slice', 'Dry 4 hours'] });
+      var jerky3=normalizeRecipe({ id:TEST_ID_MIN+4057, name:'Self-test jerky 3', ingredients:['beef'], steps:['Slice', 'Dry 5 hours'] });
+      var eggs3=normalizeRecipe({ id:TEST_ID_MIN+4058, name:'Self-test eggs 3', ingredients:['eggs'], steps:['Cook sous vide 30 minutes'] });
+      try{
+        window._household=null;   // this device only
+        try{ localStorage.removeItem(PLAN_LOCAL_KEY); }catch(e){}
+        _plan=planClean(null);
+        window.toast=function(m){ told.push(String(m)); };
+        window.aiCall=async function(prompt, max, tools, model, system){
+          asked.push({ prompt:prompt, model:model, system:system });
+          if(/Self-test bread/.test(prompt)) throw new Error('no answer');
+          if(/Self-test eggs/.test(prompt)) return '{"blocks":[{"k":"w","m":5,"s":"Seal"},{"k":"q","m":45,"s":"Water bath","r":"sousvide"}]}';
+          if(/Self-test jerky 2/.test(prompt)) return '{"blocks":[{"k":"w","m":15,"s":"Slice"},{"k":"q","m":240,"s":"Dry","r":"other","rn":"food dehydrator "}]}';
+          if(/Self-test jerky/.test(prompt)) return '{"blocks":[{"k":"w","m":15,"s":"Slice"},{"k":"q","m":240,"s":"Dry","r":"other","rn":"Food dehydrator"}]}';
+          return 'Here: {"blocks":[{"k":"w","m":20,"s":"Brown","r":"stove"},{"k":"q","m":90,"s":"Simmer","r":"stove"},{"k":"w","m":5,"s":"Season"}]}';
+        };
+        // the first time: the kitchen's equipment, asked once
+        await openPlanner();
+        var body=document.getElementById('planBody'), rf=document.getElementById('planResOverlay');
+        if(!body || !document.getElementById('planOverlay')) throw new Error('🗓️ Work Planner did not open');
+        if(!rf || !/Asked once/.test(rf.textContent)) throw new Error('the kitchen’s equipment was not asked the first time');
+        var inp=function(id){ return rf.querySelector('input[data-res="'+id+'"]'); };
+        if(!inp('stove') || inp('stove').value!=='4' || !inp('oven') || !inp('sousvide') || inp('sousvide').value!=='0') throw new Error('the usual numbers are not offered first');
+        inp('stove').value='1';
+        var cid=planResAddOther(); rf.querySelector('.pl-res-own[data-cid="'+cid+'"] .pl-res-oname').value='Thermomix';
+        for(var k=0;k<6;k++) planResAddOther();
+        if(rf.querySelectorAll('.pl-res-own').length!==6 || !document.getElementById('planResAdd').disabled) throw new Error('more than six pieces of the kitchen’s own');
+        Array.prototype.slice.call(rf.querySelectorAll('.pl-res-own'), 1).forEach(function(x){ x.remove(); });
+        if(await planResSave()!==true || document.getElementById('planResOverlay')) throw new Error('the equipment was not saved');
+        if(!_plan.res.asked || _plan.res.n.stove!==1 || _plan.res.custom.length!==1 || _plan.res.custom[0].name!=='Thermomix') throw new Error('the equipment kept: '+JSON.stringify(_plan.res));
+        // each piece by its icon, its NAME and its number (Tony, 21 Nov: "I do not understand the icons … adding titles to them or adding a legend")
+        var kitLine=body.querySelector('.pl-kit'), kit=function(id){ var c=kitLine && kitLine.querySelector('.pl-kit-item[data-res="'+id+'"]'); return c ? c.textContent.replace(/\s+/g, ' ').trim() : ''; };
+        if(kit('stove')!=='🔥 Stove burners 1' || kit('oven')!=='♨️ Ovens 1' || kit('c1')!=='🔧 Thermomix 1' || kit('sousvide')) throw new Error('🍳 Your kitchen does not name what it has: '+(kitLine && kitLine.textContent));
+        closePlanner(); await openPlanner(); body=document.getElementById('planBody');
+        if(document.getElementById('planResOverlay')) throw new Error('the equipment was asked a second time');
+        if(!/\+ Add recipe/.test(body.textContent) || !/Kept on this device/.test(body.textContent)) throw new Error('no + Add recipe, or does not say where the plan is kept');
+        if(!body.querySelector('.pl-go') || !body.querySelector('.pl-go').disabled) throw new Error('🔀 Propose order can be pressed with no dishes');
+        // a recipe: read by the AI (the small model), its blocks and their equipment kept
+        if(await planAddRecipes([stew])!==1) throw new Error('the recipe was not added');
+        if(asked.length!==1 || asked[0].model!==AI_MODEL_SMALL || asked[0].system!==PLAN_AI_SYSTEM) throw new Error('the AI was not asked once with the small model');
+        if(!/Recipe: Self-test beef stew/.test(asked[0].prompt) || !/1\. Brown the beef\n2\. Simmer 90 minutes\n3\. Season/.test(asked[0].prompt)) throw new Error('the AI was not given the recipe’s name and numbered method');
+        if(!/"stove"/.test(asked[0].prompt) || !/"sousvide"/.test(asked[0].prompt) || !/"c1": this kitchen’s own "Thermomix"/.test(asked[0].prompt)) throw new Error('the AI was not told the equipment, the kitchen’s own too');
+        var st=_plan.items[0];
+        if(planLen(st)!==115 || st.guess || !_plan.maps[planKey(stew)] || planBlocks(st.blocks)[1].r!=='stove') throw new Error('the reading was not kept: '+JSON.stringify(st));
+        // a dish filled in by hand: one block of work
+        planAddMenu(); planManualForm();
+        if(await planManualAdd()!==false || !/name/.test(document.getElementById('planManWhy').textContent)) throw new Error('a dish without a name was added');
+        document.getElementById('planManName').value='Self-test salad'; document.getElementById('planManTime').value='soon';
+        if(await planManualAdd()!==false || !/How long/.test(document.getElementById('planManWhy').textContent)) throw new Error('a dish without a time was added');
+        document.getElementById('planManTime').value='0:20';
+        if(await planManualAdd()!==true || document.getElementById('planAddOverlay')) throw new Error('the dish filled in by hand was not added, or the window stayed');
+        var sal=_plan.items[1];
+        if(!sal || sal.kind!=='manual' || JSON.stringify(sal.blocks.map(function(x){ return x.k+x.m; }))!=='["w20"]') throw new Error('a dish by hand is not one block of work: '+JSON.stringify(sal));
+        // as written: each from the start, scaled to the longest, the time used one after another
+        var rows=body.querySelectorAll('.pl-row');
+        if(rows.length!==2) throw new Error(rows.length+' rows for 2 dishes');
+        var w=function(el){ return parseFloat(el.style.width); };
+        var segS=rows[0].querySelectorAll('.pl-seg'), segL=rows[1].querySelectorAll('.pl-seg');
+        if(segS.length!==3 || Math.abs(w(segS[1])-90/115*100)>0.01 || Math.abs(w(segL[0])-20/115*100)>0.01) throw new Error('the rows are not scaled to the longest dish');
+        if(!segS[1].classList.contains('pl-q') || !segS[0].classList.contains('pl-w')) throw new Error('work and quiet time are not told apart');
+        if(!segS[1].querySelector('.pl-res') || !/🔥/.test(segS[1].title) || segS[2].querySelector('.pl-res')) throw new Error('the burner a block occupies is not shown on it');
+        var lg=body.querySelector('.pl-legend .pl-li[data-res="stove"]');
+        if(!lg || !/🔥/.test(lg.textContent) || !/Stove burners/.test(lg.textContent) || body.querySelector('.pl-legend .pl-li[data-res="oven"]')) throw new Error('the legend does not name the equipment drawn on the chart (and only that)');
+        var until=Array.from(body.querySelectorAll('.pl-until b')).map(function(x){ return x.textContent; }).join(' ');
+        if(until!=='1:55 2:15' || body.querySelector('.pl-total b').textContent!=='2:15') throw new Error('Until here / Everything as written: '+until);
+        if(!rows[1].querySelector('.pl-tag')) throw new Error('the dish by hand is not marked ✏️');
+        // 🔀 Propose order: the salad in the stew's quiet time
+        if(body.querySelector('.pl-go').disabled) throw new Error('🔀 Propose order cannot be pressed with two dishes');
+        body.querySelector('.pl-go').click(); await wait(30);
+        until=Array.from(body.querySelectorAll('.pl-until b')).map(function(x){ return x.textContent; }).join(' ');
+        if(!_plan.proposed || body.querySelector('.pl-total b').textContent!=='1:55' || until!=='1:55 0:40') throw new Error('proposed: Everything '+body.querySelector('.pl-total b').textContent+', Until here '+until);
+        if(!/One after another:\s*2:15/.test(body.querySelector('.pl-total').textContent)) throw new Error('the time one after another is not shown beside it');
+        var salSeg=body.querySelectorAll('.pl-row')[1].querySelector('.pl-seg');
+        if(Math.abs(parseFloat(salSeg.style.insetInlineStart)-20/115*100)>0.01) throw new Error('the salad is not drawn in the stew’s quiet time');
+        // 2 cooks
+        await planCooks(2);
+        if(_plan.cooks!==2 || !body.querySelector('.pl-c2') || !/The second cook/.test(body.textContent)) throw new Error('the second cook is not shown');
+        if(body.querySelector('.pl-ck.on').textContent!=='2') throw new Error('the 2 is not pressed');
+        // the same recipe twice: not added; taken off and added again: not read again; ↻ reads it again
+        if(await planAddRecipes([stew])!==0 || asked.length!==1 || !told.some(function(t){ return /already in the plan/.test(t); })) throw new Error('the same recipe was added twice');
+        await planRemove(st.id);
+        if(_plan.items.length!==1 || _plan.proposed) throw new Error('✕ did not take the dish off');
+        if(await planAddRecipes([stew])!==1 || asked.length!==1 || planLen(_plan.items[1])!==115) throw new Error('the recipe was read again although its reading was kept');
+        recipes.push(stew);
+        try{
+          var rr=body.querySelector('.pl-row[data-id="'+_plan.items[1].id+'"] button[onclick^="planReread"]');
+          if(!rr) throw new Error('no ↻ beside a recipe');
+          rr.click(); for(var r1=0; r1<20 && asked.length<2; r1++) await wait(20); await wait(30);
+          if(asked.length!==2 || planLen(_plan.items[1])!==115) throw new Error('↻ did not read the recipe again');
+        } finally { recipes.splice(recipes.indexOf(stew), 1); }
+        if(body.querySelector('.pl-row[data-id="'+sal.id+'"] button[onclick^="planReread"]')) throw new Error('↻ beside a dish filled in by hand');
+        // equipment a recipe needs and the kitchen has not listed: added (one of it), and said (Tony, 21 Nov: "When scanning the
+        // recipes, do you check for the resources they require … and add them to the resources list at the top (if they are not there)?")
+        told.length=0;
+        if(!/"other"/.test(planPrompt(eggs)) || !/"rn"/.test(planPrompt(eggs))) throw new Error('the AI is not asked to name equipment outside the list');
+        await planAddRecipes([eggs]);
+        var eg=_plan.items[2];
+        if(_plan.res.n.sousvide!==1 || !body.querySelector('.pl-kit-item[data-res="sousvide"]') || !told.some(function(t){ return /Added to your kitchen/.test(t) && /Sous vide devices/.test(t); })) throw new Error('a sous vide the recipe needs was not added to the kitchen: '+JSON.stringify(_plan.res.n)+' '+told.join(' | '));
+        if(body.querySelector('.pl-row[data-id="'+eg.id+'"] .pl-warn')) throw new Error('warned about equipment that was just added');
+        told.length=0;
+        await planAddRecipes([jerky, jerky2]);
+        var jk=_plan.items[3], jk2=_plan.items[4], dz=_plan.res.custom.filter(function(c){ return /^food dehydrator$/i.test(c.name); });
+        if(dz.length!==1 || dz[0].name!=='Food dehydrator' || dz[0].n!==1 || dz[0].id==='c1' || planBlocks(jk.blocks)[1].r!==dz[0].id || planBlocks(jk2.blocks)[1].r!==dz[0].id) throw new Error('equipment outside the list (a food dehydrator) was not added once, for both: '+JSON.stringify(_plan.res.custom));
+        kitLine=body.querySelector('.pl-kit');
+        if(kit(dz[0].id)!=='🔧 Food dehydrator 1') throw new Error('the food dehydrator is not in 🍳 Your kitchen: '+(kitLine && kitLine.textContent));
+        if(told.length!==1 || !/Added to your kitchen: 🔧 Food dehydrator\./.test(told[0])) throw new Error('two readings that add the same equipment are not said once: '+told.join(' | '));
+        // taken away yourself in ✏️ Edit: not added back; the dish says ⚠️ instead
+        body.querySelector('.pl-kit-edit').click(); rf=document.getElementById('planResOverlay');
+        rf.querySelector('input[data-res="sousvide"]').value='0';
+        rf.querySelector('.pl-res-own[data-cid="'+dz[0].id+'"]').remove();
+        await planResSave();
+        if(_plan.res.no.indexOf('sousvide')<0 || _plan.res.no.indexOf('~food dehydrator')<0 || _plan.res.custom.length!==1) throw new Error('what was taken away is not remembered: '+JSON.stringify(_plan.res));
+        if(planBlocks(jk.blocks)[1].r || _plan.maps[jk.key]) throw new Error('a dish still points to equipment taken away');
+        var warn=body.querySelector('.pl-row[data-id="'+eg.id+'"] .pl-warn');
+        if(!warn || !/🌡️/.test(warn.textContent) || !/none/.test(warn.textContent)) throw new Error('a dish needing a sous vide the kitchen says it has none of is not told');
+        told.length=0;
+        await planAddRecipes([eggs2, jerky3]);
+        if(_plan.res.n.sousvide!==0 || _plan.res.custom.length!==1 || told.some(function(t){ return /Added to your kitchen/.test(t); })) throw new Error('equipment taken away was added back: '+JSON.stringify(_plan.res));
+        await planRemove(eg.id); await planRemove(jk.id); await planRemove(jk2.id); await planRemove(_plan.items[2].id); await planRemove(_plan.items[2].id);
+        // the AI cannot answer: one block of the recipe's own time, marked ≈
+        await planAddRecipes([bread]);
+        var br=_plan.items[2];
+        if(!br.guess || planLen(br)!==40 || !/≈/.test(body.querySelector('.pl-row[data-id="'+br.id+'"] .pl-len').textContent)) throw new Error('an unreadable recipe: '+JSON.stringify(br));
+        if(!told.some(function(t){ return /could not be read/.test(t); })) throw new Error('not told that the recipe could not be read');
+        // kept on the device, read back
+        var kept=JSON.parse(localStorage.getItem(PLAN_LOCAL_KEY) || 'null');
+        if(!kept || kept.items.length!==3 || kept.cooks!==2 || !kept.maps[planKey(stew)] || !kept.res || kept.res.n.stove!==1 || !kept.res.asked) throw new Error('not kept on the device');
+        _plan=planClean(null);
+        if(await planLoad()!=='device' || _plan.items.length!==3 || _plan.cooks!==2 || _plan.res.custom[0].name!=='Thermomix') throw new Error('not read back from the device');
+        // twelve at most
+        var full=_plan.items.slice(); while(_plan.items.length<PLAN_MAX_ITEMS) _plan.items.push({ id:'pz'+_plan.items.length, kind:'manual', name:'z', blocks:[{ k:'w', m:5, s:'' }], guess:false });
+        planRender();
+        if(!body.querySelector('.pl-add').disabled || await planManualAdd('one too many', '5')!==false) throw new Error('more than twelve dishes');
+        _plan.items=full; planRender();
+        // ✏️ Edit the equipment
+        body.querySelector('.pl-kit-edit').click();
+        rf=document.getElementById('planResOverlay');
+        if(!rf || /Asked once/.test(rf.textContent) || rf.querySelector('input[data-res="stove"]').value!=='1') throw new Error('✏️ Edit does not open the kitchen’s equipment as it is');
+        rf.querySelector('input[data-res="sousvide"]').value='1';
+        await planResSave();
+        if(_plan.res.n.sousvide!==1 || !/Sous vide devices\s*1/.test((body.querySelector('.pl-kit-item[data-res="sousvide"]')||{}).textContent || '')) throw new Error('the change of equipment was not kept');
+        if(_plan.res.no.indexOf('sousvide')>=0) throw new Error('a sous vide given a number again is still taken away');
+        // 🗑️ Clear the list — asked first; the equipment stays
+        window.askConfirm=async function(o){ question=o; return false; };
+        if(await planClear()!==false || _plan.items.length!==3) throw new Error('cleared without asking');
+        if(!question || !/equipment stays/.test(question.message)) throw new Error('the question does not say the equipment stays');
+        window.askConfirm=async function(){ return true; };
+        if(!/Clear the list/.test(Array.from(body.querySelectorAll('.pl-acts .pl-btn')).map(function(x){ return x.textContent; }).join(' '))) throw new Error('no 🗑️ Clear the list');
+        if(await planClear()!==true || _plan.items.length!==0 || !body.querySelector('.pl-empty')) throw new Error('🗑️ Clear the list did not empty the plan');
+        if(!_plan.res.asked || _plan.res.n.stove!==1 || _plan.res.n.sousvide!==1 || _plan.res.custom.length!==1) throw new Error('🗑️ Clear the list took the equipment too');
+        closePlanner();
+        if(document.getElementById('planOverlay')) throw new Error('✕ did not close the window');
+        // closing the first-time question keeps the usual numbers, and it is not asked again
+        try{ localStorage.removeItem(PLAN_LOCAL_KEY); }catch(e){}
+        await openPlanner();
+        if(!document.getElementById('planResOverlay')) throw new Error('a new plan did not ask for the equipment');
+        // recipes read while the question is open (chosen with ☑ Select on the main screen): what they add shows in it, and it is still asked
+        await planAddRecipes([eggs3, jerky]);
+        rf=document.getElementById('planResOverlay');
+        if(!rf || _plan.res.asked || rf.querySelector('input[data-res="sousvide"]').value!=='1' || !Array.from(rf.querySelectorAll('.pl-res-oname')).some(function(x){ return x.value==='Food dehydrator'; })) throw new Error('equipment added while the first question was open is not in it (or the question was taken as answered)');
+        await planResSave();
+        if(_plan.res.n.sousvide!==1 || _plan.res.no.length || !_plan.res.custom.some(function(c){ return c.name==='Food dehydrator' && c.n===1; })) throw new Error('saving the first question took away what the readings added: '+JSON.stringify(_plan.res));
+        // closing it instead
+        try{ localStorage.removeItem(PLAN_LOCAL_KEY); }catch(e){}
+        closePlanner(); await openPlanner();
+        if(!document.getElementById('planResOverlay')) throw new Error('a new plan did not ask for the equipment (2)');
+        await planResClose();
+        if(document.getElementById('planResOverlay') || !_plan.res.asked || _plan.res.n.stove!==4) throw new Error('closing the question did not keep the usual numbers');
+        closePlanner(); await openPlanner();
+        if(document.getElementById('planResOverlay')) throw new Error('asked again after it was closed');
+      } finally {
+        closePlanner();
+        window._household=real.hh; window.aiCall=real.ai; window.toast=real.toast; window.askConfirm=real.ask; _plan=real.plan; _planReading={};
+        try{ if(real.local===null) localStorage.removeItem(PLAN_LOCAL_KEY); else localStorage.setItem(PLAN_LOCAL_KEY, real.local); }catch(e){}
+      }
+    } },
+  { id:'planner_arrange', group:'Features', name:'🗓️ Work Planner by hand: ⠿ drag a dish (or ↑ ↓) to change the order the dishes are started in and see how long that takes; 📌 a pinned dish keeps its place when 🔀 Propose order arranges the rest; ✓ a dish done stays greyed in the timeline, and the next Propose leaves it out; a tap on a block or line shows that step’s name and time (v40.05)',
+    test: async()=>{
+      // Tony, 21 Nov 2026: "Ability to drag and drop (reorder) the recipes · Ability to pin a recipe, so the planner would have to
+      // consider it's location in the list without being able to change it · When clicking a section in the graph (either block or
+      // line) the name and duration of the relevant step will appear above it · the ability to mark a recipe as completed" — and:
+      // "If I mark a recipe as Done and also click the "Propose Order" button, the planner should not consider the Done recipe"
+      var real={ plan:_plan, hh:window._household, local:null };
+      try{ real.local=localStorage.getItem(PLAN_LOCAL_KEY); }catch(e){}
+      var dish=function(id, name, blocks){ return { id:id, kind:'manual', name:name, rid:'', key:'', from:'', blocks:blocks, guess:false }; };
+      var names=function(){ return _plan.items.map(function(it){ return it.name; }).join(', '); };
+      var rowsShown=function(){ return Array.from(document.querySelectorAll('#planBody .pl-row')).map(function(r){ return r.querySelector('.pl-name').textContent; }).join(', '); };
+      var until=function(id){ var b=document.querySelector('#planBody .pl-row[data-id="'+id+'"] .pl-until b'); return b ? b.textContent : null; };
+      try{
+        window._household=null;
+        try{ localStorage.removeItem(PLAN_LOCAL_KEY); }catch(e){}
+        _plan=planClean({ res:{ asked:true }, cooks:1, items:[
+          dish('pS', 'Stew', [{ k:'w', m:10, s:'Brown' }, { k:'q', m:30, s:'Simmer' }, { k:'w', m:5, s:'Season' }]),
+          dish('pR', 'Rice', [{ k:'w', m:20, s:'Wash and cook' }]),
+          dish('pZ', 'Zest', [{ k:'w', m:5, s:'Grate' }]) ] });
+        try{ localStorage.setItem(PLAN_LOCAL_KEY, JSON.stringify(planOut())); }catch(e){}
+        await openPlanner();
+        var body=document.getElementById('planBody');
+        // 🔀 Propose order
+        await planPropose();
+        if(!_plan.proposed || body.querySelector('.pl-total b').textContent!=='0:45' || rowsShown()!==names()) throw new Error('proposed: '+names()+' in '+body.querySelector('.pl-total b').textContent);
+        // ⠿ drag the last dish to the top, by its handle — the order as it stands is timed, not arranged again
+        var last=_plan.items[2], first=_plan.items[0], h=body.querySelector('.pl-row[data-id="'+last.id+'"] .pl-drag');
+        if(!h || getComputedStyle(h).touchAction!=='none') throw new Error('no ⠿ handle a finger can drag');
+        var y0=h.getBoundingClientRect().top+4, yTop=body.querySelector('.pl-row[data-id="'+first.id+'"]').getBoundingClientRect().top+2;
+        var pe=function(type, y){ var e; try{ e=new PointerEvent(type, { bubbles:true, cancelable:true, clientX:20, clientY:y, pointerId:7, button:0, isPrimary:true }); }catch(x){ e=new MouseEvent(type, { bubbles:true, cancelable:true, clientX:20, clientY:y, button:0 }); } h.dispatchEvent(e); };
+        pe('pointerdown', y0);
+        if(!body.querySelector('.pl-row[data-id="'+last.id+'"]').classList.contains('pl-dragging')) throw new Error('the row is not picked up');
+        pe('pointermove', (y0+yTop)/2); pe('pointermove', yTop);
+        if(!/translateY\(-/.test(body.querySelector('.pl-row[data-id="'+last.id+'"]').style.transform) || !/translateY\(\d/.test(body.querySelector('.pl-row[data-id="'+first.id+'"]').style.transform)) throw new Error('the rows do not follow the finger and make room');
+        pe('pointerup', yTop); await wait(40);
+        if(_plan.items[0].id!==last.id || rowsShown()!==names()) throw new Error('the drag did not move the dish to the top: '+names());
+        if(!_plan.proposed) throw new Error('a drag threw the plan back to “as written”');
+        var dragged=planSchedule(_plan.items, 1, _plan.res, { fixed:true }).total;
+        if(body.querySelector('.pl-total b').textContent!==planHM(dragged)) throw new Error('the time of the order as it stands is not shown: '+body.querySelector('.pl-total b').textContent);
+        if(JSON.parse(localStorage.getItem(PLAN_LOCAL_KEY)).items[0].id!==last.id) throw new Error('the new order was not kept');
+        // ↑ ↓ on the handle
+        var key=new KeyboardEvent('keydown', { key:'ArrowDown', bubbles:true, cancelable:true });
+        body.querySelector('.pl-row[data-id="'+last.id+'"] .pl-drag').dispatchEvent(key); await wait(40);
+        if(_plan.items[1].id!==last.id || document.activeElement!==body.querySelector('.pl-row[data-id="'+last.id+'"] .pl-drag')) throw new Error('↓ did not move the dish down one (or lost the focus)');
+        // 📌 Rice pinned where it is: Propose arranges the others around it
+        var rice=_plan.items.filter(function(it){ return it.name==='Rice'; })[0], at=_plan.items.indexOf(rice);
+        body.querySelector('.pl-row[data-id="pR"] .pl-pin').click(); await wait(30);
+        if(!rice.pin || !body.querySelector('.pl-row[data-id="pR"] .pl-pin.on') || body.querySelector('.pl-row[data-id="pR"] .pl-pin').getAttribute('aria-pressed')!=='true') throw new Error('📌 did not pin Rice');
+        await planPropose();
+        if(_plan.items.indexOf(rice)!==at) throw new Error('🔀 Propose order moved the pinned Rice from place '+(at+1)+': '+names());
+        // ✓ done: greyed, still in the timeline, the others' times unchanged
+        var before={}; _plan.items.forEach(function(it){ before[it.id]=until(it.id); });
+        var stew=_plan.items.filter(function(it){ return it.name==='Stew'; })[0];
+        body.querySelector('.pl-row[data-id="'+stew.id+'"] .pl-ok').click(); await wait(30);
+        var srow=body.querySelector('.pl-row[data-id="'+stew.id+'"]');
+        if(!stew.done || !srow.classList.contains('pl-done') || !srow.querySelector('.pl-bar .pl-seg') || !/Done/.test(srow.textContent)) throw new Error('a dish marked done is not greyed in the timeline');
+        _plan.items.forEach(function(it){ if(until(it.id)!==before[it.id]) throw new Error('marking a dish done changed '+it.name+'’s time ('+before[it.id]+' → '+until(it.id)+')'); });
+        // …and the next Propose leaves it out: last, without a timeline, the rest planned without it
+        await planPropose();
+        srow=body.querySelector('.pl-row[data-id="'+stew.id+'"]');
+        if(_plan.items[_plan.items.length-1]!==stew || !stew.skip || !srow.classList.contains('pl-off') || srow.querySelector('.pl-bar') || srow.querySelector('.pl-until') || srow.querySelector('.pl-drag')) throw new Error('🔀 Propose order still plans the dish marked done: '+names());
+        if(body.querySelector('.pl-total b').textContent!=='0:25') throw new Error('the plan without the dish done takes '+body.querySelector('.pl-total b').textContent+', not 0:25');
+        if(_plan.items.indexOf(rice)!==_plan.items.filter(function(it){ return !it.done; }).indexOf(rice) || !rice.pin) throw new Error('the pin was lost');
+        // ✓ again: back in the plan
+        srow.querySelector('.pl-ok').click(); await wait(30);
+        if(stew.done || stew.skip || !body.querySelector('.pl-row[data-id="'+stew.id+'"] .pl-bar')) throw new Error('✓ again did not put the dish back in the plan');
+        // all done
+        _plan.items.forEach(function(it){ it.done=true; }); planRender();
+        if(!/All done/.test(body.querySelector('.pl-total').textContent) || !body.querySelector('.pl-go').disabled) throw new Error('all done is not said, or 🔀 Propose order can still be pressed');
+        _plan.items.forEach(function(it){ it.done=false; it.skip=false; }); planRender();
+        // a tap on a block or a line: that step's name and how long it takes, above it
+        var segs=body.querySelectorAll('.pl-row[data-id="pS"] .pl-seg'), q=Array.from(segs).filter(function(g){ return g.classList.contains('pl-q'); })[0];
+        q.click(); await wait(20);
+        var tip=body.querySelector('.pl-tip');
+        if(!tip || tip.parentNode!==q.parentNode || !/Simmer/.test(tip.textContent) || !/0:30/.test(tip.textContent)) throw new Error('a tap on the quiet line does not show “Simmer · 0:30”: '+(tip && tip.textContent));
+        if(Math.abs(parseFloat(tip.style.insetInlineStart)-(parseFloat(q.style.insetInlineStart)+parseFloat(q.style.width)/2))>0.01) throw new Error('the step is not shown above its line');
+        if(parseFloat(getComputedStyle(q, '::after').height)<16) throw new Error('the thin line is too thin to tap');
+        segs[0].click(); await wait(20);
+        if(body.querySelectorAll('.pl-tip').length!==1 || !/Brown/.test(body.querySelector('.pl-tip').textContent) || !/0:10/.test(body.querySelector('.pl-tip').textContent)) throw new Error('a tap on a block does not show its step');
+        segs[0].click(); await wait(20);
+        if(body.querySelector('.pl-tip')) throw new Error('a second tap does not hide it');
+        q.click(); body.querySelector('.pl-total').click(); await wait(20);
+        if(body.querySelector('.pl-tip')) throw new Error('a tap elsewhere does not hide it');
+        var kept=JSON.parse(localStorage.getItem(PLAN_LOCAL_KEY));
+        if(!kept.items.some(function(it){ return it.id==='pR' && it.pin; })) throw new Error('the pin was not kept');
+      } finally {
+        closePlanner();
+        window._household=real.hh; _plan=real.plan; _planReading={};
+        try{ if(real.local===null) localStorage.removeItem(PLAN_LOCAL_KEY); else localStorage.setItem(PLAN_LOCAL_KEY, real.local); }catch(e){}
+      }
+    } },
+  { id:'planner_pick', group:'Features', name:'🗓️ Work Planner: 📖 Add from the recipe list opens the list to tick several — linked kitchens’ recipes too — then 🗓️ Add to the Work Planner brings them in; ✕ Cancel or ☑ again goes back to the plan; 🗓️ is also among the select bar’s actions; an empty list says to fill in by hand (v40.05)',
+    test: async()=>{
+      var real={ plan:_plan, hh:window._household, user:window._fbUser, ai:window.aiCall, toast:window.toast, rec:recipes, local:null,
+        f:[showFavOnly, showClipsOnly, showNoPhotoOnly, showRecentOnly, showOneAwayOnly, showCollectionsOnly], cats:Array.from(activeCategories), diets:Array.from(activeDiets),
+        hidden:Array.from(hiddenHouseholds), q:document.getElementById('searchInput').value, lc:_linkCache.hLnk };
+      try{ real.local=localStorage.getItem(PLAN_LOCAL_KEY); }catch(e){}
+      var told=[], asked=0, ev={ stopPropagation:function(){} };
+      var inPlan=function(){ return _plan.items.map(function(it){ return it.name; }).join(', '); };
+      var settle=async function(){ await wait(60); for(var i=0; i<30 && Object.keys(_planReading).length; i++) await wait(30); };
+      try{
+        if(selectMode) cancelSelectMode();
+        window._fbUser=null;   // never the real household's plan
+        window._household={ hid:'hPick', role:'editor', name:'Pick Kitchen', ownerUid:'uO', links:[{ hid:'hLnk', name:'Linked Test Kitchen', code:'', at:1 }], asking:[] };
+        showFavOnly=showClipsOnly=showNoPhotoOnly=showRecentOnly=showOneAwayOnly=showCollectionsOnly=false; activeCategories.clear(); activeDiets.clear(); hiddenHouseholds.clear();
+        document.getElementById('searchInput').value='';
+        _linkCache.hLnk={ at:Date.now(), list:[normalizeRecipe({ id:5, uid:'lk5', name:'Self-test linked soup', ingredients:['water'], steps:['Simmer 20 minutes'] })], photos:{}, live:true, loading:null, error:'' };
+        try{ localStorage.removeItem(PLAN_LOCAL_KEY); }catch(e){}
+        _plan=planClean({ res:{ asked:true } });
+        try{ localStorage.setItem(PLAN_LOCAL_KEY, JSON.stringify(planOut())); }catch(e){}
+        window.toast=function(m){ told.push(String(m)); };
+        window.aiCall=async function(){ asked++; return '{"blocks":[{"k":"w","m":10,"s":"a"},{"k":"q","m":25,"s":"b"}]}'; };
+        recipes=[normalizeRecipe({ id:TEST_ID_MIN+4061, name:'Self-test soup', ingredients:['water'], steps:['Boil 25 minutes'] }),
+                 normalizeRecipe({ id:TEST_ID_MIN+4062, name:'Self-test rice', ingredients:['rice'], steps:['Cook 20 minutes'] }),
+                 normalizeRecipe({ id:TEST_ID_MIN+4063, name:'Self-test cake', ingredients:['flour'], steps:['Bake'] })];
+        renderGrid();
+        await openPlanner();
+        planAddMenu();
+        var pick=Array.from(document.querySelectorAll('#planAddOverlay .pl-choice'));
+        if(pick.length!==3 || !/Add from the recipe list/.test(pick[0].textContent) || !/Fill in manually/.test(pick[1].textContent) || !/Close/.test(pick[2].textContent)) throw new Error('+ Add recipe does not offer the three choices');
+        pick[0].click(); await wait(30);
+        var bar=document.getElementById('selectBar');
+        if(document.getElementById('planOverlay') || !selectMode || !_planPicking) throw new Error('the recipe list did not open for choosing');
+        if(!bar.classList.contains('plan-pick') || getComputedStyle(bar.querySelector('.sel-plan')).display==='none' || getComputedStyle(bar.querySelector('.sel-grid')).display!=='none') throw new Error('the bar does not offer 🗓️ Add to the Work Planner (or still offers the other actions)');
+        if(!told.some(function(t){ return /linked kitchens/.test(t); })) throw new Error('not told that linked kitchens’ recipes can be ticked too');
+        // a linked kitchen's card can be ticked while choosing
+        var lcard=document.querySelector('#linkedAll .linked-card[data-rid="5"]');
+        if(!lcard) throw new Error('the linked kitchen’s recipes are not shown while choosing');
+        lcard.click(); await wait(20);
+        if(!document.querySelector('#linkedAll .linked-card[data-rid="5"].selected') || planLinkedCount()!==1 || document.getElementById('linkedViewOverlay').classList.contains('open')) throw new Error('a tap on a linked kitchen’s card did not tick it (or opened it)');
+        toggleRecipeSelect(ev, TEST_ID_MIN+4061);
+        // the search box stays at the top while choosing, finds this kitchen's and the linked kitchens' recipes, and keeps the ticks
+        if(headerSlidePx()!==0) throw new Error('the header (and its search box) still slides away while choosing');
+        var sb=document.getElementById('searchInput');
+        sb.value='rice'; onSearchInput(); await wait(260);
+        var shown=function(){ return Array.from(document.querySelectorAll('#recipeGrid .recipe-card, #recipeGrid .recipe-list-item, #linkedAll .linked-card')).filter(function(c){ return c.offsetParent!==null; }).map(function(c){ return (c.querySelector('.card-open')||c).textContent.trim(); }).join(' | '); };
+        if(!/Self-test rice/.test(shown()) || /Self-test soup|Self-test cake/.test(shown())) throw new Error('the search while choosing shows: '+shown());
+        toggleRecipeSelect(ev, TEST_ID_MIN+4062);
+        sb.value='linked'; onSearchInput(); await wait(260);
+        if(!document.querySelector('#linkedAll .linked-card[data-rid="5"].selected') || /Self-test rice/.test(shown())) throw new Error('the search did not find the linked kitchen’s recipe, or lost its tick: '+shown());
+        sb.value=''; onSearchInput(); await wait(260);
+        if(!/^3 /.test(document.getElementById('selectedCount').textContent)) throw new Error('the count leaves out the linked kitchen’s: '+document.getElementById('selectedCount').textContent);
+        sb.value='so'; onSearchInput(); await wait(260);
+        document.getElementById('planPickAdd').click(); await settle();
+        if(selectMode || _planPicking || bar.classList.contains('plan-pick')) throw new Error('the list stayed in choosing');
+        if(document.getElementById('searchInput').value!=='') throw new Error('what was searched while choosing stayed in the search box');
+        if(!document.getElementById('planOverlay')) throw new Error('the plan did not come back');
+        if(inPlan()!=='Self-test soup, Self-test rice, Self-test linked soup' || asked!==3 || _plan.items.some(function(it){ return it.kind!=='recipe' || planLen(it)!==35; })) throw new Error('brought in: '+inPlan()+' ('+asked+' read)');
+        var lk=_plan.items[2];
+        if(lk.rid!=='LhLnk:lk5' || lk.from!=='Linked Test Kitchen' || !document.querySelector('#planBody .pl-row[data-id="'+lk.id+'"] .pl-tag[title*="Linked Test Kitchen"]')) throw new Error('the linked kitchen’s recipe is not marked as theirs: '+JSON.stringify(lk));
+        if(document.querySelector('#linkedAll .linked-card.selected')) throw new Error('a tick stayed on the linked kitchen’s card');
+        // ✕ Cancel, or ☑ Select again, goes back to the plan
+        planPickStart(); await wait(20);
+        cancelSelectMode(); await wait(60);
+        if(_planPicking || selectMode || !document.getElementById('planOverlay')) throw new Error('✕ Cancel did not go back to the plan');
+        planPickStart(); await wait(20);
+        toggleSelectMode(); await wait(60);
+        if(_planPicking || selectMode || !document.getElementById('planOverlay')) throw new Error('☑ again did not go back to the plan');
+        if(_plan.items.length!==3) throw new Error('going back changed the plan');
+        closePlanner();
+        // 🗓️ among the select bar's actions (Tony: "please add to the Select option on the main screen the option to "Add to work planner"")
+        toggleSelectMode(); await wait(20);
+        var act=document.getElementById('selPlanAdd');
+        if(!act || getComputedStyle(bar.querySelector('.sel-grid')).display==='none' || act.offsetParent===null) throw new Error('no 🗓️ Add to the Work Planner among the select bar’s actions');
+        if(document.querySelector('#linkedAll .linked-card')) throw new Error('linked kitchens’ cards in ordinary select mode (its other actions are for your own recipes)');
+        act.click(); await wait(30);
+        if(!selectMode || document.getElementById('planOverlay') || !told.some(function(t){ return /No recipes selected/.test(t); })) throw new Error('with nothing ticked it did not say so');
+        toggleRecipeSelect(ev, TEST_ID_MIN+4063);
+        act.click(); await settle();
+        if(selectMode || !document.getElementById('planOverlay') || inPlan()!=='Self-test soup, Self-test rice, Self-test linked soup, Self-test cake') throw new Error('the select bar’s 🗓️ did not bring the recipe in: '+inPlan());
+        // nothing to choose from
+        recipes=[]; delete _linkCache.hLnk;
+        if(planPickStart()!==false || _planPicking || !document.getElementById('planOverlay') || !told.some(function(t){ return /Fill in manually/.test(t); })) throw new Error('an empty list was opened for choosing');
+      } finally {
+        if(_planPicking) planPickEnd(false);
+        if(selectMode) cancelSelectMode();
+        closePlanner();
+        recipes=real.rec;
+        showFavOnly=real.f[0]; showClipsOnly=real.f[1]; showNoPhotoOnly=real.f[2]; showRecentOnly=real.f[3]; showOneAwayOnly=real.f[4]; showCollectionsOnly=real.f[5];
+        activeCategories.clear(); real.cats.forEach(function(x){ activeCategories.add(x); }); activeDiets.clear(); real.diets.forEach(function(x){ activeDiets.add(x); });
+        hiddenHouseholds.clear(); real.hidden.forEach(function(x){ hiddenHouseholds.add(x); });
+        document.getElementById('searchInput').value=real.q;
+        if(real.lc) _linkCache.hLnk=real.lc; else delete _linkCache.hLnk;
+        window._household=real.hh; window._fbUser=real.user; window.aiCall=real.ai; window.toast=real.toast; _plan=real.plan; _planReading={};
+        try{ if(real.local===null) localStorage.removeItem(PLAN_LOCAL_KEY); else localStorage.setItem(PLAN_LOCAL_KEY, real.local); }catch(e){}
+        renderGrid();
+      }
+    } },
+  { id:'planner_shared', group:'Cloud Sync', name:'🗓️ Work Planner shared with the household: one plan at households/…/planner/current — the dishes and the kitchen’s equipment — the newer copy wins, a change by someone else appears in the open window, a refused save stays on the device and says so, clearing the list keeps the equipment; deleting the household takes it (v40.05)',
+    test: async()=>{
+      var real={ plan:_plan, db:window._fbDb, user:window._fbUser, hh:window._household, layout:_cloudLayout, toast:window.toast, ask:window.askConfirm, local:null };
+      try{ real.local=localStorage.getItem(PLAN_LOCAL_KEY); }catch(e){}
+      var store={ doc:null }, sets=[], paths=[], snapCb=null, unsubbed=0, failSet=false, told=[];
+      var copy=function(x){ return JSON.parse(JSON.stringify(x)); };
+      var ref={ get:async function(){ return { exists:!!store.doc, data:function(){ return copy(store.doc); } }; },
+        set:async function(d){ if(failSet){ var e=new Error('Missing or insufficient permissions.'); e.code='permission-denied'; throw e; } sets.push(copy(d)); store.doc=copy(d); },
+        onSnapshot:function(cb){ snapCb=cb; return function(){ unsubbed++; }; } };
+      var fake={ collection:function(c){ return { doc:function(h){ return { collection:function(sub){ return { doc:function(id){ paths.push(c+'/'+h+'/'+sub+'/'+id); return ref; } }; } }; } }; } };
+      var snap=function(d){ snapCb({ exists:true, data:function(){ return copy(d); } }); };
+      try{
+        // what the cloud copy may hold
+        var c=planClean({ items:[{ id:'a', name:'A', blocks:[{ k:'q', m:10 }] }, { id:'', name:'B' }, { name:'C' }, { id:'d', name:'D', kind:'hack', blocks:[{ k:'w', m:-4 }] }], cooks:5, proposed:'yes',
+          maps:{ 'bad key':{ b:[{ k:'w', m:3 }] }, rabc:{ b:[{ k:'w', m:3 }], at:5 }, rdef:{ b:'x' } },
+          res:{ n:{ stove:-1, oven:99, sousvide:2 }, custom:[{ id:'c1', name:'Wok' }, { id:'c1', name:'twice' }, { id:'c9', name:'x' }, { id:'c2', name:' ' }], asked:'yes' } });
+        if(c.items.length!==2 || c.items[0].blocks.map(function(x){ return x.k+x.m; }).join(' ')!=='w1 q10' || c.items[1].kind!=='recipe' || c.items[1].blocks.length) throw new Error('the cloud copy is not made sure of: '+JSON.stringify(c.items));
+        if(c.cooks!==1 || c.proposed!==true || Object.keys(c.maps).join()!=='rabc') throw new Error('cooks / kept readings not made sure of: '+JSON.stringify(c));
+        if(c.res.n.stove!==4 || c.res.n.oven!==1 || c.res.n.sousvide!==2 || c.res.custom.length!==1 || c.res.custom[0].name!=='Wok' || c.res.custom[0].n!==1 || c.res.asked!==true) throw new Error('the equipment is not made sure of: '+JSON.stringify(c.res));
+        window._fbDb=fake; window._fbUser={ uid:'uMe', email:'me@example.com', displayName:'Me' };
+        window._household={ hid:'hPlan', role:'editor', name:'Plan Kitchen', ownerUid:'uO', ownerName:'Olga', links:[], asking:[] };
+        _cloudLayout='households';
+        window.toast=function(m){ told.push(String(m)); };
+        try{ localStorage.removeItem(PLAN_LOCAL_KEY); }catch(e){}
+        _plan=planClean(null);
+        if(!planCloud()) throw new Error('a household member’s plan is not shared');
+        store.doc={ items:[{ id:'pa', kind:'manual', name:'Rice', blocks:[{ k:'w', m:5 }, { k:'q', m:20 }] }], cooks:2, proposed:false, at:Date.now()-5000, maps:{},
+          res:{ n:{ stove:2 }, custom:[], asked:true } };
+        await openPlanner();
+        var body=document.getElementById('planBody');
+        if(paths.indexOf('households/hPlan/planner/current')<0) throw new Error('the plan is not the household’s: '+paths.join(', '));
+        if(_plan.items.length!==1 || _plan.items[0].name!=='Rice' || _plan.cooks!==2) throw new Error('the household’s plan was not read');
+        if(document.getElementById('planResOverlay') || _plan.res.n.stove!==2) throw new Error('the equipment someone in the household gave was asked again');
+        if(!snapCb || !/Shared with everyone in your household/.test(body.textContent)) throw new Error('not listening, or does not say the plan is shared');
+        await planManualAdd('Salad', '15');
+        var last=sets[sets.length-1];
+        if(!last || last.items.length!==2 || last.by!=='uMe' || last.at!==_plan.at || last.cooks!==2 || !last.res || last.res.n.stove!==2 || !last.res.asked) throw new Error('the change was not saved for the household: '+JSON.stringify(last));
+        if(JSON.parse(localStorage.getItem(PLAN_LOCAL_KEY)).items.length!==2) throw new Error('not kept on the device too');
+        // its own save coming back changes nothing; someone else's newer one appears; an older one does not
+        var mine=_plan; snap(last);
+        if(_plan!==mine) throw new Error('its own save, coming back, was taken as news');
+        snap(Object.assign(copy(last), { items:last.items.concat([{ id:'pc', kind:'manual', name:'Cake', blocks:[{ k:'w', m:30 }] }]), at:last.at+1000, by:'uOther',
+          res:{ n:{ stove:3 }, custom:[{ id:'c1', name:'Wok burner', n:1 }], asked:true } }));
+        if(_plan.items.length!==3 || body.querySelectorAll('.pl-row').length!==3) throw new Error('a change by someone else did not appear in the open window');
+        if(_plan.res.n.stove!==3 || !/Stove burners\s*3/.test((body.querySelector('.pl-kit-item[data-res="stove"]')||{}).textContent || '') || !/Wok burner/.test(body.querySelector('.pl-kit').textContent)) throw new Error('someone else’s change of equipment did not appear');
+        snap(Object.assign(copy(last), { items:[], at:last.at-1 }));
+        if(_plan.items.length!==3) throw new Error('an older copy replaced the newer one');
+        // opened again: the newer of the two copies
+        store.doc.at=1;
+        if(await planLoad()!=='cloud' || _plan.items.length!==3) throw new Error('an older household copy replaced the newer one on this device');
+        // refused: kept on the device, and said
+        failSet=true;
+        if(await planSave()!=='device' || !told.some(function(t){ return /could not be shared with your household/.test(t); })) throw new Error('a refused save was not said');
+        if(JSON.parse(localStorage.getItem(PLAN_LOCAL_KEY)).items.length!==3) throw new Error('a refused save was not kept on the device');
+        failSet=false;
+        var q=null; window.askConfirm=async function(o){ q=o; return false; };
+        await planClear();
+        if(!q || !/household/.test(q.message)) throw new Error('🗑️ Clear the list does not say it clears it for the whole household');
+        window.askConfirm=async function(){ return true; };
+        await planClear();
+        last=sets[sets.length-1];
+        if(!last || last.items.length!==0 || !last.res || last.res.n.stove!==3 || last.res.custom.length!==1) throw new Error('clearing the list did not keep the equipment for the household: '+JSON.stringify(last && last.res));
+        closePlanner();
+        if(unsubbed!==1) throw new Error('still listening after the window closed');
+        if(String(householdWipe).indexOf("'planner'")<0) throw new Error('deleting the household leaves its plan');
+      } finally {
+        closePlanner();
+        window._fbDb=real.db; window._fbUser=real.user; window._household=real.hh; _cloudLayout=real.layout; window.toast=real.toast; window.askConfirm=real.ask;
+        _plan=real.plan; _planReading={};
+        try{ if(real.local===null) localStorage.removeItem(PLAN_LOCAL_KEY); else localStorage.setItem(PLAN_LOCAL_KEY, real.local); }catch(e){}
+      }
+    } },
   { id:'example_twins_removed', group:'Sync', name:'🧹 The five example recipes, twice: an untouched copy goes, the first stays — and nothing anyone changed is ever taken (v38.50)',
     test: async()=>{
       var real={ recipes:recipes, save:window.saveData, del:window.queueCloudDelete, log:window.syncLog, toast:window.toast, hh:window._household };
@@ -12861,15 +13413,15 @@ window.SELF_TESTS = [
       if(heads.join('|')!=='Ideas|Tools|Kitchens and people|WhatsApp|Tidy up') throw new Error('the headings are '+heads.join(' | '));
       var where={ openExploreModal:'ideas', openSuggestModal:'ideas', openWhatCanIMake:'ideas', openCalcModal:'tools', openConnectHousehold:'people',
         openFamilyChat:'people', openKitchenChats:'people', openGiftsIn:'people', openGiftsOut:'people', openDeleteAsks:'people', openShareAppModal:'people',
-        openWaAsk:'whatsapp', openWaLinks:'whatsapp', aiTagAllDiets:'tidy', autoFetchMissingPhotos:'tidy' };
+        openWaAsk:'whatsapp', openWaLinks:'whatsapp', aiTagAllDiets:'tidy', autoFetchMissingPhotos:'tidy', openPlanner:'tools' };
       Object.keys(where).forEach(function(f){
         var it=m.querySelectorAll('[onclick*="'+f+'("]');
         if(it.length!==1) throw new Error(f+' is in ··· More '+it.length+' times');
         var sec=it[0].closest('.more-sec');
         if(!sec || sec.getAttribute('data-sec')!==where[f] || !it[0].closest('.set-body')) throw new Error(f+' is under "'+(sec&&sec.getAttribute('data-sec'))+'", not in "'+where[f]+'"\'s body');
       });
-      // v39.55 — 15 with 🗑️ Requests to delete (shown to the owner and admins while there are requests)
-      if(m.querySelectorAll('.set-body .drop-item').length!==15) throw new Error('··· More has '+m.querySelectorAll('.set-body .drop-item').length+' items, not 15');
+      // v39.55 — 15 with 🗑️ Requests to delete (shown to the owner and admins while there are requests); v40.05 — 16 with 🗓️ Work Planner
+      if(m.querySelectorAll('.set-body .drop-item').length!==16) throw new Error('··· More has '+m.querySelectorAll('.set-body .drop-item').length+' items, not 16');
       // v39.30 — Tony: "the titles … to become the only menu items under More. Clicking any of them will open a sub menu
       // with whatever is under the same title right now … in the same menu, expanding downwards, pushing the next title down."
       var seen=function(el){ return !!el && el.getClientRects().length>0 && getComputedStyle(el).visibility!=='hidden'; };
