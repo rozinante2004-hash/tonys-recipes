@@ -1,7 +1,7 @@
 {
  "lang": "hu",
  "updatedAt": 1795287635238,
- "count": 2839,
+ "count": 2841,
  "strings": {
   "\"Add to Home Screen\"": "Hozzáadás a kezdőképernyőhöz",
   "\"Open Bring!\"": "Bring! megnyitása",
@@ -1897,6 +1897,7 @@
   "{1} phrase(s) are still in English. Some are parts of the app that had not been opened yet when {2} was made — a dialog's wording only exists once it is asked. This translates only those, and adds them to the existing file. It does not redo the rest — {3} batch(es), {4}.{5}": "{1} kifejezés még angolul van. Van, amelyik az app olyan részéhez tartozik, amely még nem volt megnyitva, amikor a(z) {2} készült — egy párbeszédablak szövege csak akkor létezik, amikor megjelenik. Ez csak ezeket fordítja le, és hozzáadja őket a meglévő fájlhoz. A többit nem készíti el újra — {3} köteg, {4}.{5}",
   "{1} phrases to go": "{1} kifejezés van hátra",
   "{1} phrase{2} go back to the earlier wording{3}.{4} Everyone sees it. Every published version stays in this list, so this can be undone too.": "{1} kifejezés{2} visszaáll a korábbi szövegezésre{3}.{4} Mindenki látni fogja. Minden közzétett verzió megmarad ebben a listában, így ez is visszavonható.",
+  "{1} recipes were given new numbers — another device had used theirs. All are kept.": "{1} recept új számot kapott — egy másik eszköz már használta a számukat. Mind megmarad.",
   "{1} recipes would be written. A backup holds every photo inside it, so restoring it years from now depends on nothing.": "{1} recept kerülne mentésre. A biztonsági mentés tartalmazza az összes fényképet is, így évek múlva is bármitől függetlenül visszaállítható.",
   "{1} recipe{2} still without a photo": "{1} recept{2} még mindig fénykép nélkül",
   "{1} recipe{2} will move into {3}, and will no longer appear on their own in the list. Favourites and cooking history come along. {4} Each one can be lifted back out later with “⤴ Make its own”.": "{1} recept{2} átkerül ide: {3}, és nem jelenik meg többé önállóan a listában. A kedvencek és a főzési előzmények is átkerülnek. {4} Bármelyik később kiemelhető innen a „⤴ Legyen önálló” gombbal.",
@@ -1997,6 +1998,7 @@
   "“My Kitchen Notes — Save recipes from any site”: the job “Submit the extension to the stores” uploads each new version.": "„My Kitchen Notes — Save recipes from any site”: a „Kiterjesztés beküldése az áruházakba” feladat tölti fel minden új verziót.",
   "“{1}” as it was on {2}. The current version is kept in the history, so you can undo this.": "„{1}” olyan állapotban, amilyen {2}-kor volt. A jelenlegi verzió megmarad az előzményekben, így ezt visszavonhatod.",
   "“{1}” is 🔒 secret — only your own kitchen sees it. Send a copy of it all the same?": "„{1}” 🔒 titkos — csak a saját konyhád látja. Mégis elküldöd a másolatát?",
+  "“{1}” was given a new number — another device had used its number for another recipe. Both are kept.": "A(z) „{1}” új számot kapott — egy másik eszköz már egy másik recepthez használta a számát. Mindkettő megmarad.",
   "“{1}” was not recognised as a language": "„{1}” nem felismert nyelv",
   "“{1}” — a copy, with its photo, that they save to their recipes with one tap. It keeps for 4 weeks.": "„{1}” — egy másolat, a fotójával együtt, amit egy koppintással elmenthetnek a receptjeik közé. 4 hétig érvényes.",
   "• The export itself must be started by hand. WhatsApp offers no scheduled or programmatic export, on any platform.{3} • {4} the delivery afterwards can be automated {5} — a Shortcut that accepts a file from the Share sheet and uploads it via the GitHub API. On a work-managed phone that blocks GitHub, the five steps above are the route, and they do not depend on it.{6} • {7} share or copy the file into the repo folder and commit it; a sync-folder script can do the commit for you.{8} • Re-exporting produces the {9} history again, so replacing the old file is the right move — that's why loading the folder replaces its entries rather than appending.": "• Magát az exportálást kézzel kell elindítani. A WhatsApp semmilyen platformon nem kínál ütemezett vagy programozott exportot.{3} • {4} a kézbesítés utána automatizálható {5} — egy Parancsikon, amely fogad egy fájlt a Megosztás listából, és feltölti a GitHub API-n keresztül. Egy munkahelyi telefonon, amely blokkolja a GitHub-ot, a fenti öt lépés a járható út, és nem függ tőle.{6} • {7} oszd meg vagy másold a fájlt a repó mappájába, és commitold; egy sync-mappa szkript elvégezheti helyetted a commitot.{8} • Az újraexportálás ismét a teljes {9} előzményt hozza létre, ezért a régi fájl lecserélése a helyes lépés — ezért cseréli le a mappa betöltése a bejegyzéseket ahelyett, hogy hozzáfűzné őket.",

@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v40.12 -->
+<!-- Tony's Recipes Collection v40.13 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -2655,14 +2655,24 @@ function aiMeterOn() {
 // fetch went first, with no sign-in — and since Worker v107 (15 Nov) such a fetch is refused; "Fetch again", seconds
 // later, had the sign-in. So, as aiPrepare already does for the AI: while Firebase is there but has not yet said who is
 // signed in, the fetch waits for it — up to ten seconds, and only once if it never answers (offline).
-var _workerSignInGaveUp = false;
+// v40.13 — twenty: Tony's iPhone, 22 Nov 2026 (the beta's log), was signed in 10.9 s after the app opened, 3 ms after the
+// fetch had given up waiting and been refused ("Sign in first"); and a refusal for want of a sign-in that has come by
+// then is asked again once (runUrlImport, workerSignInArrived).
+var _workerSignInGaveUp = false, WORKER_SIGNIN_WAIT_STEPS = 80;
 async function workerSignInSettled() {
   if (window._fbAuthSettled || !window._fbAuth || _workerSignInGaveUp) return true;
-  for (var i = 0; i < 40 && !window._fbAuthSettled; i++) await new Promise(function(r){ setTimeout(r, 250); });
+  for (var i = 0; i < WORKER_SIGNIN_WAIT_STEPS && !window._fbAuthSettled; i++) await new Promise(function(r){ setTimeout(r, 250); });
   if (!window._fbAuthSettled) _workerSignInGaveUp = true;
   return !!window._fbAuthSettled;
 }
 window.workerSignInSettled = workerSignInSettled;
+// Is someone signed in now — or within `ms`? (a refused fetch is asked again only then)
+async function workerSignInArrived(ms) {
+  var who = function () { return (typeof fbSignedInUser === 'function') ? fbSignedInUser() : window._fbUser; };
+  for (var t = 0; !who() && t < (ms || 0); t += 250) await new Promise(function(r){ setTimeout(r, 250); });
+  return !!who();
+}
+window.workerSignInArrived = workerSignInArrived;
 async function workerSignIn() {
   var u = (typeof fbSignedInUser === 'function') ? fbSignedInUser() : window._fbUser;
   if (!u) { await workerSignInSettled(); u = (typeof fbSignedInUser === 'function') ? fbSignedInUser() : window._fbUser; }
@@ -11416,7 +11426,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v40.12';
+var APP_VERSION = 'v40.13';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -15188,7 +15198,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v40.12</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v40.13</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -15276,7 +15286,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v40.12</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v40.13</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -19132,6 +19142,8 @@ var I18N_EXTRA = [
    'Tap the dishes you are making \u2014 linked kitchens\u2019 too \u2014 then \u{1F5D3}\uFE0F Add to the Work Planner.',
    '\u{1F4DA} Which recipes from the collection?', 'A collection is not one dish: tick the recipes from it that you are making.', 'Already in the plan', 'Cancel',
    'Then, on another day: {1} \u2014 not planned here.',
+   '\u201c{1}\u201d was given a new number \u2014 another device had used its number for another recipe. Both are kept.',
+   '{1} recipes were given new numbers \u2014 another device had used theirs. All are kept.',
    'one day', '{1} days', '{1} h', '\u{1F469}\u200D\u{1F373} You', '\u{1F469}\u200D\u{1F373} The second cook', 'One thing at a time',
    '\u{1F4CB} Run sheet', 'Each step in the order to do it \u2014 tick it as you go.', 'Start at', 'Now', 'Nothing to do until {1} ({2})',
    '{1} is ready', '{1} \u2014 the rest on another day', 'Everything is ready',
@@ -28822,11 +28834,22 @@ async function runUrlImportSteps() {
   // server (the Worker answers "Page returned 403"), the one case a relay can help: it asks from somewhere else.
   var refusedStatus = 0;
   if (!pageText && !isFacebookUrl(url)) try {
-    const fetchResp = await fetch(WORKER_ENDPOINT, {
+    let fetchResp = await fetch(WORKER_ENDPOINT, {
       method: 'POST',
       headers: workerHeaders(),
       body: await workerBodySigned({ action: 'fetch-url', url: url })
     });
+    var wd = null;
+    if (!fetchResp.ok) {
+      try { wd = await fetchResp.json(); } catch(e2) {}
+      // v40.13 — refused for want of a sign-in that has come by now (or comes within five seconds): asked again, once
+      if (wd && wd.signIn && !wd.unconfirmed && await workerSignInArrived(5000)) {
+        syncLog('import', 'Asked for the page again, with the sign-in that came a moment later');
+        fetchResp = await fetch(WORKER_ENDPOINT, { method: 'POST', headers: workerHeaders(), body: await workerBodySigned({ action: 'fetch-url', url: url }) });
+        wd = null;
+        if (!fetchResp.ok) { try { wd = await fetchResp.json(); } catch(e3) {} }
+      }
+    }
     if (fetchResp.ok) {
       const fetchData = await fetchResp.json();
       pageText = fetchData.text || '';
@@ -28843,7 +28866,6 @@ async function runUrlImportSteps() {
       if (!pageText) attempts.push(refused ? 'the site answered the server with ' + refused[1] + (refusedStatus ? ' (it refuses servers)' : '')
         : 'the server fetched the page but found no readable text in it');
     } else {
-      var wd = null; try { wd = await fetchResp.json(); } catch(e2) {}
       attempts.push('server: ' + workerErrorText(fetchResp.status, wd));
     }
   } catch(e) {
@@ -31640,6 +31662,71 @@ window.reportIdCollisions = reportIdCollisions;
 function mergeNextId(local, cloud) {
   return Math.max(parseInt(local, 10) || 0, parseInt(cloud, 10) || 0);
 }
+// v40.13 — the first number free in the cloud: its index's nextId, or one past the highest number it lists
+function cloudNextFree(meta) {
+  var ids = Array.isArray(meta && meta.ids) ? meta.ids : [];
+  var top = ids.reduce(function (m, i) { var n = parseInt(i, 10); return n > m ? n : m; }, 0);
+  return Math.max(parseInt(meta && meta.nextId, 10) || 0, top ? top + 1 : 0);
+}
+window.cloudNextFree = cloudNextFree;
+
+// ── v40.13 — A NEW RECIPE NEVER TAKES ANOTHER DEVICE'S NUMBER (the beta's log, 22 Nov 2026, Tony's iPhone). A recipe's
+// cloud document is named by its number, and a new recipe is given this device's next number. A link shared from ynet
+// opened the app on a phone last synced two days before; the import made "מלית מבשר טחון" while the first read of the
+// cloud (46 s on that phone) was still going, so it got 445 — a number another device had used meanwhile. The save was
+// refused as "changed on another device" (the guard saw a document it had no base for), and the full read that ended a
+// moment later replaced the phone's list with the cloud's — the new recipe went with it. Now: the cloud's next free
+// number is taken as soon as its index is read (loadFromFirestore); a save that finds ANOTHER recipe (another uid) at
+// its number gives this one a free number and saves it there (saveRecipeDoc → 'collision' → renumberCollidedRecipe);
+// and the full read keeps a recipe made on this device that the cloud does not have yet (keepUnsentRecipes).
+async function renumberCollidedRecipe(r, db, why) {
+  db = db || _fbDb;
+  var meta = {};
+  try { var ms = await cloudDoc('meta', db).get(); meta = ms && ms.exists ? (ms.data() || {}) : {}; } catch (e) { meta = {}; }
+  var used = {}; recipes.forEach(function (x) { if (x && x !== r) used[x.id] = true; });
+  var localTop = recipes.reduce(function (m, x) { return Math.max(m, (x && x.id) || 0); }, 0);
+  var to = Math.max(parseInt(nextId, 10) || 0, cloudNextFree(meta), localTop + 1, (r.id || 0) + 1);
+  while (used[to]) to++;
+  var from = r.id;
+  r.id = to; r.updatedAt = Date.now();
+  delete r._ph; delete r._po;   // its photo is in memory, not under the old number
+  nextId = Math.max(nextId, to + 1);
+  if (typeof viewId !== 'undefined' && viewId === from) viewId = to;
+  if (typeof editingId !== 'undefined' && editingId === from) editingId = to;
+  try {
+    var rv = JSON.parse(localStorage.getItem('recent_views') || '[]');
+    if (Array.isArray(rv) && rv.indexOf(from) > -1) localStorage.setItem('recent_views', JSON.stringify(rv.map(function (x) { return x === from ? to : x; })));
+  } catch (e) {}
+  syncLog('save', 'Gave "' + (r.name || ('#' + to)) + '" a new number, ' + from + ' \u2192 ' + to + ' \u2014 ' + from + ' is another recipe in the cloud'
+    + (why ? ' ("' + String(why).slice(0, 60) + '")' : ''), { from: from, to: to });
+  if (typeof saveLocal === 'function') { try { saveLocal(); } catch (e) {} }
+  return { from: from, to: to };
+}
+window.renumberCollidedRecipe = renumberCollidedRecipe;
+// The recipes of this device that a full read must not drop: made here and not in the cloud yet — no base before the read
+// (never sent, never read), changed since the cloud was last seen, not a sample or a test's — kept beside the cloud's,
+// a clashing number moved (mergeRecipeLists)
+function keepUnsentRecipes(cloudList, localList, basesBefore, lastSeenAt, startId) {
+  var cloudUids = {}; (cloudList || []).forEach(function (c) { if (c && c.uid) cloudUids[c.uid] = true; });
+  var unsent = (localList || []).filter(function (r) {
+    return r && (basesBefore || {})[r.id] === undefined && !isTestFixture(r) && !/^sample-/.test(String(r.uid || ''))
+      && (r.updatedAt || 0) > (lastSeenAt || 0) && !(r.uid && cloudUids[r.uid]);
+  });
+  if (!unsent.length) return { list: cloudList, renamed: [], nextId: startId, kept: [] };
+  var out = mergeRecipeLists(cloudList, unsent, startId);
+  return { list: out.list, renamed: out.renamed, nextId: out.nextId, kept: unsent };
+}
+window.keepUnsentRecipes = keepUnsentRecipes;
+// Said once, in a toast: a recipe that moved to a new number (nothing was lost)
+function tellRenumbered(list) {
+  if (!list || !list.length) return '';
+  var t = list.length === 1
+    ? i18nPhrase('\u201c{1}\u201d was given a new number \u2014 another device had used its number for another recipe. Both are kept.').replace('{1}', list[0].name || '')
+    : i18nPhrase('{1} recipes were given new numbers \u2014 another device had used theirs. All are kept.').replace('{1}', String(list.length));
+  toast(t, 8000);
+  return t;
+}
+window.tellRenumbered = tellRenumbered;
 
 window.slimRecipeForCloud = slimRecipeForCloud;
 window.cloudDirtyIds      = cloudDirtyIds;
@@ -31686,7 +31773,7 @@ async function saveRecipeDoc(r, db, again) {
   // again, which defeated the "same version" escape hatch for exactly the oldest
   // recipes. The local copy is brought into line after a successful write.
   var stamped = stampedAt;
-  var refused = false;
+  var refused = false, collision = '';
   try {
   await db.runTransaction(async function(tx) {
     var snap = await tx.get(ref);
@@ -31696,6 +31783,13 @@ async function saveRecipeDoc(r, db, again) {
     // v38.96 — an ordinary save, while another device made it secret: it is not written back where linked households read
     if (!wantSecret && other && other.exists && _secretLives[sid] !== true && !again) { madeSecretElsewhere = true; return; }
     var cloudAt = snap.exists ? ((snap.data() || {}).updatedAt) : null;
+    // v40.13 — the same number, ANOTHER recipe (its uid): never written over, and not "changed on another device" — two
+    // devices gave a new recipe the same number (the caller moves this one: renumberCollidedRecipe)
+    collision = '';
+    if (snap.exists && r.uid) {
+      var cr = null; try { cr = JSON.parse((snap.data() || {}).r || 'null'); } catch (e) { cr = null; }
+      if (cr && cr.uid && cr.uid !== r.uid) { collision = String(cr.name || '#' + r.id); return; }
+    }
     if (!snap.exists && other && other.exists && moving) cloudAt = (other.data() || {}).updatedAt;   // judged against where it was
     if (!cloudWriteAllowed(cloudAt, base, r.updatedAt)) { refused = true; return; }
     // v38.65 — and the server's own time: what a reading device asks for (incrementalCloudLoad). A recipe edited
@@ -31721,6 +31815,7 @@ async function saveRecipeDoc(r, db, again) {
     return saveRecipeDoc(r, db, true);
   }
   if (hh) _secretLives[sid] = wantSecret;
+  if (collision) return { id: r.id, skipped: 'collision', other: collision };
   if (refused) {
     // Logged HERE, not in the caller. The successful write is logged a few lines
     // down, and splitting the two halves of the same fact across two levels
@@ -32310,6 +32405,14 @@ async function saveToFirestore() {
       var dr = live.find(function(x) { return x.id === dirty[di]; });
       if (!dr) continue;
       var res = await saveRecipeDoc(dr);
+      // v40.13 — another recipe at its number: given a free one and saved there (three tries at most)
+      var moves = [];
+      for (var mv = 0; res.skipped === 'collision' && mv < 3; mv++) {
+        var m1 = await renumberCollidedRecipe(dr, null, res.other);
+        moves.push({ from: m1.from, to: m1.to, name: dr.name || ('#' + m1.to) });
+        res = await saveRecipeDoc(dr);
+      }
+      if (moves.length) tellRenumbered([moves[moves.length - 1]]);
       // saveRecipeDoc logs the refusal itself; this level owns the UI state.
       if (res.skipped === 'conflict') { conflicts.push(dr); _conflictCount++; markRecipeConflicted(dr.id); }
       else if (res.skipped === 'too-big') oversized.push((dr.name || ('#' + dr.id)) + ' — ' + Math.round(res.bytes / 1024) + ' KB');
@@ -32476,6 +32579,10 @@ async function _loadFromFirestoreInner(user) {
     var metaSnap = await cloudDoc('meta').get();
     countCloudRead();
     var meta = metaSnap.exists ? (metaSnap.data() || {}) : {};
+    // v40.13 — the next free number AT ONCE (the rest of this read can take most of a minute on a phone; a recipe made
+    // meanwhile was given a number another device had used), and what this device knew before the read (keepUnsentRecipes)
+    nextId = mergeNextId(nextId, cloudNextFree(meta));
+    var basesBefore = Object.assign({}, _cloudRecipeBase), lastSeenBefore = _lastCloudMetaAt || 0;
     _cloudSchema = meta.schema || 0;
     // v38.96 — 🔒 the index linked households read leaves the secret recipes out; ours puts them back: from this
     // device's own recipes while nothing changed (one read, as before), from state/secretIndex when something did
@@ -32565,7 +32672,18 @@ async function _loadFromFirestoreInner(user) {
             setTimeout(function(){ reportIdCollisions(mergeOut.renamed); }, 1200);
           }
         } else {
-          recipes = fsRecipes; // normal load
+          // v40.13 — the normal load replaced the list with the cloud's; a recipe made here that the cloud does not have
+          // yet is kept (and sent), a clashing number moved
+          var keepOut = keepUnsentRecipes(fsRecipes, recipes, basesBefore, lastSeenBefore, nextId);
+          recipes = keepOut.list;
+          if (keepOut.kept.length) {
+            nextId = mergeNextId(nextId, keepOut.nextId);
+            keepOut.kept.forEach(function (k) { syncLog('load', 'Kept "' + (k.name || ('#' + k.id)) + '" — made on this device, not in the cloud yet', { id: k.id }); });
+            keepOut.renamed.forEach(function (c) { syncLog('save', 'Gave "' + (c.name || ('#' + c.to)) + '" a new number, ' + c.from + ' \u2192 ' + c.to + ' \u2014 ' + c.from + ' is another recipe in the cloud', { from: c.from, to: c.to }); });
+            tellRenumbered(keepOut.renamed);
+            _offlineQueue = true; try { localStorage.setItem('tonys_offline_queue', '1'); } catch(e) {}
+            setTimeout(function () { if (typeof saveToFirestore === 'function') saveToFirestore().catch(function () {}); }, 1500);
+          }
         }
         // Pull each recipe's photo from its own cloud doc, and restore local-only originals
         var photoRead = {};

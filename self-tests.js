@@ -8139,7 +8139,7 @@ window.SELF_TESTS = [
       } finally { _waHarvest=saved; }
     } },
 
-  { id:'signed_fetch_waits_for_signin', group:'Features', name:'🔗 A link shared into the app is fetched with the sign-in: a fetch made before Firebase has said who is signed in waits for it (once, ten seconds at most); a page that could not be read is said in the log (v39.87)',
+  { id:'signed_fetch_waits_for_signin', group:'Features', name:'🔗 A link shared into the app is fetched with the sign-in: a fetch made before Firebase has said who is signed in waits for it (once, twenty seconds at most — v40.13); refused for want of a sign-in that came a moment later, it is asked again once; a page that could not be read is said in the log (v39.87)',
     test: async()=>{
       // Tony's log, 16 Nov 2026: "Initial sharing of a recipe with the app returned no recipe. However, clicking Fetch
       // again did retrieve it successfully." The share is fetched as the app opens; Firebase answers a moment later.
@@ -8170,6 +8170,21 @@ window.SELF_TESTS = [
         await runUrlImport();
         var e=logged.filter(function(l){ return l[0]==='error' && l[1]==='URL import failed'; })[0];
         if(!e || !/could not be read/.test(e[2]) || !/Sign in first/.test(e[2])) throw new Error('the failed fetch left no reason in the log: '+JSON.stringify(logged).slice(0,200));
+        try{ closeM('urlImportOverlay'); }catch(e0){}
+        // v40.13 — Tony's iPhone, 22 Nov: refused ("Sign in first"), signed in 3 ms later — asked again, once, with the sign-in
+        if(WORKER_SIGNIN_WAIT_STEPS*250<20000) throw new Error('the wait for the sign-in is shorter than twenty seconds');
+        logged=[]; var calls=0, sent=[];
+        user=null;
+        window.fetch=async function(u, o){
+          calls++; try{ sent.push(JSON.parse(o.body).idToken || ''); }catch(e1){ sent.push('?'); }
+          if(calls===1){ setTimeout(function(){ user={ getIdToken:async function(){ return 'tok-late'; } }; }, 300);
+            return new Response(JSON.stringify({ error:'SIGN_IN: sign in first', signIn:true }), { status:401, headers:{ 'Content-Type':'application/json' } }); }
+          return new Response(JSON.stringify({ error:'Page returned 404' }), { status:200, headers:{ 'Content-Type':'application/json' } });
+        };
+        openUrlImportModal('https://recipes.example/stew-2');
+        await runUrlImport();
+        if(calls!==2 || sent[1]!=='tok-late' || !logged.some(function(l){ return /Asked for the page again/.test(l[1]); })) throw new Error('a refusal for want of a sign-in that came a moment later was not asked again with it: '+calls+' call(s), '+JSON.stringify(sent));
+        if(logged.some(function(l){ return l[0]==='error' && /Sign in first/.test(l[2]); })) throw new Error('the refusal was still logged as the reason it failed');
         return 'waited for the sign-in ('+'tok sent); signed out: at once; gave up once: no more waiting; the failure logged with its reason';
       } finally {
         window.fbSignedInUser=real.who; window._fbAuthSettled=real.settled; window._fbAuth=real.auth; _workerSignInGaveUp=real.gave;
@@ -15950,6 +15965,63 @@ window.SELF_TESTS = [
       }
     } },
 
+  { id:'sync_new_number_free', group:'Cloud Sync', name:'A new recipe never takes another device’s number: the cloud’s next free number is taken as soon as its index is read; a save that finds another recipe at its number moves this one to a free number and saves it there (never written over, not “changed on another device”); a full read keeps a recipe made here that the cloud does not have yet (v40.13)',
+    test: async()=>{
+      // The beta's log, 22 Nov 2026 (Tony's iPhone): a link shared from ynet, imported while the phone's first read of the cloud
+      // was still going; "מלית מבשר טחון" got 445 — a number another device had used — was refused as "changed on another
+      // device", and the full read a moment later replaced the phone's list with the cloud's.
+      var st=_cloudSnapshotForTest(), real={ recipes:recipes, next:nextId, toast:window.toast, saveLocal:window.saveLocal, rv:null };
+      try{ real.rv=localStorage.getItem('recent_views'); }catch(e){}
+      var told=[];
+      try{
+        window.toast=function(m){ told.push(String(m)); };
+        window.saveLocal=function(){};
+        // the cloud's next free number
+        if(cloudNextFree({ nextId:447, ids:[1, 445, 446] })!==447 || cloudNextFree({ ids:[3, '900'] })!==901 || cloudNextFree({})!==0 || cloudNextFree({ nextId:12, ids:[3] })!==12) throw new Error('the cloud’s next free number is wrong');
+        // another recipe at its number: never written over, and not a conflict
+        var B=TEST_ID_MIN+4100;
+        var other={ id:B+1, uid:'u-other', name:'Self-test other device’s recipe', updatedAt:1795339000000 };
+        var seed={ meta:{ nextId:B+3, ids:[B+1, B+2] } }; seed['recipe_'+(B+1)]={ r:JSON.stringify(other), updatedAt:other.updatedAt, id:B+1 };
+        var db=_fakeFirestore(seed);
+        var mine=normalizeRecipe({ id:B+1, uid:'u-mine', name:'Self-test filling', ingredients:['beef'], steps:['Fry'], updatedAt:1795339094371 });
+        window._cloudRecipeBase={}; window._cloudRecipeStamp={};
+        var res=await saveRecipeDoc(mine, db);
+        if(res.skipped!=='collision' || JSON.parse(db._docs['recipe_'+(B+1)].r).uid!=='u-other') throw new Error('another recipe at its number was written over, or called a conflict: '+JSON.stringify(res));
+        window._cloudRecipeBase={}; window._cloudRecipeBase[B+1]=other.updatedAt;   // even once a full read gave this device that number's base
+        res=await saveRecipeDoc(mine, db);
+        if(res.skipped!=='collision' || JSON.parse(db._docs['recipe_'+(B+1)].r).uid!=='u-other') throw new Error('with the number’s base known, another recipe at it was written over: '+JSON.stringify(res));
+        // the same recipe (its uid), edited elsewhere: still refused as a conflict, as before
+        window._cloudRecipeBase={};
+        if((await saveRecipeDoc(normalizeRecipe(Object.assign({}, other, { name:'Edited here', updatedAt:1795339099999 })), db)).skipped!=='conflict') throw new Error('an edit made elsewhere is no longer refused as one');
+        // moved past the cloud's next free number and saved there; the other recipe untouched
+        recipes=[mine]; nextId=B+2;
+        var mv=await renumberCollidedRecipe(mine, db, other.name);
+        if(mv.from!==B+1 || mine.id<B+3 || nextId<=mine.id) throw new Error('not moved past the cloud’s next free number: '+JSON.stringify(mv)+', next '+nextId);
+        res=await saveRecipeDoc(mine, db);
+        var moved=db._docs['recipe_'+mine.id];
+        if(!res.ok || !moved || JSON.parse(moved.r).uid!=='u-mine' || JSON.parse(db._docs['recipe_'+(B+1)].r).uid!=='u-other') throw new Error('the moved recipe was not saved under its new number, or the other one was touched');
+        // a full read keeps what was made here and is not in the cloud yet
+        var cloud=[normalizeRecipe({ id:445, uid:'u-other', name:'Other', updatedAt:1795339000000 }), normalizeRecipe({ id:446, uid:'u-446', name:'Another', updatedAt:1795339000001 })];
+        var fresh=normalizeRecipe({ id:445, uid:'u-mine', name:'Filling', updatedAt:1795339094371 });
+        var synced=normalizeRecipe({ id:300, uid:'u-300', name:'Deleted on another device', updatedAt:1795000000000 });
+        var oldNoBase=normalizeRecipe({ id:301, uid:'u-301', name:'Old, its base lost', updatedAt:1790000000000 });
+        var sample=normalizeRecipe({ id:302, uid:'sample-1-0', name:'Sample', updatedAt:1795339094371 });
+        var test=normalizeRecipe({ id:TEST_ID_MIN+4105, uid:'u-t', name:'Self-test', updatedAt:1795339094371 });
+        var out=keepUnsentRecipes(cloud, [synced, fresh, oldNoBase, sample, test], { 300:1795000000000 }, 1795100000000, 447);
+        if(out.kept.length!==1 || out.kept[0].uid!=='u-mine') throw new Error('kept the wrong recipes: '+out.kept.map(function(r){ return r.name; }).join(', '));
+        var f2=out.list.filter(function(r){ return r.uid==='u-mine'; })[0], o2=out.list.filter(function(r){ return r.id===445; })[0];
+        if(!f2 || f2.id<447 || !o2 || o2.uid!=='u-other' || out.list.length!==3) throw new Error('the new recipe was not kept beside the cloud’s under a free number: '+out.list.map(function(r){ return r.id+':'+r.uid; }).join(', '));
+        if(out.renamed.length!==1 || out.renamed[0].from!==445) throw new Error('its move was not reported');
+        var none=keepUnsentRecipes(cloud, [synced], { 300:1 }, 0, 447);
+        if(none.list!==cloud || none.kept.length) throw new Error('with nothing of this device’s to keep, the cloud’s list is not used as it is');
+        // said once, in plain words
+        tellRenumbered([{ from:445, to:447, name:'Self-test filling' }]);
+        if(!told.some(function(t){ return /Self-test filling/.test(t) && /new number/.test(t) && /Both are kept/.test(t); })) throw new Error('the move is not said: '+told.join(' | '));
+      } finally {
+        _cloudRestoreForTest(st); recipes=real.recipes; nextId=real.next; window.toast=real.toast; window.saveLocal=real.saveLocal;
+        try{ if(real.rv===null) localStorage.removeItem('recent_views'); else localStorage.setItem('recent_views', real.rv); }catch(e){}
+      }
+    } },
   { id:'sync_id_collision_keeps_both', group:'Cloud Sync', name:'Two devices adding offline do not overwrite each other (v31.6)',
     test: async()=>{
       // Reported by Tony: he added a recipe on the PC and Peleg added one on his

@@ -1,7 +1,7 @@
 {
  "lang": "ru",
  "updatedAt": 1795287635238,
- "count": 3360,
+ "count": 3362,
  "strings": {
   "\"Add to Home Screen\"": "Добавить на главный экран",
   "\"One item away\" filter ({1}f.{2})": "Фильтр «Не хватает одного» ({1}ф.{2})",
@@ -2357,6 +2357,7 @@
   "{1} phrase(s) are still in English. Some are parts of the app that had not been opened yet when {2} was made — a dialog's wording only exists once it is asked. This translates only those, and adds them to the existing file. It does not redo the rest.": "{1} фраз(ы) ещё на английском. Некоторые — части приложения, которые ещё не были открыты, когда делался {2}, — текст диалога появляется только когда его вызывают. Переводятся только они, и добавляются в существующий файл. Остальное не переделывается.",
   "{1} phrases to go": "{1} фраз осталось",
   "{1} phrase{2} go back to the earlier wording{3}.{4} Everyone sees it. Every published version stays in this list, so this can be undone too.": "{1} фраз{2} возвращаются к прежней формулировке{3}.{4} Увидят все. Каждая опубликованная версия остаётся в этом списке, так что это тоже можно отменить.",
+  "{1} recipes were given new numbers — another device had used theirs. All are kept.": "Рецептов с новыми номерами: {1} — другое устройство уже использовало их номера. Все сохранены.",
   "{1} recipes would be written. A backup holds every photo inside it, so restoring it years from now depends on nothing.": "Будет записано {1} рецептов. Резервная копия содержит все фото внутри себя, поэтому восстановление через годы ни от чего не зависит.",
   "{1} recipe{2} still without a photo": "{1} рецепт{2} ещё без фото",
   "{1} recipe{2} will move into {3}, and will no longer appear on their own in the list. Favourites and cooking history come along. {4} Each one can be lifted back out later with “⤴ Make its own”.": "{1} рецепт{2} переместится в {3} и больше не будет отображаться отдельно в списке. Избранное и история готовки переносятся вместе с ним. {4} Каждый можно позже вернуть обратно с помощью «⤴ Сделать отдельным».",
@@ -2470,6 +2471,7 @@
   "“Skills & Methods” is a first-class category ({1}g.{2})": "«Навыки и методы» — самостоятельная категория ({1}г.{2})",
   "“{1}” as it was on {2}. The current version is kept in the history, so you can undo this.": "«{1}» такой, какой она была {2}. Текущая версия сохранена в истории, так что это можно отменить.",
   "“{1}” is 🔒 secret — only your own kitchen sees it. Send a copy of it all the same?": "«{1}» 🔒 секретный — его видите только вы. Всё равно отправить копию?",
+  "“{1}” was given a new number — another device had used its number for another recipe. Both are kept.": "«{1}» получил новый номер — другое устройство уже использовало его номер для другого рецепта. Оба рецепта сохранены.",
   "“{1}” was not recognised as a language": "«{1}» не распознан как язык",
   "“{1}” — a copy, with its photo, that they save to their recipes with one tap. It keeps for 4 weeks.": "«{1}» — копия с фото, которую можно сохранить в рецепты одним нажатием. Она хранится 4 недели.",
   "• The export itself must be started by hand. WhatsApp offers no scheduled or programmatic export, on any platform.{3} • {4} the delivery afterwards can be automated {5} — a Shortcut that accepts a file from the Share sheet and uploads it via the GitHub API. On a work-managed phone that blocks GitHub, the five steps above are the route, and they do not depend on it.{6} • {7} share or copy the file into the repo folder and commit it; a sync-folder script can do the commit for you.{8} • Re-exporting produces the {9} history again, so replacing the old file is the right move — that's why loading the folder replaces its entries rather than appending.": "• Сам экспорт нужно запускать вручную. WhatsApp не предлагает запланированный или программный экспорт ни на одной платформе.{3} • {4} доставку после этого можно автоматизировать {5} — Быстрая команда, которая принимает файл из меню «Поделиться» и загружает его через GitHub API. На рабочем телефоне, где GitHub заблокирован, пять шагов выше — это и есть путь, не зависящий от него.{6} • {7} поделитесь файлом или скопируйте его в папку репозитория и закоммитьте; скрипт синхронизации папки может сделать коммит за вас.{8} • Повторный экспорт снова создаёт всю историю {9}, поэтому правильнее заменить старый файл — именно поэтому загрузка папки заменяет её записи, а не добавляет к ним.",

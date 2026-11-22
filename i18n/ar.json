@@ -1,7 +1,7 @@
 {
  "lang": "ar",
  "updatedAt": 1795287635238,
- "count": 3062,
+ "count": 3064,
  "strings": {
   "\"Add to Home Screen\"": "إضافة إلى الشاشة الرئيسية",
   "\"Open Bring!\"": "فتح Bring!",
@@ -2067,6 +2067,7 @@
   "{1} phrase(s) are still in English. Some are parts of the app that had not been opened yet when {2} was made — a dialog's wording only exists once it is asked. This translates only those, and adds them to the existing file. It does not redo the rest — {3} batch(es), {4}.{5}": "{1} عبارة (عبارات) لا تزال بالإنجليزية. بعضها أجزاء من التطبيق لم تُفتح بعد عند إنشاء {2} — نص أي مربع حوار لا يظهر إلا عند استدعائه. هذا يترجم فقط تلك العبارات، ويضيفها إلى الملف الحالي. لا يعيد ترجمة الباقي — {3} دفعة (دفعات)، {4}.{5}",
   "{1} phrases to go": "{1} عبارة متبقية",
   "{1} phrase{2} go back to the earlier wording{3}.{4} Everyone sees it. Every published version stays in this list, so this can be undone too.": "{1} عبارة{2} تعود إلى الصياغة السابقة{3}.{4} يراها الجميع. تبقى كل نسخة منشورة في هذه القائمة، لذا يمكن التراجع عن هذا أيضًا.",
+  "{1} recipes were given new numbers — another device had used theirs. All are kept.": "حصلت {1} وصفات على أرقام جديدة — جهاز آخر استخدم أرقامها. تم الاحتفاظ بها كلها.",
   "{1} recipes would be written. A backup holds every photo inside it, so restoring it years from now depends on nothing.": "سيتم كتابة {1} وصفة. النسخة الاحتياطية تحتوي كل صورة بداخلها، لذا استعادتها بعد سنوات لا تعتمد على شيء آخر.",
   "{1} recipe{2} still without a photo": "{1} وصفة{2} بلا صورة حتى الآن",
   "{1} recipe{2} will move into {3}, and will no longer appear on their own in the list. Favourites and cooking history come along. {4} Each one can be lifted back out later with “⤴ Make its own”.": "سـتُدمَج {1} وصفة{2} في {3}، ولن تظهر بعد ذلك بمفردها في القائمة. المفضلة وسجل الطهي ينتقلان معها. {4} يمكن إخراج كل واحدة لاحقًا باستخدام \"⤴ اجعلها مستقلة\".",
@@ -2174,6 +2175,7 @@
   "“My Kitchen Notes — Save recipes from any site”: the job “Submit the extension to the stores” uploads each new version.": "\"My Kitchen Notes — احفظ الوصفات من أي موقع\": مهمة \"إرسال الإضافة إلى المتاجر\" ترفع كل إصدار جديد.",
   "“{1}” as it was on {2}. The current version is kept in the history, so you can undo this.": "“{1}” كما كانت في {2}. النسخة الحالية محفوظة في السجل، لذا يمكنك التراجع عن هذا.",
   "“{1}” is 🔒 secret — only your own kitchen sees it. Send a copy of it all the same?": "\"{1}\" 🔒 سرّية — مطبخك فقط من يراها. هل تريد إرسال نسخة منها رغم ذلك؟",
+  "“{1}” was given a new number — another device had used its number for another recipe. Both are kept.": "حصلت الوصفة “{1}” على رقم جديد — جهاز آخر استخدم رقمها لوصفة أخرى. تم الاحتفاظ بالاثنتين.",
   "“{1}” was not recognised as a language": "لم يتم التعرف على “{1}” كلغة",
   "“{1}” — a copy, with its photo, that they save to their recipes with one tap. It keeps for 4 weeks.": "\"{1}\" — نسخة، مع صورتها، يحفظونها في وصفاتهم بلمسة واحدة. تبقى متاحة لمدة 4 أسابيع.",
   "• The export itself must be started by hand. WhatsApp offers no scheduled or programmatic export, on any platform.{3} • {4} the delivery afterwards can be automated {5} — a Shortcut that accepts a file from the Share sheet and uploads it via the GitHub API. On a work-managed phone that blocks GitHub, the five steps above are the route, and they do not depend on it.{6} • {7} share or copy the file into the repo folder and commit it; a sync-folder script can do the commit for you.{8} • Re-exporting produces the {9} history again, so replacing the old file is the right move — that's why loading the folder replaces its entries rather than appending.": "• يجب بدء التصدير يدويًا. لا يوفر WhatsApp أي تصدير مجدول أو آلي، على أي منصة.{3} • {4} يمكن أتمتة عملية الإرسال بعد ذلك {5} — اختصار (Shortcut) يستقبل ملفًا من قائمة المشاركة ويرفعه عبر GitHub API. على هاتف عمل يحظر GitHub، الخطوات الخمس أعلاه هي الطريق، ولا تعتمد عليه.{6} • {7} شارك أو انسخ الملف إلى مجلد المستودع ونفّذ الكوميت؛ يمكن لسكربت مزامنة المجلد أن يقوم بالكوميت نيابة عنك.{8} • إعادة التصدير تنتج سجل {9} من جديد، لذا فاستبدال الملف القديم هو التصرف الصحيح — لهذا يستبدل تحميل المجلد إدخالاته بدلًا من إضافتها إليها.",

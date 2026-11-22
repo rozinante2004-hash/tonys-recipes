@@ -1,7 +1,7 @@
 {
  "lang": "ja",
  "updatedAt": 1795287635238,
- "count": 3365,
+ "count": 3367,
  "strings": {
   "\"Add to Home Screen\"": "ホーム画面に追加",
   "\"One item away\" filter ({1}f.{2})": "「あと1品」フィルター（{1}f.{2}）",
@@ -2362,6 +2362,7 @@
   "{1} phrase(s) are still in English. Some are parts of the app that had not been opened yet when {2} was made — a dialog's wording only exists once it is asked. This translates only those, and adds them to the existing file. It does not redo the rest.": "{1} 個のフレーズがまだ英語のままです。アプリの一部は{2}が作られた時点でまだ開かれておらず、ダイアログの文言は実際に表示されて初めて存在します。今回はその分だけを翻訳し、既存のファイルに追加します。残りはそのままです。",
   "{1} phrases to go": "残り{1}フレーズ",
   "{1} phrase{2} go back to the earlier wording{3}.{4} Everyone sees it. Every published version stays in this list, so this can be undone too.": "{1}個のフレーズ{2}が、以前の文言に戻ります{3}。{4} 全員に表示されます。公開済みのバージョンはすべてこの一覧に残るので、これも元に戻せます。",
+  "{1} recipes were given new numbers — another device had used theirs. All are kept.": "{1}件のレシピに新しい番号が付きました — 別の端末がその番号を使っていました。すべて保存されています。",
   "{1} recipes would be written. A backup holds every photo inside it, so restoring it years from now depends on nothing.": "{1} 件のレシピが書き込まれます。バックアップにはすべての写真が含まれているので、何年後に復元しても何にも依存しません。",
   "{1} recipe{2} still without a photo": "写真のないレシピが{1}{2}件",
   "{1} recipe{2} will move into {3}, and will no longer appear on their own in the list. Favourites and cooking history come along. {4} Each one can be lifted back out later with “⤴ Make its own”.": "{1}{2}件は{3}に移動し、単独ではリストに表示されなくなります。お気に入りと調理履歴はそのまま引き継がれます。{4} あとから「⤴ 独立させる」でいつでも元に戻せます。",
@@ -2475,6 +2476,7 @@
   "“Skills & Methods” is a first-class category ({1}g.{2})": "「Skills & Methods」は最上位カテゴリです({1}g.{2})",
   "“{1}” as it was on {2}. The current version is kept in the history, so you can undo this.": "{2}時点の「{1}」。現在のバージョンは履歴に保存されているので、元に戻すことができます。",
   "“{1}” is 🔒 secret — only your own kitchen sees it. Send a copy of it all the same?": "「{1}」は🔒非公開です — あなたのキッチンだけが見られます。それでもコピーを送りますか？",
+  "“{1}” was given a new number — another device had used its number for another recipe. Both are kept.": "「{1}」に新しい番号が付きました — 別の端末がその番号を別のレシピに使っていました。どちらも保存されています。",
   "“{1}” was not recognised as a language": "「{1}」は言語として認識されませんでした",
   "“{1}” — a copy, with its photo, that they save to their recipes with one tap. It keeps for 4 weeks.": "「{1}」— 写真付きのコピーで、相手はワンタップでレシピに保存できます。4週間有効です。",
   "• The export itself must be started by hand. WhatsApp offers no scheduled or programmatic export, on any platform.{3} • {4} the delivery afterwards can be automated {5} — a Shortcut that accepts a file from the Share sheet and uploads it via the GitHub API. On a work-managed phone that blocks GitHub, the five steps above are the route, and they do not depend on it.{6} • {7} share or copy the file into the repo folder and commit it; a sync-folder script can do the commit for you.{8} • Re-exporting produces the {9} history again, so replacing the old file is the right move — that's why loading the folder replaces its entries rather than appending.": "• エクスポート自体は手動で行う必要があります。WhatsAppにはどのプラットフォームでも、予約や自動でのエクスポート機能はありません。{3} • {4}その後の配信は自動化できます{5} — Share sheetからファイルを受け取り、GitHub API経由でアップロードするショートカットです。GitHubがブロックされている業務用スマホでは、上記5つの手順が唯一の方法であり、これに依存しません。{6} • {7}ファイルを共有またはコピーしてリポジトリのフォルダに入れ、コミットしてください。同期フォルダのスクリプトでコミットを代行することもできます。{8} • 再エクスポートすると{9}の履歴が再び生成されるため、古いファイルを置き換えるのが正解です。だからこそ、フォルダを読み込むと追記ではなく既存の項目が置き換えられます。",

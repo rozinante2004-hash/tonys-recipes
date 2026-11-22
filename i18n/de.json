@@ -1,7 +1,7 @@
 {
  "lang": "de",
  "updatedAt": 1795287635238,
- "count": 3059,
+ "count": 3061,
  "strings": {
   "\"Add to Home Screen\"": "Zum Home-Bildschirm hinzufügen",
   "\"Open Bring!\"": "Bring! öffnen",
@@ -2067,6 +2067,7 @@
   "{1} phrase(s) are still in English. Some are parts of the app that had not been opened yet when {2} was made — a dialog's wording only exists once it is asked. This translates only those, and adds them to the existing file. It does not redo the rest — {3} batch(es), {4}.{5}": "{1} Ausdrücke sind noch auf Englisch. Manche gehören zu Teilen der App, die noch nicht geöffnet waren, als {2} erstellt wurde — der Text eines Dialogs existiert erst, wenn er aufgerufen wird. Dies übersetzt nur diese und fügt sie der bestehenden Datei hinzu. Der Rest wird nicht neu gemacht — {3} Stapel, {4}.{5}",
   "{1} phrases to go": "{1} Ausdrücke übrig",
   "{1} phrase{2} go back to the earlier wording{3}.{4} Everyone sees it. Every published version stays in this list, so this can be undone too.": "{1} Phrase{2} geht zurück zum früheren Wortlaut{3}.{4} Alle sehen es. Jede veröffentlichte Version bleibt in dieser Liste, also kann auch das rückgängig gemacht werden.",
+  "{1} recipes were given new numbers — another device had used theirs. All are kept.": "{1} Rezepte haben neue Nummern bekommen — ein anderes Gerät hatte ihre verwendet. Alle bleiben erhalten.",
   "{1} recipes would be written. A backup holds every photo inside it, so restoring it years from now depends on nothing.": "{1} Rezepte würden geschrieben. Ein Backup enthält jedes Foto direkt in sich, daher hängt eine Wiederherstellung Jahre später von nichts anderem ab.",
   "{1} recipe{2} still without a photo": "{1} Rezept{2} noch ohne Foto",
   "{1} recipe{2} will move into {3}, and will no longer appear on their own in the list. Favourites and cooking history come along. {4} Each one can be lifted back out later with “⤴ Make its own”.": "{1} Rezept{2} wird in {3} verschoben und erscheint nicht mehr einzeln in der Liste. Favoriten und Kochverlauf werden übernommen. {4} Jedes kann später mit „⤴ Eigenes Rezept machen“ wieder herausgelöst werden.",
@@ -2174,6 +2175,7 @@
   "“My Kitchen Notes — Save recipes from any site”: the job “Submit the extension to the stores” uploads each new version.": "„My Kitchen Notes – Rezepte von jeder Seite speichern“: Der Job „Erweiterung in den Stores einreichen“ lädt jede neue Version hoch.",
   "“{1}” as it was on {2}. The current version is kept in the history, so you can undo this.": "„{1}“ wie es am {2} war. Die aktuelle Version bleibt in der Historie erhalten, du kannst das also rückgängig machen.",
   "“{1}” is 🔒 secret — only your own kitchen sees it. Send a copy of it all the same?": "„{1}“ ist 🔒 geheim — nur deine eigene Küche sieht es. Trotzdem eine Kopie davon senden?",
+  "“{1}” was given a new number — another device had used its number for another recipe. Both are kept.": "„{1}“ hat eine neue Nummer bekommen — ein anderes Gerät hatte ihre Nummer für ein anderes Rezept verwendet. Beide bleiben erhalten.",
   "“{1}” was not recognised as a language": "„{1}“ wurde nicht als Sprache erkannt",
   "“{1}” — a copy, with its photo, that they save to their recipes with one tap. It keeps for 4 weeks.": "„{1}“ — eine Kopie mit Foto, die sie mit einem Tipp zu ihren Rezepten speichern können. Sie bleibt 4 Wochen gültig.",
   "• The export itself must be started by hand. WhatsApp offers no scheduled or programmatic export, on any platform.{3} • {4} the delivery afterwards can be automated {5} — a Shortcut that accepts a file from the Share sheet and uploads it via the GitHub API. On a work-managed phone that blocks GitHub, the five steps above are the route, and they do not depend on it.{6} • {7} share or copy the file into the repo folder and commit it; a sync-folder script can do the commit for you.{8} • Re-exporting produces the {9} history again, so replacing the old file is the right move — that's why loading the folder replaces its entries rather than appending.": "• Der Export selbst muss von Hand gestartet werden. WhatsApp bietet auf keiner Plattform einen geplanten oder automatisierten Export.{3} • {4} die Zustellung danach lässt sich automatisieren {5} — ein Kurzbefehl, der eine Datei aus dem Teilen-Menü annimmt und sie über die GitHub-API hochlädt. Auf einem dienstlich verwalteten Handy, das GitHub blockiert, sind die fünf Schritte oben der richtige Weg, unabhängig davon.{6} • {7} die Datei per Teilen oder Kopieren in den Repo-Ordner legen und committen; ein Sync-Ordner-Skript kann den Commit für dich übernehmen.{8} • Ein erneuter Export erzeugt wieder den {9}-Verlauf, deshalb ist es richtig, die alte Datei zu ersetzen — darum ersetzt das Laden des Ordners seine Einträge, statt sie anzuhängen.",

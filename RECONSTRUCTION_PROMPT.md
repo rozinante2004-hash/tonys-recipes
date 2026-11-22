@@ -1274,7 +1274,10 @@ invitation-only (unless adding to the tester's household)."
   "Your sign-in could not be checked…", "The video's sign-in has run out…". `SIGNED_FETCH_DEFAULT` is 'require'
   since Worker v107 (it was 'accept' in v105–v106, while the apps released before v39.65 sent no token): a call with
   no token is refused — so `workerSignIn` (v39.87) waits, while `window._fbAuth` exists and `_fbAuthSettled` is not
-  yet set (a link shared into the app is fetched as the app opens), up to 10 s, once only if Firebase never answers; the Worker variable `SIGNED_FETCH=accept` serves such calls again (the way back, no code
+  yet set (a link shared into the app is fetched as the app opens), up to 20 s (v40.13 — `WORKER_SIGNIN_WAIT_STEPS` × 250 ms; it
+  was 10 s, and Tony's iPhone signed in after 10.9 s), once only if Firebase never answers; and a page fetch refused for
+  want of a sign-in (`signIn`, not `unconfirmed`) is asked again once when someone is signed in by then or within 5 s
+  (`workerSignInArrived`; logged "Asked for the page again, with the sign-in that came a moment later"); the Worker variable `SIGNED_FETCH=accept` serves such calls again (the way back, no code
   change). `health` → `signedFetch: { version, required }`.
 - **The app speaks of itself in the masculine singular (v40.10).** Tony: "when the app is referring to itself, like when
   it reads a recipe, it should use the single male form: קורא את המתכון and not the plural one." A status of the app
@@ -2628,6 +2631,22 @@ transaction that compares the cloud document's `updatedAt` against the base we l
 (`cloudWriteAllowed`) and **refuses** if another device wrote in between, telling the user
 plainly. Deliberately not a field‑by‑field merge: a wrong silent merge is worse than an
 honest refusal. `nextId` is merged upward, never lowered, or two devices mint the same id.
+
+**A new recipe never takes another device's number (v40.13 — the beta's log of 22 Nov 2026).** A phone last synced two
+days before opened with a shared link; the import made a recipe while the first cloud read (46 s) was still going, so it
+got the phone's next number, 445 — which another device had used since. The save was refused as "changed on another
+device" and the full read a moment later replaced the list with the cloud's, the new recipe with it. Three changes:
+(1) `loadFromFirestore` takes `cloudNextFree(meta)` (the index's `nextId`, or one past the highest id it lists) the moment
+the index is read, not after every document; (2) `saveRecipeDoc` returns `{skipped:'collision', other}` when the cloud
+document at its number holds ANOTHER recipe (a different `uid` in its `r` JSON — never written over, whatever the base),
+and `saveToFirestore` gives it a free number (`renumberCollidedRecipe`: past the index's next free number, this device's
+`nextId` and every local id; its photo goes with it in memory; `viewId`/`editingId`/`recent_views` follow) and saves it
+again, three tries at most, then says so once (`tellRenumbered`: "“{1}” was given a new number — another device had used
+its number for another recipe. Both are kept."); the same recipe (same uid) edited elsewhere is still a conflict;
+(3) the normal full read keeps this device's unsent recipes (`keepUnsentRecipes`: no base before the read, changed since
+the cloud was last seen, not a sample or a test fixture, its uid not in the cloud) beside the cloud's through
+`mergeRecipeLists`, logs each "Kept …", says any move, and sends them (the offline mark, a save 1.5 s later). Self Test
+`sync_new_number_free`.
 
 **A refused write must come with a way out (v35.3).** Refusing is only half the job: before
 v35.3 the recipe stayed diverged with no route back, because nothing re‑read a single document

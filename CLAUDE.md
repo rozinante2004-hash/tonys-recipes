@@ -44,7 +44,9 @@ where.
   network Self Tests send the sign-in; v39.93 at 19:55 on 4b688fc: each farm animal in its own recorded voice,
   `docs/farm-voices.md`; Worker v108 since 20 Nov 01:59 (from Test); the jobs are listed near the top of `docs/history/2026-11.md`).
   **On Test, not released:** v40.12 — 📋 Run sheet: a recipe's name opens it on top of the run sheet (closing returns to
-  it); the tick box still marks the step done. The test copy
+  it); the tick box still marks the step done. v40.13 — a new recipe never takes another device's number (the cloud's
+  next free number taken at once; a clash at save moves it to a free number; the full read keeps unsent new recipes);
+  a shared link waits 20 s for the sign-in and asks again once. The test copy
   (https://tonys-recipes-test.pages.dev, its own database and rules) follows `test`.
 - **The beta has had testers since Sunday 25 Oct 2026** and is **by invitation only**: the owner invites with
   ⚙️ → 👑 → ✉️ Invite testers (the congratulatory wording of v39.60); a tester's share button asks the owner for an

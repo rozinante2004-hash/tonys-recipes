@@ -1,7 +1,7 @@
 {
  "lang": "zh",
  "updatedAt": 1795287635238,
- "count": 3064,
+ "count": 3066,
  "strings": {
   "\"Add to Home Screen\"": "添加到主屏幕",
   "\"Open Bring!\"": "打开 Bring!",
@@ -2067,6 +2067,7 @@
   "{1} phrase(s) are still in English. Some are parts of the app that had not been opened yet when {2} was made — a dialog's wording only exists once it is asked. This translates only those, and adds them to the existing file. It does not redo the rest — {3} batch(es), {4}.{5}": "还有 {1} 个短语仍是英文。其中一些是应用中尚未打开过的部分——对话框的文字只有在被触发时才会存在，是制作 {2} 时还没打开的部分。这里只翻译这些，并将它们添加到现有文件中。不会重新处理其余部分——{3} 批，{4}。{5}",
   "{1} phrases to go": "还剩 {1} 个短语",
   "{1} phrase{2} go back to the earlier wording{3}.{4} Everyone sees it. Every published version stays in this list, so this can be undone too.": "{1} 短语{2}恢复为之前的内容{3}。{4}所有人都能看到。每个已发布的版本都会保留在这个列表中，所以这个操作也可以撤销。",
+  "{1} recipes were given new numbers — another device had used theirs. All are kept.": "{1}份食谱已换了新编号——另一台设备已用了它们的编号。全部都已保留。",
   "{1} recipes would be written. A backup holds every photo inside it, so restoring it years from now depends on nothing.": "将写入 {1} 个食谱。备份中包含所有照片，因此多年后恢复时不依赖任何外部内容。",
   "{1} recipe{2} still without a photo": "还有 {1} 个食谱{2}没有照片",
   "{1} recipe{2} will move into {3}, and will no longer appear on their own in the list. Favourites and cooking history come along. {4} Each one can be lifted back out later with “⤴ Make its own”.": "{1} 个食谱{2}将移入 {3}，不再单独出现在列表中。收藏和烹饪记录会一并带过去。{4} 之后可以用“⤴ 独立出来”把它们逐一取出。",
@@ -2174,6 +2175,7 @@
   "“My Kitchen Notes — Save recipes from any site”: the job “Submit the extension to the stores” uploads each new version.": "“My Kitchen Notes — Save recipes from any site”：“提交扩展到应用商店”任务会上传每个新版本。",
   "“{1}” as it was on {2}. The current version is kept in the history, so you can undo this.": "把“{1}”恢复为{2}时的样子。当前版本已保存在历史记录中，你可以撤销此操作。",
   "“{1}” is 🔒 secret — only your own kitchen sees it. Send a copy of it all the same?": "“{1}”是 🔒 私密的 — 只有你自己的厨房能看到。还是要发一份副本吗？",
+  "“{1}” was given a new number — another device had used its number for another recipe. Both are kept.": "“{1}”已换了新编号——另一台设备已把它的编号用于另一份食谱。两份都已保留。",
   "“{1}” was not recognised as a language": "“{1}”未被识别为一种语言",
   "“{1}” — a copy, with its photo, that they save to their recipes with one tap. It keeps for 4 weeks.": "“{1}” — 一份带照片的副本，对方一点就能存进自己的食谱。4 周内有效。",
   "• The export itself must be started by hand. WhatsApp offers no scheduled or programmatic export, on any platform.{3} • {4} the delivery afterwards can be automated {5} — a Shortcut that accepts a file from the Share sheet and uploads it via the GitHub API. On a work-managed phone that blocks GitHub, the five steps above are the route, and they do not depend on it.{6} • {7} share or copy the file into the repo folder and commit it; a sync-folder script can do the commit for you.{8} • Re-exporting produces the {9} history again, so replacing the old file is the right move — that's why loading the folder replaces its entries rather than appending.": "• 导出本身必须手动开始。WhatsApp 在任何平台上都不提供定时或程序化导出。{3} • {4} 之后的传输可以自动化{5}——一个接受来自分享面板文件并通过 GitHub API 上传的快捷指令。在阻止 GitHub 的工作管理手机上，上面五个步骤就是解决方案，且不依赖于它。{6} • {7} 将文件分享或复制到仓库文件夹并提交；同步文件夹脚本可以帮你完成提交。{8} • 重新导出会再次生成{9}记录，所以替换旧文件才是正确做法——这就是为什么加载文件夹会替换其条目而不是追加。",

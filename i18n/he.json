@@ -1,7 +1,7 @@
 {
  "lang": "he",
  "updatedAt": 1795287635238,
- "count": 3488,
+ "count": 3490,
  "strings": {
   "\"Add to Home Screen\"": "הוספה למסך הבית",
   "\"One item away\" filter ({1}f.{2})": "פילטר \"פריט אחד חסר\" ({1}f.{2})",
@@ -2476,6 +2476,7 @@
   "{1} phrase(s) are still in English. Some are parts of the app that had not been opened yet when {2} was made — a dialog's wording only exists once it is asked. This translates only those, and adds them to the existing file. It does not redo the rest.": "{1} ביטויים עדיין באנגלית. חלקם שייכים לחלקים באפליקציה שלא נפתחו עדיין כאשר {2} נוצר — הניסוח של תיבת דו-שיח קיים רק לאחר שהיא מוצגת. כאן מתורגמים רק אלה, והם מתווספים לקובץ הקיים. שאר הקובץ נשאר ללא שינוי.",
   "{1} phrases to go": "{1} ביטויים נותרו",
   "{1} phrase{2} go back to the earlier wording{3}.{4} Everyone sees it. Every published version stays in this list, so this can be undone too.": "{1} ביטוי{2} חוזרים לניסוח הקודם{3}.{4} כולם רואים את זה. כל גרסה שפורסמה נשארת ברשימה הזו, כך שגם את זה אפשר לבטל.",
+  "{1} recipes were given new numbers — another device had used theirs. All are kept.": "{1} מתכונים קיבלו מספרים חדשים — מכשיר אחר כבר השתמש במספרים שלהם. כולם נשמרו.",
   "{1} recipes would be written. A backup holds every photo inside it, so restoring it years from now depends on nothing.": "מתכוני {1} היו נכתבים. גיבוי מכיל כל תמונה בתוכו, כך ששחזור בעוד שנים לא תלוי בכלום.",
   "{1} recipe{2} still without a photo": "{1} מתכון{2} עדיין בלי תמונה",
   "{1} recipe{2} will move into {3}, and will no longer appear on their own in the list. Favourites and cooking history come along. {4} Each one can be lifted back out later with “⤴ Make its own”.": "{1} מתכון{2} יעברו אל {3} ולא יופיעו יותר בנפרד ברשימה. המועדפים והיסטוריית הבישול יעברו איתם. {4} כל אחד מהם אפשר להוציא בחזרה מאוחר יותר באמצעות \"⤴ הפרדה כעצמאי\".",
@@ -2588,6 +2589,7 @@
   "“Skills & Methods” is a first-class category ({1}g.{2})": "\"Skills & Methods\" היא קטגוריית-על ({1}g.{2})",
   "“{1}” as it was on {2}. The current version is kept in the history, so you can undo this.": "“{1}” כפי שהיה ב-{2}. הגרסה הנוכחית נשמרת בהיסטוריה, כך שאפשר לבטל את זה.",
   "“{1}” is 🔒 secret — only your own kitchen sees it. Send a copy of it all the same?": "\"{1}\" הוא 🔒 סודי — רק המטבח שלכם רואה אותו. לשלוח עותק בכל זאת?",
+  "“{1}” was given a new number — another device had used its number for another recipe. Both are kept.": "המתכון “{1}” קיבל מספר חדש — מכשיר אחר כבר השתמש במספר שלו למתכון אחר. שניהם נשמרו.",
   "“{1}” was not recognised as a language": "“{1}” לא זוהתה כשפה",
   "“{1}” — a copy, with its photo, that they save to their recipes with one tap. It keeps for 4 weeks.": "\"{1}\" — עותק, עם התמונה שלו, שהם שומרים למתכונים שלהם בלחיצה אחת. הוא נשמר למשך 4 שבועות.",
   "• A translation batch failed for he (×11){1}• The en translation could not be shared{2}• 538 string(s) came back untranslated for he": "• קבוצת תרגום נכשלה עבור he (×11){1}• לא ניתן היה לשתף את תרגום ה-en{2}• 538 מחרוזות חזרו לא מתורגמות עבור he",
