@@ -17,7 +17,11 @@ where.
 **Live now**
 - The family's copy (`main`, https://rozinante2004-hash.github.io/tonys-recipes/ — it forwards to the community app)
   and the community app (`beta`, https://mykitchennotes.community, Firebase project my-kitchen-notes-beta) run
-  **v40.11 + Worker v108** (released 21 Nov 2026, 20:59 Israel time, on 392b6e4 — v40.09: 🗓️ a multi-day recipe planned
+  **v40.13 + Worker v108** (released 22 Nov 2026, 14:04 Israel time, on 5768217 — v40.12: 📋 Run sheet: a dish's name
+  opens its recipe on top of the sheet (closing returns to it; the tick box still marks the step done); v40.13: a new
+  recipe never takes another device's number (the cloud's next free number taken at once; a clash at save moves it to a
+  free number, "“…” was given a new number"; the full read keeps unsent new recipes), a shared link waits 20 s for the
+  sign-in and asks again once — from the beta's sync log of 22 Nov). Before it: **v40.11** (released 21 Nov 2026, 20:59 Israel time, on 392b6e4 — v40.09: 🗓️ a multi-day recipe planned
   only up to its first step that waits for another day (🌙, "Then, on another day: … — not planned here."); v40.10: the
   Hebrew of the app speaking of itself in the masculine singular (⏳ קורא את המתכון…; rule 7a; the 13 lines written to
   the shared Hebrew at 19:32); v40.11: the waiting folded (≥ 20 min when nobody has work → a striped band "≈ 1:55"),
@@ -43,10 +47,7 @@ where.
   own `i18n/_farm_<lang>`; v39.94 at 21:40 on db945ab: the
   network Self Tests send the sign-in; v39.93 at 19:55 on 4b688fc: each farm animal in its own recorded voice,
   `docs/farm-voices.md`; Worker v108 since 20 Nov 01:59 (from Test); the jobs are listed near the top of `docs/history/2026-11.md`).
-  **On Test, not released:** v40.12 — 📋 Run sheet: a recipe's name opens it on top of the run sheet (closing returns to
-  it); the tick box still marks the step done. v40.13 — a new recipe never takes another device's number (the cloud's
-  next free number taken at once; a clash at save moves it to a free number; the full read keeps unsent new recipes);
-  a shared link waits 20 s for the sign-in and asks again once. The test copy
+  **On Test, not released:** nothing beyond v40.13. The test copy
   (https://tonys-recipes-test.pages.dev, its own database and rules) follows `test`.
 - **The beta has had testers since Sunday 25 Oct 2026** and is **by invitation only**: the owner invites with
   ⚙️ → 👑 → ✉️ Invite testers (the congratulatory wording of v39.60); a tester's share button asks the owner for an
