@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v40.14 -->
+<!-- Tony's Recipes Collection v40.15 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -6810,7 +6810,8 @@ async function pushForgetDevice() {
     var reg = await navigator.serviceWorker.getRegistration(), sub = reg && await reg.pushManager.getSubscription();
     if (!sub) return false;
     var ep = sub.endpoint;
-    try { await sub.unsubscribe(); } catch(e) {}
+    // v40.15 — the timers ring through the same address: it is kept while they may (the server forgets it for the chats)
+    if (!(typeof bellState === 'function' && bellState() === 'on')) { try { await sub.unsubscribe(); } catch(e) {} _bellSub = null; }
     await fetch(WORKER_ENDPOINT, { method: 'POST', headers: workerHeaders(), signal: AbortSignal.timeout(10000), body: workerBody({ action: 'push-forget', endpoint: ep }) });
     return true;
   } catch(e) { return false; }
@@ -6886,6 +6887,200 @@ window.pushTurnOn = pushTurnOn; window.pushTurnOff = pushTurnOff; window.pushSta
 window.pushRowsRefresh = pushRowsRefresh; window.pushRefresh = pushRefresh; window.pushForgetDevice = pushForgetDevice;
 window.pushFamilyBody = pushFamilyBody; window.pushKitchenBody = pushKitchenBody; window.pushAnnounce = pushAnnounce;
 window.pushOpenChat = pushOpenChat; window.pushWorker = pushWorker; window.pushAfterLive = pushAfterLive;
+// ─── v40.15 — A TIMER RINGS WHEN THE PHONE IS LOCKED OR IN ANOTHER APP (Worker v109) ─────────────────────────────────
+// Tony, 25 Nov 2026: "Yes. Please send a notification when the time is up on an iPhone and whatever is needed for
+// Android, so it makes a sound while the phone is locked or while in another app." A web app cannot make a sound while
+// the phone is locked or another app is in front: its page is asleep. So a timer started here is also handed to the
+// Worker (push-timer: this device's push address and keys, a key, how long, two lines), which sends it back as a
+// notification at that second, with the phone's own sound — three times, 30 s apart, unless the app lets it go first:
+// the timer stopped, paused or reset, its recipe closed, or the app opened (or the notification tapped) while it rings.
+// The chats' notifications, with a switch of its own (⚙️ → ♿ Accessibility → ⏰), so either can be on without the
+// other — and turning the chats off no longer drops the address the timers use. The first timer on a device that can,
+// asks once (Allow / Not now) — a device that already allows notifications is not asked; an iPhone's browser is told,
+// once, that only the app on the Home Screen can. On Android the notification rings like any other app's; the sound is
+// the phone's (Settings → Apps → the app or Chrome → Notifications). A timer still rings in the app while it is open.
+var BELL_KEY = 'mkn_bell', BELL_HINT_KEY = 'mkn_bell_hint', BELL_KEYS_KEY = 'mkn_bell_keys';
+var _bellSub = null;
+function bellServerOn() { return !!(_workerHealth && _workerHealth.timers === true); }
+// 'on' · 'off' (Not now, or switched off) · 'ask' (not asked yet) · 'blocked' · 'install' (an iPhone's browser) · 'unable'
+function bellState(dev) {
+  dev = dev || { can: pushCan(), perm: typeof Notification !== 'undefined' ? Notification.permission : '', ios: deviceKind() === 'ios',
+                 installed: appInstalled(), v: pushLs(BELL_KEY) };
+  if (!dev.can) return dev.ios && !dev.installed ? 'install' : 'unable';
+  if (dev.perm === 'denied') return 'blocked';
+  if (dev.v === '0') return 'off';
+  if (dev.perm === 'granted') return 'on';      // notifications already allowed here (the chats): no need to ask
+  return 'ask';
+}
+// The timers handed to the server and not let go yet: { key: when it ends } (kept, so a reopened app can let them go)
+function bellKeys(v) {
+  if (v !== undefined) { pushLs(BELL_KEYS_KEY, JSON.stringify(v)); return v; }
+  try { var o = JSON.parse(pushLs(BELL_KEYS_KEY) || '{}'); return (o && typeof o === 'object') ? o : {}; } catch(e) { return {}; }
+}
+// This device's push address — the chats' if it has one, made with the server's key if not (or if that key changed).
+async function bellSubscription() {
+  if (_bellSub) return _bellSub;
+  var k = await pushWorker({ action: 'push-key' });
+  if (!k.ok || !k.d.key) return null;
+  var reg = await navigator.serviceWorker.ready, sub = await reg.pushManager.getSubscription(), want = pushKeyBytes(k.d.key);
+  if (sub && sub.options && sub.options.applicationServerKey) {
+    var have = new Uint8Array(sub.options.applicationServerKey), same = have.length === want.length;
+    for (var i = 0; same && i < have.length; i++) same = have[i] === want[i];
+    if (!same) { try { await sub.unsubscribe(); } catch(e) {} sub = null; }
+  }
+  if (!sub) {
+    sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: want });
+    if (pushLs(PUSH_ON_KEY) === '1') pushSignUp().catch(function(){});   // the chats follow the new address
+  }
+  _bellSub = sub;
+  return sub;
+}
+// Hand a timer to the server: it rings `ms` from now unless let go. False when it cannot (then it rings only in the app).
+async function bellSet(key, ms, title, body) {
+  if (window._selfTestRunning && !window._bellUnderTest) return false;
+  if (bellState() !== 'on' || !bellServerOn() || !window._fbUser || !(ms >= 1000)) return false;
+  try {
+    var sub = await bellSubscription();
+    if (!sub) return false;
+    var r = await pushWorker({ action: 'push-timer', key: key, inMs: Math.round(ms), title: String(title || '').slice(0, 80),
+      body: String(body || '').slice(0, 200), sub: sub.toJSON() });
+    if (!r.ok) { syncLog('error', 'A timer will ring only while the app is open', { status: r.status, reason: String(r.d.error || '').slice(0, 140) }); return false; }
+    var ks = bellKeys(); ks[key] = Date.now() + ms; bellKeys(ks);
+    return true;
+  } catch(e) {
+    syncLog('error', 'A timer will ring only while the app is open', String((e && ((e.name || '') + ': ' + e.message)) || e).slice(0, 140));
+    return false;
+  }
+}
+// Let timers go on the server (stopped, paused, reset, closed — or heard here). `all`: every timer of this device.
+function bellCancel(keys, all) {
+  var ks = bellKeys();
+  keys = [].concat(keys || []).filter(function(k){ return k && ks[k]; });
+  if (!keys.length && !all) return false;
+  keys.forEach(function(k){ delete ks[k]; });
+  bellKeys(all ? {} : ks);
+  if (window._selfTestRunning && !window._bellUnderTest) return false;
+  (async function(){
+    var sub = _bellSub;
+    if (!sub && pushCan()) { var reg = await navigator.serviceWorker.getRegistration(); sub = reg && await reg.pushManager.getSubscription(); }
+    if (!sub) return;
+    await fetch(WORKER_ENDPOINT, { method: 'POST', headers: workerHeaders(), keepalive: true, signal: AbortSignal.timeout(10000),
+      body: workerBody(all ? { action: 'push-timer-cancel', endpoint: sub.endpoint, all: true } : { action: 'push-timer-cancel', endpoint: sub.endpoint, keys: keys }) });
+  })().catch(function(e){ syncLog('error', 'A timer could not be let go on the server', String((e && e.message) || e).slice(0, 120)); });
+  return true;
+}
+// Back in the app: the timers that have ended are being heard here — their remaining rings are let go.
+function bellQuietDone() {
+  var ks = bellKeys(), now = Date.now();
+  var done = Object.keys(ks).filter(function(k){ return ks[k] <= now + 1000; });
+  return done.length ? bellCancel(done) : false;
+}
+// Rung here, in the app: the chosen sound three times and the phone's vibration; on the screen, the server's rings go.
+function timerRingHere(bellKey, msg) {
+  try { if (navigator.vibrate) navigator.vibrate([300, 150, 300, 150, 600]); } catch(e) {}
+  if (document.visibilityState === 'visible') {
+    [0, 1700, 3400].forEach(function(ms){ setTimeout(function(){ chimePlay('request', chimeChoice()); }, ms); });
+    if (bellKey) bellCancel(bellKey);
+  }
+  if (msg) toast(msg, 9000);
+  return true;
+}
+// Asked as the first timer starts (once a device), or the iPhone's browser told what it takes (once).
+function bellOffer() {
+  if (window._selfTestRunning && !window._bellUnderTest) return false;
+  var st = bellState();
+  if (st === 'install') {
+    if (!pushLs(BELL_HINT_KEY) && bellServerOn()) {
+      pushLs(BELL_HINT_KEY, '1');
+      toast('⏰ On an iPhone or iPad, a timer rings when the phone is locked only in the app on the Home Screen: Share → Add to Home Screen, then open the app from there.', 12000);
+      return true;
+    }
+    return false;
+  }
+  if (st !== 'ask' || !bellServerOn() || !window._fbUser) return false;
+  var bar = document.getElementById('bellOffer');
+  if (!bar) return false;
+  bar.hidden = false;
+  return true;
+}
+function bellHideOffer() { var bar = document.getElementById('bellOffer'); if (bar) bar.hidden = true; }
+// Allow — on the tap itself (an iPhone asks only on a tap): the permission, the address, and the timers already running.
+function bellAllow() {
+  if (!pushCan()) { bellHideOffer(); return Promise.resolve(false); }
+  var ask = Notification.permission === 'granted' ? Promise.resolve('granted') : Notification.requestPermission();
+  bellHideOffer();
+  return Promise.resolve(ask).then(async function(perm){
+    if (perm !== 'granted') {
+      pushLs(BELL_KEY, '0');
+      var why = 'Timers will ring only while the app is open.';
+      if (perm === 'denied') why = PUSH_BLOCKED;
+      toast(why, 8000);
+      return false;
+    }
+    pushLs(BELL_KEY, '1');
+    var sub = null;
+    try { sub = await bellSubscription(); } catch(e) { sub = null; }
+    if (!sub) { toast('Timers will ring only while the app is open.', 7000); return false; }
+    syncLog('save', 'Timers ring when the phone is locked: on, on this device', {});
+    toast('\u{1F514} Done — timers will ring on this device even when it is locked.', 7000);
+    bellResendRunning();
+    return true;
+  }).catch(function(e){
+    syncLog('error', 'Timers could not be set to ring when the phone is locked', String((e && e.message) || e).slice(0, 140));
+    return false;
+  }).then(function(v){ bellRefreshSettings(); return v; });
+}
+function bellNotNow() { pushLs(BELL_KEY, '0'); bellHideOffer(); bellRefreshSettings(); return true; }
+function bellOff() {
+  bellCancel([], true);
+  pushLs(BELL_KEY, '0');
+  syncLog('save', 'Timers ring when the phone is locked: off, on this device', {});
+  toast('Timers will ring only while the app is open.', 5000);
+  bellRefreshSettings();
+  return true;
+}
+function bellSwitch(on) { return on ? bellAllow() : Promise.resolve(bellOff()); }
+// Switched on while timers run: they are handed over now.
+function bellResendRunning() {
+  Object.keys(_cookTimers).forEach(function(k){
+    var t = _cookTimers[k], ms = t.ends - Date.now();
+    if (ms > 1000) bellSet(t.bell, ms, i18nPhrase('⏰ Time is up'), t.lines || '');
+  });
+  if (typeof ktmBellSet === 'function') ktmBellSet();
+}
+// ⚙️ → ♿ Accessibility → ⏰ Timers ring when the phone is locked (shown where the server can)
+function bellRefreshSettings() {
+  var it = document.getElementById('bellToggleItem'), box = document.getElementById('bellToggle');
+  if (!it || !box) return false;
+  var st = bellState();
+  it.style.display = bellServerOn() && st !== 'unable' ? 'flex' : 'none';
+  box.checked = st === 'on';
+  box.disabled = st === 'blocked' || st === 'install';
+  return true;
+}
+document.addEventListener('visibilitychange', function(){
+  if (document.visibilityState !== 'visible') return;
+  bellQuietDone();
+  if (typeof ktmCheck === 'function') ktmCheck();
+});
+// A tapped timer notification: the app comes forward (or opens with ?timer=…): its rings are let go, the hourglass shown.
+(function(){
+  var t = '';
+  try { t = new URLSearchParams(location.search).get('timer') || ''; } catch(e) { t = ''; }
+  if (/^[A-Za-z0-9_.:-]{1,80}$/.test(t)) {
+    var rest = location.search.replace(/[?&]timer=[^&]*/, '').replace(/^&/, '?');
+    try { history.replaceState(history.state, '', location.pathname + rest + location.hash); } catch(e) {}
+    setTimeout(function(){ bellQuietDone(); if (t === 'hourglass' && typeof openKitchenTimer === 'function') openKitchenTimer(); }, 600);
+  }
+  if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', function(e){
+    var d = e.data || {};
+    if (d.type === 'mkn-timer') { bellQuietDone(); if (d.timer === 'hourglass' && typeof openKitchenTimer === 'function') openKitchenTimer(); }
+  });
+})();
+window.bellSet = bellSet; window.bellCancel = bellCancel; window.bellState = bellState; window.bellOffer = bellOffer;
+window.bellAllow = bellAllow; window.bellNotNow = bellNotNow; window.bellOff = bellOff; window.bellSwitch = bellSwitch;
+window.bellQuietDone = bellQuietDone; window.bellRefreshSettings = bellRefreshSettings; window.timerRingHere = timerRingHere;
+window.bellKeys = bellKeys; window.bellServerOn = bellServerOn;
 async function linkReqAct(i, what) {
   var r = _linkState.pending[i];
   if (!r || !householdCanManage()) return false;
@@ -11426,7 +11621,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v40.14';
+var APP_VERSION = 'v40.15';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -14298,6 +14493,65 @@ li.line-sub-indent { padding-inline-start: 22px; }
 }
 .calc-close:hover { color: white; }
 .calc-body { padding: 16px 20px 20px; }
+/* ── v40.15 — ⏳ the hourglass timer, 🧮 the calculator, and the "ring when locked?" bar ───────────────────────────── */
+.ktm-modal, .kpad-modal { max-width: 380px; }
+.ktm-body { display: grid; justify-items: center; gap: 8px; padding: 14px 16px 18px; max-height: calc(min(90vh, 100%) - 60px); overflow-y: auto; overscroll-behavior: contain; }
+.ktm-glass { display: block; width: 118px; height: auto; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; cursor: pointer; overflow: visible; }
+.ktm-glass:focus-visible { outline: 3px solid var(--gold); outline-offset: 4px; border-radius: 8px; }
+.ktm-wood { fill: #9A643F; }
+.ktm-cap { fill: #9A643F; stroke: #5E3B25; stroke-width: 1.5; }
+.ktm-glassline { fill: rgba(255,255,255,.6); stroke: rgba(92,61,46,.42); stroke-width: 2.5; stroke-linejoin: round; }
+.ktm-sand { fill: var(--gold); }
+.ktm-stream { stroke: #B88E33; stroke-width: 2.4; stroke-dasharray: 2 3; }
+.ktm-shine { fill: none; stroke: rgba(255,255,255,.9); stroke-width: 4; stroke-linecap: round; opacity: .6; }
+:root[data-theme="dark"] .ktm-glassline { fill: rgba(255,255,255,.06); stroke: rgba(242,237,230,.4); }
+:root[data-theme="dark"] .ktm-shine { stroke: rgba(255,255,255,.28); }
+:root[data-theme="dark"] .ktm-wood, :root[data-theme="dark"] .ktm-cap { fill: #8A5A38; }
+.ktm-read { font-size: 30px; font-weight: 700; line-height: 1.1; color: var(--heading); font-variant-numeric: tabular-nums; text-align: center; }
+.ktm-read.ktm-ready { color: var(--terracotta); }
+.ktm-hint { margin: 0; min-height: 2.8em; font-size: 13.5px; color: var(--muted); text-align: center; max-width: 30ch; }
+.ktm-hint.ktm-nudge { animation: ktmNudge .45s ease; }
+@keyframes ktmNudge { 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+.ktm-wheels { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; width: 100%; max-width: 290px; transition: opacity .2s; }
+.ktm-wheels.ktm-locked { opacity: .45; pointer-events: none; }
+.ktm-wcol { display: grid; gap: 4px; justify-items: center; min-width: 0; }
+.ktm-wbox { position: relative; width: 100%; height: 132px; border-radius: 16px; background: var(--bg); border: 1px solid var(--border); overflow: hidden; }
+.ktm-wbox::before { content: ""; position: absolute; left: 6px; right: 6px; top: 44px; height: 44px; border-radius: 10px; background: rgba(221,179,84,.22); pointer-events: none; }
+.ktm-wheel { position: absolute; inset: 0; overflow-y: scroll; scroll-snap-type: y mandatory; scrollbar-width: none; overscroll-behavior: contain;
+  -webkit-mask-image: linear-gradient(transparent, #000 30%, #000 70%, transparent); mask-image: linear-gradient(transparent, #000 30%, #000 70%, transparent); }
+.ktm-wheel::-webkit-scrollbar { display: none; }
+.ktm-wheel:focus-visible { outline: 3px solid var(--gold); outline-offset: -3px; border-radius: 16px; }
+.ktm-n, .ktm-pad { height: 44px; }
+.ktm-n { display: flex; align-items: center; justify-content: center; scroll-snap-align: center; font-size: 26px; font-weight: 700; color: var(--heading); font-variant-numeric: tabular-nums; }
+.ktm-wlab { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+.ktm-row { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 4px; }
+.ktm-btn { font: inherit; font-size: 15px; font-weight: 600; border-radius: 999px; padding: 8px 20px; min-height: 42px; cursor: pointer; border: 1px solid var(--border); background: var(--bg); color: var(--ink); touch-action: manipulation; }
+.ktm-btn.ktm-main { background: var(--terracotta-fill); border-color: var(--terracotta-fill); color: #fff; }
+.ktm-pill { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ktm-pill.ktm-pill-ready { background: var(--terracotta-fill) !important; color: #fff !important; animation: ktmPulse 1.2s ease-in-out infinite; }
+@keyframes ktmPulse { 50% { opacity: .65; } }
+@media (prefers-reduced-motion: reduce) { .ktm-pill.ktm-pill-ready, .ktm-hint.ktm-nudge { animation: none; } }
+.kpad-body { padding: 14px; display: grid; gap: 12px; outline: none; }
+.kpad-screen { background: var(--bg); border: 1px solid var(--border); border-radius: 14px; padding: 12px 14px 10px; text-align: right; min-height: 104px; display: grid; align-content: end; gap: 2px; min-width: 0; direction: ltr; }
+.kpad-expr { font-size: 17px; color: var(--muted); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; min-height: 1.5em; }
+.kpad-res { font: inherit; font-size: 38px; font-weight: 700; color: var(--heading); background: none; border: 0; padding: 0; text-align: right; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; cursor: copy; line-height: 1.15; }
+.kpad-res.kpad-preview { color: var(--muted); }
+.kpad-keys { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; direction: ltr; }
+.kpad-keys button { font: inherit; font-size: 22px; font-weight: 600; height: 54px; border-radius: 14px; border: 1px solid var(--border); background: var(--card-bg); color: var(--ink); cursor: pointer; touch-action: manipulation; }
+.kpad-keys .kpad-fn { background: var(--bg); color: var(--heading); font-size: 19px; }
+.kpad-keys .kpad-op { color: var(--terracotta); background: var(--recent-bg); font-size: 27px; }
+.kpad-keys .kpad-eq { background: var(--terracotta-fill); color: #fff; border-color: var(--terracotta-fill); }
+.kpad-keys button:active { transform: translateY(1px); }
+.bell-offer { position: fixed; left: 12px; right: 12px; bottom: calc(12px + var(--bottom-safe, 0px)); z-index: 3000; max-width: 460px; margin: 0 auto;
+  background: var(--card-bg); color: var(--ink); border: 1px solid var(--border); border-radius: 16px; box-shadow: 0 10px 34px rgba(0,0,0,.28);
+  padding: 12px 14px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.bell-offer[hidden] { display: none; }
+.bell-offer-text { flex: 1 1 220px; min-width: 0; display: grid; gap: 2px; font-size: 14px; line-height: 1.4; }
+.bell-offer-text b { color: var(--heading); font-size: 15px; }
+.bell-offer-text span { color: var(--muted); }
+.bell-offer-btns { display: flex; gap: 8px; flex: none; }
+.bell-offer-btns button { font: inherit; font-size: 14px; font-weight: 600; border-radius: 999px; padding: 8px 16px; min-height: 40px; cursor: pointer; border: 1px solid var(--border); background: var(--bg); color: var(--ink); }
+.bell-offer-btns .bell-yes { background: var(--terracotta-fill); border-color: var(--terracotta-fill); color: #fff; }
 .calc-category-row {
   display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px;
 }
@@ -15198,7 +15452,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v40.14</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v40.15</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -15286,7 +15540,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v40.14</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v40.15</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -15342,6 +15596,8 @@ body.banner-shown .header {
               <button class="drop-item" title="Light, dark, or following the device — on this device only." id="themeModeItem" onclick="cycleTheme()">🌗 Theme: Auto</button>
               <label class="drop-item" id="chimeToggleItem" title="A sound when a message or a request to link kitchens arrives. Untick to mute it. On this device." style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" id="chimeToggle" checked onchange="chimeSetOn(this.checked)" style="width:18px;height:18px;flex:none;accent-color:var(--terracotta);"> 🔔 Sound for messages and requests</label>
               <button class="drop-item" id="chimeChooseItem" title="Choose the sound, and hear each one." onclick="closeDrop('settingsDrop');openChimeSettings()">🎵 The sound: Spoon on a wine glass</button>
+              <!-- v40.15 — Tony: "Please send a notification when the time is up … so it makes a sound while the phone is locked or while in another app." -->
+              <label class="drop-item" id="bellToggleItem" title="When the time is up, a timer rings on this device even when it is locked or you are in another app — through a notification. On this device." style="display:none;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" id="bellToggle" onchange="bellSwitch(this.checked)" style="width:18px;height:18px;flex:none;accent-color:var(--terracotta);"> ⏰ Timers ring when the phone is locked</label>
             </div>
           </div>
           <div class="set-group" data-group="household">
@@ -15439,6 +15695,7 @@ body.banner-shown .header {
                background:rgba(255,255,255,0.18);color:rgba(255,255,255,0.85);font-size:13px;">✕</button>
     </div>
     <div class="header-actions">
+      <button type="button" class="btn btn-secondary ktm-pill" id="ktmPill" style="display:none;" onclick="openKitchenTimer()" title="The hourglass timer">⏳ <span id="ktmPillTime"></span></button>
       <div class="drop-group">
         <button class="btn btn-secondary" onclick="toggleDrop('moreDrop')">··· More</button>
         <div class="drop-menu" id="moreDrop">
@@ -15458,10 +15715,13 @@ body.banner-shown .header {
             </div>
           </div>
           <div class="more-sec set-group" data-sec="tools" data-group="tools">
-            <button type="button" class="drop-item set-head" aria-expanded="false" title="The Work Planner and the measurement converter" onclick="moreGroup('tools')">🧰 Tools</button>
+            <button type="button" class="drop-item set-head" aria-expanded="false" title="The Work Planner, the timer, the calculator and the measurement converter" onclick="moreGroup('tools')">🧰 Tools</button>
             <div class="set-body">
             <!-- v40.05 — Tony: "a Work Planner, located under More…" -->
             <button class="drop-item" id="planItem" onclick="closeDrop('moreDrop');openPlanner()">🗓️ Work Planner</button>
+            <!-- v40.15 — Tony: "I would like to add 2 tools under the Tools menu: A simple calculator and a timer." -->
+            <button class="drop-item" id="ktmItem" onclick="closeDrop('moreDrop');openKitchenTimer()">⏳ Timer</button>
+            <button class="drop-item" id="kpadItem" onclick="closeDrop('moreDrop');openCalcPad()">🧮 Calculator</button>
             <button class="drop-item" onclick="closeDrop('moreDrop');openCalcModal()">⚖️ Measurement converter</button>
             </div>
           </div>
@@ -16163,6 +16423,66 @@ body.banner-shown .header {
      made visible. Its Excel/Word buttons are now on the live #selectBar above.) -->
 
 
+<!-- v40.15 — ⏳ THE HOURGLASS TIMER (Tony: "I like the hourglass timer … count days as well (up to 31)"; the controls:
+     "Please use Option A" — three wheels). Script: ktm* (openKitchenTimer). -->
+<div class="calc-overlay" id="ktmOverlay" onclick="bgClose(event,'ktmOverlay')">
+  <div class="calc-modal ktm-modal" role="dialog" aria-labelledby="ktmTitle">
+    <div class="calc-header">
+      <div class="calc-header-title" id="ktmTitle">⏳ Timer</div>
+      <button class="calc-close" onclick="closeM('ktmOverlay')" aria-label="Close">✕</button>
+    </div>
+    <div class="ktm-body">
+      <svg class="ktm-glass" id="ktmGlass" viewBox="0 0 260 390" role="button" tabindex="0" aria-label="The hourglass: flip it to start, tap to lay it down"></svg>
+      <div class="ktm-read" id="ktmRead">0:00</div>
+      <p class="ktm-hint" id="ktmHint"></p>
+      <div class="ktm-wheels" id="ktmWheels">
+        <div class="ktm-wcol"><div class="ktm-wbox"><div class="ktm-wheel" id="ktmWd" tabindex="0" role="spinbutton" aria-valuemin="0" aria-valuemax="31" aria-valuenow="0" aria-label="Days"></div></div><span class="ktm-wlab">days</span></div>
+        <div class="ktm-wcol"><div class="ktm-wbox"><div class="ktm-wheel" id="ktmWh" tabindex="0" role="spinbutton" aria-valuemin="0" aria-valuemax="23" aria-valuenow="0" aria-label="Hours"></div></div><span class="ktm-wlab">hours</span></div>
+        <div class="ktm-wcol"><div class="ktm-wbox"><div class="ktm-wheel" id="ktmWm" tabindex="0" role="spinbutton" aria-valuemin="0" aria-valuemax="59" aria-valuenow="0" aria-label="Minutes"></div></div><span class="ktm-wlab">min</span></div>
+      </div>
+      <div class="ktm-row">
+        <button type="button" class="ktm-btn ktm-main" id="ktmFlip" onclick="ktmFlipBtn();ktmDraw()">Flip</button>
+        <button type="button" class="ktm-btn" id="ktmReset" hidden onclick="ktmReset();ktmDraw()">↺ Reset</button>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- v40.15 — 🧮 THE CALCULATOR (Tony: "A simple calculator"). Script: kpad* (openCalcPad). -->
+<div class="calc-overlay" id="kpadOverlay" onclick="bgClose(event,'kpadOverlay')">
+  <div class="calc-modal kpad-modal" role="dialog" aria-labelledby="kpadTitle">
+    <div class="calc-header">
+      <div class="calc-header-title" id="kpadTitle">🧮 Calculator</div>
+      <button class="calc-close" onclick="closeM('kpadOverlay')" aria-label="Close">✕</button>
+    </div>
+    <div class="kpad-body" id="kpadBox" tabindex="-1" onkeydown="kpadKey(event)">
+      <div class="kpad-screen">
+        <div class="kpad-expr" id="kpadExpr" aria-live="polite"></div>
+        <button type="button" class="kpad-res" id="kpadRes" title="Tap to copy" onclick="kpadCopy()">0</button>
+      </div>
+      <div class="kpad-keys">
+        <button type="button" class="kpad-fn" onclick="kpadPress('C')">C</button>
+        <button type="button" class="kpad-fn" onclick="kpadPress('back')" aria-label="Delete">⌫</button>
+        <button type="button" class="kpad-fn" onclick="kpadPress('%')" aria-label="Percent">%</button>
+        <button type="button" class="kpad-op" onclick="kpadPress('/')" aria-label="Divide">÷</button>
+        <button type="button" onclick="kpadPress('7')">7</button><button type="button" onclick="kpadPress('8')">8</button><button type="button" onclick="kpadPress('9')">9</button>
+        <button type="button" class="kpad-op" onclick="kpadPress('*')" aria-label="Times">×</button>
+        <button type="button" onclick="kpadPress('4')">4</button><button type="button" onclick="kpadPress('5')">5</button><button type="button" onclick="kpadPress('6')">6</button>
+        <button type="button" class="kpad-op" onclick="kpadPress('-')" aria-label="Minus">−</button>
+        <button type="button" onclick="kpadPress('1')">1</button><button type="button" onclick="kpadPress('2')">2</button><button type="button" onclick="kpadPress('3')">3</button>
+        <button type="button" class="kpad-op" onclick="kpadPress('+')" aria-label="Plus">+</button>
+        <button type="button" class="kpad-fn" onclick="kpadPress('neg')" aria-label="Plus or minus">±</button>
+        <button type="button" onclick="kpadPress('0')">0</button>
+        <button type="button" onclick="kpadPress('.')" aria-label="Decimal point">.</button>
+        <button type="button" class="kpad-eq" onclick="kpadPress('=')" aria-label="Equals">=</button>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- v40.15 — asked once, as the first timer starts: may a timer ring when the phone is locked? (bellOffer) -->
+<div class="bell-offer" id="bellOffer" hidden role="dialog" aria-labelledby="bellOfferTitle">
+  <div class="bell-offer-text"><b id="bellOfferTitle">🔔 Ring when the phone is locked?</b><span>The timer can ring on this phone even when it is locked or you are in another app.</span></div>
+  <div class="bell-offer-btns"><button type="button" class="bell-yes" onclick="bellAllow()">Allow</button><button type="button" class="bell-no" onclick="bellNotNow()">Not now</button></div>
+</div>
 <!-- MEASUREMENT CALCULATOR -->
 <div class="calc-overlay" id="calcOverlay" onclick="bgClose(event,'calcOverlay')">
   <div class="calc-modal">
@@ -17199,9 +17519,21 @@ function fmtClock(s) {
   var h = Math.floor(s/3600), m = Math.floor((s%3600)/60), sec = s%60;
   return (h ? h + ':' + String(m).padStart(2,'0') : String(m)) + ':' + String(sec).padStart(2,'0');
 }
+// v40.15 — counted by the clock (a phone that slept a while is not behind), and handed to the server to ring if the
+// phone is locked by then (bellSet); stopped, or its recipe closed or redrawn: let go there too.
 function clearCookTimers() {
-  Object.keys(_cookTimers).forEach(function(k){ clearInterval(_cookTimers[k].handle); });
+  var bells = [];
+  Object.keys(_cookTimers).forEach(function(k){ clearInterval(_cookTimers[k].handle); if (_cookTimers[k].bell) bells.push(_cookTimers[k].bell); });
   _cookTimers = {};
+  if (bells.length && typeof bellCancel === 'function') bellCancel(bells);
+}
+// The notification's line: the recipe's name and the step (without its ⏱ buttons)
+function cookTimerLines(btn) {
+  var t = document.getElementById('viewTitle'), name = t ? String(t.textContent || '').trim() : '', step = '';
+  var li = btn && btn.closest ? btn.closest('li') : null, sp = li && li.querySelector('.step-text');
+  if (sp) { var c = sp.cloneNode(true); c.querySelectorAll('.cook-timer-btn').forEach(function(b){ b.remove(); }); step = String(c.textContent || '').replace(/\s+/g, ' ').trim(); }
+  if (step.length > 120) step = step.slice(0, 119) + '…';
+  return (name ? name + ' · ' : '') + step;
 }
 function startCookTimer(key, secs) {
   if (typeof insightCount === 'function') insightCount('timer', 'timer:' + key);
@@ -17210,25 +17542,31 @@ function startCookTimer(key, secs) {
   var t = _cookTimers[key];
   if (t) { // tapping a running timer cancels it
     clearInterval(t.handle); delete _cookTimers[key];
+    if (typeof bellCancel === 'function') bellCancel(t.bell);
     btn.classList.remove('running','done');
     btn.textContent = '⏱ ' + fmtClock(secs);
     return;
   }
-  var left = secs;
-  btn.classList.add('running');
-  btn.textContent = '⏱ ' + fmtClock(left) + ' — tap to cancel';
-  _cookTimers[key] = { handle: setInterval(function() {
-    left--;
+  var ends = Date.now() + secs * 1000, bell = 'step:' + String(typeof viewId !== 'undefined' && viewId != null ? viewId : 'r') + ':' + key;
+  var lines = cookTimerLines(btn);
+  btn.classList.remove('done'); btn.classList.add('running');
+  var tick = function() {
+    var me = _cookTimers[key];
+    if (!me) return;
+    var left = Math.max(0, Math.ceil((me.ends - Date.now()) / 1000));
     if (left <= 0) {
-      clearInterval(_cookTimers[key].handle); delete _cookTimers[key];
+      clearInterval(me.handle); delete _cookTimers[key];
       btn.classList.remove('running'); btn.classList.add('done');
       btn.textContent = '⏰ Time! (' + fmtClock(secs) + ')';
-      try { if (navigator.vibrate) navigator.vibrate([200,100,200,100,400]); } catch(e) {}
-      toast('⏰ Timer finished: ' + fmtClock(secs));
+      timerRingHere(bell, '⏰ Timer finished: ' + fmtClock(secs));
       return;
     }
     btn.textContent = '⏱ ' + fmtClock(left) + ' — tap to cancel';
-  }, 1000), secs: secs };
+  };
+  _cookTimers[key] = { handle: setInterval(tick, 1000), secs: secs, ends: ends, bell: bell, lines: lines };
+  tick();
+  bellSet(bell, secs * 1000, i18nPhrase('\u23F0 Time is up'), lines);
+  bellOffer();
 }
 window.startCookTimer=startCookTimer; window.findStepTimers=findStepTimers;
 
@@ -19255,6 +19593,16 @@ var I18N_EXTRA = [
    'Mark as done', 'Done \u2014 tap if it is not', '\u2713 Done', 'All done.',
    'Added to your kitchen: {1}. Change it with \u{1F373} Your kitchen if it is not right.', 'There is no room for more equipment of your own: {1} was left out.',
    'There are no recipes in the list yet. Use \u270F\uFE0F Fill in manually.'],
+  ['\u23F3 Timer', '\u{1F9EE} Calculator', 'The Work Planner, the timer, the calculator and the measurement converter',   // v40.15 — the hourglass, the calculator, the bell
+   'days', 'hours', 'min', 'Flip', 'Stand it up', '↺ Reset', 'Ready', 'Roll the wheels to the time you need.', 'Flip it to start: tap it, or swipe up or down.',
+   'Tap it to lay it down and pause.', 'Lying down: the sand has stopped. Tap to stand it up.', 'The sand has run out. Flip it for another {1}.',
+   '{1} min', 'Days', 'Hours', 'Minutes', 'Divide', 'Times', 'Minus', 'Plus', 'Plus or minus', 'Equals', 'Decimal point', 'Percent', 'C',
+   'The hourglass: flip it to start, tap to lay it down', '\u23F0 Time is up', '\u23F3 The hourglass: {1}', 'The hourglass timer', 'Cannot divide by 0', 'Too big', 'Copied: {1}', 'Tap to copy',
+   '\u{1F514} Ring when the phone is locked?', 'The timer can ring on this phone even when it is locked or you are in another app.', 'Allow', 'Not now',
+   '\u23F0 Timers ring when the phone is locked',
+   'When the time is up, a timer rings on this device even when it is locked or you are in another app — through a notification. On this device.',
+   'Timers will ring only while the app is open.', '\u{1F514} Done — timers will ring on this device even when it is locked.',
+   '\u23F0 On an iPhone or iPad, a timer rings when the phone is locked only in the app on the Home Screen: Share → Add to Home Screen, then open the app from there.'],
   ['\u{1F514} Notify me of new messages when the app is closed', '\u{1F514} Notifications are on for this device.', '\u{1F515} Turn off',   // v40.02 — chat notifications
    '\u{1F515} Notifications are blocked for this app — allow them in the phone’s (or this browser’s) settings, then come back here.',
    '\u{1F514} On an iPhone or iPad, notifications come only to the app on the Home Screen: Share → Add to Home Screen, then open the app from there.',
@@ -27573,6 +27921,7 @@ function settingsItemShown(el, stop) {
 function settingsGroupsRefresh(collapse) {
   try { farmRefreshSettings(); } catch(e) {}
   try { chimeRefreshSettings(); } catch(e) {}
+  try { bellRefreshSettings(); } catch(e) {}   // v40.15
   try { accessRefreshSettings(); } catch(e) {}
   var groups = document.querySelectorAll('#settingsDrop .set-group');
   Array.prototype.forEach.call(groups, function(g) {
@@ -27804,6 +28153,7 @@ function closeM(id){
   document.getElementById(id).classList.remove('open');
   releaseFocus(id);   // 5c.1b — hand focus back to whatever opened THIS one (v36.65)
   if (id === 'playerOverlay') playerStop();   // v39.72 — a closed player plays nothing
+  if (id === 'ktmOverlay' && typeof ktmClosed === 'function') ktmClosed();   // v40.15 — the hourglass is drawn only while open
   if(id==='viewOverlay') { releaseWakeLock(); clearCookTimers(); stopVoice(); _ticks = {}; }
   if (id === 'viewOverlay' && typeof recentRowRefresh === 'function') setTimeout(function(){ try { recentRowRefresh(); } catch(e) {} }, 0);   // v39.80 — Recent: the one just closed first
   if ((id === 'viewOverlay' || id === 'linkedViewOverlay') && !_rlMoving && typeof rlBackForget === 'function') rlBackForget();   // v39.53 — ✕ ends the trail
@@ -37249,7 +37599,7 @@ var HELP_SYSTEM_PROMPT = [
   (APP_CONFIG.environment === 'live' ? "Tony's Recipes Collection" : (APP_CONFIG.brandName || 'My Kitchen Notes')) + " is a single-page web app hosted at " + APP_CONFIG.siteOrigin + APP_CONFIG.sitePath,
   "It stores recipes in Firebase Firestore (cloud) and localStorage (offline). All AI features route through a Cloudflare Worker.",
   "THE HEADER'S MENUS: ··· More, 📁 Files & backup (📁 Files on a narrow phone) and + Add Recipe; ⚙️ is Settings.",
-  "- ··· MORE shows five headings: 💡 Ideas (Explore, Suggest, What can I make), 🧰 Tools (the measurement converter), 🏡 Kitchens and people (connecting with another household, the chats, recipes sent to you and by you, sharing the app), 📱 WhatsApp, and 🧹 Tidy up (auto-tag diet types, auto-fetch missing photos). Tap a heading to open what is under it, right in the menu (the headings below move down); tap it again, or another heading, to close it — as in ⚙️ Settings. A heading with nothing under it on your copy is not shown.",
+  "- ··· MORE shows five headings: 💡 Ideas (Explore, Suggest, What can I make), 🧰 Tools (🗓️ the Work Planner, ⏳ the timer, 🧮 the calculator, ⚖️ the measurement converter), 🏡 Kitchens and people (connecting with another household, the chats, recipes sent to you and by you, sharing the app), 📱 WhatsApp, and 🧹 Tidy up (auto-tag diet types, auto-fetch missing photos). Tap a heading to open what is under it, right in the menu (the headings below move down); tap it again, or another heading, to close it — as in ⚙️ Settings. A heading with nothing under it on your copy is not shown.",
   "",
   "=== BROWSING & FILTERING ===",
   "- Recipes are shown in List or Grid view (toggle top-right)",
@@ -37363,6 +37713,13 @@ var HELP_SYSTEM_PROMPT = [
   "- Once installed: opens in its own window without browser chrome",
   "- A NEW VERSION is noticed while the app stays open too (v39.31): when you come back to it, when you pull the list down, and every half hour — a notice at the bottom says so, with 🔄 Update now; Later keeps it quiet for two hours. Closing and reopening the app is no longer needed",
   "- PULLING THE LIST DOWN (at the top of the page) checks for a new version of the app at once — signed in or not — and, signed in, for changes in the cloud; it says what it found: '🆕 vX is ready — tap Update now below', or '✅ Up to date: the recipes, and the app (vX)' (v39.32)",
+  "",
+  "=== ⏳ TIMER (v40.15) ===",
+  "- ··· More → 🧰 Tools → ⏳ Timer — an hourglass, from a minute up to 31 days. SET IT with the three wheels under it: days (0–31), hours (0–23), minutes (0–59) — roll each up or down. START: flip the hourglass — tap it, swipe up or down on it, or tap Flip; the sand runs down and the time left shows under it (a day or more in days: '3 days 4:12:05'). PAUSE: tap it — it lies on its side and the sand stops; tap again (or Stand it up) and it stands up and runs on. Flipped while it runs it gives back the time that has already run, like a real hourglass. When the sand has run out it rings (the sound chosen in ⚙️ → ♿ Accessibility, three times) and the phone vibrates; flip it for another round of the same time. While it runs, lies down or rings, the wheels are locked (↺ Reset lays the sand back down and frees them), and ⏳ with the time left stands first among the buttons at the top of the screen — tap it to open the timer. It is kept on this device: closing the window or the app does not stop it. [GO:timer] leads there.",
+  "- ⏰ A TIMER RINGS WHEN THE PHONE IS LOCKED (v40.15): the hourglass and the ⏱ step timers in recipes ring on this device even when it is locked or you are in another app — a notification with the phone's own sound, three times 30 seconds apart, unless you open the app (or tap the notification) first. The first time a timer starts the app asks 'Ring when the phone is locked?' (Allow / Not now); a device that already allows notifications (the chats') is not asked. To turn it on or off later: ⚙️ → ♿ Accessibility → ⏰ Timers ring when the phone is locked [GO:timer-bell]. On an iPhone or iPad it works only in the app on the Home Screen (Share → Add to Home Screen, iOS 16.4 or later); on Android the sound is the phone's notification sound for the app (Settings → Apps → the app, or Chrome → Notifications). Pausing, resetting, or closing a recipe with a running step timer stops it there too. Signed out, a timer rings only while the app is open.",
+  "",
+  "=== 🧮 CALCULATOR (v40.15) ===",
+  "- ··· More → 🧰 Tools → 🧮 Calculator — a plain calculator, as on the phone: the sum being typed on top and the answer under it (grey '= …' while typing, firm after =). × and ÷ come before + and − (250 × 3 ÷ 4 = 187.5). % after + or − is a percent of what comes before (200 + 15% = 230); alone it is a hundredth (40% = 0.4). ± changes the sign, ⌫ deletes the last key, C clears. Tap the answer to copy it. On a computer the keyboard types too (Enter is =, Esc clears, Backspace deletes). [GO:calculator] leads there.",
   "",
   "=== MEASUREMENT CONVERTER ===",
   "- ··· More → 🧰 Tools → ⚖️ Measurement converter",
@@ -37886,6 +38243,9 @@ var HELP_PLACES = [
   ['what-can-i-make', '··· More → 💡 Ideas → 🥫 What can I make with what I have?', 'openWhatCanIMake', 'open'],
   ['work-planner', '··· More → 🧰 Tools → 🗓️ Work Planner', 'openPlanner', 'open'],
   ['converter', '··· More → 🧰 Tools → ⚖️ Measurement converter', 'openCalcModal', 'open'],
+  ['timer', '··· More → 🧰 Tools → ⏳ Timer', 'openKitchenTimer', 'open'],   // v40.15
+  ['calculator', '··· More → 🧰 Tools → 🧮 Calculator', 'openCalcPad', 'open'],
+  ['timer-bell', '⚙️ → ♿ Accessibility → ⏰ Timers ring when the phone is locked', '#bellToggleItem', 'show'],
   ['connect-household', '··· More → 🏡 Kitchens and people → 🤝 Connect with another household', 'openConnectHousehold', 'open'],
   ['family-chat', '··· More → 🏡 Kitchens and people → 👪 Chat with family members', 'openFamilyChat', 'open'],
   ['kitchen-chats', '··· More → 🏡 Kitchens and people → 💬 Chats with linked kitchens', 'openKitchenChats', 'open'],
@@ -43021,6 +43381,397 @@ function openCalcModal() {
   document.getElementById('calcTo').value = '';
   document.getElementById('calcOverlay').classList.add('open');
 }
+
+// ─── v40.15 — ⏳ THE HOURGLASS TIMER (··· More → 🧰 Tools → ⏳ Timer) ───────────────────────────────────────────────
+// Tony, 25 Nov 2026, of five working designs: "I like the hourglass timer. However, I would like it to be able to count
+// days as well (up to 31). It's timing controls should be different." — and of five ways to set it: "Please use Option
+// A": three wheels, days (0–31), hours (0–23), minutes (0–59). Flip it to start (tap it, swipe up or down on it, or
+// Flip); tap it and it lies on its side and the sand stops (pause); tap again and it stands up. Flipped while it runs it
+// gives back the time that has run, like a real one. When the sand has run out it rings here (the chosen sound three
+// times, the phone vibrates) — and with the phone locked or another app in front the Worker rings it (bellSet). Kept on
+// this device (KTM_KEY: when it ends, or what was left when it was laid down), so closing the window or the app loses
+// nothing; while it runs, waits or rings, ⏳ and the time left stand first among the header's buttons. While it runs or
+// lies down the wheels are locked: ↺ Reset lays the sand back down and frees them.
+var KTM_KEY = 'mkn_hourglass', KTM_MAX = 31 * 864e5, KTM_BELL = 'hourglass';
+var _ktm = null, _ktmRaf = 0, _ktmTimer = 0, _ktmView = null, _ktmWheelsBuilt = false;
+function ktmLoad() {
+  if (_ktm) return _ktm;
+  var s = null;
+  try { s = JSON.parse(localStorage.getItem(KTM_KEY) || 'null'); } catch(e) { s = null; }
+  s = (s && typeof s === 'object') ? s : {};
+  _ktm = { chosen: Math.max(0, Math.min(KTM_MAX, s.chosen === undefined ? 10 * 60000 : +s.chosen || 0)),
+           state: ['off', 'run', 'pause', 'done'].indexOf(s.state) >= 0 ? s.state : 'off',
+           total: +s.total || 0, ends: +s.ends || 0, left: +s.left || 0 };
+  return _ktm;
+}
+function ktmSave() {
+  try { localStorage.setItem(KTM_KEY, JSON.stringify({ chosen: _ktm.chosen, state: _ktm.state, total: _ktm.total, ends: _ktm.ends, left: _ktm.left })); } catch(e) {}
+}
+function ktmLeft() { var k = ktmLoad(); return k.state === 'run' ? Math.max(0, k.ends - Date.now()) : k.state === 'pause' ? k.left : k.state === 'done' ? 0 : k.chosen; }
+function ktmFrac() { var k = ktmLoad(); return (k.state === 'run' || k.state === 'pause') && k.total ? Math.max(0, Math.min(1, ktmLeft() / k.total)) : 0; }
+function ktmDays(d) { return d === 1 ? i18nPhrase('one day') : i18nPhrase('{1} days').replace('{1}', d); }
+function ktmFmt(ms) {
+  var s = Math.max(0, Math.ceil(ms / 1000)), d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60), x = s % 60;
+  var p = function(n){ return String(n).padStart(2, '0'); }, t = (h || d) ? h + ':' + p(m) + ':' + p(x) : m + ':' + p(x);
+  return d ? ktmDays(d) + ' ' + t : t;
+}
+function ktmWords(ms) {
+  var t = Math.round(ms / 60000), d = Math.floor(t / 1440), h = Math.floor(t % 1440 / 60), m = t % 60, out = [];
+  if (d) out.push(ktmDays(d));
+  if (h) out.push(i18nPhrase('{1} h').replace('{1}', h));
+  if (m || !out.length) out.push(i18nPhrase('{1} min').replace('{1}', m));
+  return out.join(' ');
+}
+function ktmBellSet() {
+  var k = ktmLoad();
+  if (k.state !== 'run') return false;
+  bellSet(KTM_BELL, k.ends - Date.now(), i18nPhrase('⏰ Time is up'), i18nPhrase('⏳ The hourglass: {1}').replace('{1}', ktmWords(k.total)));
+  return true;
+}
+// The one place the sand runs out: here (each second while it runs), when the app comes back, and as it opens.
+function ktmCheck() {
+  var k = ktmLoad();
+  if (k.state === 'run' && Date.now() >= k.ends) {
+    k.state = 'done'; k.left = 0; ktmSave();
+    if (_ktmView) _ktmView.wobble();
+    timerRingHere(KTM_BELL, i18nPhrase('⏰ Time is up') + ' — ' + i18nPhrase('⏳ The hourglass: {1}').replace('{1}', ktmWords(k.total)));
+  }
+  ktmPill();
+  ktmTickOn();
+  return k.state;
+}
+function ktmTickOn() {
+  var k = ktmLoad(), want = k.state === 'run' || k.state === 'pause' || k.state === 'done';
+  if (want && !_ktmTimer) _ktmTimer = setInterval(ktmCheck, 1000);
+  if (!want && _ktmTimer) { clearInterval(_ktmTimer); _ktmTimer = 0; }
+}
+// ⏳ first among the header's buttons while it runs, lies down or rings — a tap opens it
+function ktmPill() {
+  var b = document.getElementById('ktmPill'), t = document.getElementById('ktmPillTime');
+  if (!b || !t) return false;
+  var k = ktmLoad(), on = k.state === 'run' || k.state === 'pause' || k.state === 'done';
+  b.style.display = on ? '' : 'none';
+  if (on) {
+    var s = k.state === 'done' ? i18nPhrase('Ready') : ktmFmt(ktmLeft());
+    if (k.state === 'pause') s = '⏸ ' + s;
+    if (t.textContent !== s) t.textContent = s;
+    b.classList.toggle('ktm-pill-ready', k.state === 'done');
+  }
+  return on;
+}
+function ktmFlip() {
+  var k = ktmLoad(), now = Date.now(), pre = ktmFrac(), newLeft;
+  if (_ktmView && _ktmView.busy()) return false;
+  if (k.state === 'off' || k.state === 'done') { if (!k.chosen) { ktmHint(true); return false; } k.total = k.chosen; newLeft = k.chosen; }
+  else newLeft = k.total - ktmLeft();
+  k.state = 'run'; k.ends = now + Math.max(1000, newLeft); k.left = 0;
+  ktmSave(); ktmTickOn(); ktmPill(); ktmWheelsLock();
+  bellCancel(KTM_BELL); ktmBellSet(); bellOffer();
+  if (_ktmView) _ktmView.flip(pre);
+  return true;
+}
+function ktmTap() {
+  var k = ktmLoad();
+  if (_ktmView && _ktmView.busy()) return false;
+  if (k.state === 'run') {
+    k.left = ktmLeft(); k.state = 'pause'; ktmSave(); bellCancel(KTM_BELL);
+    if (_ktmView) _ktmView.tilt(true);
+  } else if (k.state === 'pause') {
+    k.ends = Date.now() + k.left; k.left = 0; k.state = 'run'; ktmSave(); ktmBellSet();
+    if (_ktmView) _ktmView.tilt(false);
+  } else return ktmFlip();
+  ktmPill(); ktmTickOn();
+  return true;
+}
+function ktmFlipBtn() { return ktmLoad().state === 'pause' ? ktmTap() : ktmFlip(); }
+function ktmReset() {
+  var k = ktmLoad();
+  k.state = 'off'; k.total = 0; k.ends = 0; k.left = 0; ktmSave();
+  bellCancel(KTM_BELL); ktmTickOn(); ktmPill(); ktmWheelsLock();
+  if (_ktmView) _ktmView.reset();
+  return true;
+}
+function ktmSetChosen(ms) {
+  var k = ktmLoad();
+  if (k.state === 'run' || k.state === 'pause') return false;
+  k.chosen = Math.max(0, Math.min(KTM_MAX, Math.round(ms)));
+  if (k.state === 'done') k.state = 'off';
+  ktmSave(); ktmPill();
+  return true;
+}
+// ── the wheels (scroll-snap: the browser's own feel, on every phone) ──
+var KTM_WHEELS = [['ktmWd', 31, 864e5], ['ktmWh', 23, 36e5], ['ktmWm', 59, 6e4]];
+function ktmWheelsBuild() {
+  if (_ktmWheelsBuilt) return;
+  KTM_WHEELS.forEach(function(w){
+    var el = document.getElementById(w[0]);
+    if (!el) return;
+    var html = '<div class="ktm-pad"></div>';
+    for (var i = 0; i <= w[1]; i++) html += '<div class="ktm-n">' + i + '</div>';
+    el.innerHTML = html + '<div class="ktm-pad"></div>';
+    el.addEventListener('scroll', function(){ ktmWheelAria(el, w); ktmWheelRead(el, w); }, { passive: true });
+    el.addEventListener('keydown', function(e){
+      if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+      e.preventDefault();
+      var h = ktmItemH(el), v = Math.max(0, Math.min(w[1], Math.round(el.scrollTop / h) + (e.key === 'ArrowDown' ? 1 : -1)));
+      el.scrollTop = v * h; ktmWheelAria(el, w); ktmWheelRead(el, w);
+    });
+  });
+  _ktmWheelsBuilt = true;
+}
+function ktmItemH(el) { var n = el.querySelector('.ktm-n'); return (n && n.offsetHeight) || 44; }
+// A wheel is a spin button to a screen reader: its number now, 0 to its top (the arrow keys move it)
+function ktmWheelAria(el, w) {
+  var v = String(Math.max(0, Math.min(w[1], Math.round(el.scrollTop / ktmItemH(el)))));
+  if (el.getAttribute('aria-valuenow') !== v) el.setAttribute('aria-valuenow', v);
+}
+function ktmWheelVals() {
+  return KTM_WHEELS.map(function(w){ var el = document.getElementById(w[0]); return el ? Math.max(0, Math.min(w[1], Math.round(el.scrollTop / ktmItemH(el)))) : 0; });
+}
+function ktmWheelRead(el, w) {
+  var k = ktmLoad();
+  if (k.state === 'run' || k.state === 'pause' || el._ktmSetting) return;
+  var v = ktmWheelVals(), ms = v[0] * 864e5 + v[1] * 36e5 + v[2] * 6e4;
+  if (ms === k.chosen) return;
+  if (ms > KTM_MAX) { ms = KTM_MAX; ktmWheelsShow(ms); }   // 31 days and no more: hours and minutes back to 0
+  ktmSetChosen(ms);
+  ktmDraw();
+}
+function ktmWheelsShow(ms) {
+  var t = Math.round(ms / 6e4), v = [Math.floor(t / 1440), Math.floor(t % 1440 / 60), t % 60];
+  KTM_WHEELS.forEach(function(w, i){
+    var el = document.getElementById(w[0]);
+    if (!el) return;
+    el._ktmSetting = true; el.scrollTop = v[i] * ktmItemH(el); el.setAttribute('aria-valuenow', String(v[i]));
+    setTimeout(function(){ el._ktmSetting = false; }, 120);
+  });
+}
+function ktmWheelsLock() {
+  var box = document.getElementById('ktmWheels'), k = ktmLoad(), locked = k.state === 'run' || k.state === 'pause';
+  if (box) box.classList.toggle('ktm-locked', locked);
+  KTM_WHEELS.forEach(function(w){ var el = document.getElementById(w[0]); if (el) el.setAttribute('aria-disabled', String(locked)); });
+  var r = document.getElementById('ktmReset'); if (r) r.hidden = k.state === 'off';
+  if (!locked && box) ktmWheelsShow(k.chosen);
+}
+function ktmHint(nudge) {
+  var el = document.getElementById('ktmHint'); if (!el) return;
+  var k = ktmLoad(), s;
+  if (k.state === 'done') s = i18nPhrase('The sand has run out. Flip it for another {1}.').replace('{1}', ktmWords(k.total || k.chosen));
+  else if (k.state === 'pause') s = i18nPhrase('Lying down: the sand has stopped. Tap to stand it up.');
+  else if (k.state === 'run') s = i18nPhrase('Tap it to lay it down and pause.');
+  else if (!k.chosen) s = i18nPhrase('Roll the wheels to the time you need.');
+  else s = i18nPhrase('Flip it to start: tap it, or swipe up or down.');
+  if (el.textContent !== s) el.textContent = s;
+  if (nudge) { el.classList.remove('ktm-nudge'); void el.offsetWidth; el.classList.add('ktm-nudge'); }
+}
+function ktmDraw() {
+  var k = ktmLoad(), r = document.getElementById('ktmRead'), f = document.getElementById('ktmFlip');
+  if (r) { var s = k.state === 'done' ? i18nPhrase('Ready') : ktmFmt(ktmLeft()); if (r.textContent !== s) r.textContent = s; r.classList.toggle('ktm-ready', k.state === 'done'); }
+  if (f) { var fl = k.state === 'pause' ? i18nPhrase('Stand it up') : i18nPhrase('Flip'); if (f.textContent !== fl) f.textContent = fl; }
+  ktmHint(false);
+}
+// ── the glass: drawn once, animated only while the window is open ──
+function ktmGlass(svg) {
+  var NS = 'http://www.w3.org/2000/svg', CX = 130, NY = 195;
+  var el = function(tag, a, parent){ var e = document.createElementNS(NS, tag); for (var k in a) e.setAttribute(k, a[k]); if (parent) parent.appendChild(e); return e; };
+  var hw = function(d){ if (d <= 0) return 5; if (d <= 118) return 5 + 55 * Math.pow(Math.sin(d / 118 * Math.PI / 2), 1.25); var u = (d - 118) / 22; return 60 - 10 * u * u; };
+  var A = [0]; for (var d = 1; d <= 140; d++) A[d] = A[d - 1] + 2 * Math.max(0, hw(d - .5) - 2);
+  var AF = A[112], AT = A[140], Bc = []; for (var h = 0; h <= 140; h++) Bc[h] = AT - A[140 - h];
+  var inv = function(arr, a){ if (a <= 0) return 0; for (var i = 1; i < arr.length; i++) if (arr[i] >= a) return i - 1 + (a - arr[i - 1]) / (arr[i] - arr[i - 1]); return arr.length - 1; };
+  var bulb = function(sign){ var L = [], R = []; for (var d = 140; d >= 0; d -= 4) { var y = NY + sign * d, w = Math.max(1, hw(d) - 2); R.push((CX + w).toFixed(1) + ' ' + y); L.unshift((CX - w).toFixed(1) + ' ' + y); } return 'M ' + R.concat(L).join(' L ') + ' Z'; };
+  var R = [], L = [];
+  for (d = 140; d >= 0; d -= 4) R.push((CX + hw(d)).toFixed(1) + ' ' + (NY - d));
+  for (d = 0; d <= 140; d += 4) R.push((CX + hw(d)).toFixed(1) + ' ' + (NY + d));
+  for (d = 140; d >= 0; d -= 4) L.push((CX - hw(d)).toFixed(1) + ' ' + (NY + d));
+  for (d = 0; d <= 140; d += 4) L.push((CX - hw(d)).toFixed(1) + ' ' + (NY - d));
+  var defs = el('defs', {}, svg);
+  el('path', { d: bulb(-1) }, el('clipPath', { id: 'ktmClipT' }, defs));
+  el('path', { d: bulb(1) }, el('clipPath', { id: 'ktmClipB' }, defs));
+  var grp = el('g', {}, svg);
+  el('rect', { x: 43, y: 56, width: 7, height: 278, rx: 3, 'class': 'ktm-wood' }, grp);
+  el('rect', { x: 210, y: 56, width: 7, height: 278, rx: 3, 'class': 'ktm-wood' }, grp);
+  el('path', { d: 'M ' + R.concat(L).join(' L ') + ' Z', 'class': 'ktm-glassline' }, grp);
+  var top = el('path', { 'clip-path': 'url(#ktmClipT)', 'class': 'ktm-sand' }, grp);
+  var bot = el('path', { 'clip-path': 'url(#ktmClipB)', 'class': 'ktm-sand' }, grp);
+  var stream = el('line', { x1: CX, y1: NY - 2, x2: CX, y2: 300, opacity: '0', 'class': 'ktm-stream' }, grp);
+  el('path', { d: 'M ' + (CX + 40) + ' 80 C ' + (CX + 50) + ' 110 ' + (CX + 36) + ' 150 ' + (CX + 14) + ' 176', 'class': 'ktm-shine' }, grp);
+  el('rect', { x: 34, y: 38, width: 192, height: 20, rx: 7, 'class': 'ktm-cap' }, grp);
+  el('rect', { x: 34, y: 332, width: 192, height: 20, rx: 7, 'class': 'ktm-cap' }, grp);
+  var settled = function(r){ var d = inv(A, r * AF), h = inv(Bc, (1 - r) * AF); return { t1: NY - d, t2: NY + 2, b1: 335 - h, b2: 337, d: d, h: h }; };
+  var band = function(y1, y2, dip, k){ if (y2 - y1 < .3) return ''; var e = dip ? y1 : y1 + k, c = dip ? y1 + 2 * k : y1 - k; return 'M 30 ' + e.toFixed(1) + ' Q ' + CX + ' ' + c.toFixed(1) + ' 230 ' + e.toFixed(1) + ' L 230 ' + y2.toFixed(1) + ' L 30 ' + y2.toFixed(1) + ' Z'; };
+  var ease = function(p){ return p < .5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2; };
+  var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var V = { phase: 'idle', p0: 0, rot: ktmLoad().state === 'pause' ? 90 : 0, from: 0, to: 0, pre: null, wob: 0 };
+  V.busy = function(){ return V.phase === 'flip' || V.phase === 'settle'; };
+  V.flip = function(preFrac){ V.pre = settled(preFrac); V.phase = 'flip'; V.p0 = performance.now(); V.from = V.rot; V.to = 180; };
+  V.tilt = function(down){ V.phase = 'tilt'; V.p0 = performance.now(); V.from = V.rot; V.to = down ? 90 : 0; };
+  V.wobble = function(){ V.wob = performance.now(); };
+  V.reset = function(){ V.phase = 'idle'; V.rot = 0; };
+  V.frame = function(now){
+    var dur = reduce ? 1 : V.phase === 'flip' ? 620 : V.phase === 'settle' ? 360 : 420, p = Math.min(1, (now - V.p0) / dur), t, b, show = false;
+    var k = ktmLoad();
+    if (V.phase === 'flip') {
+      V.rot = V.from + (V.to - V.from) * ease(p);
+      t = [V.pre.t1, V.pre.t2, true, 0]; b = [V.pre.b1, V.pre.b2, false, Math.min(9, V.pre.h * .32)];
+      if (p >= 1) { V.rot = 0; V.phase = 'settle'; V.p0 = now; }
+    } else if (V.phase === 'settle') {
+      var to = settled(ktmFrac()), q = p * p, pr = V.pre, fT1 = 390 - pr.b2, fT2 = 390 - pr.b1, fB1 = 390 - pr.t2, fB2 = 390 - pr.t1;
+      t = [fT1 + (to.t1 - fT1) * q, fT2 + (to.t2 - fT2) * q, true, 0];
+      b = [fB1 + (to.b1 - fB1) * q, fB2 + (to.b2 - fB2) * q, false, Math.min(9, to.h * .32) * q];
+      if (p >= 1) V.phase = 'idle';
+    } else {
+      if (V.phase === 'tilt') { V.rot = V.from + (V.to - V.from) * ease(p); if (p >= 1) { V.rot = V.to; V.phase = 'idle'; } }
+      else if (V.wob && now - V.wob < 900 && !reduce) { var w = (now - V.wob) / 900; V.rot = 5 * Math.sin(w * Math.PI * 3) * (1 - w); }
+      else V.rot = k.state === 'pause' ? 90 : 0;
+      var s = settled(ktmFrac());
+      t = [s.t1, s.t2, true, k.state === 'run' ? Math.min(7, s.d * .22) : 0];
+      b = [s.b1, s.b2, false, Math.min(9, s.h * .32)];
+      show = k.state === 'run' && s.d > .2;
+      if (show) { stream.setAttribute('y2', (s.b1 + 2).toFixed(1)); stream.setAttribute('stroke-dashoffset', (-(now / 14) % 5).toFixed(2)); }
+    }
+    top.setAttribute('d', band(t[0], t[1], t[2], t[3])); bot.setAttribute('d', band(b[0], b[1], b[2], b[3]));
+    stream.setAttribute('opacity', show ? '1' : '0');
+    grp.setAttribute('transform', 'rotate(' + V.rot.toFixed(2) + ' ' + CX + ' ' + NY + ')');
+  };
+  var pd = null;
+  svg.addEventListener('pointerdown', function(e){ if (e.button > 0) return; e.preventDefault(); try { svg.setPointerCapture(e.pointerId); } catch(_) {} pd = { x: e.clientX, y: e.clientY, id: e.pointerId }; });
+  svg.addEventListener('pointerup', function(e){
+    if (!pd || pd.id !== e.pointerId) return;
+    var dx = e.clientX - pd.x, dy = e.clientY - pd.y; pd = null;
+    if ((Math.abs(dy) > 36 || Math.abs(dx) > 36) && ktmLoad().state !== 'pause') ktmFlip(); else ktmTap();
+    ktmDraw();
+    try { if (e.pointerType !== 'keyboard') svg.blur(); } catch(_) {}   // the gold ring is for the keyboard, not for a tap
+  });
+  svg.addEventListener('pointercancel', function(){ pd = null; });
+  svg.addEventListener('keydown', function(e){ if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); ktmTap(); ktmDraw(); } });
+  return V;
+}
+function ktmLoop(now) {
+  if (!_ktmRaf) return;
+  try { if (_ktmView) _ktmView.frame(now); ktmDraw(); } catch(e) {}
+  _ktmRaf = requestAnimationFrame(ktmLoop);
+}
+function openKitchenTimer() {
+  var ov = document.getElementById('ktmOverlay');
+  if (!ov) return false;
+  ktmLoad();
+  if (!_ktmView) { var svg = document.getElementById('ktmGlass'); if (svg) _ktmView = ktmGlass(svg); }
+  ktmWheelsBuild();
+  ov.classList.add('open');
+  ktmCheck(); ktmWheelsLock(); ktmDraw();
+  if (_ktm.state === 'done' && document.visibilityState === 'visible') bellCancel(KTM_BELL);
+  requestAnimationFrame(function(){ ktmWheelsShow(ktmLoad().chosen); });
+  if (!_ktmRaf) _ktmRaf = requestAnimationFrame(ktmLoop);
+  return true;
+}
+function ktmClosed() { if (_ktmRaf) cancelAnimationFrame(_ktmRaf); _ktmRaf = 0; }
+setTimeout(function(){ try { ktmLoad(); ktmCheck(); } catch(e) {} }, 0);
+window.openKitchenTimer = openKitchenTimer; window.ktmFlip = ktmFlip; window.ktmTap = ktmTap; window.ktmFlipBtn = ktmFlipBtn;
+window.ktmReset = ktmReset; window.ktmSetChosen = ktmSetChosen; window.ktmClosed = ktmClosed; window.ktmCheck = ktmCheck;
+window.ktmLoad = ktmLoad; window.ktmFmt = ktmFmt; window.ktmWords = ktmWords; window.ktmBellSet = ktmBellSet; window.ktmPill = ktmPill;
+
+// ─── v40.15 — 🧮 THE CALCULATOR (··· More → 🧰 Tools → 🧮 Calculator) ────────────────────────────────────────────────
+// Tony, 25 Nov 2026: "I would like to add 2 tools under the Tools menu: A simple calculator and a timer." Plain on purpose,
+// as on the phone: the sum being typed on top, the answer under it (a grey "= …" while typing); × and ÷ before + and −;
+// a percent after + or − is of what comes before it (200 + 15% = 230), alone it is a hundredth (40% = 0.4); ± C ⌫;
+// a tap on the answer copies it; on a computer the keyboard types (Enter =, Esc C, Backspace ⌫). Kept while the app is
+// open, nowhere else. (Its window and functions are kpad*: the ⚖️ converter has had calc* since long before.)
+var _kpad = { toks: [], shown: null, note: '' };
+function kpadIsOp(s) { return s === '+' || s === '-' || s === '*' || s === '/'; }
+function kpadVal(s) { var pct = /%$/.test(s), n = parseFloat(pct ? s.slice(0, -1) : s); return { n: isNaN(n) ? 0 : n, pct: pct }; }
+function kpadEval(list) {
+  var tk = (list || []).slice();
+  while (tk.length && kpadIsOp(tk[tk.length - 1])) tk.pop();
+  if (!tk.length) return { ok: false };
+  var sum = 0, sign = 1, f = kpadVal(tk[0]), term = f.pct ? f.n / 100 : f.n;
+  for (var i = 1; i < tk.length; i += 2) {
+    var op = tk[i], b = kpadVal(tk[i + 1]);
+    if (op === '*' || op === '/') {
+      var bv = b.pct ? b.n / 100 : b.n;
+      if (op === '/' && bv === 0) return { ok: false, err: 'Cannot divide by 0' };
+      term = op === '*' ? term * bv : term / bv;
+    } else { sum += sign * term; sign = op === '+' ? 1 : -1; term = b.pct ? sum * b.n / 100 : b.n; }
+  }
+  var r = sum + sign * term;
+  if (!isFinite(r)) return { ok: false, err: 'Too big' };
+  return { ok: true, r: Number(r.toPrecision(12)) };
+}
+function kpadShow(n) { return Math.abs(n) >= 1e15 ? n.toExponential(6) : n.toLocaleString('en-US', { maximumFractionDigits: 10 }); }
+function kpadTok(s) {
+  if (kpadIsOp(s)) return { '+': '+', '-': '−', '*': '×', '/': '÷' }[s];
+  var pct = /%$/.test(s), core = pct ? s.slice(0, -1) : s, neg = core.charAt(0) === '-', body = neg ? core.slice(1) : core;
+  var parts = body.split('.'), int = parts[0] === '' ? '' : Number(parts[0]).toLocaleString('en-US');
+  return (neg ? '−' : '') + int + (parts.length > 1 ? '.' + parts[1] : '') + (pct ? '%' : '');
+}
+function kpadCur() { var t = _kpad.toks; return t.length && !kpadIsOp(t[t.length - 1]) ? t[t.length - 1] : null; }
+function kpadRender() {
+  var ex = document.getElementById('kpadExpr'), res = document.getElementById('kpadRes');
+  if (!ex || !res) return;
+  var expr = _kpad.toks.map(kpadTok).join(' ');
+  if (_kpad.shown !== null) { ex.textContent = _kpad.note || (expr + ' ='); res.textContent = _kpad.shown; res.classList.remove('kpad-preview'); return; }
+  ex.textContent = _kpad.note || expr || ' ';
+  var hasOp = _kpad.toks.some(function(s){ return kpadIsOp(s) || /%$/.test(s); }), ev = kpadEval(_kpad.toks);
+  if (hasOp && ev.ok) { res.textContent = '= ' + kpadShow(ev.r); res.classList.add('kpad-preview'); }
+  else { var c = kpadCur(); res.textContent = c !== null ? kpadTok(c) : '0'; res.classList.remove('kpad-preview'); }
+}
+function kpadPress(k) {
+  var t = _kpad.toks, c;
+  _kpad.note = '';
+  if (/^[0-9.]$/.test(k)) {
+    if (_kpad.shown !== null) { _kpad.toks = t = []; _kpad.shown = null; }
+    c = kpadCur();
+    if (c === null || /%$/.test(c)) { if (c !== null) t.push('*'); t.push(k === '.' ? '0.' : k); }
+    else {
+      if (k === '.' && c.indexOf('.') >= 0) return false;
+      if (c.replace(/[-.]/g, '').length >= 15) return false;
+      t[t.length - 1] = (c === '0' && k !== '.') ? k : (c === '-0' && k !== '.') ? '-' + k : c + k;
+    }
+  } else if (kpadIsOp(k)) {
+    _kpad.shown = null;
+    if (!t.length) { if (k === '-') t.push('-0'); else return false; }
+    else if (kpadIsOp(t[t.length - 1])) t[t.length - 1] = k; else t.push(k);
+  } else if (k === 'neg') {
+    _kpad.shown = null; c = kpadCur(); if (c === null) return false;
+    t[t.length - 1] = c.charAt(0) === '-' ? c.slice(1) : '-' + c;
+  } else if (k === '%') {
+    _kpad.shown = null; c = kpadCur(); if (c === null || /%$/.test(c)) return false;
+    t[t.length - 1] = c + '%';
+  } else if (k === 'back') {
+    if (_kpad.shown !== null) { _kpad.shown = null; kpadRender(); return true; }
+    if (!t.length) return false;
+    c = t[t.length - 1];
+    if (kpadIsOp(c) || c.length <= 1 || c === '-0' || /^-\d$/.test(c)) t.pop(); else t[t.length - 1] = c.slice(0, -1);
+  } else if (k === 'C') { _kpad.toks = []; _kpad.shown = null; }
+  else if (k === '=') {
+    var ev = kpadEval(t);
+    if (!ev.ok) { if (ev.err) _kpad.note = i18nPhrase(ev.err); kpadRender(); return false; }
+    _kpad.shown = kpadShow(ev.r); kpadRender(); _kpad.toks = [String(ev.r)]; return true;
+  } else return false;
+  kpadRender();
+  return true;
+}
+function kpadCopy() {
+  var res = document.getElementById('kpadRes'); if (!res) return false;
+  var txt = (res.textContent || '').replace(/^= /, '').replace(/,/g, '').replace('−', '-');
+  var said = function(){ _kpad.note = i18nPhrase('Copied: {1}').replace('{1}', txt); kpadRender(); setTimeout(function(){ _kpad.note = ''; kpadRender(); }, 1500); };
+  try { navigator.clipboard.writeText(txt).then(said, function(){ toast(txt); }); } catch(e) { toast(txt); }
+  return true;
+}
+function kpadKey(e) {
+  var map = { Enter: '=', '=': '=', Backspace: 'back', Escape: 'C', Delete: 'C', x: '*', X: '*', '×': '*', '÷': '/' };
+  var k = map[e.key] || e.key;
+  if (e.key === 'Escape' && !_kpad.toks.length && _kpad.shown === null) return;   // empty: Escape closes the window
+  if (/^[0-9.+\-*/%]$/.test(k) || k === '=' || k === 'back' || k === 'C') { e.preventDefault(); e.stopPropagation(); kpadPress(k); }
+}
+function openCalcPad() {
+  var ov = document.getElementById('kpadOverlay');
+  if (!ov) return false;
+  ov.classList.add('open');
+  kpadRender();
+  var box = document.getElementById('kpadBox'); if (box) setTimeout(function(){ try { box.focus({ preventScroll: true }); } catch(e) {} }, 60);
+  return true;
+}
+window.openCalcPad = openCalcPad; window.kpadPress = kpadPress; window.kpadEval = kpadEval; window.kpadCopy = kpadCopy; window.kpadKey = kpadKey;
 
 function setCalcCat(cat) {
   _calcCat = cat;

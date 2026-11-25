@@ -494,6 +494,69 @@ under its plain path only (a `?url=` request goes network-first).
   of that link's kitchen messages until their device's 45 days are up. Self Tests
   `chat_notifications_switch`, `chat_notifications_announced`, `chat_notifications_shown_and_tapped` (the real sw.js
   handlers, through `tests/sw-probe.js`); Worker checks in `tests/worker-cors.mjs` (a separate RFC 8291 decryption).
+- **⏳ The hourglass timer (v40.15).** Tony, 25 Nov 2026: "I would like to add 2 tools under the Tools menu: A simple
+  calculator and a timer. I would like the timer to have a very unique design, but yet be intuitive and easy to use."
+  Of five working designs (a cooktop, a measuring jug, an hourglass, a pie, a rolling pin): "I like the hourglass timer.
+  However, I would like it to be able to count days as well (up to 31). It's timing controls should be different." —
+  and of five ways to set it (three wheels, a turning dial, scoops of sand, writing it, a ready-at time): "Please use
+  Option A". ··· More → 🧰 Tools → ⏳ Timer (`openKitchenTimer`, `#ktmOverlay`, the converter's `.calc-overlay` look).
+  THE GLASS (`ktmGlass(svg)`, an SVG drawn once): two bulbs from one width function, the sand as two bands clipped by
+  each bulb — the top one's level from the area left (`settled(frac)`), the bottom a mound — a dashed falling stream;
+  animated by requestAnimationFrame only while the window is open (`ktmLoop`; `closeM` → `ktmClosed`). FLIP (a tap,
+  a swipe of 36 px up or down, or Flip): rotate 180° over 620 ms, then the sand slides down to the neck in 360 ms;
+  flipped while it runs, the time left becomes what had run (`total − left`), like a real one. TAP while it runs: it lies
+  on its side (90°) — paused; tap again (or Stand it up): it stands and runs on. The sand runs out: Ready, the chosen
+  chime three times 1.7 s apart and the phone's vibration (`timerRingHere`), a wobble, "The sand has run out. Flip it
+  for another {1}." THE WHEELS: `#ktmWd` 0–31 days, `#ktmWh` 0–23 hours, `#ktmWm` 0–59 minutes — CSS scroll-snap lists
+  (44 px rows, a gold band behind the middle one), read on scroll (`ktmWheelRead`); over 31 days → 31 days and the
+  others back to 0; each a `role="spinbutton"` (aria-valuenow kept by `ktmWheelAria`, ↑/↓ move it; aria-disabled while
+  locked); locked (`.ktm-locked`) while it runs or lies down — ↺ Reset lays the sand down and frees them. KEPT
+  ON THE DEVICE (`mkn_hourglass`: chosen, state off/run/pause/done, total, ends, left): counted by the clock, so a
+  phone that slept is not behind and the app closed loses nothing; `ktmCheck` once a second while it runs (and on
+  return to the app) finds the end. THE HEADER: `#ktmPill` (⏳ and the time left, ⏸ when lying down, Ready pulsing)
+  first among `.header-actions` while it runs, lies down or rings; a tap opens it. The time left: `ktmFmt` ('3 days
+  4:12:05', 'one day 0:00:00', '1:05'); words: `ktmWords` ('1 h 30 min'). The server rings it when the phone is
+  locked: key `hourglass` (below). Self Test `kitchen_timer_hourglass`.
+- **🧮 The calculator (v40.15).** ··· More → 🧰 Tools → 🧮 Calculator (`openCalcPad`, `#kpadOverlay`; kpad*, because
+  the ⚖️ converter has had calc* since long before). The sum being typed on top (`#kpadExpr`, 1,250 × 3 ÷ 4), the answer
+  under it (`#kpadRes`: grey '= …' while typing, firm after =). `kpadEval(tokens)`: × and ÷ before + and −; a % after
+  + or − is of the sum before it (200 + 15% = 230), alone a hundredth (40% = 0.4); 12 significant digits; ÷ 0 → "Cannot
+  divide by 0". Keys: C ⌫ % ÷ / 7 8 9 × / 4 5 6 − / 1 2 3 + / ± 0 . = (LTR in Hebrew too); after = a digit starts
+  afresh, an operator goes on from the answer; a tap on the answer copies it; the keyboard types (Enter =, Esc C — Esc
+  on an empty pad closes the window —, Backspace ⌫). Self Test `calc_pad`.
+- **⏰ A timer rings when the phone is locked (v40.15, Worker v109).** Tony: "Yes. Please send a notification when the
+  time is up on an iPhone and whatever is needed for Android, so it makes a sound while the phone is locked or while in
+  another app." A web app makes no sound while it sleeps, so each timer is also handed to the Worker, which sends it
+  back as a Web Push notification at that second. THE APP (`bell*`): `bellState(dev)` → 'on' (allowed here — a device
+  that already allows notifications, the chats', is not asked) | 'ask' | 'off' (Not now / switched off, `mkn_bell` =
+  '0') | 'blocked' | 'install' (an iPhone's browser) | 'unable'. `bellSet(key, ms, title, body)`: `bellSubscription()`
+  (the chats' push address if there is one — made with the server's key, made again if that key changed, the chats
+  told then) → `push-timer` { key, inMs, title, body, sub } (signed in; health `timers: true`); handed-over keys kept
+  in `mkn_bell_keys` {key: ends}. `bellCancel(keys | all)` → `push-timer-cancel` { endpoint, keys } (no sign-in; the
+  device's address is enough). `bellQuietDone()` on return to the app (and on a tapped notification): the rings of
+  timers that have ended are let go. `timerRingHere(key, msg)`: vibrate; on the screen the chime three times and
+  `bellCancel(key)`; a toast. `bellOffer()` as a timer starts: 'ask' → the bar `#bellOffer` ("🔔 Ring when the phone is
+  locked?" Allow / Not now — Allow asks `Notification.requestPermission()` ON THE TAP, then hands over the timers
+  already running, `bellResendRunning`); 'install' → once, a toast that only the Home Screen app can. ⚙️ → ♿
+  Accessibility → ⏰ Timers ring when the phone is locked (`#bellToggleItem`, shown where the server can;
+  `bellSwitch`). The chats' 🔕 no longer drops the browser's address while timers may ring (`pushForgetDevice`). THE
+  STEP TIMERS (`startCookTimer`): by the clock (`_cookTimers[key].ends`), `bellSet('step:<recipe id>:<key>', secs,
+  '⏰ Time is up', '<recipe name> · <the step's text>')`; stopped, or the recipe closed or redrawn (`clearCookTimers`)
+  → `bellCancel`. THE HOURGLASS: key `hourglass`, body '⏳ The hourglass: <length>'; laid down or reset → cancelled;
+  stood up → handed over again with what is left. sw.js shows `kind: 'timer'` with `requireInteraction` and a
+  vibration; a tap opens `?timer=<key>` or tells the open app (`mkn-timer`). THE WORKER (v109): D1 `push_timers` (id =
+  endpoint#key, endpoint, project, uid, p256dh, auth, due — this server's clock: `now + inMs`, so a phone's wrong clock
+  does not matter —, ring, title, body, tkey, at); a second to 31 days (+ an hour); twenty a device, forty a person;
+  three rings 30 s apart (`TIMER_RINGS`, `TIMER_RING_GAP`), each CLAIMED before it is sent (moved on, or deleted after
+  the last — a cancel or another run wins); `MINUTE_CRON` '* * * * *' (worker/wrangler.jsonc) → `timerSweep`: the rings
+  due before the next minute, each sent at its second (the cron may wait), a ring an hour overdue dropped; a timer due
+  within 28 s is rung from the request that set it (`ctx.waitUntil`); 404 / 410 → all that device's timers go; TTL
+  1800 s, urgency high. Self Tests `timer_bell`, `timer_notifications_shown_and_tapped` (sw-probe); worker-cors.mjs: 25
+  checks (sign-in, real push service and keys, a plain key, 1 s – 31 days, due by the server's clock, two lines tidied,
+  a ring at its second read back with a separate RFC 8291 decryption, 30 s later the next, then gone, cancel, all at
+  once, set again moves it, two sweeps at once ring each ring once, 410, an hour overdue, under 28 s from the request,
+  twenty a device, the hourly cron rings none, the minute's runs no daily sweep, no key → 503) — five deliberate breaks
+  of the Worker each caught. Privacy Statement 1.20.
 - **📍 Take me there in Help (v40.01).** Tony: a "Take me there" next to a Help answer's Details "and also inside the
   modal opening in response to clicking the Details button, in the appropriate places", "not … when it is not
   applicable". `HELP_PLACES` ([id, path, the item's function or #id, 'open' | 'show' | 'menu']) names 70 places in ⚙️,
@@ -528,7 +591,7 @@ under its plain path only (a `?url=` request goes network-first).
   resources, like stoves and others, should not be cleared, but they should be editable … Please allow selecting recipes
   from joined kitchens as well, not only from my own kitchen."
   - **Where:** ··· More → 🧰 Tools → 🗓️ Work Planner (`openPlanner`; the Tools heading's title "The Work Planner and the
-    measurement converter"). One window, `#planOverlay` / `#planBody`, drawn by `planRender` from `planView()`.
+    measurement converter" — v40.15: "The Work Planner, the timer, the calculator and the measurement converter"). One window, `#planOverlay` / `#planBody`, drawn by `planRender` from `planView()`.
   - **v40.06 — the screen to itself.** Tony, 21 Nov 2026, from his iPhone screenshot: "In order to save on screen space, Please move the kitchen resources section to a pop up modal, accessible via a dedicated button. Also expand the planner's modal to full screen. Also, please add an Undo button, in case something was clicked erroneously. In portrait mode, see attached, the recipe names get truncated. Please find a better way to show them while saving on vertical space. Please change the translation from גוש עבודה to יחידת עבודה."
     The window FILLS THE SCREEN (`#planOverlay` without padding; its card 100% × 100%, no corners; on a wide screen the
     content keeps to 960 px in the middle — `padding-inline: max(14px, calc((100% - 960px) / 2))`). Its TOP BAR
@@ -1806,7 +1869,7 @@ notebook page, a Hebrew invitation link that opens the app in Hebrew.
 | `.github/workflows/deploy.yml` | GitHub Actions → GitHub Pages deploy on push to `main`. |
 | `.github/workflows/self-tests.yml` | Runs the Self Test suite headlessly on every push (5.6). Skips `net_*`/`stor_firebase`, and also fails the build on a test that closes the suite or strands a dialog. |
 | `tests/fixtures/multi-recipe-article.json` | A faithful sample of a real multi‑recipe article (ynet's chestnut round‑up) plus the AI answer it should produce. The messiness is the point — run‑on ingredients, per‑recipe sub‑headings, bylines — and it makes the whole collection pipeline testable without the network. |
-| `tests/sw-probe.js` | Loads the real `sw.js` in a dedicated worker with `addEventListener` stubbed, so `sw_serves_only_the_app_shell` can drive its fetch handler (and, since v40.02, `chat_notifications_shown_and_tapped` its `push` and `notificationclick` handlers: `{ pushCases }`, with stand-in windows, registration and clients). Needed because the CSP has no `'unsafe-eval'` and a second service worker cannot be installed mid‑suite. |
+| `tests/sw-probe.js` | Loads the real `sw.js` in a dedicated worker with `addEventListener` stubbed, so `sw_serves_only_the_app_shell` can drive its fetch handler (and, since v40.02, `chat_notifications_shown_and_tapped` — v40.15 also `timer_notifications_shown_and_tapped` — its `push` and `notificationclick` handlers: `{ pushCases }`, with stand-in windows, registration and clients). Needed because the CSP has no `'unsafe-eval'` and a second service worker cannot be installed mid‑suite. |
 | `tests/firestore-rules.test.mjs` | The published rules, checked on the Firestore emulator (`demo-rules`). |
 | `tests/e2e-sync.mjs` | End-to-end sync: owner, writer and reader devices signed in against the Firestore + Auth emulators, served by its own local server (emulator hosts added to the CSP), SDK from npm at the version the page loads. Only uses the emulator from localhost with a `demo-` project. |
 | `tests/axe-scan.js`, `tests/contrast-scan.js`, `tests/phone-chrome.js` | Accessibility (axe over the page and every dialog), colour contrast at phone width in both themes, and the phone header budget. |
@@ -1880,6 +1943,10 @@ The `share_target` lets Android/iOS "Share to app" send a URL/text; the app read
   and `focus()`; otherwise `openWindow(BASE + '?chat=' + chat)` — only a `chat` of the form `f:<id>` / `k:<id>` goes
   into the address. The app reads `?chat=` at start (and takes it out of the address) and opens that conversation
   once the household is there (`pushOpenChat`).
+- **`push` kind 'timer' (v40.15, Worker v109):** `{ kind: 'timer', title, body, tag: 'mkn-timer-<key>', timer, ring, of }`
+  — shown with `requireInteraction: true`, `vibrate`, `renotify`, `data: { timer }` (not while the app is on the screen,
+  which rings itself — except on Apple's devices); a tap opens `?timer=<key>` or tells the open app
+  `{ type: 'mkn-timer', timer }`: its remaining rings are let go (`bellQuietDone`) and, for `hourglass`, the timer opens.
 
 ---
 
@@ -2080,6 +2147,9 @@ default was committed to a public repo, so it was never a secret.
    where `configured` is a per-service boolean map derived from which env vars are set. Keep the
    reported `version` in step with the file header — it drifted to `v34` on a v36 Worker, which is
    exactly the kind of small lie §4b exists to forbid.
+8. **`push-timer`, `push-timer-cancel` (Worker v109, a timer rings when the phone is locked)** — see the v40.15 entry in
+   §1b.8: one timer of one device kept in D1 `push_timers` and rung at its second by `MINUTE_CRON` (or from the request,
+   under 28 s), three rings 30 s apart unless let go; `health` says `timers: true`.
 8. **`push-key`, `push-subscribe`, `push-notify`, `push-forget` (Worker v108, the chat notifications)** — see the
    v40.02 entry in §1b.8: the device's push address kept per member of a household (D1 `push_subs`),
    a message read from Firestore with the SENDER's token and sent, encrypted, to those who may read it. `health`
@@ -3327,7 +3397,9 @@ never lose it.
 
 **Step timers.** Durations found by `findStepTimers()` render as `.cook-timer-btn` countdowns
 inside the step. These lived in Cook Mode but were never part of it; they survived its removal.
-`clearCookTimers()` runs on every re-render and when the recipe closes. **Nothing is stored:** the
+`clearCookTimers()` runs on every re-render and when the recipe closes (v40.15: and lets their server rings go). v40.15 —
+counted by the clock (`_cookTimers[key].ends`), and handed to the Worker to ring a locked phone (`bellSet`, §1b.8).
+**Nothing is stored:** the
 time is read from the step's words every time the recipe is drawn, so a better reading gives every
 recipe its timers at once (v40.14 — Tony thought older recipes lacked them; it was Hebrew steps that
 were never read). `findStepTimers(text)` → up to three `{secs, label}`, in the order written, one per

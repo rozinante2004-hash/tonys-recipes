@@ -13873,15 +13873,17 @@ window.SELF_TESTS = [
       if(heads.join('|')!=='Ideas|Tools|Kitchens and people|WhatsApp|Tidy up') throw new Error('the headings are '+heads.join(' | '));
       var where={ openExploreModal:'ideas', openSuggestModal:'ideas', openWhatCanIMake:'ideas', openCalcModal:'tools', openConnectHousehold:'people',
         openFamilyChat:'people', openKitchenChats:'people', openGiftsIn:'people', openGiftsOut:'people', openDeleteAsks:'people', openShareAppModal:'people',
-        openWaAsk:'whatsapp', openWaLinks:'whatsapp', aiTagAllDiets:'tidy', autoFetchMissingPhotos:'tidy', openPlanner:'tools' };
+        openWaAsk:'whatsapp', openWaLinks:'whatsapp', aiTagAllDiets:'tidy', autoFetchMissingPhotos:'tidy', openPlanner:'tools',
+        openKitchenTimer:'tools', openCalcPad:'tools' };
       Object.keys(where).forEach(function(f){
         var it=m.querySelectorAll('[onclick*="'+f+'("]');
         if(it.length!==1) throw new Error(f+' is in ··· More '+it.length+' times');
         var sec=it[0].closest('.more-sec');
         if(!sec || sec.getAttribute('data-sec')!==where[f] || !it[0].closest('.set-body')) throw new Error(f+' is under "'+(sec&&sec.getAttribute('data-sec'))+'", not in "'+where[f]+'"\'s body');
       });
-      // v39.55 — 15 with 🗑️ Requests to delete (shown to the owner and admins while there are requests); v40.05 — 16 with 🗓️ Work Planner
-      if(m.querySelectorAll('.set-body .drop-item').length!==16) throw new Error('··· More has '+m.querySelectorAll('.set-body .drop-item').length+' items, not 16');
+      // v39.55 — 15 with 🗑️ Requests to delete (shown to the owner and admins while there are requests); v40.05 — 16 with 🗓️ Work Planner;
+      // v40.15 — 18 with ⏳ Timer and 🧮 Calculator under 🧰 Tools
+      if(m.querySelectorAll('.set-body .drop-item').length!==18) throw new Error('··· More has '+m.querySelectorAll('.set-body .drop-item').length+' items, not 18');
       // v39.30 — Tony: "the titles … to become the only menu items under More. Clicking any of them will open a sub menu
       // with whatever is under the same title right now … in the same menu, expanding downwards, pushing the next title down."
       var seen=function(el){ return !!el && el.getClientRects().length>0 && getComputedStyle(el).visibility!=='hidden'; };
@@ -24365,6 +24367,188 @@ window.SELF_TESTS = [
         closeM('viewOverlay'); clearCookTimers();
         recipes=recipes.filter(function(r){return r.id!==testId;}); renderGrid();
       }
+    } },
+  { id:'kitchen_timer_hourglass', group:'Features', name:'⏳ The hourglass timer (··· More → 🧰 Tools): three wheels set days, hours and minutes up to 31 days; flip starts it by the clock, a tap lays it down (pause) and stands it up, a flip halfway gives back what has run; the sand runs out → Ready and a ring; kept on the device; ⏳ in the header while it runs (v40.15)',
+    test: async()=>{
+      var real={ store:null, ktm:window._ktm, toast:window.toast, ring:window.timerRingHere }, rung=[];
+      try{ real.store=localStorage.getItem(KTM_KEY); }catch(e){}
+      try{
+        window.toast=function(){}; window.timerRingHere=function(k, m){ rung.push([k, m]); return true; };
+        try{ localStorage.removeItem(KTM_KEY); }catch(e){}
+        window._ktm=null; ktmLoad();
+        if(!document.getElementById('ktmItem') || !/openKitchenTimer/.test(document.getElementById('ktmItem').getAttribute('onclick'))) throw new Error('no ⏳ Timer under 🧰 Tools');
+        openKitchenTimer(); await wait(320);
+        if(!document.getElementById('ktmOverlay').classList.contains('open')) throw new Error('the timer window did not open');
+        var counts=['ktmWd','ktmWh','ktmWm'].map(function(id){ return document.querySelectorAll('#'+id+' .ktm-n').length; }).join();
+        if(counts!=='32,24,60') throw new Error('the wheels are not 0–31 days, 0–23 hours, 0–59 minutes: '+counts);
+        var ih=document.querySelector('#ktmWh .ktm-n').offsetHeight;
+        document.getElementById('ktmWd').scrollTop=2*ih; document.getElementById('ktmWh').scrollTop=3*ih; document.getElementById('ktmWm').scrollTop=4*ih;
+        await wait(250);
+        if(ktmLoad().chosen!==(2*1440+3*60+4)*60000) throw new Error('the wheels set '+ktmLoad().chosen+' ms, not 2 days 3 h 4 min');
+        var sb=['ktmWd','ktmWh','ktmWm'].map(function(id){ var el=document.getElementById(id); return el.getAttribute('role')+':'+el.getAttribute('aria-valuenow')+'/'+el.getAttribute('aria-valuemax'); }).join();
+        if(sb!=='spinbutton:2/31,spinbutton:3/23,spinbutton:4/59') throw new Error('a screen reader is not told the wheels\' numbers: '+sb);
+        document.getElementById('ktmWd').scrollTop=31*ih; await wait(250);
+        if(ktmLoad().chosen!==31*864e5) throw new Error('more than 31 days was let through: '+ktmLoad().chosen);
+        ktmSetChosen(90*60000); var t0=Date.now();
+        if(!ktmFlip()) throw new Error('flipping did not start it');
+        var k=ktmLoad(), saved=JSON.parse(localStorage.getItem(KTM_KEY)||'{}');
+        if(k.state!=='run' || Math.abs(k.ends-(t0+90*60000))>2000 || saved.state!=='run' || saved.ends!==k.ends) throw new Error('not started by the clock and kept: '+JSON.stringify(saved));
+        if(!document.getElementById('ktmWheels').classList.contains('ktm-locked')) throw new Error('the wheels are not locked while it runs');
+        var pill=document.getElementById('ktmPill');
+        if(pill.style.display==='none' || !/1:29:|1:30:00/.test(document.getElementById('ktmPillTime').textContent)) throw new Error('no ⏳ with the time left in the header: '+document.getElementById('ktmPillTime').textContent);
+        await wait(1150);   // the flip and the sand settling
+        if(ktmTap()!==true || ktmLoad().state!=='pause') throw new Error('a tap did not lay it down');
+        var left=ktmLoad().left;
+        if(!(left>89*60000 && left<=90*60000)) throw new Error('lying down kept the wrong time: '+left);
+        ktmDraw();
+        if(document.getElementById('ktmFlip').textContent!=='Stand it up' || !/Lying down/.test(document.getElementById('ktmHint').textContent)) throw new Error('lying down is not said');
+        await wait(700); ktmTap();
+        if(ktmLoad().state!=='run' || Math.abs(ktmLoad().ends-(Date.now()+left))>1500) throw new Error('standing it up did not carry on from where it stopped');
+        await wait(700);
+        // three quarters run (as if): a flip gives back the time that ran
+        k=ktmLoad(); k.ends=Date.now()+0.25*k.total; ktmSave(); await wait(700);
+        ktmFlip(); var back=ktmLoad().ends-Date.now();
+        if(Math.abs(back-0.75*ktmLoad().total)>3000) throw new Error('a flip halfway did not give back the time that ran: '+back);
+        await wait(1100);
+        // the sand runs out
+        k=ktmLoad(); k.ends=Date.now()-5; ktmSave(); rung=[];
+        ktmCheck(); ktmDraw();
+        if(ktmLoad().state!=='done' || document.getElementById('ktmRead').textContent!=='Ready' || !rung.length || rung[0][0]!=='hourglass') throw new Error('the end was not Ready and rung: '+ktmLoad().state+' / '+JSON.stringify(rung));
+        if(!/Flip it for another 1 h 30 min/.test(document.getElementById('ktmHint').textContent)) throw new Error('the hint does not offer another round: '+document.getElementById('ktmHint').textContent);
+        // kept on the device
+        window._ktm=null;
+        if(ktmLoad().state!=='done' || ktmLoad().total!==90*60000) throw new Error('not kept on the device');
+        ktmReset();
+        if(ktmLoad().state!=='off' || document.getElementById('ktmWheels').classList.contains('ktm-locked') || pill.style.display!=='none') throw new Error('↺ Reset did not lay it down and free the wheels');
+        if(ktmFmt(3*864e5+4*36e5+12*6e4+5e3)!=='3 days 4:12:05' || ktmFmt(864e5)!=='one day 0:00:00' || ktmFmt(65000)!=='1:05') throw new Error('the time left is written wrong: '+ktmFmt(3*864e5+4*36e5+12*6e4+5e3));
+      } finally {
+        try{ closeM('ktmOverlay'); }catch(e){}
+        window.toast=real.toast; window.timerRingHere=real.ring;
+        try{ if(real.store===null) localStorage.removeItem(KTM_KEY); else localStorage.setItem(KTM_KEY, real.store); }catch(e){}
+        window._ktm=null; ktmLoad(); ktmTickOn(); ktmPill();
+      }
+    } },
+  { id:'calc_pad', group:'Features', name:'🧮 The calculator (··· More → 🧰 Tools): × and ÷ before + and −, a percent after + or − is of what comes before, ± ⌫ C, the sum on top and the answer under it, divide by 0 said (v40.15)',
+    test: async()=>{
+      if(!document.getElementById('kpadItem')) throw new Error('no 🧮 Calculator under 🧰 Tools');
+      var cases=[[['250','*','3','/','4'],187.5],[['2','+','3','*','4'],14],[['200','+','15%'],230],[['200','-','10%'],180],[['40%'],0.4],[['0.1','+','0.2'],0.3],[['-5','*','-2'],10],[['7','+'],7]];
+      cases.forEach(function(c){ var e=kpadEval(c[0]); if(!e.ok || e.r!==c[1]) throw new Error(c[0].join(' ')+' = '+JSON.stringify(e)+', not '+c[1]); });
+      if(kpadEval(['1','/','0']).err!=='Cannot divide by 0') throw new Error('dividing by 0 is not said');
+      try{
+        openCalcPad(); await wait(80);
+        kpadPress('C'); ['1','2','5','0','*','3','/','4'].forEach(kpadPress);
+        var res=document.getElementById('kpadRes'), ex=document.getElementById('kpadExpr');
+        if(ex.textContent!=='1,250 × 3 ÷ 4' || res.textContent!=='= 937.5' || !res.classList.contains('kpad-preview')) throw new Error('while typing: '+ex.textContent+' / '+res.textContent);
+        kpadPress('=');
+        if(res.textContent!=='937.5' || ex.textContent!=='1,250 × 3 ÷ 4 =' || res.classList.contains('kpad-preview')) throw new Error('after =: '+ex.textContent+' / '+res.textContent);
+        kpadPress('+'); kpadPress('1'); kpadPress('neg'); kpadPress('=');
+        if(res.textContent!=='936.5') throw new Error('going on from the answer with ±: '+res.textContent);
+        kpadPress('C'); kpadPress('9'); kpadPress('8'); kpadPress('back');
+        if(res.textContent!=='9') throw new Error('⌫ did not take the last digit off: '+res.textContent);
+        kpadPress('/'); kpadPress('0'); kpadPress('=');
+        if(!/divide/.test(ex.textContent)) throw new Error('÷ 0 not said on the screen: '+ex.textContent);
+        kpadPress('C');
+        if(res.textContent!=='0') throw new Error('C did not clear');
+      } finally { try{ kpadPress('C'); closeM('kpadOverlay'); }catch(e){} }
+    } },
+  { id:'timer_bell', group:'Features', name:'⏰ A timer rings on a locked phone: started, it is handed to the server (push-timer: this device, how long, the dish and the step); stopped or done here, it is let go (push-timer-cancel); asked once (Allow / Not now); a step timer counts by the clock (v40.15)',
+    test: async()=>{
+      var real={ pw:window.pushWorker, sub:window.bellSubscription, st:window.bellState, fetch:window.fetch, bs:window._bellSub, user:window._fbUser,
+                 health:_workerHealth, bell:pushLs(BELL_KEY), keys:pushLs(BELL_KEYS_KEY), toast:window.toast, ring:window.timerRingHere };
+      var calls=[], cancels=[], fake={ endpoint:'https://fcm.googleapis.com/fcm/send/selftest', toJSON:function(){ return { endpoint:this.endpoint, keys:{ p256dh:'p', auth:'a' } }; } };
+      var testId=888897;
+      try{
+        // what each kind of device is
+        var st=[bellState({ can:true, perm:'granted', v:null }), bellState({ can:true, perm:'default', v:null }), bellState({ can:true, perm:'granted', v:'0' }),
+                bellState({ can:true, perm:'denied', v:'1' }), bellState({ can:false, ios:true, installed:false }), bellState({ can:false, ios:false })].join();
+        if(st!=='on,ask,off,blocked,install,unable') throw new Error('the states: '+st);
+        window._bellUnderTest=true; window.toast=function(){};
+        window._fbUser=window._fbUser||{ uid:'uSelfTest' };
+        _workerHealth=Object.assign({}, _workerHealth||{}, { ok:true, timers:true });
+        window.bellState=function(){ return 'on'; };
+        window.bellSubscription=async function(){ return fake; };
+        window._bellSub=fake;
+        window.pushWorker=async function(b){ calls.push(b); return { ok:true, status:200, d:{ ok:true } }; };
+        window.fetch=async function(u, o){ try{ cancels.push(JSON.parse(o.body)); }catch(e){ cancels.push({}); } return new Response('{"ok":true}', { status:200 }); };
+        pushLs(BELL_KEYS_KEY, null);
+        if(await bellSet('t1', 60000, '⏰ Time is up', 'Soup · Simmer')!==true) throw new Error('bellSet refused');
+        var c=calls[0];
+        if(!c || c.action!=='push-timer' || c.key!=='t1' || c.inMs!==60000 || c.title!=='⏰ Time is up' || c.body!=='Soup · Simmer' || c.sub.endpoint!==fake.endpoint) throw new Error('not handed over as it should be: '+JSON.stringify(c));
+        if(!bellKeys().t1) throw new Error('not remembered as handed over');
+        bellCancel('t1'); await wait(30);
+        if(!cancels[0] || cancels[0].action!=='push-timer-cancel' || cancels[0].endpoint!==fake.endpoint || (cancels[0].keys||[]).join()!=='t1' || bellKeys().t1) throw new Error('not let go: '+JSON.stringify(cancels));
+        cancels=[]; bellCancel('never-set'); await wait(20);
+        if(cancels.length) throw new Error('let go a timer never handed over');
+        // a recipe's step timer
+        calls=[]; cancels=[];
+        recipes.unshift(normalizeRecipe({ id:testId, name:'Self-test soup', ingredients:[{ a:'1', n:'onion' }], steps:['Simmer for 20 minutes'], updatedAt:Date.now() }));
+        openView(testId); await wait(80);
+        var btn=document.querySelector('#viewModal .cook-timer-btn');
+        if(!btn) throw new Error('no ⏱ on the step');
+        btn.click(); await wait(40);
+        c=calls[calls.length-1];
+        if(!c || c.action!=='push-timer' || c.inMs!==1200000 || !/^step:/.test(c.key) || !/Self-test soup/.test(c.body) || !/Simmer for 20 minutes/.test(c.body) || /⏱/.test(c.body))
+          throw new Error('the step timer was not handed over with the dish and the step: '+JSON.stringify(c));
+        btn.click(); await wait(40);
+        if(!cancels.length || (cancels[0].keys||[]).join()!==c.key) throw new Error('stopping the step timer did not let it go: '+JSON.stringify(cancels));
+        // by the clock: a phone that slept past the end finds it done
+        var rung=[]; window.timerRingHere=function(k){ rung.push(k); return true; };
+        btn.click(); await wait(40);
+        var key=Object.keys(_cookTimers)[0];
+        _cookTimers[key].ends=Date.now()-10; await wait(1200);
+        if(!/Time!/.test(btn.textContent) || rung[0]!==c.key) throw new Error('the step timer did not end by the clock: '+btn.textContent+' / '+rung.join());
+        // closing the recipe lets its running timers go
+        btn.click(); await wait(40); cancels=[];
+        closeM('viewOverlay'); await wait(40);
+        if(!cancels.length) throw new Error('closing the recipe did not let its timer go');
+        // asked once
+        window.bellState=function(){ return 'ask'; };
+        var bar=document.getElementById('bellOffer');
+        if(bellOffer()!==true || bar.hidden) throw new Error('not asked');
+        bellNotNow();
+        if(!bar.hidden || pushLs(BELL_KEY)!=='0') throw new Error('Not now was not kept');
+      } finally {
+        window._bellUnderTest=false; window.pushWorker=real.pw; window.bellSubscription=real.sub; window.bellState=real.st; window.fetch=real.fetch;
+        window._bellSub=real.bs; window._fbUser=real.user; _workerHealth=real.health; window.toast=real.toast; window.timerRingHere=real.ring;
+        pushLs(BELL_KEY, real.bell); pushLs(BELL_KEYS_KEY, real.keys); bellHideOffer();
+        try{ closeM('viewOverlay'); }catch(e){} clearCookTimers();
+        recipes=recipes.filter(function(r){ return r.id!==testId; }); renderGrid();
+      }
+    } },
+  { id:'timer_notifications_shown_and_tapped', group:'Features', name:'⏰ The service worker shows a timer that has run out (it stays until seen, and vibrates) unless the app is on the screen — always on Apple’s devices — and a tap opens the app, which lets its rings go and shows the hourglass (v40.15)',
+    test: async()=>{
+      var probe=new Worker('tests/sw-probe.js'), msg={ kind:'timer', title:'⏰ Time is up', body:'⏳ The hourglass: 3 days', tag:'mkn-timer-hourglass', timer:'hourglass', ring:1, of:3 };
+      var chrome='Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Mobile Safari/537.36';
+      var iphone='Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Mobile/15E148 Safari/604.1';
+      var app=location.origin+'/tonys-recipes/';
+      try{
+        var reply=await new Promise(function(res, rej){
+          var t=setTimeout(function(){ rej(new Error('sw-probe did not answer in 5s')); }, 5000);
+          probe.onmessage=function(ev){ clearTimeout(t); res(ev.data); };
+          probe.onerror=function(ev){ clearTimeout(t); rej(new Error('sw-probe failed to load: '+(ev.message||'?'))); };
+          probe.postMessage({ pushCases:[
+            { kind:'push', data:msg, ua:chrome, clients:[] },
+            { kind:'push', data:msg, ua:chrome, clients:[{ url:app, visible:true }] },
+            { kind:'push', data:msg, ua:iphone, clients:[{ url:app, visible:true }] },
+            { kind:'click', data:{ timer:'hourglass' }, clients:[] },
+            { kind:'click', data:{ timer:'step:7:s0-0' }, clients:[{ url:app, visible:false }] },
+            { kind:'click', data:{ timer:'<x>' }, clients:[] }
+          ] });
+        });
+        if(reply.loadError) throw new Error('sw.js would not load: '+reply.loadError);
+        var r=reply.pushResults;
+        r.forEach(function(x, i){ if(x && x.error) throw new Error('case '+i+' '+x.error); });
+        var n=r[0].shown[0];
+        if(r[0].shown.length!==1 || n.title!=='⏰ Time is up' || n.options.body!=='⏳ The hourglass: 3 days' || n.options.tag!=='mkn-timer-hourglass' || !n.options.renotify
+          || !n.options.requireInteraction || !(n.options.vibrate||[]).length || n.options.data.timer!=='hourglass')
+          throw new Error('the app closed: not shown as a timer — '+JSON.stringify(r[0].shown));
+        if(r[1].shown.length) throw new Error('shown while the app is on the screen (it rings there itself)');
+        if(r[2].shown.length!==1) throw new Error('an iPhone with the app on the screen showed nothing');
+        if(r[3].opened.length!==1 || new URL(r[3].opened[0]).searchParams.get('timer')!=='hourglass') throw new Error('a tap with the app closed does not open it with the timer: '+JSON.stringify(r[3]));
+        if(r[4].opened.length || r[4].focused!==1 || !r[4].told.length || r[4].told[0].type!=='mkn-timer' || r[4].told[0].timer!=='step:7:s0-0')
+          throw new Error('a tap with the app open does not bring it forward and tell it: '+JSON.stringify(r[4]));
+        if(r[5].opened.length!==1 || new URL(r[5].opened[0]).searchParams.has('timer')) throw new Error('a strange "timer" was put in the address');
+      } finally { probe.terminate(); }
     } },
   { id:'feat_line_marker', group:'Features', name:'Line marker: tap to mark, slides, survives re-render',
     test: async()=>{

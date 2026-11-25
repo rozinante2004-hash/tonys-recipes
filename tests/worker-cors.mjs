@@ -2901,6 +2901,111 @@ console.log('\nChat notifications when the app is closed (v108): devices kept pe
     for (let i = 0; i < 12; i++) await call({ action: 'push-subscribe', idToken: tA, hid: 'hP', sub: device('https://fcm.googleapis.com/fcm/send/many' + i).sub });
     expect('v108: at most ten devices a person (the newest kept)', raw.prepare("SELECT COUNT(*) AS n FROM push_subs WHERE uid = 'uA'").get().n === 10
       && !rows().some(x => x.endpoint === devA.sub.endpoint), raw.prepare("SELECT COUNT(*) AS n FROM push_subs WHERE uid = 'uA'").get().n);
+
+    // ── v109 — a timer rings on a locked phone: kept with the device's own address and keys, rung at its second ──
+    console.log('\nTimers that ring on a locked phone (v109):');
+    const timers = () => raw.prepare('SELECT id, endpoint, uid, project, due, ring, title, body, tkey FROM push_timers ORDER BY due').all();
+    let slept = [];
+    const envT = Object.assign({}, env, { __sleep: async (ms) => { slept.push(ms); } });
+    const minute = async (e = envT) => { const w = []; await worker.scheduled({ cron: '* * * * *', scheduledTime: Date.now() }, e, { waitUntil: p => w.push(p) }); await Promise.all(w); };
+    r = await call({ action: 'health' });
+    expect('v109: health says timers can ring', r.d && r.d.timers === true, JSON.stringify(r.d && r.d.timers));
+    const devT = device('https://fcm.googleapis.com/fcm/send/devT'), devI = device('https://web.push.apple.com/devI'), devX = device('https://fcm.googleapis.com/fcm/send/gone-devX');
+    [devT, devI, devX].forEach(d => byEndpoint.set(d.sub.endpoint, d));
+    const setT = (o, e = envT, ctx) => worker.fetch(post(Object.assign({ appKey: 'k', action: 'push-timer' }, o)), e, ctx).then(async x => ({ status: x.status, d: await x.json().catch(() => null) }));
+    r = await setT({ sub: devT.sub, key: 'step:7:s0-0', inMs: 120000, title: '⏰ Time is up', body: 'Soup · 2:00' });
+    expect('v109: setting a timer needs a sign-in', r.status === 401 && !timers().length, JSON.stringify(r));
+    r = await setT({ idToken: tA, sub: Object.assign({}, devT.sub, { endpoint: 'https://evil.example/t' }), key: 'a', inMs: 60000 });
+    expect('v109: …an address at a real push service', r.status === 400, JSON.stringify(r));
+    r = await setT({ idToken: tA, sub: { endpoint: devT.sub.endpoint, keys: { p256dh: 'x', auth: 'y' } }, key: 'a', inMs: 60000 });
+    expect('v109: …the device\'s real keys', r.status === 400, JSON.stringify(r));
+    r = await setT({ idToken: tA, sub: devT.sub, key: 'a b/../c', inMs: 60000 });
+    expect('v109: …a plain name for the timer', r.status === 400, JSON.stringify(r));
+    r = await setT({ idToken: tA, sub: devT.sub, key: 'a', inMs: 0 });
+    const r2 = await setT({ idToken: tA, sub: devT.sub, key: 'a', inMs: 33 * 864e5 });
+    expect('v109: …and a second to 31 days', r.status === 400 && r2.status === 400 && !timers().length, JSON.stringify([r, r2]));
+    const t0 = Date.now();
+    r = await setT({ idToken: tA, sub: devT.sub, key: 'step:7:s0-0', inMs: 120000, title: '⏰ Time is up', body: 'Soup  ·\n 2:00' });
+    let row = timers()[0];
+    expect('v109: a timer is kept for the device, due by this server\'s clock (not the phone\'s), its two lines tidied',
+      r.status === 200 && timers().length === 1 && row.uid === 'uA' && row.project === 'my-kitchen-notes-beta' && row.tkey === 'step:7:s0-0'
+      && Math.abs(row.due - (t0 + 120000)) < 2000 && row.body === 'Soup · 2:00' && row.ring === 0 && r.d.due === row.due, JSON.stringify([r, row]));
+    pushed = []; slept = [];
+    await minute();
+    expect('v109: the minute\'s sweep leaves a timer due after the next minute alone', !pushed.length && timers()[0].ring === 0, JSON.stringify(pushed.map(x => x.url)));
+    raw.prepare('UPDATE push_timers SET due = ? WHERE tkey = ?').run(Date.now() + 40000, 'step:7:s0-0');
+    await minute();
+    const ring1 = pushed[0] && decrypt(pushed[0].body, devT);
+    expect('v109: a ring due within the minute is sent at its second (the sweep waits for it)',
+      pushed.length === 1 && pushed[0].url === devT.sub.endpoint && slept.some(ms => ms > 35000 && ms <= 40000), JSON.stringify([pushed.length, slept]));
+    expect('v109: …the device reads it: a timer, its two lines, its own tag and key, ring 1 of 3',
+      ring1 && ring1.kind === 'timer' && ring1.title === '⏰ Time is up' && ring1.body === 'Soup · 2:00' && ring1.tag === 'mkn-timer-step:7:s0-0'
+      && ring1.timer === 'step:7:s0-0' && ring1.ring === 1 && ring1.of === 3, JSON.stringify(ring1));
+    expect('v109: …encrypted and signed like a chat message, sent urgent and short-lived', !pushed[0].body.includes(Buffer.from('Soup'))
+      && !vapidOk(pushed[0].headers.Authorization, devT.sub.endpoint) && pushed[0].headers.Urgency === 'high' && pushed[0].headers.TTL === '1800', JSON.stringify(pushed[0].headers));
+    row = timers()[0];
+    expect('v109: …and it is kept for its next ring, 30 s later', row && row.ring === 1 && Math.abs(row.due - (Date.now() + 70000)) < 3000, JSON.stringify(row));
+    raw.prepare('UPDATE push_timers SET due = ? WHERE tkey = ?').run(Date.now() - 1000, 'step:7:s0-0');
+    pushed = [];
+    await minute();
+    const rings = pushed.map(x => decrypt(x.body, devT).ring);
+    expect('v109: the second ring, and the third 30 s after it within the same minute — then it is gone', rings.join() === '2,3' && !timers().length, JSON.stringify([rings, timers()]));
+    // let go before it rings
+    await setT({ idToken: tA, sub: devT.sub, key: 'egg', inMs: 50000, title: 'Egg', body: '' });
+    r = await call({ action: 'push-timer-cancel', endpoint: devT.sub.endpoint, keys: ['egg', 'not there', 'x'.repeat(200)] });
+    pushed = []; await minute();
+    expect('v109: a timer let go (the device\'s address is enough) never rings', r.status === 200 && r.d.cancelled === 1 && !timers().length && !pushed.length, JSON.stringify([r, timers()]));
+    r = await call({ action: 'push-timer-cancel', endpoint: 'https://evil.example/t', all: true });
+    expect('v109: …an address that is not a push service\'s is refused', r.status === 400, JSON.stringify(r));
+    await setT({ idToken: tA, sub: devT.sub, key: 'one', inMs: 600000 }); await setT({ idToken: tA, sub: devT.sub, key: 'two', inMs: 600000 });
+    await setT({ idToken: tB, sub: devI.sub, key: 'one', inMs: 600000 });
+    r = await call({ action: 'push-timer-cancel', endpoint: devT.sub.endpoint, all: true });
+    expect('v109: all of one device\'s timers let go at once — another device\'s timer of the same name stays',
+      r.d && r.d.cancelled === 2 && timers().length === 1 && timers()[0].endpoint === devI.sub.endpoint, JSON.stringify(timers()));
+    await setT({ idToken: tB, sub: devI.sub, key: 'one', inMs: 300000, title: 'Again' });
+    expect('v109: setting a timer again (resumed after a pause) moves it — one row, from its first ring', timers().length === 1 && timers()[0].title === 'Again' && timers()[0].ring === 0, JSON.stringify(timers()));
+    raw.prepare('DELETE FROM push_timers').run();
+    // twice at once: one ring
+    await setT({ idToken: tA, sub: devT.sub, key: 'race', inMs: 20000 + 30000 });
+    raw.prepare('UPDATE push_timers SET due = ? WHERE tkey = ?').run(Date.now() + 5000, 'race');
+    pushed = [];
+    await Promise.all([minute(), minute()]);
+    const raceRings = pushed.map(x => decrypt(x.body, devT).ring).sort().join();
+    expect('v109: two sweeps at once ring each ring once (a ring is claimed before it is sent) — the third, a minute after the first, is the next sweep\'s',
+      raceRings === '1,2' && timers().length === 1 && timers()[0].ring === 2, JSON.stringify([raceRings, timers()]));
+    raw.prepare('DELETE FROM push_timers').run();
+    // a device gone
+    await setT({ idToken: tA, sub: devX.sub, key: 'gone1', inMs: 30000 }); await setT({ idToken: tA, sub: devX.sub, key: 'gone2', inMs: 400000 });
+    raw.prepare('UPDATE push_timers SET due = ? WHERE tkey = ?').run(Date.now() - 10, 'gone1');
+    await minute();
+    expect('v109: a device whose push service says it is gone (410): all its timers go', !timers().some(t => t.endpoint === devX.sub.endpoint), JSON.stringify(timers()));
+    // an hour overdue: let go
+    await setT({ idToken: tA, sub: devT.sub, key: 'late', inMs: 60000 });
+    raw.prepare('UPDATE push_timers SET due = ? WHERE tkey = ?').run(Date.now() - 2 * 36e5, 'late');
+    pushed = []; await minute();
+    expect('v109: a ring an hour overdue (the server was down) is not sent late — it is let go', !pushed.length && !timers().length, JSON.stringify(pushed.length));
+    // soon: rung from the request itself (really waited for here: a second and a bit)
+    const waits = []; pushed = [];
+    r = await setT({ idToken: tA, sub: devT.sub, key: 'soon', inMs: 1200, title: 'Toast' }, env, { waitUntil: p => waits.push(p) });
+    await Promise.all(waits);
+    expect('v109: a timer due in under 28 s rings from the request that set it (the sweep comes once a minute)',
+      r.status === 200 && pushed.length === 1 && decrypt(pushed[0].body, devT).title === 'Toast' && timers()[0] && timers()[0].ring === 1, JSON.stringify([pushed.length, timers()]));
+    raw.prepare('DELETE FROM push_timers').run();
+    // limits
+    for (let i = 0; i < 23; i++) await setT({ idToken: tA, sub: devT.sub, key: 'm' + i, inMs: 600000 + i });
+    expect('v109: at most twenty timers a device (the newest kept)', timers().length === 20 && !timers().some(t => t.tkey === 'm0'), timers().length);
+    // the other crons do not ring timers, and the minute's does not run the daily sweep
+    raw.prepare('UPDATE push_timers SET due = ? WHERE tkey = ?').run(Date.now() - 5, 'm22');
+    pushed = [];
+    { const w = []; await worker.scheduled({ cron: '17 * * * *', scheduledTime: Date.now() }, envT, { waitUntil: p => w.push(p) }); await Promise.all(w.map(p => p.catch(() => null))); }
+    expect('v109: the hourly cron does not ring timers', !pushed.length, pushed.length);
+    raw.prepare("INSERT OR REPLACE INTO counters (k, n, until) VALUES ('expired-test', 1, ?)").run(Date.now() - 1000);
+    await minute();
+    expect('v109: the minute\'s cron rings them (all three rings fall in this minute), and leaves the daily sweep to the daily cron', pushed.length === 3
+      && raw.prepare("SELECT COUNT(*) AS n FROM counters WHERE k = 'expired-test'").get().n === 1, JSON.stringify([pushed.length]));
+    const noKey = Object.assign({}, envT); delete noKey.VAPID_JWK;
+    r = await setT({ idToken: tA, sub: devT.sub, key: 'n', inMs: 60000 }, noKey);
+    expect('v109: without the server\'s key a timer is refused as not set up (the app then keeps it to itself)', r.status === 503 && r.d.needsConfig === true, JSON.stringify(r));
   } finally { globalThis.fetch = realFetch; }
 }
 

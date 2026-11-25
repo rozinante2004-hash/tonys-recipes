@@ -1,4 +1,14 @@
-// Tony's Recipes — Cloudflare Worker v108
+// Tony's Recipes — Cloudflare Worker v109
+// v109: A TIMER RINGS WHEN THE PHONE IS LOCKED OR IN ANOTHER APP (Tony, 25 Nov 2026: "Yes. Please send a notification
+//   when the time is up on an iPhone and whatever is needed for Android, so it makes a sound while the phone is locked or
+//   while in another app."). The same Web Push as the chats, sent LATER: `push-timer` { idToken, sub, key, inMs, title,
+//   body } keeps one timer of one device (its address and keys come with it — no chat sign-up needed) to ring inMs from
+//   now (this server's clock, so a phone's wrong clock does not matter), a second to 31 days; `push-timer-cancel`
+//   { endpoint, keys | all } lets it go (knowing the device's address is enough, as for push-forget). It rings three
+//   times, 30 s apart (TIMER_RINGS), unless the app — opened, or the notification tapped — lets it go first. Who rings it:
+//   a cron every minute (MINUTE_CRON) takes the rings due in the next minute and sends each at its second; one due within
+//   28 s of being set is rung from the request itself. Kept: the device's address and keys, the person, the timer's
+//   two lines (the dish and the step) and when — until its last ring, an hour late at most. health: `timers`.
 // v108: CHAT NOTIFICATIONS WHEN THE APP IS CLOSED (Tony, 20 Nov 2026: "Yes, build it, show the message text, both family
 //   and linked kitchen chats."). Web Push: `push-key` → { key } (this server's public VAPID key); `push-subscribe`
 //   { idToken, hid, sub, lang, words } keeps a device's push address for a member of that household; `push-forget`
@@ -517,7 +527,7 @@
 //   AI_MAX_TOKENS   – the longest answer one call may ask for (32000; the
 //                     app's largest, reading several recipes at once, asks 8000).
 
-const WORKER_VERSION = 'v108';
+const WORKER_VERSION = 'v109';
 // v105 (audit S1) — the actions that take a sign-in, and whether a call without one is still served (see the top).
 const SIGNED_ACTIONS = new Set(['fetch-url', 'facebook-fetch', 'instagram-fetch', 'fb-probe', 'video-from-url',
   'video-recipe', 'photo-fetch', 'photo-search', 'video-ticket']);
@@ -1119,6 +1129,7 @@ async function usageEvaluate(env, m) {
 // token that may only read analytics (CF_ANALYTICS_TOKEN, from the GitHub secret of that name). Pages builds and
 // Firebase's own counts stay with the GitHub watch (other keys); the apps count their Firestore reads (v83).
 const CF_ACCOUNT = '4dbc420100c13bf94fda83047ce0a7ac';   // public: worker/wrangler.jsonc
+const MINUTE_CRON = '* * * * *';                          // v109 — the timers' rings (worker/wrangler.jsonc triggers)
 const HOURLY_CRON = '17 * * * *';                          // worker/wrangler.jsonc triggers
 async function cloudflareToday(env) {
   const now = new Date(), since = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
@@ -1350,6 +1361,7 @@ async function handleRequest(request, env, ctx) {
         signals: !!env.METER_DB,      // v69 — the testers' apps report errors and feature counts
         survey: !!env.METER_DB,       // v71 — the end-of-beta question
         push: !!(env.VAPID_JWK && env.METER_DB),   // v108 — chat notifications when the app is closed (Web Push)
+        timers: !!(env.VAPID_JWK && env.METER_DB),   // v109 — a timer rings on a locked phone (push-timer)
         configured: {
           anthropic: !!env.ANTHROPIC_API_KEY,
           openverse: true,
@@ -1864,7 +1876,7 @@ async function handleRequest(request, env, ctx) {
       return sr;
     }
     if (body.action === 'survey-status' || body.action === 'survey-answer') return await surveyAction(request, env, body);   // v71
-    if (/^push-(key|subscribe|notify|forget)$/.test(String(body.action || ''))) return await pushAction(request, env, body);   // v108
+    if (/^push-(key|subscribe|notify|forget|timer|timer-cancel)$/.test(String(body.action || ''))) return await pushAction(request, env, body, ctx);   // v108; v109 timers
 
     // ── Anthropic proxy ───────────────────────────────────────────────────────
     try {
@@ -2549,6 +2561,11 @@ async function pushDb(env) {
     + 'uid TEXT NOT NULL, hid TEXT NOT NULL, p256dh TEXT NOT NULL, auth TEXT NOT NULL, lang TEXT, words TEXT, at INTEGER, '
     + 'sent_at INTEGER, fails INTEGER NOT NULL DEFAULT 0)');
   await tableOnce(db, 'push_subs_by_hid', 'CREATE INDEX IF NOT EXISTS push_subs_by_hid ON push_subs (project, hid)');
+  // v109 — a timer's rings: one row a timer of a device (id = its address + '#' + the app's key for it)
+  await tableOnce(db, 'push_timers', 'CREATE TABLE IF NOT EXISTS push_timers (id TEXT PRIMARY KEY, endpoint TEXT NOT NULL, '
+    + 'project TEXT NOT NULL, uid TEXT NOT NULL, p256dh TEXT NOT NULL, auth TEXT NOT NULL, due INTEGER NOT NULL, '
+    + 'ring INTEGER NOT NULL DEFAULT 0, title TEXT NOT NULL, body TEXT NOT NULL, tkey TEXT NOT NULL, at INTEGER NOT NULL)');
+  await tableOnce(db, 'push_timers_due', 'CREATE INDEX IF NOT EXISTS push_timers_due ON push_timers (due)');
   await tableOnce(db, 'counters', 'CREATE TABLE IF NOT EXISTS counters (k TEXT PRIMARY KEY, n INTEGER NOT NULL DEFAULT 0, until INTEGER)');
   return db;
 }
@@ -2595,7 +2612,7 @@ function pushWords(w) {
   if (w && typeof w === 'object') ['all'].forEach(k => { if (typeof w[k] === 'string') out[k] = w[k].replace(/[\u0000-\u001f]/g, '').slice(0, 40); });
   return JSON.stringify(out);
 }
-async function pushAction(request, env, body) {
+async function pushAction(request, env, body, ctx) {
   const a = body.action;
   const v = await vapidKey(env);
   if (!v || !env.METER_DB) return jsonResp({ error: 'PUSH: notifications are not set up on the server.', needsConfig: true }, 503);
@@ -2607,6 +2624,18 @@ async function pushAction(request, env, body) {
     if (!pushEndpointOk(ep)) return jsonResp({ error: 'PUSH: which device?' }, 400);
     await db.prepare('DELETE FROM push_subs WHERE endpoint = ?1').bind(ep).run();
     return jsonResp({ ok: true });
+  }
+  // v109 — a timer let go (stopped, paused, done, or the app opened while it rings): the device's address is enough
+  if (a === 'push-timer-cancel') {
+    const ep = String((body.sub && body.sub.endpoint) || body.endpoint || '');
+    if (!pushEndpointOk(ep)) return jsonResp({ error: 'PUSH: which device?' }, 400);
+    let n = 0;
+    if (body.all === true) n = ((await db.prepare('DELETE FROM push_timers WHERE endpoint = ?1').bind(ep).run()).meta || {}).changes || 0;
+    else for (const k of (Array.isArray(body.keys) ? body.keys : []).slice(0, 50)) {
+      if (!TIMER_KEY_RE.test(String(k))) continue;
+      n += ((await db.prepare('DELETE FROM push_timers WHERE id = ?1').bind(ep + '#' + k).run()).meta || {}).changes || 0;
+    }
+    return jsonResp({ ok: true, cancelled: n });
   }
   const s = await pushSignedIn(body, env);
   if (s.resp) return s.resp;
@@ -2629,6 +2658,7 @@ async function pushAction(request, env, body) {
     for (const r of mine.slice(PUSH_PER_PERSON)) await db.prepare('DELETE FROM push_subs WHERE endpoint = ?1').bind(r.endpoint).run();
     return jsonResp({ ok: true, key: v.pub });
   }
+  if (a === 'push-timer') return await timerSet(env, db, claims, body, ctx);
   if (a !== 'push-notify') return jsonResp({ error: 'PUSH: unknown action' }, 400);
   const kind = body.kind === 'kitchen' ? 'kitchen' : 'family', id = String(body.id || '');
   if (!/^[A-Za-z0-9]{1,40}$/.test(id)) return jsonResp({ error: 'PUSH: which message?' }, 400);
@@ -2703,6 +2733,88 @@ async function pushAction(request, env, body) {
   const sent = answers.filter(s => s >= 200 && s < 300).length;
   if (answers.length && !sent) console.log('[push] none of ' + answers.length + ' delivered: ' + answers.join(','));
   return jsonResp({ ok: true, sent, devices: answers.length });
+}
+// ── v109 — TIMERS THAT RING ON A LOCKED PHONE ───────────────────────────────────────────────────────────────────────
+const TIMER_KEY_RE = /^[A-Za-z0-9_.:-]{1,80}$/;
+const TIMER_MAX_MS = 31 * 864e5 + 36e5;   // 31 days (and an hour's slack for a timer set at the edge)
+const TIMER_RINGS = 3;                    // rung three times…
+const TIMER_RING_GAP = 30e3;              // …30 s apart, unless let go first
+const TIMER_SOON_MS = 28e3;               // due this soon: rung from the request that set it (the sweep runs once a minute)
+const TIMERS_PER_DEVICE = 20, TIMERS_PER_PERSON = 40;
+const TIMER_TTL_SEC = 1800;               // a phone out of reach for half an hour: that ring is not worth delivering late
+function timerSleep(env, ms) { return env.__sleep ? env.__sleep(ms) : new Promise(r => setTimeout(r, Math.max(0, ms))); }
+async function timerSet(env, db, claims, body, ctx) {
+  const sub = body.sub || {}, keys = sub.keys || {}, key = String(body.key || '');
+  if (!pushEndpointOk(sub.endpoint)) return jsonResp({ error: 'PUSH: this device\'s notification address is not one this server sends to.' }, 400);
+  try { if (b64uBytes(keys.p256dh).length !== 65 || b64uBytes(keys.auth).length !== 16) throw 0; }
+  catch (e) { return jsonResp({ error: 'PUSH: this device\'s notification keys are not valid.' }, 400); }
+  if (!TIMER_KEY_RE.test(key)) return jsonResp({ error: 'PUSH: which timer?' }, 400);
+  const inMs = Math.round(Number(body.inMs));
+  if (!(inMs >= 1000 && inMs <= TIMER_MAX_MS)) return jsonResp({ error: 'PUSH: a timer runs from a second to 31 days.' }, 400);
+  const title = pushText(String(body.title || '')).slice(0, 80) || '\u23F0', text = pushText(String(body.body || '')).slice(0, 200);
+  const now = Date.now(), due = now + inMs, id = sub.endpoint + '#' + key, project = claims.aud, me = claims.sub;
+  await db.prepare('INSERT INTO push_timers (id, endpoint, project, uid, p256dh, auth, due, ring, title, body, tkey, at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 0, ?8, ?9, ?10, ?11) '
+    + 'ON CONFLICT (id) DO UPDATE SET project = ?3, uid = ?4, p256dh = ?5, auth = ?6, due = ?7, ring = 0, title = ?8, body = ?9, at = ?11')
+    .bind(id, sub.endpoint, project, me, String(keys.p256dh), String(keys.auth), due, title, text, key, now).run();
+  // At most twenty a device and forty a person: the ones set longest ago go.
+  const dev = (await db.prepare('SELECT id FROM push_timers WHERE endpoint = ?1 ORDER BY at DESC').bind(sub.endpoint).all()).results || [];
+  for (const r of dev.slice(TIMERS_PER_DEVICE)) await db.prepare('DELETE FROM push_timers WHERE id = ?1').bind(r.id).run();
+  const per = (await db.prepare('SELECT id FROM push_timers WHERE project = ?1 AND uid = ?2 ORDER BY at DESC').bind(project, me).all()).results || [];
+  for (const r of per.slice(TIMERS_PER_PERSON)) await db.prepare('DELETE FROM push_timers WHERE id = ?1').bind(r.id).run();
+  if (inMs <= TIMER_SOON_MS) {
+    const soon = timerSleep(env, inMs).then(() => timerRingDue(env, id)).catch(() => null);
+    if (ctx && ctx.waitUntil) ctx.waitUntil(soon);
+  }
+  return jsonResp({ ok: true, key, due });
+}
+async function timerRingDue(env, id) {
+  const v = await vapidKey(env), db = await pushDb(env);
+  if (!v || !db) return 0;
+  const row = await db.prepare('SELECT * FROM push_timers WHERE id = ?1').bind(id).first();
+  if (!row || row.due > Date.now() + 1000) return 0;
+  return (await timerRing(env, v, db, row)) ? 1 : 0;
+}
+// One ring: claimed first (moved on to the next ring, or gone after the last) so that a cancel, or another run, wins.
+async function timerRing(env, v, db, row) {
+  const next = Number(row.ring) + 1;
+  const ch = next >= TIMER_RINGS
+    ? await db.prepare('DELETE FROM push_timers WHERE id = ?1 AND ring = ?2 AND due = ?3').bind(row.id, row.ring, row.due).run()
+    : await db.prepare('UPDATE push_timers SET ring = ?4, due = ?5 WHERE id = ?1 AND ring = ?2 AND due = ?3').bind(row.id, row.ring, row.due, next, Number(row.due) + TIMER_RING_GAP).run();
+  if (!ch || !ch.meta || !ch.meta.changes) return null;
+  let status = 0;
+  try {
+    const payload = { kind: 'timer', title: row.title, body: row.body, tag: 'mkn-timer-' + row.tkey, timer: row.tkey, ring: next, of: TIMER_RINGS };
+    const enc = await pushEncrypt(JSON.stringify(payload), row.p256dh, row.auth);
+    const r = await (env.__fetch || fetch)(row.endpoint, { method: 'POST', body: enc, signal: AbortSignal.timeout(8000),
+      headers: { Authorization: await vapidAuth(v, row.endpoint), 'Content-Encoding': 'aes128gcm',
+        'Content-Type': 'application/octet-stream', TTL: String(TIMER_TTL_SEC), Urgency: 'high' } });
+    status = r.status;
+  } catch (e) { status = -1; }
+  if (status === 404 || status === 410) { try { await db.prepare('DELETE FROM push_timers WHERE endpoint = ?1').bind(row.endpoint).run(); } catch (e) {} }
+  return { status, next: next < TIMER_RINGS ? { due: Number(row.due) + TIMER_RING_GAP, ring: next } : null };
+}
+// The minute's sweep: every ring due before the next sweep, each sent at its second (the cron allows minutes of waiting).
+async function timerSweep(env, at) {
+  const v = await vapidKey(env), db = await pushDb(env);
+  if (!v || !db) return { rang: 0 };
+  const now = Date.now(), until = Math.max(now, at || 0) + 60e3;
+  await db.prepare('DELETE FROM push_timers WHERE due < ?1').bind(now - 36e5).run();   // an hour overdue (the server was down): let go
+  const queue = ((await db.prepare('SELECT * FROM push_timers WHERE due < ?1 ORDER BY due LIMIT 200').bind(until).all()).results || []);
+  let rang = 0;
+  while (queue.length) {
+    const row = queue.shift(), wait = Number(row.due) - Date.now();
+    if (wait > 0) await timerSleep(env, wait);
+    const r = await timerRing(env, v, db, row);
+    if (!r) continue;
+    if (r.status >= 200 && r.status < 300) rang++;
+    // its next ring, if it falls before the next sweep, is rung by this one (in its place by time)
+    if (r.next && r.next.due < until && r.status !== 404 && r.status !== 410) {
+      const again = Object.assign({}, row, r.next);
+      let i = queue.findIndex(q => Number(q.due) > again.due); if (i < 0) i = queue.length;
+      queue.splice(i, 0, again);
+    }
+  }
+  return { rang };
 }
 function pushText(t) {
   t = String(t || '').replace(/\s+/g, ' ').trim();
@@ -4712,6 +4824,11 @@ export default {
   // v75 — the daily sweep (cron in worker/wrangler.jsonc).
   async scheduled(event, env, ctx) {
     const at = (event && Number(event.scheduledTime)) || Date.now();
+    // v109 — every minute: the timers whose rings fall in it
+    if (event && event.cron === MINUTE_CRON) {
+      const tp = timerSweep(env, at).catch(e => { console.log('[timers] ' + String((e && e.message) || e).slice(0, 120)); return null; });
+      if (ctx && ctx.waitUntil) ctx.waitUntil(tp); else await tp; return;
+    }
     // v84 — the hourly usage check (its own cron); the daily sweep is the other
     if (event && event.cron === HOURLY_CRON) {
       // v90 — and any report a run after it was sent could not pass on
@@ -4768,4 +4885,4 @@ export default {
   }
 };
 
-// ── END OF WORKER v108 ── If this is the last line in the Cloudflare editor, the whole file was pasted.
+// ── END OF WORKER v109 ── If this is the last line in the Cloudflare editor, the whole file was pasted.

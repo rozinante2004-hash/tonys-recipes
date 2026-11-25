@@ -1,4 +1,4 @@
-// Tony's Recipes — Service Worker v5 (v40.02: + chat notifications, `push` and `notificationclick` below)
+// Tony's Recipes — Service Worker v5 (v40.02: + chat notifications, `push` and `notificationclick` below; v40.15: + timers)
 // Strategy: stale-while-revalidate for the document, cache-first for assets.
 // version.json is never cached, and the in-app update banner is what tells the
 // user a newer version has landed — see the note on the fetch handler below.
@@ -205,6 +205,15 @@ self.addEventListener('push', function(event) {
     var apple = /iPhone|iPad|iPod|Macintosh/.test(ua) && !/Chrome|CriOS|Chromium|Firefox|FxiOS|Edg/.test(ua);
     var onScreen = list.some(function(c) { return c.visibilityState === 'visible'; });
     if (onScreen && !apple) return null;
+    // v40.15 (Worker v109) — a timer whose time is up: { kind: 'timer', title, body, tag, timer, ring, of }. It stays until
+    // it is seen (requireInteraction, where the phone allows), rings and vibrates again at each of its three rings; a tap
+    // opens the app, which lets its remaining rings go. While the app is on the screen it rings there itself.
+    if (d.kind === 'timer') {
+      return self.registration.showNotification(String(d.title || '\u23F0').slice(0, 120), {
+        body: String(d.body || '').slice(0, 400), tag: String(d.tag || 'mkn-timer'), renotify: true, requireInteraction: true,
+        vibrate: [300, 150, 300, 150, 600], dir: 'auto', icon: BASE + 'icons/icon-192.png', data: { timer: String(d.timer || '') }
+      });
+    }
     return self.registration.showNotification(String(d.title || '\u{1F4AC}').slice(0, 120), {
       body: String(d.body || '').slice(0, 400), tag: String(d.tag || 'mkn-chat'), renotify: true, dir: 'auto',
       icon: BASE + 'icons/icon-192.png', data: { chat: String(d.chat || ''), hid: String(d.hid || '') }
@@ -212,14 +221,15 @@ self.addEventListener('push', function(event) {
   }));
 });
 self.addEventListener('notificationclick', function(event) {
-  var n = event.notification, chat = (n.data && n.data.chat) || '';
+  var n = event.notification, chat = (n.data && n.data.chat) || '', timer = (n.data && n.data.timer) || '';
   n.close();
   var url = new URL(BASE, self.location.origin);
   if (/^[fk]:[A-Za-z0-9_-]{1,80}$/.test(chat)) url.searchParams.set('chat', chat);
+  if (/^[A-Za-z0-9_.:-]{1,80}$/.test(timer)) url.searchParams.set('timer', timer);   // v40.15 — the app lets its rings go
   event.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(list) {
     var open = list.filter(function(c) { try { return new URL(c.url).pathname.indexOf(BASE) === 0; } catch (e) { return false; } })[0];
     if (open) {
-      try { open.postMessage({ type: 'mkn-open-chat', chat: chat }); } catch (e) {}
+      try { open.postMessage(timer ? { type: 'mkn-timer', timer: timer } : { type: 'mkn-open-chat', chat: chat }); } catch (e) {}
       return open.focus();
     }
     return self.clients.openWindow(url.href);
