@@ -24328,6 +24328,44 @@ window.SELF_TESTS = [
         recipes=recipes.filter(function(r){return r.id!==testId;}); renderGrid();
       }
     } },
+  { id:'step_timers_every_language', group:'Features', name:'⏱ A step’s time is read in Hebrew, in words and in the app’s other languages — every recipe has its timers with nothing stored (v40.14: “20 דקות”, “כחצי שעה”, “שעה וחצי”, “an hour”, “1 h 30”); “פרוסות דקות”, “בשעה 8” and “a second batch” are not timers',
+    test: async()=>{
+      // Tony, 25 Nov 2026: "I do not have them in all recipes … go over my recipes and add these timer wherever applicable."
+      // The timers were never stored: a Hebrew step's time was simply not read (only "20 minutes"-style English was).
+      var cases=[
+        ['לבשל 20 דקות על אש קטנה',[1200]], ['לאפות 25-30 דקות ב-180 מעלות',[1500]], ["לטגן 3–4 דק' מכל צד",[180]], ["לצלות 40 ד'",[2400]],
+        ['לאפות 20־25 דק׳',[1200]], ['לבשל כ־2.5 שעות',[9000]], ['לבשל כחצי שעה',[1800]], ['להשאיר לתפוח כשעה וחצי',[5400]],
+        ['לבשל על אש נמוכה שעתיים וחצי',[9000]], ['להשרות שעה, ואז לבשל רבע שעה',[3600,900]], ['לאדות שלושת רבעי שעה',[2700]],
+        ['לבשל שעה ו-20 דקות',[4800]], ['לבשל שעה ועשרים דקות',[4800]], ['לבשל 2 שעות וחצי',[9000]], ['לבשל חמש דקות',[300]],
+        ['לבשל כדקה',[60]], ['לערבב דקה או שתיים',[60]], ['לבשל דקה וחצי',[90]], ['לקרר לפחות 4 שעות',[14400]],
+        ['לחתוך לפרוסות דקות',[]], ['בשעה שהבצק תופח, להכין את המלית',[]], ['להגיש בשעה 8',[]], ['להשרות 48 שעות',[]],
+        ['Bake 1 hour then rest 90 seconds',[3600,90]], ['Stir gently',[]], ['Simmer for an hour',[3600]], ['Rest for half an hour',[1800]],
+        ['Bake 1½ hours',[5400]], ['Bake 1 1/2 hours',[5400]], ['Let rise 1 hour 30 minutes',[5400]], ['Let rise 1h30',[5400]],
+        ['Rest 2 hours and 15 minutes',[8100]], ['Simmer 1:30 hours',[5400]], ['Chill for an hour and a half',[5400]],
+        ['Cook 2-3 minutes per side',[120]], ['Bake at 350 for 25 to 30 minutes',[1500]], ['Bake 45 minutes to an hour',[2700,3600]],
+        ['Cook for a minute, then repeat with a second batch',[60]], ['Add a few minutes later',[]], ['5 mint leaves',[]], ['2 handfuls of spinach',[]],
+        ['Варить 20 минут',[1200]], ['Cuire 1 h 30',[5400]], ['Backen 15 Min.',[900]], ['Cocinar 1 hora y media',[5400]], ['Cuocere per 2 ore',[7200]],
+        ['Cozinhe 10 minutos',[600]], ['20 percig főzzük',[1200]], ['اطبخي لمدة ٢٠ دقيقة',[1200]], ['20分煮る',[1200]], ['3分の1カップ',[]],
+        ['煮20分钟',[1200]], ['炖半小时',[1800]], ['1時間半寝かせる',[5400]]
+      ];
+      var wrong=cases.filter(function(c){ return JSON.stringify(findStepTimers(c[0]).map(function(t){ return t.secs; }))!==JSON.stringify(c[1]); });
+      if(wrong.length) throw new Error(wrong.length+' step(s) read wrong, e.g. “'+wrong[0][0]+'” → '+JSON.stringify(findStepTimers(wrong[0][0]))+', want '+JSON.stringify(wrong[0][1]));
+      if(findStepTimers('5 minutes, 10 minutes, 15 minutes, 20 minutes').length!==3) throw new Error('more than three timers on one step');
+      // a Hebrew recipe shows them on its steps, as the English ones always did
+      var testId=888896;
+      recipes.unshift(normalizeRecipe({id:testId,name:'Self-test timers',ingredients:[{a:'1',n:'בצל'}],steps:['לטגן את הבצל 10 דקות','לבשל כשעה וחצי','לחתוך לפרוסות דקות'],updatedAt:Date.now()}));
+      try {
+        openView(testId); await wait(80);
+        var lis=document.querySelectorAll('#viewModal .steps-list li');
+        var b0=lis[0]&&lis[0].querySelector('.cook-timer-btn'), b1=lis[1]&&lis[1].querySelector('.cook-timer-btn');
+        if(!b0||b0.textContent.indexOf('10:00')===-1) throw new Error('“10 דקות” has no ⏱ 10:00 on its step');
+        if(!b1||b1.textContent.indexOf('1:30:00')===-1) throw new Error('“כשעה וחצי” has no ⏱ 1:30:00 on its step');
+        if(lis[2]&&lis[2].querySelector('.cook-timer-btn')) throw new Error('“פרוסות דקות” (thin slices) was given a timer');
+      } finally {
+        closeM('viewOverlay'); clearCookTimers();
+        recipes=recipes.filter(function(r){return r.id!==testId;}); renderGrid();
+      }
+    } },
   { id:'feat_line_marker', group:'Features', name:'Line marker: tap to mark, slides, survives re-render',
     test: async()=>{
       ['markLine','clearLineMark','loadLineMark','refreshLineMarker'].forEach(function(f){

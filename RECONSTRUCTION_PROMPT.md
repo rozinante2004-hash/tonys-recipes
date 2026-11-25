@@ -3327,7 +3327,32 @@ never lose it.
 
 **Step timers.** Durations found by `findStepTimers()` render as `.cook-timer-btn` countdowns
 inside the step. These lived in Cook Mode but were never part of it; they survived its removal.
-`clearCookTimers()` runs on every re-render and when the recipe closes.
+`clearCookTimers()` runs on every re-render and when the recipe closes. **Nothing is stored:** the
+time is read from the step's words every time the recipe is drawn, so a better reading gives every
+recipe its timers at once (v40.14 — Tony thought older recipes lacked them; it was Hebrew steps that
+were never read). `findStepTimers(text)` → up to three `{secs, label}`, in the order written, one per
+length, 5 s to 24 h. It reads (regexes built once in `stepTimerRx()`; no look-behind — older iPhones):
+- a figure + a unit of any of the app's languages: Hebrew דקות / דקה / דק' / ד' (׳ ’ too), שעות / שעה,
+  שניות; ru мин/минут/час/ч/сек; fr min/heure/h; de Min./Minute(n)/Std./Stunde(n)/Sek.; es/pt
+  minuto(s)/hora(s)/segundo(s); it minuti/ore/ora; hu perc(ig)/óra/másodperc; ar دقيقة/دقائق/ساعة/
+  ساعات/ثانية; ja 分 (not 分の — "3分の1" is a third)/時間/秒; zh 分钟/小时/秒 — a unit never runs into a
+  letter ("5 mint", "2 handfuls"); figures 1.5, 1,5, 1½, 1 1/2, ½, and Arabic-Indic / Persian / full-width
+  digits (mapped one for one first, so places stay);
+- a range as its SHORTER time ("25–30 minutes", "20־25 דק׳", "2 or 3", "5 a 10" → the first: look then;
+  until v40.13 the longer one), "and a half" / וחצי / y media / et demie / 半 after the unit;
+- hours and minutes as one: "1 h 30", "1h30", "1:30 hours", and any two readings in falling units with
+  only a comma / and / ו / y / et / und / e / и between ("1 hour 30 minutes", "שעה ו-20 דקות", "שעה ועשרים
+  דקות");
+- words: English a/an/one…twelve, fifteen, twenty(-five), thirty, forty(-five), fifty, sixty, ninety +
+  unit; half an hour, a quarter of an hour, three quarters of an hour, an hour and a half, half a
+  minute; Hebrew number words (שתי, שלוש, חמש, עשר, עשרים…, masculine forms too) + unit; שעה (with
+  ו/כ/ל only), חצי שעה, רבע שעה, שלושת רבעי שעה, שעה וחצי, שעה ורבע, שעתיים (וחצי / ורבע), דקה וחצי,
+  דקותיים, חצי דקה; Chinese 半小时.
+Never: "דקות" without a number (also "thin": פרוסות דקות) — "דקה" alone only as כדקה / לדקה / במשך דקה /
+עוד דקה / דקה אחת / דקה או שתיים; "בשעה" (at eight; while…) and "משעה"; "a second batch" (under 5 s);
+over a day ("48 שעות"). Where readings overlap, the one that starts first, then the longer, wins.
+Self Test `step_timers_every_language` (54 steps in eleven languages, and a Hebrew recipe showing ⏱ 10:00
+and ⏱ 1:30:00 on its steps but none on "פרוסות דקות").
 
 **Voice (3.7)** is scoped to the marker: `handleVoiceCommand()` understands next / back / repeat /
 clear / ingredients / steps in English and Hebrew, clamps at the first and last line, and is

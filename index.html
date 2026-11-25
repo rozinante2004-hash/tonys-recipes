@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v40.13 -->
+<!-- Tony's Recipes Collection v40.14 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -11426,7 +11426,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v40.13';
+var APP_VERSION = 'v40.14';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -15198,7 +15198,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v40.13</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v40.14</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -15286,7 +15286,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v40.13</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v40.14</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -17083,20 +17083,118 @@ window.setSort = setSort; window.sortPaint = sortPaint;
 // timers were never really part of it, so they now sit on the steps themselves.
 var _cookTimers = {};
 
-function findStepTimers(text) {
-  var out = [], seen = {};
-  var re = /(\d+(?:[.,]\d+)?)\s*(hours?|hrs?|minutes?|mins?|seconds?|secs?)\b/gi, m;
-  while ((m = re.exec(String(text||'')))) {
-    var n = parseFloat(m[1].replace(',', '.'));
-    var u = m[2].toLowerCase();
-    var secs = /^h/.test(u) ? n*3600 : /^m/.test(u) ? n*60 : n;
-    secs = Math.round(secs);
-    if (!secs || secs > 24*3600 || seen[secs]) continue;
-    seen[secs] = true;
-    out.push({ secs: secs, label: m[0] });
-  }
-  return out.slice(0, 3);
+// v40.14 — Tony, 25 Nov 2026: "I think the timers in the recipes are great. However, I think I do not have them in all
+// recipes as it was a late addition. I would like you to go over my recipes and add these timer wherever applicable."
+// A timer is never stored in a recipe: it is read from the step's words each time the recipe is drawn, so no recipe is
+// edited — the reading is what changed. Until v40.13 it read only English figures ("20 minutes", "1 hour"), so a Hebrew
+// step ("לבשל 20 דקות", "כחצי שעה", "שעה וחצי", "שעתיים") had none, nor "an hour" or "half an hour". Now it reads:
+//  - a figure and a unit in the app's languages: Hebrew דקות / דקה / דק' / ד', שעות / שעה, שניות; Russian, French, German,
+//    Spanish, Italian, Portuguese, Hungarian, Arabic (Arabic-Indic figures too), Japanese, Chinese; 1½, 1 1/2, 1.5, 1,5;
+//  - a range as its shorter time ("25–30 minutes" → 25:00: look then; it used to be the longer one);
+//  - hours and minutes as one timer: "1 h 30", "1h30", "1:30 hours", "an hour and 20 minutes", "שעה ו-20 דקות";
+//  - the words cooks write: an hour, a minute, two hours, half an hour, a quarter of an hour, an hour and a half; שעה,
+//    חצי שעה, רבע שעה, שלושת רבעי שעה, שעה וחצי, שעה ורבע, שעתיים (וחצי), דקה וחצי, דקותיים, חמש דקות, עשרים דקות; 半小时.
+// Never a timer: "דקות" with no number (it is also "thin": פרוסות דקות) — "דקה" alone only as כדקה / לדקה / במשך דקה /
+// עוד דקה / דקה אחת / דקה או שתיים; "בשעה" (at eight o'clock; while…); "a second batch"; under 5 seconds or over a day.
+var STEP_TIMER_RX = null;
+function stepTimerRx() {
+  if (STEP_TIMER_RX) return STEP_TIMER_RX;
+  var NUM = '(\\d+(?:[.,]\\d+)?(?:\\s?[½¼¾⅓⅔]|\\s[1-3]\\/[2-4])?|[½¼¾⅓⅔]|[1-3]\\/[2-4])';
+  var H = 'hours?|hrs?|h|שעות|שעה|часов|часа|час|ч\\.?|heures?|stunden|stunde|std\\.?|horas?|ore|ora|óráig|órát|órán|órára|óra|ساعات|ساعة|時間|个小时|個小時|小时|小時';
+  var M = 'minutes?|mins?\\.?|דקות|דקה|דק[\'׳’]?|ד[\'׳’]|минуты|минуту|минута|минут|мин\\.?|minuten|minute|minutos?|minuti|minuto|percig|percet|percre|perc|دقائق|دقيقة|دقيقه|分钟|分鐘|分(?!の)';
+  var S = 'seconds?|secs?\\.?|שניות|שנייה|שניה|секунды|секунду|секунда|секунд|сек\\.?|secondes?|sekunden|sekunde|sek\\.?|segundos?|secondi|secondo|másodpercig|másodperc|ثوان[يٍ]?|ثانية|秒';
+  var END = '(?![A-Za-z\\u00C0-\\u024F\\u0400-\\u04FF\\u05D0-\\u05EA\\u0620-\\u064A])';
+  var HALF = '(\\s*(?:and a half|וחצי|y media|et demie|e mezza|e meia|с половиной|半))?';
+  var HEB = '\\u05D0-\\u05EA';
+  STEP_TIMER_RX = {
+    num: new RegExp(NUM + '(?:\\s*(?:-|–|—|־|to|or|עד|או|до|à|a|bis|ou|o)\\s*' + NUM + ')?(\\s+and\\s+a\\s+half)?\\s*(?:(' + H + ')|(' + M + ')|(' + S + '))' + END + HALF, 'gi'),
+    hm: new RegExp('(\\d+)\\s*(?:hours?|hrs?|h|ч\\.?|std\\.?|heures?)\\s*(\\d{1,2})(?![\\d.,:\\/])(?!\\s*(?:' + S + ')' + END + ')', 'gi'),
+    clock: new RegExp('(\\d{1,2}):([0-5]\\d)\\s*(?:hours?|hrs?|h|שעות|часа|часов|heures?|stunden|std\\.?|horas?|ore)' + END, 'gi'),
+    enPhrase: /\b(three[\s-]quarters? of an hour|(?:a\s+)?quarter[\s-](?:of\s+an\s+)?hour|an\s+hour\s+and\s+a\s+half|a\s+minute\s+and\s+a\s+half|half[\s-](?:an[\s-])?hour|half\s+a\s+minute)\b/gi,
+    enWord: /\b(twenty-five|forty-five|twenty|thirty|forty|fifty|sixty|ninety|fifteen|eleven|twelve|one|two|three|four|five|six|seven|eight|nine|ten|an|a)(\s+and\s+a\s+half)?\s+(hours?|hrs?|minutes?|mins?|seconds?|secs?)\b(\s+and\s+a\s+half)?/gi,
+    hePhrase: new RegExp('(^|[^' + HEB + '])([וכלבמ]{0,2})(שלושת רבעי שעה|שלושה רבעי שעה|שעתיים וחצי|שעתיים ורבע|שעתיים|שעה וחצי|שעה ורבע|חצי[\\s\\-־]שעה|רבע שעה|דקה וחצי|דקותיים|חצי דקה)(?![' + HEB + '])', 'g'),
+    heWord: new RegExp('(^|[^' + HEB + '])([וכלבמ]{0,2})(אחת|שתיים|שתים|שתי|שלושה|שלוש|ארבעה|ארבע|חמישה|חמש|שישה|שש|שבעה|שבע|שמונה|תשעה|תשע|עשרים|שלושים|ארבעים|חמישים|שישים|עשרה|עשר)\\s+(שעות|שעה|דקות|דקה|שניות)(\\s+וחצי)?(?![' + HEB + '])', 'g'),
+    heHour: new RegExp('(^|[^' + HEB + '])([וכל]{0,2}שעה)(?![' + HEB + '])(?!\\s*\\d)', 'g'),
+    heMinute: new RegExp('(^|[^' + HEB + '])((?:[כל]|במשך\\s+|עוד\\s+)דקה(?:\\s+אחת)?|דקה(?=\\s+(?:או|עד)\\s+(?:שתיים|שתים|שתי|2)))(?![' + HEB + '])', 'g'),
+    zhHalf: /半(?:个|個)?(?:小时|小時)/g
+  };
+  return STEP_TIMER_RX;
 }
+var STEP_TIMER_WORDS = { a:1, an:1, one:1, two:2, three:3, four:4, five:5, six:6, seven:7, eight:8, nine:9, ten:10,
+  eleven:11, twelve:12, fifteen:15, twenty:20, 'twenty-five':25, thirty:30, forty:40, 'forty-five':45, fifty:50, sixty:60, ninety:90,
+  'אחת':1, 'שתיים':2, 'שתים':2, 'שתי':2, 'שלושה':3, 'שלוש':3, 'ארבעה':4, 'ארבע':4, 'חמישה':5, 'חמש':5, 'שישה':6, 'שש':6,
+  'שבעה':7, 'שבע':7, 'שמונה':8, 'תשעה':9, 'תשע':9, 'עשרה':10, 'עשר':10, 'עשרים':20, 'שלושים':30, 'ארבעים':40, 'חמישים':50, 'שישים':60 };
+var STEP_TIMER_HE = { 'שלושת רבעי שעה':[2700,3600], 'שלושה רבעי שעה':[2700,3600], 'שעתיים וחצי':[9000,3600], 'שעתיים ורבע':[8100,3600],
+  'שעתיים':[7200,3600], 'שעה וחצי':[5400,3600], 'שעה ורבע':[4500,3600], 'חצי שעה':[1800,3600], 'רבע שעה':[900,3600],
+  'דקה וחצי':[90,60], 'דקותיים':[120,60], 'חצי דקה':[30,60] };
+function stepTimerNum(s) {
+  var m = /^(\d+(?:[.,]\d+)?)?\s?(?:([½¼¾⅓⅔])|(\d)\/(\d))?$/.exec(String(s || '').trim());
+  if (!m || !(m[1] || m[2] || m[3])) return NaN;
+  var n = m[1] ? parseFloat(m[1].replace(',', '.')) : 0;
+  if (m[2]) n += { '½': .5, '¼': .25, '¾': .75, '⅓': 1 / 3, '⅔': 2 / 3 }[m[2]];
+  else if (m[3]) n += (+m[3]) / (+m[4]);
+  return n;
+}
+function findStepTimers(text) {
+  // figures written in Arabic-Indic, Persian or full-width digits read as 0–9 (one character for one: places stay put)
+  var t = String(text || '').replace(/[٠-٩۰-۹０-９]/g, function (c) {
+    var k = c.charCodeAt(0); return String(k - (k >= 0xFF10 ? 0xFF10 : k >= 0x06F0 ? 0x06F0 : 0x0660));
+  });
+  var rx = stepTimerRx(), found = [];
+  function scan(re, fn) { var m; re.lastIndex = 0; while ((m = re.exec(t))) { var r = fn(m); if (r) found.push(r); if (!m[0].length) re.lastIndex++; } }
+  function at(m, lead, secs, unit) { var s = m.index + (lead || 0); return { start: s, end: m.index + m[0].length, secs: secs, unit: unit }; }
+  scan(rx.num, function (m) {
+    var n = stepTimerNum(m[1]); if (isNaN(n)) return null;
+    if (m[3]) n += .5; if (m[7]) n += .5;
+    var unit = m[4] ? 3600 : m[5] ? 60 : 1;
+    return at(m, 0, n * unit, unit);
+  });
+  scan(rx.hm, function (m) { return at(m, 0, (+m[1]) * 3600 + (+m[2]) * 60, 3600); });
+  scan(rx.clock, function (m) { return at(m, 0, (+m[1]) * 3600 + (+m[2]) * 60, 3600); });
+  scan(rx.enPhrase, function (m) {
+    var s = m[1].toLowerCase();
+    var v = /^three/.test(s) ? 2700 : /quarter/.test(s) ? 900 : /^an\s+hour\s+and/.test(s) ? 5400 : /^a\s+minute\s+and/.test(s) ? 90 : /half\s+a\s+minute/.test(s) ? 30 : 1800;
+    return at(m, 0, v, /minute/.test(s) ? 60 : 3600);
+  });
+  scan(rx.enWord, function (m) {
+    var n = STEP_TIMER_WORDS[m[1].toLowerCase()]; if (!n) return null;
+    if (m[2] || m[4]) n += .5;
+    var u = m[3].toLowerCase(), unit = /^h/.test(u) ? 3600 : /^m/.test(u) ? 60 : 1;
+    return at(m, 0, n * unit, unit);
+  });
+  scan(rx.hePhrase, function (m) { var v = STEP_TIMER_HE[m[3].replace(/[\s\-־]/, ' ')]; return v ? at(m, m[1].length, v[0], v[1]) : null; });
+  scan(rx.heWord, function (m) {
+    var n = STEP_TIMER_WORDS[m[3]]; if (!n) return null;
+    if (m[5]) n += .5;
+    var unit = /^ש(עה|עות)$/.test(m[4]) ? 3600 : /^ד/.test(m[4]) ? 60 : 1;
+    return at(m, m[1].length, n * unit, unit);
+  });
+  scan(rx.heHour, function (m) { return at(m, m[1].length, 3600, 3600); });
+  scan(rx.heMinute, function (m) { return at(m, m[1].length, 60, 60); });
+  scan(rx.zhHalf, function (m) { return at(m, 0, 1800, 3600); });
+  // where two readings overlap, the one that starts first (then the longer) is the one meant
+  found.sort(function (a, b) { return a.start - b.start || (b.end - b.start) - (a.end - a.start); });
+  var kept = [], end = -1;
+  found.forEach(function (f) { if (f.start >= end) { kept.push(f); end = f.end; } });
+  // "1 hour 30 minutes", "שעה ו-20 דקות", "2 hours and 15 minutes": one timer
+  var joined = [];
+  kept.forEach(function (f) {
+    var p = joined[joined.length - 1];
+    if (p && p.unit > f.unit && /^\s*(?:,|and|plus|ו-?|ו־|y|et|und|e|и)?\s*$/i.test(t.slice(p.end, f.start))) {
+      p.secs += f.secs; p.end = f.end; p.unit = f.unit; return;
+    }
+    joined.push({ start: f.start, end: f.end, secs: f.secs, unit: f.unit });
+  });
+  var out = [], seen = {};
+  joined.forEach(function (f) {
+    var secs = Math.round(f.secs);
+    if (secs < 5 || secs > 24 * 3600 || seen[secs] || out.length >= 3) return;
+    seen[secs] = true;
+    out.push({ secs: secs, label: String(text || '').slice(f.start, f.end).trim() });
+  });
+  return out;
+}
+
 function fmtClock(s) {
   var h = Math.floor(s/3600), m = Math.floor((s%3600)/60), sec = s%60;
   return (h ? h + ':' + String(m).padStart(2,'0') : String(m)) + ':' + String(sec).padStart(2,'0');
@@ -37218,7 +37316,7 @@ var HELP_SYSTEM_PROMPT = [
   "- Scaling also changes the amounts written in the method (\"add 2 eggs\" becomes \"add 4 eggs\" at ×2) — shown in bold; the recipe itself is not changed",
   "- On a computer, drag the recipe window's bottom-right corner to make it bigger; click the corner once for full size, again for the usual size",
   "- ☐ TICK AS YOU COOK: a tick box beside every ingredient and every step — tick an ingredient once it is in the bowl, a step once it is done; the line is struck through. Clear ticks unticks them all. The ticks are for this cooking only: closing the recipe clears them. Tap a line itself (not its box) to mark where you are — it is highlighted, and 🎤 Voice moves that mark; double-tap to clear it (v39.43).",
-  "- ⏱ STEP TIMERS: a time written in a step ('bake for 20 minutes') shows a ⏱ 20:00 button beside it — tap it to start the countdown, tap again to cancel; at the end it says ⏰ Time! and the phone vibrates where it can (v39.43).",
+  "- ⏱ STEP TIMERS: a time written in a step ('bake for 20 minutes', 'לבשל 20 דקות', 'כחצי שעה', 'an hour and a half') shows a ⏱ button with that time beside it — tap it to start the countdown, tap again to cancel; at the end it says ⏰ Time! and the phone vibrates where it can (v39.43). The app reads the time from the step's own words each time the recipe opens — figures or words, in Hebrew, English and the app's other languages (v40.14) — so every recipe has them, old or new, and there is nothing to add or switch on; a range ('25–30 minutes') gives the shorter time, to look then; hours and minutes together ('1 hour 30 minutes', 'שעה ו-20 דקות') are one timer; up to three timers in a step. A step with no time written in it has none (the app does not guess one).",
   "- 🎤 VOICE, for messy hands: in an open recipe tap 🎤 Voice, then say 'next', 'back', 'repeat' (it reads the line aloud) or 'clear' — in Hebrew too (הבא, אחורה, שוב, נקה); 'ingredients' goes to the first ingredient. It only moves your place in the recipe and reads it — it never changes anything. Shown only where the browser can listen (Chrome, Edge — not on an iPhone or iPad); it stops by itself after 10 minutes, or tap 🎤 again (v39.43).",
   "- 🕘 VERSION HISTORY: a recipe that has been changed shows 🕘 Version history (N) — its last three earlier versions, each with its date and what changed; ↩ Restore puts one back (v39.43).",
   "",
