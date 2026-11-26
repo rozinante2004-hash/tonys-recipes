@@ -17,7 +17,11 @@ where.
 **Live now**
 - The family's copy (`main`, https://rozinante2004-hash.github.io/tonys-recipes/ — it forwards to the community app)
   and the community app (`beta`, https://mykitchennotes.community, Firebase project my-kitchen-notes-beta) run
-  **v40.13 + Worker v108** (released 22 Nov 2026, 14:04 Israel time, on 5768217 — v40.12: 📋 Run sheet: a dish's name
+  **v40.16 + Worker v109** (released 26 Nov 2026, 08:14 Israel time, on 451e434 — v40.14: ⏱ a step's time read in
+  Hebrew, in words and in all the app's languages, so every recipe has its timers; v40.15: ⏳ the hourglass timer (three
+  wheels, up to 31 days; flip, lay down) and 🧮 the calculator under 🧰 Tools, timers that ring on a locked phone (Web
+  Push from the Worker at that second, three rings; ⏰ in ♿ Accessibility; Privacy Statement 1.20); v40.16: the
+  calculator as a page from a squared notebook, keys drawn by hand, figures in the same pen). Before it: **v40.13 + Worker v108** (released 22 Nov 2026, 14:04 Israel time, on 5768217 — v40.12: 📋 Run sheet: a dish's name
   opens its recipe on top of the sheet (closing returns to it; the tick box still marks the step done); v40.13: a new
   recipe never takes another device's number (the cloud's next free number taken at once; a clash at save moves it to a
   free number, "“…” was given a new number"; the full read keeps unsent new recipes), a shared link waits 20 s for the
@@ -47,13 +51,7 @@ where.
   own `i18n/_farm_<lang>`; v39.94 at 21:40 on db945ab: the
   network Self Tests send the sign-in; v39.93 at 19:55 on 4b688fc: each farm animal in its own recorded voice,
   `docs/farm-voices.md`; Worker v108 since 20 Nov 01:59 (from Test); the jobs are listed near the top of `docs/history/2026-11.md`).
-  **On Test, not released:** v40.16 — 🧮 the calculator as a page from a squared notebook (keys drawn by hand in pen,
-  figures, sum and answer handwritten in the same ink). v40.15 + Worker v109 — ⏳ the hourglass timer (three wheels, up to 31 days; flip, lay down),
-  🧮 the calculator, and ⏰ timers (the hourglass and the recipes' ⏱) that ring when the phone is locked or in another
-  app (Web Push at that second, three rings; the Worker's cron every minute — it goes live from `test` as usual; Privacy
-  Statement 1.20). v40.14 — ⏱ a step's time is read in Hebrew, in words and in all the app's languages
-  ("20 דקות", "ד'", "כחצי שעה", "שעה וחצי", "an hour", "1 h 30"), so every recipe has its timers (nothing is stored; no
-  recipe edited); a range gives its shorter time. The test copy
+  **On Test, not released:** nothing beyond v40.16. The test copy
   (https://tonys-recipes-test.pages.dev, its own database and rules) follows `test`.
 - **The beta has had testers since Sunday 25 Oct 2026** and is **by invitation only**: the owner invites with
   ⚙️ → 👑 → ✉️ Invite testers (the congratulatory wording of v39.60); a tester's share button asks the owner for an
