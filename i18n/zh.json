@@ -1,7 +1,7 @@
 {
  "lang": "zh",
  "updatedAt": 1795349121832,
- "count": 3109,
+ "count": 3110,
  "strings": {
   "\"Add to Home Screen\"": "添加到主屏幕",
   "\"Open Bring!\"": "打开 Bring!",
@@ -219,6 +219,7 @@
   "Brunch": "早午餐",
   "By their identifier (MKN-…) or the e-mail address of anyone in it.": "按识别码（MKN-…）或其中任何人的邮箱地址。",
   "C": "C",
+  "Calculator": "计算器",
   "Calories": "卡路里",
   "Cancel": "取消",
   "Cancel — send nothing": "取消 —— 不发送",

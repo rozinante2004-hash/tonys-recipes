@@ -524,6 +524,24 @@ under its plain path only (a `?url=` request goes network-first).
   divide by 0". Keys: C ⌫ % ÷ / 7 8 9 × / 4 5 6 − / 1 2 3 + / ± 0 . = (LTR in Hebrew too); after = a digit starts
   afresh, an operator goes on from the answer; a tap on the answer copies it; the keyboard types (Enter =, Esc C — Esc
   on an empty pad closes the window —, Backspace ⌫). Self Test `calc_pad`.
+  THE NOTEBOOK PAGE (v40.16) — Tony: "please change the design of the calculator to look like a page from a notebook.
+  The buttons should be squerish and look pen-drawn by hand. The numbers and other content on buttons and display screen
+  should also look handwritten with the same pen." `.kpad-modal`: cream paper (#fdf8ec) squared every 14 px in faint
+  blue, a red margin line 33 px in from the side a hand starts from (`html[dir="rtl"]`: the right), a strip of tape at
+  the top; the same in the dark theme (paper is paper — literal colours, as the other notebook pages). One ballpoint
+  ink, `--kp-ink` #1d3a87 (the sum being typed and the grey preview in `--kp-ink2` #475c9b). The hand: Caveat (its
+  Latin file has every figure and ÷ × − + ± %), Playpen Sans Hebrew / Arabic for those letters, from
+  `fonts/legal-fonts.css` (`legalFonts()` on opening). `kpadInk()` (once): each key's text goes into a `.kpad-l` span
+  and an `svg.kpad-ink` (viewBox 70 × 50, preserveAspectRatio none, `vector-effect: non-scaling-stroke`, 2 px) is drawn
+  behind it — `kpadInkPath(W, H, rnd, {m, a, r, b})`: four corners jittered ±a, sides bowed ±b (quadratic curves),
+  corners rounded r, the line begun 38 % up the left side and carried past its start at the end, as a pen goes round;
+  seeded (`kpadRnd(4021 + i·97)`), so the page is the same every time. ÷ × − + and = gone over twice (`.kp2`), =
+  shaded with slanting strokes (`kpadHatch`), ⌫ and ✕ drawn (`KPAD_BACK_SVG`), the screen boxed the same way
+  (300 × 110); a pressed key fills faintly with ink. The answer after = is underlined twice (`.kpad-done`). The
+  window's title is "Calculator" without the coloured 🧮 (the menu keeps it). A translation parked on a key is moved to
+  its span, so a language change never writes the bare word over the drawing. The page scrolls on a short screen (a
+  phone on its side) with its title and ✕ held at the top (`position: sticky`, the same paper behind them, lined up
+  through `--kp-sheet`); the tape above them.
 - **⏰ A timer rings when the phone is locked (v40.15, Worker v109).** Tony: "Yes. Please send a notification when the
   time is up on an iPhone and whatever is needed for Android, so it makes a sound while the phone is locked or while in
   another app." A web app makes no sound while it sleeps, so each timer is also handed to the Worker, which sends it

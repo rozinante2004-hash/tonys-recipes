@@ -1,7 +1,7 @@
 {
  "lang": "de",
  "updatedAt": 1795349121832,
- "count": 3104,
+ "count": 3105,
  "strings": {
   "\"Add to Home Screen\"": "Zum Home-Bildschirm hinzufügen",
   "\"Open Bring!\"": "Bring! öffnen",
@@ -219,6 +219,7 @@
   "Brunch": "Brunch",
   "By their identifier (MKN-…) or the e-mail address of anyone in it.": "Anhand der Kennung (MKN-…) oder der E-Mail-Adresse eines Mitglieds.",
   "C": "C",
+  "Calculator": "Rechner",
   "Calories": "Kalorien",
   "Cancel": "Abbrechen",
   "Cancel — send nothing": "Abbrechen — nichts wird gesendet",

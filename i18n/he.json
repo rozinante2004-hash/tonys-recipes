@@ -1,7 +1,7 @@
 {
  "lang": "he",
  "updatedAt": 1795349121832,
- "count": 3533,
+ "count": 3534,
  "strings": {
   "\"Add to Home Screen\"": "הוספה למסך הבית",
   "\"One item away\" filter ({1}f.{2})": "פילטר \"פריט אחד חסר\" ({1}f.{2})",
@@ -296,6 +296,7 @@
   "CRUD": "CRUD",
   "CSS": "CSS",
   "CSS variables loaded": "משתני CSS נטענו",
+  "Calculator": "מחשבון",
   "Calories": "קלוריות",
   "Camera import function exists": "קיימת פונקציית ייבוא ממצלמה",
   "Cancel": "ביטול",

@@ -1,7 +1,7 @@
 {
  "lang": "hu",
  "updatedAt": 1795349121832,
- "count": 2885,
+ "count": 2886,
  "strings": {
   "\"Add to Home Screen\"": "Hozzáadás a kezdőképernyőhöz",
   "\"Open Bring!\"": "Bring! megnyitása",
@@ -199,6 +199,7 @@
   "Brunch": "Brunch",
   "By their identifier (MKN-…) or the e-mail address of anyone in it.": "Az azonosítója (MKN-…) vagy bármelyik tagjának e-mail címe alapján.",
   "C": "C",
+  "Calculator": "Számológép",
   "Calories": "Kalória",
   "Cancel": "Mégse",
   "Cancel — send nothing": "Mégse — ne küldjön semmit",

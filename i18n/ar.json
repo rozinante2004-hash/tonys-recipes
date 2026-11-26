@@ -1,7 +1,7 @@
 {
  "lang": "ar",
  "updatedAt": 1795349121832,
- "count": 3107,
+ "count": 3108,
  "strings": {
   "\"Add to Home Screen\"": "إضافة إلى الشاشة الرئيسية",
   "\"Open Bring!\"": "فتح Bring!",
@@ -219,6 +219,7 @@
   "Brunch": "برنش",
   "By their identifier (MKN-…) or the e-mail address of anyone in it.": "بواسطة المعرّف الخاص بها (MKN-…) أو البريد الإلكتروني لأي شخص فيها.",
   "C": "C",
+  "Calculator": "آلة حاسبة",
   "Calories": "السعرات الحرارية",
   "Cancel": "إلغاء",
   "Cancel — send nothing": "إلغاء — بدون إرسال",

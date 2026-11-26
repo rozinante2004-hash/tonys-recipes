@@ -1,7 +1,7 @@
 {
  "lang": "ru",
  "updatedAt": 1795349121832,
- "count": 3405,
+ "count": 3406,
  "strings": {
   "\"Add to Home Screen\"": "Добавить на главный экран",
   "\"One item away\" filter ({1}f.{2})": "Фильтр «Не хватает одного» ({1}ф.{2})",
@@ -288,6 +288,7 @@
   "CRUD": "CRUD",
   "CSS": "CSS",
   "CSS variables loaded": "CSS-переменные загружены",
+  "Calculator": "Калькулятор",
   "Calories": "Калории",
   "Camera import function exists": "Функция импорта с камеры существует",
   "Cancel": "Отмена",

@@ -1,7 +1,7 @@
 {
  "lang": "ja",
  "updatedAt": 1795349121832,
- "count": 3410,
+ "count": 3411,
  "strings": {
   "\"Add to Home Screen\"": "ホーム画面に追加",
   "\"One item away\" filter ({1}f.{2})": "「あと1品」フィルター（{1}f.{2}）",
@@ -289,6 +289,7 @@
   "CRUD": "CRUD",
   "CSS": "CSS",
   "CSS variables loaded": "CSS変数を読み込み済み",
+  "Calculator": "電卓",
   "Calories": "カロリー",
   "Camera import function exists": "カメラ取り込み機能あり",
   "Cancel": "キャンセル",

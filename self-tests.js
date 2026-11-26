@@ -24428,7 +24428,7 @@ window.SELF_TESTS = [
         window._ktm=null; ktmLoad(); ktmTickOn(); ktmPill();
       }
     } },
-  { id:'calc_pad', group:'Features', name:'🧮 The calculator (··· More → 🧰 Tools): × and ÷ before + and −, a percent after + or − is of what comes before, ± ⌫ C, the sum on top and the answer under it, divide by 0 said (v40.15)',
+  { id:'calc_pad', group:'Features', name:'🧮 The calculator (··· More → 🧰 Tools), a notebook page — keys drawn by hand, figures in the same pen: × and ÷ before + and −, a percent after + or − is of what comes before, ± ⌫ C, the sum on top and the answer under it, divide by 0 said (v40.15)',
     test: async()=>{
       if(!document.getElementById('kpadItem')) throw new Error('no 🧮 Calculator under 🧰 Tools');
       var cases=[[['250','*','3','/','4'],187.5],[['2','+','3','*','4'],14],[['200','+','15%'],230],[['200','-','10%'],180],[['40%'],0.4],[['0.1','+','0.2'],0.3],[['-5','*','-2'],10],[['7','+'],7]];
@@ -24436,11 +24436,32 @@ window.SELF_TESTS = [
       if(kpadEval(['1','/','0']).err!=='Cannot divide by 0') throw new Error('dividing by 0 is not said');
       try{
         openCalcPad(); await wait(80);
+        // v40.16 — Tony: "a page from a notebook. The buttons should be squerish and look pen-drawn by hand. The numbers
+        // and other content on buttons and display screen should also look handwritten with the same pen."
+        var keys=document.querySelectorAll('#kpadOverlay .kpad-keys button');
+        if(keys.length!==20) throw new Error(keys.length+' keys, not 20');
+        var bare=Array.prototype.filter.call(keys, function(b){ var p=b.querySelector('svg.kpad-ink path.kp1'), cs=getComputedStyle(b);
+          return !p || !/^M[\d. -]+ Q/.test(p.getAttribute('d')||'') || (cs.borderTopStyle!=='none' && parseFloat(cs.borderTopWidth)>0) || cs.backgroundColor!=='rgba(0, 0, 0, 0)'; });
+        if(bare.length) throw new Error(bare.length+' keys are not squares drawn by pen (a box of the browser\'s, or no outline)');
+        if(keys[4].querySelector('.kp1').getAttribute('d')===keys[5].querySelector('.kp1').getAttribute('d')) throw new Error('two keys are drawn exactly alike — not by hand');
+        if(kpadInkPath(70,50,kpadRnd(9),KPAD_KEY_BOX)!==kpadInkPath(70,50,kpadRnd(9),KPAD_KEY_BOX)) throw new Error('the page is drawn differently each time it opens');
+        var hand=[keys[4], document.getElementById('kpadRes'), document.getElementById('kpadExpr'), document.getElementById('kpadTitle')].filter(function(el){ return !/^Caveat/.test(getComputedStyle(el).fontFamily); });
+        if(hand.length) throw new Error('not in the pen\'s hand: '+hand.map(function(el){ return el.id||el.textContent; }).join(', '));
+        var ink=getComputedStyle(keys[4]).color;
+        if(getComputedStyle(document.getElementById('kpadRes')).color!==ink || getComputedStyle(keys[4].querySelector('.kp1')).stroke!==ink) throw new Error('the figures, the answer and the squares are not one pen');
+        if(!document.querySelector('#kpadOverlay .kpad-keys button[onclick*="back"] svg.kpad-glyph')) throw new Error('⌫ is not drawn');
+        if(!document.querySelector('#kpadOverlay .kpad-eq path.kph')) throw new Error('= is not shaded');
+        if(!document.querySelector('#kpadScreen > svg.kpad-ink path.kp1')) throw new Error('the screen is not boxed by hand');
+        if(getComputedStyle(document.querySelector('#kpadOverlay .kpad-modal')).backgroundColor!=='rgb(253, 248, 236)') throw new Error('not a notebook page');
+        kpadInk();
+        if(document.querySelectorAll('#kpadOverlay .kpad-keys button .kpad-ink').length!==20) throw new Error('drawn twice over');
         kpadPress('C'); ['1','2','5','0','*','3','/','4'].forEach(kpadPress);
         var res=document.getElementById('kpadRes'), ex=document.getElementById('kpadExpr');
         if(ex.textContent!=='1,250 × 3 ÷ 4' || res.textContent!=='= 937.5' || !res.classList.contains('kpad-preview')) throw new Error('while typing: '+ex.textContent+' / '+res.textContent);
+        if(res.classList.contains('kpad-done')) throw new Error('underlined before =');
         kpadPress('=');
         if(res.textContent!=='937.5' || ex.textContent!=='1,250 × 3 ÷ 4 =' || res.classList.contains('kpad-preview')) throw new Error('after =: '+ex.textContent+' / '+res.textContent);
+        if(!res.classList.contains('kpad-done') || !/double/.test(getComputedStyle(res).textDecorationStyle)) throw new Error('the answer is not underlined twice');
         kpadPress('+'); kpadPress('1'); kpadPress('neg'); kpadPress('=');
         if(res.textContent!=='936.5') throw new Error('going on from the answer with ±: '+res.textContent);
         kpadPress('C'); kpadPress('9'); kpadPress('8'); kpadPress('back');

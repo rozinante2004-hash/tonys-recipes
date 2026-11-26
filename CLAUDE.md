@@ -47,7 +47,8 @@ where.
   own `i18n/_farm_<lang>`; v39.94 at 21:40 on db945ab: the
   network Self Tests send the sign-in; v39.93 at 19:55 on 4b688fc: each farm animal in its own recorded voice,
   `docs/farm-voices.md`; Worker v108 since 20 Nov 01:59 (from Test); the jobs are listed near the top of `docs/history/2026-11.md`).
-  **On Test, not released:** v40.15 + Worker v109 — ⏳ the hourglass timer (three wheels, up to 31 days; flip, lay down),
+  **On Test, not released:** v40.16 — 🧮 the calculator as a page from a squared notebook (keys drawn by hand in pen,
+  figures, sum and answer handwritten in the same ink). v40.15 + Worker v109 — ⏳ the hourglass timer (three wheels, up to 31 days; flip, lay down),
   🧮 the calculator, and ⏰ timers (the hourglass and the recipes' ⏱) that ring when the phone is locked or in another
   app (Web Push at that second, three rings; the Worker's cron every minute — it goes live from `test` as usual; Privacy
   Statement 1.20). v40.14 — ⏱ a step's time is read in Hebrew, in words and in all the app's languages
