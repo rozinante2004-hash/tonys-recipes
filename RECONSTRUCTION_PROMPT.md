@@ -505,8 +505,8 @@ under its plain path only (a `?url=` request goes network-first).
   animated by requestAnimationFrame only while the window is open (`ktmLoop`; `closeM` → `ktmClosed`). FLIP (a tap,
   a swipe of 36 px up or down, or Flip): rotate 180° over 620 ms, then the sand slides down to the neck in 360 ms;
   flipped while it runs, the time left becomes what had run (`total − left`), like a real one. TAP while it runs: it lies
-  on its side (90°) — paused; tap again (or Stand it up): it stands and runs on. The sand runs out: Ready, the chosen
-  chime three times 1.7 s apart and the phone's vibration (`timerRingHere`), a wobble, "The sand has run out. Flip it
+  on its side (90°) — paused; tap again (or Stand it up): it stands and runs on. The sand runs out: Ready, the timers' own
+  sound (v40.19, `timerSoundPlay`) and the phone's vibration (`timerRingHere`), a wobble, "The sand has run out. Flip it
   for another {1}." THE WHEELS: `#ktmWd` 0–31 days, `#ktmWh` 0–23 hours, `#ktmWm` 0–59 minutes — CSS scroll-snap lists
   (44 px rows, a gold band behind the middle one), read on scroll (`ktmWheelRead`); over 31 days → 31 days and the
   others back to 0; days, hours, minutes from left to right in every language — numbers are read left to right in
@@ -544,6 +544,20 @@ under its plain path only (a `?url=` request goes network-first).
   its span, so a language change never writes the bare word over the drawing. The page scrolls on a short screen (a
   phone on its side) with its title and ✕ held at the top (`position: sticky`, the same paper behind them, lined up
   through `--kp-sheet`); the tape above them.
+- **⏲️ The timers' own sound (v40.19).** Tony: "give timers their own in-app sound, for example a mechanical
+  kitchen-timer bell, separate from the message sound. That would at least work while the app is open". While the app
+  is open a timer that ends (`timerRingHere`: the hourglass, a recipe's ⏱) rings with `timerSoundPlay()` — not the
+  messages' chime, and not silenced by their 🔕. `TIMER_SOUNDS` (`mkn_timer_sound`, first choice `wind`): ⏲️ A wind-up
+  kitchen timer — `timerStrikeBuffer`: one blow on a small steel dome, 2380 Hz with partials ×2.09, ×3.87, ×5.52 dying
+  in 0.42/0.22/0.11/0.06 s and a 4 ms noise click, made once per sample rate; struck ~23 times a second for 2.4 s,
+  slowing to ~12 in the last 0.6 s as the spring runs down, each blow a little uneven; twice, 3.6 s apart —;
+  📟 An oven's beeps (2730 Hz square through a 3.6 kHz low-pass, three groups of four 0.12 s beeps); 🛎️ The kitchen's
+  service bell (`CHIME_VOICES.bell`, twice three). `timerSoundOut`: gain 1.4 (the bell its own level) into the
+  messages' compressor; `chimeCtx`/`chimeRest` shared. ⚙️ → ♿ Accessibility → `#timerSoundItem` "⏲️ Timer sound: …"
+  (`timerSoundRefreshSettings` in `settingsGroupsRefresh`) opens `openTimerSoundSettings()` (three radios, ▶ Listen).
+  Go-list `timer-sound`. A locked phone still rings with the phone's own notification sound. Self Test
+  `timer_own_sound` (renders each voice offline: loud enough, not clipped, as long as it says; the timer's dozens of
+  blows).
 - **⏰ A timer rings when the phone is locked (v40.15, Worker v109).** Tony: "Yes. Please send a notification when the
   time is up on an iPhone and whatever is needed for Android, so it makes a sound while the phone is locked or while in
   another app." A web app makes no sound while it sleeps, so each timer is also handed to the Worker, which sends it

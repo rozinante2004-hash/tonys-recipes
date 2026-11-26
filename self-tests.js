@@ -24585,6 +24585,63 @@ window.SELF_TESTS = [
         if(r[5].opened.length!==1 || new URL(r[5].opened[0]).searchParams.has('timer')) throw new Error('a strange "timer" was put in the address');
       } finally { probe.terminate(); }
     } },
+  { id:'timer_own_sound', group:'Features', name:'⏲️ Timers ring with a sound of their own while the app is open — a wind-up kitchen timer (the first choice), an oven’s beeps or the service bell — chosen in ⚙️ → ♿ Accessibility, apart from the messages’ sound and not silenced by their mute; each one really sounds (v40.19)',
+    test: async()=>{
+      // Tony, 26 Nov 2026: "give timers their own in-app sound, for example a mechanical kitchen-timer bell, separate from
+      // the message sound."
+      var keep={}; [TIMER_SOUND_KEY, CHIME_MUTE_KEY, CHIME_KEY].forEach(function(k){ try{ keep[k]=localStorage.getItem(k); }catch(e){} });
+      var real={ tsp:window.timerSoundPlay, cp:window.chimePlay };
+      var says=function(el, en){ return el.textContent===en || el.textContent===i18nPhrase(en); };
+      try{
+        try{ localStorage.removeItem(TIMER_SOUND_KEY); }catch(e){}
+        if(timerSoundChoice()!=='wind') throw new Error('the first timer sound is not the wind-up kitchen timer: '+timerSoundChoice());
+        // its line in ♿ Accessibility, beside the messages' sound
+        var item=document.getElementById('timerSoundItem'), chime=document.getElementById('chimeChooseItem');
+        if(!item || !chime || item.closest('.set-group')!==chime.closest('.set-group')) throw new Error('no ⏲️ Timer sound in ♿ Accessibility');
+        timerSoundRefreshSettings();
+        if(!says(item, '⏲️ Timer sound: A wind-up kitchen timer')) throw new Error('the line says: '+item.textContent);
+        // a timer that ends rings with it — not with the messages' sound — and the messages' mute does not silence it
+        var played=[], chimed=[];
+        window.timerSoundPlay=function(s){ played.push(s||''); return true; };
+        window.chimePlay=function(k){ chimed.push(k); return true; };
+        try{ localStorage.setItem(CHIME_MUTE_KEY,'1'); }catch(e){}
+        timerRingHere(null, null);
+        if(document.visibilityState==='visible' && (played.length!==1 || chimed.length)) throw new Error('a timer rang with '+(chimed.length?'the messages’ sound':'no sound'));
+        window.timerSoundPlay=real.tsp; window.chimePlay=real.cp;
+        // chosen in its own window, each sound with ▶ Listen; the messages' sound stays as it was
+        var msg=chimeChoice(), ov=openTimerSoundSettings();
+        var radios=ov.querySelectorAll('input[name="timerSound"]'), listen=ov.querySelectorAll('button[onclick*="timerSoundPlay"]');
+        if(radios.length!==3 || listen.length!==3) throw new Error('the window offers '+radios.length+' sounds and '+listen.length+' ▶ buttons');
+        if(!ov.querySelector('input[value="wind"]').checked) throw new Error('the wind-up timer is not ticked');
+        var oven=ov.querySelector('input[value="oven"]'); oven.checked=true; oven.dispatchEvent(new Event('change', { bubbles:true }));
+        if(timerSoundChoice()!=='oven' || !says(item, '⏲️ Timer sound: An oven’s beeps')) throw new Error('choosing the oven did not stick: '+timerSoundChoice()+' / '+item.textContent);
+        if(chimeChoice()!==msg) throw new Error('choosing a timer sound changed the messages’ sound');
+        ov.remove();
+        // each one really sounds, as loud as the others and for as long as it says (drawn offline: nothing is heard)
+        if(typeof OfflineAudioContext!=='undefined'){
+          var heard={};
+          for(var s of ['wind','oven','bell']){
+            var sr=44100, oc=new OfflineAudioContext(1, sr*7, sr), secs=TIMER_VOICES[s](oc, timerSoundOut(oc, s), 0.03);
+            var d=(await oc.startRendering()).getChannelData(0), peak=0, last=0;
+            for(var i=0;i<d.length;i++){ var a=Math.abs(d[i]); if(a>peak) peak=a; if(a>0.02) last=i; }
+            if(peak<0.3 || peak>1.0001) throw new Error(s+' is '+(peak<0.3?'too quiet':'clipped')+': its peak is '+peak.toFixed(3));
+            if(last/sr < Math.min(secs, 7)*0.5) throw new Error(s+' falls silent after '+(last/sr).toFixed(2)+' s of '+secs+' s');
+            heard[s]=(last/sr).toFixed(1)+' s';
+          }
+          // the kitchen timer's hammer: dozens of blows, not a few taps (its own little bell, rattling)
+          var n=0;
+          var oc2=new OfflineAudioContext(1, 44100, 44100), out2=oc2.createGain(), mk=oc2.createBufferSource.bind(oc2);
+          oc2.createBufferSource=function(){ n++; return mk(); };
+          TIMER_VOICES.wind(oc2, out2, 0);
+          if(n<60) throw new Error('the kitchen timer strikes its bell only '+n+' times');
+        }
+      } finally {
+        window.timerSoundPlay=real.tsp; window.chimePlay=real.cp;
+        Object.keys(keep).forEach(function(k){ try{ if(keep[k]===null) localStorage.removeItem(k); else localStorage.setItem(k, keep[k]); }catch(e){} });
+        try{ timerSoundRefreshSettings(); chimeRefreshSettings(); }catch(e){}
+        var o=document.getElementById('timerSoundOverlay'); if(o) o.remove();
+      }
+    } },
   { id:'feat_line_marker', group:'Features', name:'Line marker: tap to mark, slides, survives re-render',
     test: async()=>{
       ['markLine','clearLineMark','loadLineMark','refreshLineMarker'].forEach(function(f){

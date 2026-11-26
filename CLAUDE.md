@@ -51,7 +51,8 @@ where.
   own `i18n/_farm_<lang>`; v39.94 at 21:40 on db945ab: the
   network Self Tests send the sign-in; v39.93 at 19:55 on 4b688fc: each farm animal in its own recorded voice,
   `docs/farm-voices.md`; Worker v108 since 20 Nov 01:59 (from Test); the jobs are listed near the top of `docs/history/2026-11.md`).
-  **On Test, not released:** v40.18 — the timer's wheels days, hours, minutes from left to right in Hebrew too. v40.17 — the translated privacy statement and terms are asked for again once if a read
+  **On Test, not released:** v40.19 — ⏲️ timers ring with their own sound while the app is open (a wind-up kitchen
+  timer by default; ⚙️ → ♿ Accessibility → ⏲️ Timer sound). v40.18 — the timer's wheels days, hours, minutes from left to right in Hebrew too. v40.17 — the translated privacy statement and terms are asked for again once if a read
   fails (the translation editor); two Self Tests fixed after Tony's installed-iPhone run (the planner's ✕ under the
   notch; one read of the Arabic documents). The test copy
   (https://tonys-recipes-test.pages.dev, its own database and rules) follows `test`.

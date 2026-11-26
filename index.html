@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v40.18 -->
+<!-- Tony's Recipes Collection v40.19 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -6975,11 +6975,11 @@ function bellQuietDone() {
   var done = Object.keys(ks).filter(function(k){ return ks[k] <= now + 1000; });
   return done.length ? bellCancel(done) : false;
 }
-// Rung here, in the app: the chosen sound three times and the phone's vibration; on the screen, the server's rings go.
+// Rung here, in the app: the timers' own sound (v40.19) and the phone's vibration; on the screen, the server's rings go.
 function timerRingHere(bellKey, msg) {
   try { if (navigator.vibrate) navigator.vibrate([300, 150, 300, 150, 600]); } catch(e) {}
   if (document.visibilityState === 'visible') {
-    [0, 1700, 3400].forEach(function(ms){ setTimeout(function(){ chimePlay('request', chimeChoice()); }, ms); });
+    timerSoundPlay();   // v40.19 — the timers' own sound (⚙️ → ♿ Accessibility → ⏲️ Timer sound), not the messages'
     if (bellKey) bellCancel(bellKey);
   }
   if (msg) toast(msg, 9000);
@@ -7298,6 +7298,123 @@ function openChimeSettings() {
 }
 window.chimePlay = chimePlay; window.chimeChoice = chimeChoice; window.chimeMuted = chimeMuted; window.chimeTaps = chimeTaps;
 window.chimeSetOn = chimeSetOn; window.chimeSetSound = chimeSetSound; window.openChimeSettings = openChimeSettings;
+
+// ─── v40.19 — ⏲️ THE TIMERS' OWN SOUND ──────────────────────────────────────────────────────────────────────────────
+// Tony, 26 Nov 2026: "give timers their own in-app sound, for example a mechanical kitchen-timer bell, separate from the
+// message sound. That would at least work while the app is open". Drawn by the browser (Web Audio), as the messages'
+// sounds are — no sound file: a wind-up kitchen timer (its hammer on a small steel bell some 23 times a second, slowing
+// as the spring runs down; twice), an oven's beeps (three times four), or the kitchen's service bell (twice three).
+// ⚙️ → ♿ Accessibility → ⏲️ Timer sound, on this device. The messages' 🔕 does not silence a timer — a timer nobody hears
+// is no timer. On a locked phone or in another app the notification rings with the phone's own sound (v40.15).
+var TIMER_SOUND_KEY = 'mkn_timer_sound';
+var TIMER_SOUNDS = { wind: '⏲️ A wind-up kitchen timer', oven: '\u{1F4DF} An oven’s beeps', bell: '\u{1F6CE}️ The kitchen’s service bell' };
+var _timerStrike = null;
+function timerSoundChoice() { var v = ''; try { v = localStorage.getItem(TIMER_SOUND_KEY) || ''; } catch(e) {} return TIMER_SOUNDS[v] ? v : 'wind'; }
+// One blow of the hammer: a small steel dome rings with uneven overtones (≈ 2.1×, 3.9×, 5.5×) and dies away quickly;
+// the blow itself a few milliseconds of noise. Made once, then played for every blow.
+function timerStrikeBuffer(c) {
+  if (_timerStrike && _timerStrike.sampleRate === c.sampleRate) return _timerStrike;
+  var sr = c.sampleRate, n = Math.floor(sr * 0.5), buf = c.createBuffer(1, n, sr), ch = buf.getChannelData(0);
+  var f = 2380, parts = [[1, 0.5, 0.42], [2.09, 0.24, 0.22], [3.87, 0.12, 0.11], [5.52, 0.06, 0.06]];
+  for (var i = 0; i < n; i++) {
+    var t = i / sr, v = 0;
+    for (var p = 0; p < parts.length; p++) v += parts[p][1] * Math.exp(-t / parts[p][2]) * Math.sin(2 * Math.PI * f * parts[p][0] * t);
+    if (t < 0.004) v += (Math.random() * 2 - 1) * 0.35 * (1 - t / 0.004);
+    ch[i] = v;
+  }
+  _timerStrike = buf;
+  return buf;
+}
+// Each voice schedules its sound from t0 and says how many seconds it lasts.
+var TIMER_VOICES = {
+  wind: function(c, out, t0) {
+    var buf = timerStrikeBuffer(c), dur = 2.4;
+    [0, 3.6].forEach(function(start){
+      for (var at = 0; at < dur;) {
+        var s = c.createBufferSource(), g = c.createGain();
+        s.buffer = buf;
+        g.gain.value = 0.16 * (0.85 + Math.random() * 0.3) * (at > dur - 0.5 ? 0.75 : 1);
+        s.connect(g); g.connect(out); s.start(Math.max(t0, t0 + start + at + (Math.random() - 0.5) * 0.004));   // a blow a little uneven, never before t0
+        at += 1 / (at < dur - 0.6 ? 23 : 23 - (at - (dur - 0.6)) / 0.6 * 11);   // the spring runs down: slower at the end
+      }
+    });
+    return 3.6 + dur + 0.5;
+  },
+  oven: function(c, out, t0) {
+    for (var gi = 0; gi < 3; gi++) for (var b = 0; b < 4; b++) {
+      var t = t0 + gi * 1.25 + b * 0.2, o = c.createOscillator(), g = c.createGain(), lp = c.createBiquadFilter();
+      o.type = 'square'; o.frequency.value = 2730; lp.type = 'lowpass'; lp.frequency.value = 3600;
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.3, t + 0.006);
+      g.gain.setValueAtTime(0.3, t + 0.11); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.12);
+      o.connect(lp); lp.connect(g); g.connect(out); o.start(t); o.stop(t + 0.14);
+    }
+    return 2 * 1.25 + 3 * 0.2 + 0.3;
+  },
+  bell: function(c, out, t0) {
+    [0, 0.34, 0.68, 1.9, 2.24, 2.58].forEach(function(d){ CHIME_VOICES.bell.tap(c, out, t0 + d); });
+    return 5;
+  }
+};
+// The way out: a little louder than a message, its peaks held down as the messages' are.
+function timerSoundOut(c, sound) {
+  var out = c.createGain(), comp = c.createDynamicsCompressor();
+  [['threshold', -6], ['knee', 6], ['ratio', 4], ['attack', 0.002], ['release', 0.15]].forEach(function(p){ if (comp[p[0]]) comp[p[0]].value = p[1]; });
+  out.gain.value = sound === 'bell' ? CHIME_VOICES.bell.level : 1.4;
+  out.connect(comp); comp.connect(c.destination);
+  return out;
+}
+// Rings the chosen timer sound (or `sound`, from the ▶ buttons). False when it cannot: a page nobody has touched yet,
+// or no sound on this device.
+function timerSoundPlay(sound) {
+  if (_selfTestRunning && !window._chimeUnderTest) return false;
+  if (!_chimeCtx && !chimePageTouched()) return false;
+  var c = chimeCtx();
+  if (!c) return false;
+  sound = TIMER_SOUNDS[sound] ? sound : timerSoundChoice();
+  var asked = Date.now();
+  var go = function(){
+    if (c.state !== 'running' || Date.now() - asked > 1500) return;
+    var secs = TIMER_VOICES[sound](c, timerSoundOut(c, sound), c.currentTime + 0.03);
+    chimeRest(c, secs * 1000 + 1500);
+  };
+  if (c.state === 'running') { go(); return true; }
+  if (c.resume) c.resume().then(go, function(){});
+  return true;
+}
+// ⚙️ → ♿ Accessibility → ⏲️ Timer sound, and its window (each sound with ▶ to hear it)
+function timerSoundRefreshSettings() {
+  var it = document.getElementById('timerSoundItem');
+  if (it) it.textContent = '⏲️ Timer sound: ' + TIMER_SOUNDS[timerSoundChoice()].replace(/^\S+\s/, '');
+  return !!it;
+}
+function timerSoundSet(s) {
+  if (!TIMER_SOUNDS[s]) return false;
+  try { localStorage.setItem(TIMER_SOUND_KEY, s); } catch(e) {}
+  timerSoundRefreshSettings();
+  timerSoundPlay(s);
+  return s;
+}
+function openTimerSoundSettings() {
+  var prev = document.getElementById('timerSoundOverlay'); if (prev) prev.remove();
+  var ov = document.createElement('div'), now = timerSoundChoice();
+  ov.id = 'timerSoundOverlay'; ov.className = 'modal-overlay open';
+  ov.innerHTML = '<div class="ask-card" role="dialog" aria-modal="true" aria-labelledby="timerSoundTitle" style="max-width:460px;text-align:start;">'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><div class="ask-title" id="timerSoundTitle" style="margin:0;">⏲️ Sound for timers</div>'
+    + '<button type="button" class="modal-close" style="position:relative;top:auto;right:auto;" aria-label="Close" onclick="document.getElementById(\'timerSoundOverlay\').remove()">✕</button></div>'
+    + '<div style="margin:8px 0 10px;font-size:13px;color:var(--muted);">A timer that ends rings with it while the app is open. When the phone is locked, the notification rings with the phone’s own sound. On this device.</div>'
+    + Object.keys(TIMER_SOUNDS).map(function(s){
+        return '<div class="access-row" style="margin-top:6px;flex-wrap:wrap;row-gap:6px;"><label style="display:flex;align-items:center;gap:8px;flex:1 1 190px;min-width:0;cursor:pointer;">'
+          + '<input type="radio" name="timerSound" value="' + s + '"' + (s === now ? ' checked' : '') + ' onchange="timerSoundSet(this.value)" style="accent-color:var(--terracotta);">'
+          + '<span>' + TIMER_SOUNDS[s] + '</span></label>'
+          + '<button type="button" class="access-remove-btn" style="color:var(--heading);border-color:var(--border);flex:none;margin-inline-start:auto;" onclick="timerSoundPlay(' + jsA(s) + ')">▶ Listen</button></div>';
+      }).join('')
+    + '<div class="ask-actions" style="margin-top:14px;"><button type="button" class="ask-btn" onclick="document.getElementById(\'timerSoundOverlay\').remove()">Done</button></div></div>';
+  ov.onclick = function(e){ if (e.target === ov) ov.remove(); };
+  document.body.appendChild(ov);
+  return ov;
+}
+window.timerSoundPlay = timerSoundPlay; window.timerSoundChoice = timerSoundChoice; window.timerSoundSet = timerSoundSet;
+window.openTimerSoundSettings = openTimerSoundSettings; window.timerSoundRefreshSettings = timerSoundRefreshSettings;
 window.chimeRefreshSettings = chimeRefreshSettings; window.CHIME_SOUNDS = CHIME_SOUNDS;
 // ─── LIVE (v38.49) ───────────────────────────────────────────────────────────
 // Tony: "I can see a message arriving only after refreshing the page/app. This is not good enough. It should appear
@@ -11621,7 +11738,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v40.18';
+var APP_VERSION = 'v40.19';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -15501,7 +15618,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v40.18</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v40.19</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -15589,7 +15706,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v40.18</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v40.19</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -15645,6 +15762,8 @@ body.banner-shown .header {
               <button class="drop-item" title="Light, dark, or following the device — on this device only." id="themeModeItem" onclick="cycleTheme()">🌗 Theme: Auto</button>
               <label class="drop-item" id="chimeToggleItem" title="A sound when a message or a request to link kitchens arrives. Untick to mute it. On this device." style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" id="chimeToggle" checked onchange="chimeSetOn(this.checked)" style="width:18px;height:18px;flex:none;accent-color:var(--terracotta);"> 🔔 Sound for messages and requests</label>
               <button class="drop-item" id="chimeChooseItem" title="Choose the sound, and hear each one." onclick="closeDrop('settingsDrop');openChimeSettings()">🎵 The sound: Spoon on a wine glass</button>
+              <!-- v40.19 — Tony: "give timers their own in-app sound, for example a mechanical kitchen-timer bell, separate from the message sound" -->
+              <button class="drop-item" id="timerSoundItem" title="The sound a timer rings with while the app is open — apart from the messages’ sound. On this device." onclick="closeDrop('settingsDrop');openTimerSoundSettings()">⏲️ Timer sound: A wind-up kitchen timer</button>
               <!-- v40.15 — Tony: "Please send a notification when the time is up … so it makes a sound while the phone is locked or while in another app." -->
               <label class="drop-item" id="bellToggleItem" title="When the time is up, a timer rings on this device even when it is locked or you are in another app — through a notification. On this device." style="display:none;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" id="bellToggle" onchange="bellSwitch(this.checked)" style="width:18px;height:18px;flex:none;accent-color:var(--terracotta);"> ⏰ Timers ring when the phone is locked</label>
             </div>
@@ -19501,6 +19620,10 @@ var I18N_EXTRA = [
   '\u2713 Synced — {1}', '(yours)', 'Reading the recipe…', 'Fetching page via server…', 'about ${1}', 'under ${1}', '{1} of {2}', '⏳ Reading the requests…', 'new — nothing saved to the cloud yet',
   // v38.82 — the sound's line in ⚙️ → ♿ Accessibility, for each sound; v38.81 — a photo library's pause, in 🔍 Find a photo
   '🎵 The sound: Spoon on a wine glass', '🎵 The sound: The kitchen’s service bell', '🎵 The sound: Wooden spoon on a pot',
+  // v40.19 — the timers' own sound: its line in ♿ Accessibility for each sound, and the sounds' names
+  '⏲️ Timer sound: A wind-up kitchen timer', '⏲️ Timer sound: An oven’s beeps', '⏲️ Timer sound: The kitchen’s service bell',
+  '⏲️ A wind-up kitchen timer', '📟 An oven’s beeps',
+  '⏲️ Sound for timers', 'A timer that ends rings with it while the app is open. When the phone is locked, the notification rings with the phone’s own sound. On this device.', '▶ Listen',
   '⏳ {1} asks for a pause — {2} s…',
   // v38.86 — the button on a toast about a message (toastAction's label is never a literal the scrape reads)
   'Open',
@@ -27971,6 +28094,7 @@ function settingsGroupsRefresh(collapse) {
   try { farmRefreshSettings(); } catch(e) {}
   try { chimeRefreshSettings(); } catch(e) {}
   try { bellRefreshSettings(); } catch(e) {}   // v40.15
+  try { timerSoundRefreshSettings(); } catch(e) {}   // v40.19
   try { accessRefreshSettings(); } catch(e) {}
   var groups = document.querySelectorAll('#settingsDrop .set-group');
   Array.prototype.forEach.call(groups, function(g) {
@@ -35655,6 +35779,7 @@ function appFeatureSections(all) {
       'Chat with the people in your household: one person at a time, or everyone at once for announcements.',
       'Hear of a new message even when the app is closed — 🔔 at the foot of the chat window (on an iPhone, in the app on the Home Screen).',   // v40.02
       'A kitchen sound when a message or a request arrives — a spoon on a wine glass, or another; mute it in Settings.',   // v38.82
+      'Timers ring with a sound of their own — a wind-up kitchen timer, an oven’s beeps or the service bell; choose it in Settings.',   // v40.19
       'Link with other households you know: each sees the other’s recipes, and you can write to each other in the app.',
       'Keep your own copy of a recipe from a linked household.',
       'A linked household’s recipe opens just like yours — as wide, and on a computer you can drag its corner to make it bigger.',   // v39.58
@@ -37772,7 +37897,8 @@ var HELP_SYSTEM_PROMPT = [
   "- PULLING THE LIST DOWN (at the top of the page) checks for a new version of the app at once — signed in or not — and, signed in, for changes in the cloud; it says what it found: '🆕 vX is ready — tap Update now below', or '✅ Up to date: the recipes, and the app (vX)' (v39.32)",
   "",
   "=== ⏳ TIMER (v40.15) ===",
-  "- ··· More → 🧰 Tools → ⏳ Timer — an hourglass, from a minute up to 31 days. SET IT with the three wheels under it: days (0–31), hours (0–23), minutes (0–59) — roll each up or down. START: flip the hourglass — tap it, swipe up or down on it, or tap Flip; the sand runs down and the time left shows under it (a day or more in days: '3 days 4:12:05'). PAUSE: tap it — it lies on its side and the sand stops; tap again (or Stand it up) and it stands up and runs on. Flipped while it runs it gives back the time that has already run, like a real hourglass. When the sand has run out it rings (the sound chosen in ⚙️ → ♿ Accessibility, three times) and the phone vibrates; flip it for another round of the same time. While it runs, lies down or rings, the wheels are locked (↺ Reset lays the sand back down and frees them), and ⏳ with the time left stands first among the buttons at the top of the screen — tap it to open the timer. It is kept on this device: closing the window or the app does not stop it. [GO:timer] leads there.",
+  "- ··· More → 🧰 Tools → ⏳ Timer — an hourglass, from a minute up to 31 days. SET IT with the three wheels under it: days (0–31), hours (0–23), minutes (0–59) — roll each up or down. START: flip the hourglass — tap it, swipe up or down on it, or tap Flip; the sand runs down and the time left shows under it (a day or more in days: '3 days 4:12:05'). PAUSE: tap it — it lies on its side and the sand stops; tap again (or Stand it up) and it stands up and runs on. Flipped while it runs it gives back the time that has already run, like a real hourglass. When the sand has run out it rings with the timers' own sound (⚙️ → ♿ Accessibility → ⏲️ Timer sound) and the phone vibrates; flip it for another round of the same time. While it runs, lies down or rings, the wheels are locked (↺ Reset lays the sand back down and frees them), and ⏳ with the time left stands first among the buttons at the top of the screen — tap it to open the timer. It is kept on this device: closing the window or the app does not stop it. [GO:timer] leads there.",
+  "- ⏲️ THE TIMERS' OWN SOUND (v40.19): while the app is open, the hourglass and the ⏱ step timers in recipes ring with a sound of their own, apart from the messages' — ⏲️ A wind-up kitchen timer (its little bell rattling twice; the first choice), 📟 An oven's beeps, or 🛎️ The kitchen's service bell, each with ▶ Listen — in ⚙️ → ♿ Accessibility → ⏲️ Timer sound [GO:timer-sound]. Muting the messages (🔔 Sound for messages and requests) does not silence a timer. On this device only. When the phone is locked or another app is in front, a timer rings through a notification with the phone's own sound, which an app cannot choose (on Android it is the app's notification sound in the phone's settings, shared with the chats; an iPhone does not let a single app choose — from iOS 17.2, Settings → Sounds & Haptics → Default Alerts changes it for every app).",
   "- ⏰ A TIMER RINGS WHEN THE PHONE IS LOCKED (v40.15): the hourglass and the ⏱ step timers in recipes ring on this device even when it is locked or you are in another app — a notification with the phone's own sound, three times 30 seconds apart, unless you open the app (or tap the notification) first. The first time a timer starts the app asks 'Ring when the phone is locked?' (Allow / Not now); a device that already allows notifications (the chats') is not asked. To turn it on or off later: ⚙️ → ♿ Accessibility → ⏰ Timers ring when the phone is locked [GO:timer-bell]. On an iPhone or iPad it works only in the app on the Home Screen (Share → Add to Home Screen, iOS 16.4 or later); on Android the sound is the phone's notification sound for the app (Settings → Apps → the app, or Chrome → Notifications). Pausing, resetting, or closing a recipe with a running step timer stops it there too. Signed out, a timer rings only while the app is open.",
   "",
   "=== 🧮 CALCULATOR (v40.15; the notebook page v40.16) ===",
@@ -38303,6 +38429,7 @@ var HELP_PLACES = [
   ['timer', '··· More → 🧰 Tools → ⏳ Timer', 'openKitchenTimer', 'open'],   // v40.15
   ['calculator', '··· More → 🧰 Tools → 🧮 Calculator', 'openCalcPad', 'open'],
   ['timer-bell', '⚙️ → ♿ Accessibility → ⏰ Timers ring when the phone is locked', '#bellToggleItem', 'show'],
+  ['timer-sound', '⚙️ → ♿ Accessibility → ⏲️ Timer sound', '#timerSoundItem', 'show'],   // v40.19
   ['connect-household', '··· More → 🏡 Kitchens and people → 🤝 Connect with another household', 'openConnectHousehold', 'open'],
   ['family-chat', '··· More → 🏡 Kitchens and people → 👪 Chat with family members', 'openFamilyChat', 'open'],
   ['kitchen-chats', '··· More → 🏡 Kitchens and people → 💬 Chats with linked kitchens', 'openKitchenChats', 'open'],
