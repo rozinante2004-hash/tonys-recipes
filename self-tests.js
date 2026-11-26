@@ -24387,6 +24387,13 @@ window.SELF_TESTS = [
         openKitchenTimer(); await wait(320);
         if(!document.getElementById('ktmOverlay').classList.contains('open')) throw new Error('the timer window did not open');
         var counts=['ktmWd','ktmWh','ktmWm'].map(function(id){ return document.querySelectorAll('#'+id+' .ktm-n').length; }).join();
+        // v40.18 — Tony: numbers are read left to right in Hebrew too: days, hours, minutes from left to right in every language
+        var dirWas=document.documentElement.getAttribute('dir');
+        try{
+          document.documentElement.setAttribute('dir','rtl'); await wait(30);
+          var lx=['ktmWd','ktmWh','ktmWm'].map(function(id){ return Math.round(document.getElementById(id).getBoundingClientRect().left); });
+          if(!(lx[0]<lx[1] && lx[1]<lx[2])) throw new Error('right to left, the wheels are not days, hours, minutes from left to right: '+lx.join(', '));
+        } finally { if(dirWas===null) document.documentElement.removeAttribute('dir'); else document.documentElement.setAttribute('dir', dirWas); }
         if(counts!=='32,24,60') throw new Error('the wheels are not 0–31 days, 0–23 hours, 0–59 minutes: '+counts);
         var ih=document.querySelector('#ktmWh .ktm-n').offsetHeight;
         document.getElementById('ktmWd').scrollTop=2*ih; document.getElementById('ktmWh').scrollTop=3*ih; document.getElementById('ktmWm').scrollTop=4*ih;

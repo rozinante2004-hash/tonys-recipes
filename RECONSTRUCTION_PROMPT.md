@@ -509,7 +509,9 @@ under its plain path only (a `?url=` request goes network-first).
   chime three times 1.7 s apart and the phone's vibration (`timerRingHere`), a wobble, "The sand has run out. Flip it
   for another {1}." THE WHEELS: `#ktmWd` 0–31 days, `#ktmWh` 0–23 hours, `#ktmWm` 0–59 minutes — CSS scroll-snap lists
   (44 px rows, a gold band behind the middle one), read on scroll (`ktmWheelRead`); over 31 days → 31 days and the
-  others back to 0; each a `role="spinbutton"` (aria-valuenow kept by `ktmWheelAria`, ↑/↓ move it; aria-disabled while
+  others back to 0; days, hours, minutes from left to right in every language — numbers are read left to right in
+  Hebrew too (v40.18, `.ktm-wheels { direction: ltr }`; the labels under them in the reader's language, without letter
+  spacing right to left); each a `role="spinbutton"` (aria-valuenow kept by `ktmWheelAria`, ↑/↓ move it; aria-disabled while
   locked); locked (`.ktm-locked`) while it runs or lies down — ↺ Reset lays the sand down and frees them. KEPT
   ON THE DEVICE (`mkn_hourglass`: chosen, state off/run/pause/done, total, ends, left): counted by the clock, so a
   phone that slept is not behind and the app closed loses nothing; `ktmCheck` once a second while it runs (and on
