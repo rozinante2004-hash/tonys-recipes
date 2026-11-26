@@ -1041,7 +1041,8 @@ under its plain path only (a `?url=` request goes network-first).
   (`appFeatureSections`), ✉️ Contact us (`APP_CONFIG.supportMailbox` — contact [at] mykitchennotes.community, joined only on screen),
   🔒 What leaves this device, the **Privacy Statement** and **Terms of Use** — `privacy.html` /
   `terms.html` plus 10 translations each (`privacy.<lang>.html`, `legal-i18n.js`,
-  `tools/legal-keys.py`). The Terms are between the user and the "My Kitchen Notes Team"; the privacy
+  `tools/legal-keys.py`; the translation editor reads a language's passages with `legalDocBase(lang)`, which asks
+  for a document again once, 0.7 s later, if it does not come — v40.17 — and logs it if it still does not). The Terms are between the user and the "My Kitchen Notes Team"; the privacy
   statement names the data controller and every service data goes to (a test checks the list).
   About says "© 2026 My Kitchen Notes".
 - **Feedback:** the floating 💬 (community and test) and ⚙️ → ✉️ Send feedback open one form (note,

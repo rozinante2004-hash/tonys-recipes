@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v40.16 -->
+<!-- Tony's Recipes Collection v40.17 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -11621,7 +11621,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v40.16';
+var APP_VERSION = 'v40.17';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -15496,7 +15496,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v40.16</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v40.17</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -15584,7 +15584,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v40.16</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v40.17</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -35845,12 +35845,20 @@ async function legalDocBase(lang) {
   var out = {};
   if (LEGAL_LANGS.indexOf(lang) === -1) return out;
   for (var which of ['privacy', 'terms']) {
-    try {
-      var r = await fetch(which + '.' + lang + '.html', { cache: 'no-cache' });
-      if (!r.ok) continue;
-      var d = new DOMParser().parseFromString(await r.text(), 'text/html');
-      d.querySelectorAll('[data-k]').forEach(function(el){ out[el.getAttribute('data-k')] = el.textContent.replace(/\s+/g, ' ').trim(); });
-    } catch(e) {}
+    // v40.17 — asked again once if it does not come (Tony's installed iPhone, beta, 26 Nov: one read of the Arabic
+    // terms came back empty while the next was whole — the editor would have shown half the passages).
+    for (var tries = 0; tries < 2; tries++) {
+      try {
+        var r = await fetch(which + '.' + lang + '.html', { cache: 'no-cache' });
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        var d = new DOMParser().parseFromString(await r.text(), 'text/html');
+        d.querySelectorAll('[data-k]').forEach(function(el){ out[el.getAttribute('data-k')] = el.textContent.replace(/\s+/g, ' ').trim(); });
+        break;
+      } catch(e) {
+        if (tries) { syncLog('error', 'A translated document could not be read', which + '.' + lang + '.html: ' + String((e && e.message) || e).slice(0, 80)); break; }
+        await new Promise(function(res){ setTimeout(res, 700); });
+      }
+    }
   }
   return out;
 }

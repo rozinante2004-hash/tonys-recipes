@@ -10243,9 +10243,10 @@ window.SELF_TESTS = [
         var top=card.querySelector('.pl-top'), x=top && top.querySelector('.modal-close');
         if(!top || !x || !top.contains(undo) || !top.querySelector('#planTitle') || getComputedStyle(top).position!=='sticky') throw new Error('no top bar with the title, ↩︎ Undo and ✕');
         body.style.paddingBottom='3000px'; card.scrollTop=card.scrollHeight; await wait(30);
-        var xr=x.getBoundingClientRect();
+        var xr=x.getBoundingClientRect(), tr=top.getBoundingClientRect();
         var cr2=card.getBoundingClientRect();
-        if(card.scrollTop<100 || xr.top<cr2.top-1 || xr.bottom>cr2.top+120) throw new Error('the ✕ is not in sight when the plan is scrolled down: scrolled '+Math.round(card.scrollTop)+' px, ✕ at '+Math.round(xr.top)+'–'+Math.round(xr.bottom)+' (window from '+Math.round(cr2.top)+')');
+        // v40.17 — in the top bar, and the bar at the window's top (Tony's installed iPhone: the bar starts under the notch, ✕ at 83–123)
+        if(card.scrollTop<100 || Math.abs(tr.top-cr2.top)>1 || xr.top<tr.top-1 || xr.bottom>tr.bottom+1) throw new Error('the ✕ is not in sight when the plan is scrolled down: scrolled '+Math.round(card.scrollTop)+' px, ✕ at '+Math.round(xr.top)+'–'+Math.round(xr.bottom)+' (window from '+Math.round(cr2.top)+')');
         body.style.paddingBottom=''; card.scrollTop=0;
         if(!undo.disabled) throw new Error('↩︎ Undo can be pressed with nothing to undo');
         // each name on a line of its own (only the ⠿ handle beside it); the buttons and “Until here” under the chart
@@ -12375,11 +12376,17 @@ window.SELF_TESTS = [
     test: async()=>{
       var real={ lang:_i18nLang, dict:_i18nDict, edLang:_i18nEdLang, draft:_i18nEdDraft, base:_i18nEdDocBase, dirty:_i18nEdDirty, write:window.i18nWriteCloud, toast:window.toast };
       var rowsEl=document.getElementById('i18nEdRows'), rowsWas=rowsEl ? rowsEl.innerHTML : null;   // saving redraws the editor's rows
-      var kTitle=LEGAL_KEY_PREFIX.terms+'Terms of Use and Disclaimer';
-      var kAgree=Object.keys(await legalDocBase('ar')).filter(function(k){ return k.indexOf(LEGAL_KEY_PREFIX.terms+'These terms are an agreement')===0; })[0];
+      var kTitle=LEGAL_KEY_PREFIX.terms+'Terms of Use and Disclaimer', kAgree;
       try{
-        var base=await legalDocBase('ar');
-        if(Object.keys(base).length<100 || !base[kTitle] || !kAgree) throw new Error('the Arabic documents\' passages cannot be read: '+Object.keys(base).length);
+        // v40.17 — read once (two reads could differ, and the message counted the second)
+        var base=await legalDocBase('ar'), bk=Object.keys(base);
+        kAgree=bk.filter(function(k){ return k.indexOf(LEGAL_KEY_PREFIX.terms+'These terms are an agreement')===0; })[0];
+        var nP=bk.filter(function(k){ return k.indexOf(LEGAL_KEY_PREFIX.privacy)===0; }).length, nT=bk.filter(function(k){ return k.indexOf(LEGAL_KEY_PREFIX.terms)===0; }).length;
+        if(nP<100 || nT<40 || !base[kTitle] || !kAgree) throw new Error('the Arabic documents\' passages cannot be read: privacy '+nP+', terms '+nT+(base[kTitle]?'':' (no title)')+(kAgree?'':' (no agreement line)'));
+        // …and a document that does not come the first time is asked for again (a phone's network drops one now and then)
+        var realFetch=window.fetch, dropped=0;
+        window.fetch=function(u){ if(/terms\.ar\.html/.test(String(u)) && !dropped++) return Promise.reject(new TypeError('Load failed')); return realFetch.apply(this, arguments); };
+        try{ var again=await legalDocBase('ar'); if(dropped<2 || !again[kTitle]) throw new Error('a document that did not come is not asked for again'); } finally{ window.fetch=realFetch; }
         // The editor lists them as live phrases, not orphans, and its search finds them.
         _i18nEdLang='ar'; _i18nEdDocBase=base; _i18nEdDraft={}; Object.keys(base).forEach(function(k){ _i18nEdDraft[k]=base[k]; });
         i18nEdInvalidate(); var info=i18nEdInfo();
