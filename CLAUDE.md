@@ -17,7 +17,9 @@ where.
 **Live now**
 - The family's copy (`main`, https://rozinante2004-hash.github.io/tonys-recipes/ — it forwards to the community app)
   and the community app (`beta`, https://mykitchennotes.community, Firebase project my-kitchen-notes-beta) run
-  **v40.19 + Worker v109** (released 26 Nov 2026, 17:31 Israel time, on a7f7913 — v40.17: the translated
+  **v40.20 + Worker v109** (released 27 Nov 2026, 16:26 Israel time, on bd529d1 — a collection tapped in "Recent:"
+  (or with 🕐 Recent on) opens at the recipe in it you were at, within 12 hours, the same on all your devices; every
+  recipe opens at its top). Before it: **v40.19 + Worker v109** (released 26 Nov 2026, 17:31 Israel time, on a7f7913 — v40.17: the translated
   documents asked for again once if a read fails, two Self Tests fixed after Tony's installed-iPhone run; v40.18: the
   timer's wheels left to right in Hebrew too; v40.19: ⏲️ timers ring with their own sound while the app is open — a
   wind-up kitchen timer by default, ⚙️ → ♿ Accessibility → ⏲️ Timer sound). Before it: **v40.16 + Worker v109** (released 26 Nov 2026, 08:14 Israel time, on 451e434 — v40.14: ⏱ a step's time read in
@@ -54,9 +56,7 @@ where.
   own `i18n/_farm_<lang>`; v39.94 at 21:40 on db945ab: the
   network Self Tests send the sign-in; v39.93 at 19:55 on 4b688fc: each farm animal in its own recorded voice,
   `docs/farm-voices.md`; Worker v108 since 20 Nov 01:59 (from Test); the jobs are listed near the top of `docs/history/2026-11.md`).
-  **On Test, not released:** v40.20 — a collection tapped in "Recent:" (or with 🕐 Recent on) opens at the recipe in
-  it you were at when it was last open less than 12 hours ago, the same on all your devices; and every recipe opens at
-  its top (Chrome brought back the scroll of the recipe read before). The test copy
+  **On Test, not released:** nothing beyond v40.20. The test copy
   (https://tonys-recipes-test.pages.dev, its own database and rules) follows `test`.
 - **The beta has had testers since Sunday 25 Oct 2026** and is **by invitation only**: the owner invites with
   ⚙️ → 👑 → ✉️ Invite testers (the congratulatory wording of v39.60); a tester's share button asks the owner for an
