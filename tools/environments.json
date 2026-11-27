@@ -18,6 +18,8 @@
     "movedTo": "",
     "_why_movedTo": "v38.31 — the family copy forwards every visit to the community copy since move day (13 Oct 2026); this copy forwards nowhere.",
     "dataLayout": "households",
+    "recipePages": true,
+    "_why_recipePages": "v40.21 — a recipe sent as a link opens as its own page on this copy's address (/r/<id>, a Cloudflare Pages function), which WhatsApp shows as a card with its photo and name.",
     "_why_dataLayout": "WP-D rehearsal (28 Sep 2026): the test copy runs in the household layout after Tony copied its collection into a household (Family Access → Copy this collection into a household). Its `shared` collection is untouched; setting this back to 'shared' returns to it.",
     "extensionStores": { "chrome": "https://chrome.google.com/webstore/detail/dofokgilnfbpkjncmnkgfolhpjhpeglk", "edge": "", "firefox": "https://addons.mozilla.org/firefox/addon/my-kitchen-notes/" },
     "_why_sameAsBeta": "v38.99 — Tony, 27 Oct: \"once a build is released to it, it behaves exactly the same as the Beta would have\". So the test copy's features, diagnostics and store links are the beta's; it differs only in who it is (its Firebase project, address, name, icons and banner). The store extension itself opens the beta.",
@@ -81,6 +83,8 @@
     "iosShortcutUrl": "https://www.icloud.com/shortcuts/3dfda89e7d04454496d0acc527284190",
     "_why_iosShortcutUrl": "v37.72 — Tony's beta shortcut (5 Oct 2026): a copy of his, pointed at this address. v38.37 — since the move, the ONE shortcut for everyone (Tony, 14 Oct 2026: his family shortcut pointed at this address); the family copy offers the same.",
     "dataLayout": "households",
+    "recipePages": true,
+    "_why_recipePages": "v40.21 — a recipe sent as a link opens as its own page on this copy's address (/r/<id>, a Cloudflare Pages function), which WhatsApp shows as a card with its photo and name.",
     "extensionStores": { "chrome": "https://chrome.google.com/webstore/detail/dofokgilnfbpkjncmnkgfolhpjhpeglk", "edge": "", "firefox": "https://addons.mozilla.org/firefox/addon/my-kitchen-notes/" },
     "_why_extensionStores": "v37.97 — Tony: the store extension leads to the beta now (extension 1.7: My Kitchen Notes for everyone, the family app for whoever opens it in that browser), so the beta offers the store listing. (v37.73–96: its own download, my-kitchen-notes-extension-BETA.zip.)",
     "features": {

@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v40.20 -->
+<!-- Tony's Recipes Collection v40.21 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -176,6 +176,10 @@
     // its household (Family Access → 🏠 Copy this collection into a household);
     // `shared` stays untouched, and 'shared' here returns to it.
     dataLayout:          'households',
+    // v40.21 — a recipe sent as a link opens as its own page at <address>/r/<id> (functions/r/[[path]].js), drawn on
+    // the server so WhatsApp shows it as a card with its photo and name. Only a copy on Cloudflare Pages can (the test
+    // copy and the community copy); this one, on GitHub Pages, sends the app's own ?recipe= link.
+    recipePages:         false,
     // v36.91 — the public app's name (Tony, 27 Sep 2026: "My Kitchen Notes at
     // this stage; we can always change it later"). Each household is called
     // "<first name>'s Kitchen Notes" until renamed. The family's copy keeps its
@@ -8101,6 +8105,11 @@ window.openLinkedRecipe = openLinkedRecipe; window.openLinkedRecipeObj = openLin
 // of each, and withdraws one. During the closed beta, someone without an account who opens the link sees the recipe
 // and may ask the app's owner for an invitation (Tony: "Closed Beta. Ask for an Invitation").
 var GIFT_DAYS = 28, GIFT_MS = GIFT_DAYS * 864e5;
+// v40.21 — a recipe sent as a LINK keeps 6 months (Tony, 27 Nov 2026: "Let's say 6 months should suffice"); one sent to a
+// kitchen through the app still 4 weeks (it waits in their app, and goes once saved). firestore.rules holds both.
+var GIFT_LINK_DAYS = 183, GIFT_LINK_MS = GIFT_LINK_DAYS * 864e5;
+function giftKeepsMs(via) { return via === 'app' ? GIFT_MS : GIFT_LINK_MS; }
+var GIFT_REUSE_KEY = 'mkn_gift_reuse';        // v40.21 — + kitchen: the link last made for each recipe on this device
 var GIFT_KEY = 'mkn_gift';                    // sessionStorage: the …?recipe=<id> this visit came with
 var GIFT_SEEN_KEY = 'mkn_gift_seen_';         // + kitchen: the ones already shown on this device
 var GIFT_LINKS_KEY = 'mkn_gift_links';        // links opened on this device: [{ id, at, saved }]
@@ -8123,6 +8132,17 @@ var GIFT_FOR_KEY = 'mkn_gift_for';
     history.replaceState(null, '', location.pathname + location.search.replace(/([?&])recipe=[^&]*&?/, '$1').replace(/[?&]$/, '') + hash);
   } catch(e) {}
 })();
+// v40.21 — …/?invite-me: the link at the end of a shared recipe's WhatsApp message while newcomers come by invitation only
+// (Tony: "While in Beta, the link should open an invitation request"). Kept for this visit and taken out of the address
+// bar; signed out, the invitation request opens (inviteMeMaybe).
+var INVITE_ME_KEY = 'mkn_invite_me';
+(function captureInviteMe() {
+  try {
+    if (!/[?&]invite-me(?:=[^&]*)?(?=&|$)/.test(location.search)) return;
+    sessionStorage.setItem(INVITE_ME_KEY, '1');
+    history.replaceState(null, '', location.pathname + location.search.replace(/([?&])invite-me(?:=[^&]*)?&?/, '$1').replace(/[?&]$/, '') + location.hash);
+  } catch(e) {}
+})();
 function giftNewId() {
   var abc = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789', out = '', b = new Uint8Array(24);
   crypto.getRandomValues(b);
@@ -8132,6 +8152,14 @@ function giftNewId() {
 function giftUrl(id, to) {
   var em = String(to || '').trim();
   return APP_CONFIG.siteOrigin + APP_CONFIG.sitePath + '?recipe=' + id + (/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(em) ? '#for=' + encodeURIComponent(em) : '');
+}
+// v40.21 — the link a person is SENT: the recipe's own page on this copy's address (<site>/r/<id>, drawn by the server
+// — share/recipe-page.mjs — so WhatsApp shows it as a card with its photo and name, and it opens in any browser), in
+// the sender's language; its Save button leads to giftUrl. A copy that cannot serve those pages sends giftUrl itself.
+function giftShareUrl(id) {
+  if (!APP_CONFIG.recipePages) return giftUrl(id);
+  var l = (typeof _i18nLang === 'string' && /^[a-z]{2}$/.test(_i18nLang) && _i18nLang !== 'en') ? '?l=' + _i18nLang : '';
+  return APP_CONFIG.siteOrigin + APP_CONFIG.sitePath + 'r/' + id + l;
 }
 function giftMs(t) { return t && typeof t.toMillis === 'function' ? t.toMillis() : (+t || 0); }
 function giftDay(t) { var ms = giftMs(t); return ms ? new Date(ms).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : ''; }
@@ -8170,18 +8198,124 @@ async function giftSend(r, o) {
   var id = giftNewId(), photo = await giftPhotoOf(r);
   var recipe = giftPayload(r);
   if (JSON.stringify(recipe).length > 700000) throw new Error('This recipe is too long to send.');
-  var exp = firebase.firestore.Timestamp.fromMillis(Date.now() + GIFT_MS);
-  var g = { from: me.hid, fromName: me.name || '', fromCode: me.code || '', to: o.to || '', toCode: o.toCode || '',
-            by: _fbUser.uid, via: o.via, name: String(r.name || 'A recipe').slice(0, 200), recipe: recipe, photo: !!photo,
-            note: String(o.note || '').trim().slice(0, 500), at: firebase.firestore.FieldValue.serverTimestamp(), expireAt: exp, saved: {} };
-  var b = db.batch();
-  b.set(db.collection('recipeGifts').doc(id), g);
-  if (photo) b.set(db.collection('recipeGiftPhotos').doc(id), { from: me.hid, data: photo, expireAt: exp });
-  await b.commit();
+  // v40.21 — a link keeps 6 months, and its photo travels with a small copy for the link's preview card (WhatsApp
+  // shows a picture only when it is small)
+  var keep = giftKeepsMs(o.via), thumb = (photo && o.via !== 'app') ? await giftThumbOf(photo) : '', g = null, exp = null;
+  var attempt = async function(keepMs, withThumb) {
+    exp = firebase.firestore.Timestamp.fromMillis(Date.now() + keepMs);
+    g = { from: me.hid, fromName: me.name || '', fromCode: me.code || '', to: o.to || '', toCode: o.toCode || '',
+          by: _fbUser.uid, via: o.via, name: String(r.name || 'A recipe').slice(0, 200), recipe: recipe, photo: !!photo,
+          note: String(o.note || '').trim().slice(0, 500), at: firebase.firestore.FieldValue.serverTimestamp(), expireAt: exp, saved: {} };
+    var b = db.batch();
+    b.set(db.collection('recipeGifts').doc(id), g);
+    if (photo) {
+      var ph = { from: me.hid, data: photo, expireAt: exp };
+      if (withThumb && thumb) ph.thumb = thumb;
+      b.set(db.collection('recipeGiftPhotos').doc(id), ph);
+    }
+    await b.commit();
+  };
+  try { await attempt(keep, true); }
+  catch(e) {
+    // A database whose rules are older than this app (4 weeks, no small picture) refuses the new kind: sent as before.
+    if (!(e && e.code === 'permission-denied') || (keep === GIFT_MS && !thumb)) throw e;
+    syncLog('error', 'A sent recipe was refused for 6 months — sent for 4 weeks instead', { why: (e && e.message) || String(e) });
+    await attempt(GIFT_MS, false);
+  }
   syncLog('save', 'Sent a recipe', { name: g.name, via: o.via });
   if (typeof insightCount === 'function') insightCount('recipe-sent');
-  return { id: id, url: giftUrl(id), name: g.name };
+  return { id: id, url: giftUrl(id), page: giftShareUrl(id), name: g.name, until: exp.toMillis() };
 }
+// v40.21 — the preview card's picture: the photo made small (at most ~190 KB; WhatsApp leaves out a large one). A photo
+// that is a web address has none — the page sends that address itself.
+async function giftThumbOf(p) {
+  if (!/^data:image\//i.test(String(p || ''))) return '';
+  var img = await cardLoadImage(p);          // a picture that does not load gives none (and never waits for ever)
+  if (!img) return '';
+  var make = function(max, q){
+    var k = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight)), w = Math.max(1, Math.round(img.naturalWidth * k)), h = Math.max(1, Math.round(img.naturalHeight * k));
+    var c = document.createElement('canvas'); c.width = w; c.height = h;
+    var x = c.getContext('2d'); x.fillStyle = '#FFFFFF'; x.fillRect(0, 0, w, h); x.drawImage(img, 0, 0, w, h);
+    return c.toDataURL('image/jpeg', q);
+  };
+  try { var t = make(600, 0.72); if (t.length > 190000) t = make(420, 0.62); return t.length <= 190000 ? t : ''; }
+  catch(e) { return ''; }
+}
+window.giftThumbOf = giftThumbOf; window.giftShareUrl = giftShareUrl;
+// ─── v40.21 — 💬 SHARE ON WHATSAPP: A LINK WITH ITS PHOTO, AND A WORD FOR THE APP ──────────────────────────────────
+// Tony, 27 Nov 2026: "I accept your recommendation. Option 2 seems safer. We could also add a sales pitch like
+// "Download the app - it will last longer" and provide a link in the WhatsApp message … While in Beta, the link should
+// open an invitation request … Family too." The recipe's own page (giftShareUrl), which WhatsApp shows as a card with
+// its photo and name, then a line for the app and its link: while the copy takes newcomers by invitation only, that
+// link opens the invitation request (…/?invite-me). Signed out, offline, or refused: the recipe as text, as before,
+// with the line. The same recipe shared again within a week, unchanged, reuses its link (one copy on the server).
+function giftCanSend() {
+  // never a real copy on the server from a Self Test run, unless the test stands in for the server itself
+  if (typeof _selfTestRunning !== 'undefined' && _selfTestRunning && !window._giftUnderTest) return false;
+  return !!(typeof _household !== 'undefined' && _household && _household.hid && window._fbUser && typeof hhDb === 'function' && hhDb()
+    && APP_CONFIG.dataLayout === 'households');
+}
+async function giftForShare(r, key, via) {
+  var all = {}, k = String(key), hid = _household.hid, now = Date.now(), upd = +(r && r.updatedAt) || 0;
+  try { all = JSON.parse(localStorage.getItem(GIFT_REUSE_KEY + hid) || '{}') || {}; } catch(e) { all = {}; }
+  var was = all[k];
+  if (was && was.id && now - (was.at || 0) < 7 * 864e5 && upd <= (was.at || 0) && (was.until || 0) - now > 150 * 864e5) {
+    try {
+      var s = await hhDb().collection('recipeGifts').doc(was.id).get();
+      if (s.exists) return { id: was.id, url: giftUrl(was.id), page: giftShareUrl(was.id), name: (s.data() || {}).name || r.name, until: was.until, again: true };
+    } catch(e) {}
+  }
+  var made = await giftSend(r, { via: via || 'whatsapp' });
+  all[k] = { id: made.id, at: now, until: made.until };
+  Object.keys(all).forEach(function(x){ if (now - ((all[x] && all[x].at) || 0) > 7 * 864e5) delete all[x]; });
+  try { localStorage.setItem(GIFT_REUSE_KEY + hid, JSON.stringify(all)); } catch(e) {}
+  return made;
+}
+// The line for the app, and where its link leads: the invitation request while newcomers come by invitation only
+// (📊 Households), else the app itself. The family's copy points at the community copy it moved into.
+async function appPitchLine(withLink) {
+  var closed = true;
+  if (typeof window._pitchOpenForTest === 'boolean') closed = !window._pitchOpenForTest;   // tests: never the copy's real setting
+  else if (!(typeof _selfTestRunning !== 'undefined' && _selfTestRunning)) {
+    try { if (giftCanSend()) closed = (await hhFoundingOpen()) === false; } catch(e) {}
+  }
+  var home = APP_CONFIG.movedTo || (APP_CONFIG.siteOrigin + APP_CONFIG.sitePath);
+  var words = withLink
+    ? (closed ? '\u{1F4F2} Download My Kitchen Notes and keep the recipe for good — this link lasts 6 months. Ask for an invitation:'
+              : '\u{1F4F2} Download My Kitchen Notes and keep the recipe for good — this link lasts 6 months:')
+    : (closed ? '\u{1F4F2} Download My Kitchen Notes and keep your recipes in one place. Ask for an invitation:'
+              : '\u{1F4F2} Download My Kitchen Notes and keep your recipes in one place:');
+  return i18nPhrase(words) + ' ' + home + (closed ? '?invite-me' : '');
+}
+// The message: the recipe's name and its page, then the line. null when the person stopped (a secret recipe).
+async function recipeShareText(r, key, via) {
+  var made = null, why = '';
+  if (giftCanSend()) {
+    if (r.secret && await askConfirm({ icon: '\u{1F512}', title: 'Send a secret recipe?',
+        message: '“' + r.name + '” is 🔒 secret — only your own kitchen sees it. Send a copy of it all the same?',
+        okLabel: 'Send a copy', cancelLabel: 'Cancel' }) !== true) return null;
+    try { made = await giftForShare(r, key, via); }
+    catch(e) { why = giftErrText(e); syncLog('error', 'The recipe’s link could not be made — sent as text', { name: r.name, why: why }); }
+  }
+  if (made) return (r.emoji || '\u{1F374}') + ' ' + noBold(made.name || r.name) + '\n' + made.page + '\n\n' + await appPitchLine(true);
+  if (why) toast('The link could not be made, so the recipe goes as text.', 8000);
+  return rText(r) + '\n\n' + await appPitchLine(false);
+}
+// WhatsApp opens only straight after a tap; after the link was made the tap may have run out — then one more tap.
+async function waOpen(url) {
+  var w = null;
+  try { w = window.open(url, '_blank'); } catch(e) {}
+  if (w) { try { w.opener = null; } catch(e) {} return 'wa'; }
+  var go = await askConfirm({ icon: '\u{1F4AC}', title: 'Ready to send', message: 'Press the button to open WhatsApp with the message.',
+    okLabel: '\u{1F4AC} Open WhatsApp', cancelLabel: 'Cancel' });
+  if (go !== true) return null;
+  try { w = window.open(url, '_blank'); } catch(e) {}
+  if (w) { try { w.opener = null; } catch(e) {} return 'wa'; }
+  location.href = url;
+  return 'wa';
+}
+window.recipeShareText = recipeShareText; window.appPitchLine = appPitchLine; window.giftForShare = giftForShare;
+window.waOpen = waOpen; window.giftCanSend = giftCanSend;
 // ⋯ the recipe's 📤 Share → 📨 Send to another kitchen. Each step has ‹ Back, with what was typed kept; nothing is sent
 // before the last one. By identifier it goes through the app; the other ways send a link — made once, however often
 // the way to tell them is changed.
@@ -8195,7 +8329,7 @@ async function openSendRecipe(rid) {
   var step = 1, how = '', mailHow = '', toMail = '', code = '', note = '', made = null;
   for (var guard = 0; guard < 40; guard++) {
     if (step === 1) {
-      how = await askChoice('“' + r.name + '” — a copy, with its photo, that they save to their recipes with one tap. It keeps for 4 weeks.', [
+      how = await askChoice('“' + r.name + '” — a copy, with its photo, that they save to their recipes with one tap. Through the app it waits 4 weeks; a link keeps 6 months.', [
           { value: 'app', primary: true, label: '\u{1F4E8} Via My Kitchen Notes (recommended)', title: 'To another kitchen, by its identifier (MKN-…): it pops up in their app' },
           { value: 'email', label: '✉️ Via Email', title: 'The app e-mails them its photo and a button to save it — no mail program needed' },
           { value: 'wa', label: '\u{1F4AC} Via WhatsApp', title: 'A WhatsApp message with a link to the recipe' }]
@@ -8268,9 +8402,12 @@ async function openSendRecipe(rid) {
       step = 3; continue;
     }
     var kname = _household.name || 'My kitchen', mailTo = how === 'email' ? toMail : '';
+    // v40.21 — the recipe's own page (a card with its photo in WhatsApp); e-mailed from one's own mail, the app's link
+    // with the address, so asking for an invitation needs no typing. Then the line for the app.
     var text = kname + ' sent you a recipe for “' + made.name + '” from My Kitchen Notes'
       + (note.trim() ? ': “' + note.trim() + '”' : '.')
-      + '\n\nOpen it to see it, and save it to your recipes with one tap (the link keeps for 4 weeks):\n' + giftUrl(made.id, mailTo);
+      + '\n\nOpen it to see it, and save it to your recipes with one tap (the link keeps for 6 months):\n' + (mailTo ? giftUrl(made.id, mailTo) : giftShareUrl(made.id))
+      + '\n\n' + await appPitchLine(true);
     var did = await shareDo(how === 'email' ? mailHow : how, { to: mailTo, subject: 'A recipe for you: ' + made.name, text: text, copyText: text });
     if (did === ASK_BACK) { step = 3; continue; }                 // no mail program: the e-mail choices again (sent once)
     if (!did) { toast('Not sent. The link is kept: ··· More → 🏡 Kitchens and people → \u{1F4E4} Recipes I sent copies it or sends it again.', 8000, openGiftsOut); return made; }   // v39.16
@@ -8311,7 +8448,7 @@ function giftMarkSeen(id) {
 }
 function giftLinks() { try { var v = JSON.parse(localStorage.getItem(GIFT_LINKS_KEY) || '[]'); return Array.isArray(v) ? v : []; } catch(e) { return []; } }
 function giftRememberLink(id, saved) {
-  var l = giftLinks().filter(function(x){ return x && x.id !== id && Date.now() - (x.at || 0) < GIFT_MS; });
+  var l = giftLinks().filter(function(x){ return x && x.id !== id && Date.now() - (x.at || 0) < GIFT_LINK_MS; });
   l.push({ id: id, at: Date.now(), saved: !!saved });
   try { localStorage.setItem(GIFT_LINKS_KEY, JSON.stringify(l.slice(-100))); } catch(e) {}
 }
@@ -8503,7 +8640,7 @@ async function giftFromUrl() {
   var g = await giftGet(id);
   if (!g) {
     await askConfirm({ icon: '\u{1F4E8}', title: 'This recipe is no longer here',
-      message: 'The link has expired — a sent recipe keeps for 4 weeks — or the kitchen that sent it took it back. Ask them to send it again.', okLabel: 'OK' });
+      message: 'The link has expired — a sent recipe keeps for 4 weeks in the app, 6 months as a link — or the kitchen that sent it took it back. Ask them to send it again.', okLabel: 'OK' });
     return 'gone';
   }
   if (g.d.from === _household.hid) { toast('\u{1F4E4} That is a recipe your own kitchen sent.', 6000, openGiftsOut); return 'own'; }
@@ -8522,13 +8659,28 @@ async function giftSignedOutMaybe() {
   try { var s = await window._fbDb.collection('recipeGifts').doc(id).get(); if (s.exists) g = { id: id, d: s.data() || {} }; } catch(e) {}
   if (!g) {
     await askConfirm({ icon: '\u{1F4E8}', title: 'This recipe is no longer here', z: 10200,
-      message: 'The link has expired — a sent recipe keeps for 4 weeks — or the kitchen that sent it took it back.', okLabel: 'OK' });
+      message: 'The link has expired — a sent recipe keeps for 4 weeks in the app, 6 months as a link — or the kitchen that sent it took it back.', okLabel: 'OK' });
     try { sessionStorage.removeItem(GIFT_KEY); } catch(e) {}
     return 'gone';
   }
   await giftLook(g, true);
   return 'shown';
 }
+// v40.21 — the invitation request from …/?invite-me, once it is known whether this person is signed in; after a recipe's
+// own window, if the visit brought one too. Someone already in is told so.
+async function inviteMeMaybe() {
+  var on = '';
+  try { on = sessionStorage.getItem(INVITE_ME_KEY) || ''; } catch(e) {}
+  if (!on) return false;
+  for (var i = 0; i < 40 && !window._fbAuthSettled; i++) await wait(250);
+  try { sessionStorage.removeItem(INVITE_ME_KEY); } catch(e) {}
+  if (fbSignedInUser()) { toast('You already have My Kitchen Notes 🙂', 5000); return 'in'; }
+  var busy = function(){ var lv = document.getElementById('linkedViewOverlay'); return !!document.getElementById('askOverlay') || !!(lv && lv.classList.contains('open')); };
+  for (var w = 0; w < 300 && busy(); w++) await wait(200);
+  if (fbSignedInUser()) return 'in';
+  return (await giftAskInvitation()) ? 'asked' : 'not';
+}
+window.inviteMeMaybe = inviteMeMaybe;
 function giftSignInInstead() {
   closeM('linkedViewOverlay');
   var ls = document.getElementById('loginScreen');
@@ -8557,8 +8709,10 @@ async function giftAskInvitation() {
     await askConfirm({ icon: '✉️', title: 'Not sent', z: 10200, message: 'It could not be sent just now: ' + ((e && e.message) || e) + '\n\nTry again in a moment.', okLabel: 'OK' });
     return false;
   }
-  await askConfirm({ icon: '✉️', title: 'Sent', z: 10200,
-    message: 'Thank you! The app’s owner will write to ' + em + ' with an invitation. Keep this link: once you are in, it saves the recipe to your new kitchen (for 4 weeks).', okLabel: 'OK' });
+  if (d.name) await askConfirm({ icon: '✉️', title: 'Sent', z: 10200,
+    message: 'Thank you! The app’s owner will write to ' + em + ' with an invitation. Keep this link: once you are in, it saves the recipe to your new kitchen (until ' + giftDay(d.expireAt) + ').', okLabel: 'OK' });
+  else await askConfirm({ icon: '✉️', title: 'Sent', z: 10200,      // v40.21 — from …/?invite-me, no recipe
+    message: 'Thank you! The app’s owner will write to ' + em + ' with an invitation.', okLabel: 'OK' });
   return true;
 }
 // ── ··· More → 🏡 Kitchens and people → 📨 Recipes sent to me ──────────────────────────────────────────
@@ -8596,7 +8750,7 @@ function giftRenderIn() {
   all.sort(function(a, b){ return giftMs(b.d.at) - giftMs(a.d.at); });
   _gifts.shown = all;
   var btn = 'padding:6px 11px;border-radius:8px;font-size:12.5px;font-weight:600;cursor:pointer;min-height:32px;font-family:inherit;';
-  var h = '<div style="font-size:12.5px;color:var(--muted);line-height:1.5;margin:4px 0 12px;">Recipes other kitchens sent yours through the app, and the links you opened on this device. Each keeps for 4 weeks from the day it was sent.</div>';
+  var h = '<div style="font-size:12.5px;color:var(--muted);line-height:1.5;margin:4px 0 12px;">Recipes other kitchens sent yours through the app, and the links you opened on this device. Through the app each keeps for 4 weeks from the day it was sent; a link, 6 months.</div>';
   h += all.length ? all.map(function(g, i){
       var d = g.d, inApp = d.to && d.to === _household.hid;
       return '<div style="border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px;">'
@@ -8663,7 +8817,7 @@ function giftRenderOut() {
   Object.keys(picked).forEach(function(id){ if (!all.some(function(g){ return g.id === id; })) delete picked[id]; });
   var btn = 'padding:6px 11px;border-radius:8px;font-size:12.5px;font-weight:600;cursor:pointer;min-height:32px;font-family:inherit;';
   var ghost = btn + 'background:var(--card-bg);color:var(--heading);border:1px solid var(--border);';
-  var h = '<div style="font-size:12.5px;color:var(--muted);line-height:1.5;margin:4px 0 12px;">What your kitchen sent in the last 4 weeks, and what became of it. Taken back, or 4 weeks old, a recipe is gone from here and from their list — what they saved stays theirs.</div>';
+  var h = '<div style="font-size:12.5px;color:var(--muted);line-height:1.5;margin:4px 0 12px;">What your kitchen sent that is still kept, and what became of it. Taken back, or past its time (4 weeks through the app, 6 months as a link), a recipe is gone from here and from their list — what they saved stays theirs.</div>';
   if (all.length) h += '<div id="goBar" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;position:sticky;top:-1px;z-index:2;background:inherit;padding:6px 0 8px;margin-bottom:6px;border-bottom:1px solid var(--border);">'
     + '<label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;cursor:pointer;margin-inline-end:4px;"><input type="checkbox" id="goAll" onchange="giftPickAll(this.checked)"> <span>Select all</span></label>'
     + '<button type="button" id="goBulkBack" style="' + ghost + '" onclick="giftOutBulk(\'withdraw\')">↩️ <span>Take back</span> <span data-no-i18n class="go-n"></span></button>'
@@ -8683,7 +8837,7 @@ function giftRenderOut() {
         +   '<button type="button" style="' + ghost + '" onclick="giftOutAct(' + i + ',\'resend\')">\u{1F4E8} Send again</button>'
         +   '<button type="button" style="' + ghost + '" onclick="giftOutAct(' + i + ',\'withdraw\')">↩️ Take it back</button>'
         + '</div></div>';
-    }).join('') : '<div style="font-size:13px;color:var(--muted);padding:2px 0 8px;">Nothing sent in the last 4 weeks. To send one: open a recipe → \u{1F4E4} Share → \u{1F4E8} Send to another kitchen.</div>';
+    }).join('') : '<div style="font-size:13px;color:var(--muted);padding:2px 0 8px;">Nothing sent that is still kept. To send one: open a recipe → \u{1F4E4} Share → \u{1F4E8} Send to another kitchen.</div>';
   body.innerHTML = h;
   giftBarShow();
 }
@@ -8716,8 +8870,8 @@ async function giftOutAct(i, what) {
   var g = (_gifts.sent || [])[i];
   if (!g) return false;
   if (what === 'copy') {
-    try { await navigator.clipboard.writeText(giftUrl(g.id)); toast('\u{1F4CB} Link copied', 4000); }
-    catch(e) { await askConfirm({ icon: '\u{1F517}', title: 'The link', message: giftUrl(g.id), okLabel: 'OK' }); }
+    try { await navigator.clipboard.writeText(giftShareUrl(g.id)); toast('\u{1F4CB} Link copied', 4000); }
+    catch(e) { await askConfirm({ icon: '\u{1F517}', title: 'The link', message: giftShareUrl(g.id), okLabel: 'OK' }); }
     return 'copied';
   }
   if (what === 'resend') return await giftResend([g]);
@@ -8735,7 +8889,7 @@ async function giftOutBulk(what) {
   if (what === 'copy') {
     var links = list.filter(function(g){ return !g.d.to; }), skipped = list.length - links.length;
     if (!links.length) { await askConfirm({ icon: '\u{1F517}', title: 'No link to copy', message: 'These went to kitchens in the app — only a recipe sent as a link has one.', okLabel: 'OK' }); return false; }
-    var text = links.map(function(g){ return g.d.name + ': ' + giftUrl(g.id); }).join('\n');
+    var text = links.map(function(g){ return g.d.name + ': ' + giftShareUrl(g.id); }).join('\n');
     try { await navigator.clipboard.writeText(text); toast('\u{1F4CB} ' + links.length + (links.length === 1 ? ' link' : ' links') + ' copied' + (skipped ? ' — ' + skipped + ' sent in the app had none' : ''), 6000); }
     catch(e) { await askConfirm({ icon: '\u{1F517}', title: 'The links', message: text, okLabel: 'OK' }); }
     return 'copied';
@@ -8755,13 +8909,13 @@ async function giftOutBulk(what) {
   return gone;
 }
 // Send again: to a kitchen in the app, a fresh copy pops up in their app for 4 more weeks, and the earlier one is taken
-// back (no two of the same waiting); as a link, a new link for 4 more weeks, sent the way chosen — several in one
-// message — while the earlier links keep working until they expire (others may have them).
+// back (no two of the same waiting); as a link, a new link for 6 more months (v40.21), sent the way chosen — several in
+// one message — while the earlier links keep working until they expire (others may have them).
 async function giftResend(list) {
   var n = list.length, toKitchens = list.filter(function(g){ return !!g.d.to; }).length, links = n - toKitchens;
   if (await askConfirm({ icon: '\u{1F4E8}', title: n === 1 ? 'Send “' + list[0].d.name + '” again?' : 'Send ' + n + ' recipes again?',
       message: (toKitchens ? 'To a kitchen in the app: it pops up in their app again, for 4 more weeks; the earlier one is taken back.' : '')
-        + (toKitchens && links ? '\n\n' : '') + (links ? 'Sent as a link: a new link, good for 4 more weeks — you choose how to send it. The earlier link keeps working until it expires.' : ''),
+        + (toKitchens && links ? '\n\n' : '') + (links ? 'Sent as a link: a new link, good for 6 more months — you choose how to send it. The earlier link keeps working until it expires.' : ''),
       okLabel: 'Send again', cancelLabel: 'Cancel' }) !== true) return false;
   var made = [], failed = '', again = 0;
   for (var i = 0; i < list.length; i++) {
@@ -8777,9 +8931,10 @@ async function giftResend(list) {
   giftRenderOut();
   if (made.length) {
     var kname = (_household && _household.name) || 'My kitchen', text = made.length === 1
-      ? kname + ' sent you a recipe for “' + made[0].name + '” from My Kitchen Notes.\n\nOpen it to see it, and save it to your recipes with one tap (the link keeps for 4 weeks):\n' + giftUrl(made[0].id)
-      : kname + ' sent you ' + made.length + ' recipes from My Kitchen Notes. Open each to see it, and save it to your recipes with one tap (the links keep for 4 weeks):\n\n'
-        + made.map(function(m){ return '• ' + m.name + ':\n' + giftUrl(m.id); }).join('\n\n');
+      ? kname + ' sent you a recipe for “' + made[0].name + '” from My Kitchen Notes.\n\nOpen it to see it, and save it to your recipes with one tap (the link keeps for 6 months):\n' + giftShareUrl(made[0].id)
+      : kname + ' sent you ' + made.length + ' recipes from My Kitchen Notes. Open each to see it, and save it to your recipes with one tap (the links keep for 6 months):\n\n'
+        + made.map(function(m){ return '• ' + m.name + ':\n' + giftShareUrl(m.id); }).join('\n\n');
+    text += '\n\n' + await appPitchLine(true);
     await shareMessage({ title: made.length === 1 ? 'Send the new link' : 'Send the ' + made.length + ' new links', icon: '\u{1F4E8}',
       intro: 'The new ' + (made.length === 1 ? 'link is' : 'links are') + ' ready. How do you want to send ' + (made.length === 1 ? 'it' : 'them') + '?',
       subject: made.length === 1 ? 'A recipe for you: ' + made[0].name : made.length + ' recipes for you', text: text, copyText: text, cancelLabel: 'Not now' });
@@ -8805,7 +8960,7 @@ async function giftSweep(list) {
   try { localStorage.setItem(key, String(Date.now())); } catch(e) {}
   var old = list.filter(function(g){ return !giftLive(g.d); }), n = 0;
   for (var i = 0; i < old.length; i++) { try { await giftDelete(old[i]); n++; } catch(e) {} }
-  if (n) syncLog('save', 'Cleared sent recipes older than 4 weeks', { n: n });
+  if (n) syncLog('save', 'Cleared sent recipes past their time', { n: n });
   return n;
 }
 window.openSendRecipe = openSendRecipe; window.openGiftsIn = openGiftsIn; window.openGiftsOut = openGiftsOut;
@@ -10329,7 +10484,8 @@ function sendFeedbackByEmail() {
     subject: 'Feedback \u2014 ' + (APP_CONFIG.brandName || 'My Kitchen Notes') + ' ' + APP_VERSION, text: body });
 }
 setTimeout(function(){ firstRunLanguageOffer().catch(function(){}).then(function(){ return setupWizMaybe(); }).catch(function(){}); }, 1200);
-setTimeout(function(){ giftSignedOutMaybe().catch(function(){}); }, 1500);   // v39.10 — a sent recipe's link, signed out   // v38.95 — then the wizard
+setTimeout(function(){ giftSignedOutMaybe().catch(function(){}); }, 1500);
+setTimeout(function(){ inviteMeMaybe().catch(function(){}); }, 1700);   // v40.21 — …/?invite-me   // v39.10 — a sent recipe's link, signed out   // v38.95 — then the wizard
 window.householdCodeFrom = householdCodeFrom; window.householdWelcome = householdWelcome; window.firstRunEmptyHtml = firstRunEmptyHtml;
 window.addSampleRecipes = addSampleRecipes; window.startTour = startTour; window.tourTargets = tourTargets;
 window.i18nDeviceLangOffer = i18nDeviceLangOffer; window.firstRunLanguageOffer = firstRunLanguageOffer;
@@ -11744,7 +11900,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v40.20';
+var APP_VERSION = 'v40.21';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -15624,7 +15780,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v40.20</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v40.21</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -15712,7 +15868,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v40.20</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v40.21</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -17854,57 +18010,87 @@ window.addEventListener('resize', function(){ if (_lineMark) refreshLineMarker()
 // decision than a share button should make on your behalf. The file opens in
 // any browser, on any device, forever, with nothing to keep running.
 function buildRecipePage(r) {
-  var esc = function(v){ return escH(v).replace(/<br>/g, '<br>'); };
+  // v40.21 — Tony: "When creating the web page, the Hebrew is a bit messed up. The amounts are on the right, the step
+  // numbers are overwritten by the text". The page took its direction from <body dir="auto"> — whatever text came
+  // first — and laid a Hebrew recipe out left to right; the list numbers sat in a 20 px margin that "10." does not fit.
+  // Now: the page in the recipe's own direction (recipePageDir), every line isolated (dir="auto" / <bdi>) so a Hebrew
+  // line with English or numbers keeps its order, and each step's number a drawn badge beside its text.
+  var dir = recipePageDir(r);
   var img = r.photo ? '<img\u0020class="hero" src="' + escA(r.photo) + '" alt="">' : '';
-  var ings = allIngredients(r).map(function(i){
-    return '<li><span>' + escB(i.n) + '</span><b>' + escB(i.a) + '</b></li>';
-  }).join('');
-  var steps = allSteps(r).map(function(st){ return '<li>' + escB(st) + '</li>'; }).join('');
-  return '<!doctype html><html><head><meta charset="utf-8">'
+  var ings = pageIngredientsHtml(allIngredients(r));
+  var steps = allSteps(r).map(function(st, si){ return pageStepHtml(si + 1, bidiFrac(escB(st))); }).join('');
+  var bit = function(x){ return x ? '<bdi>' + bidiFrac(escH(x)) + '</bdi>' : ''; };
+  var meta = [r.category ? bit(i18nPhrase(String(r.category))) : '', r.difficulty ? bit(i18nPhrase(String(r.difficulty))) : '', bit(r.prep),
+    r.servings ? bit(i18nPhrase('Servings') + ': ' + r.servings) : ''].filter(Boolean).join(' &middot; ');
+  return '<!doctype html><html' + langAttr(r.name) + ' dir="' + dir + '"><head><meta charset="utf-8">'
     + '<meta name="viewport" content="width=device-width,initial-scale=1">'
     + '<title>' + escH(r.name) + '</title><style>'
-    + 'body{margin:0;background:#FAF7F2;color:#1C1A18;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;line-height:1.65;}'
+    + 'body{margin:0;background:#FAF7F2;color:#1C1A18;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans Hebrew","Noto Sans Arabic",sans-serif;line-height:1.65;}'
     + '.wrap{max-width:640px;margin:0 auto;background:#fff;box-shadow:0 2px 24px rgba(0,0,0,.08);}'
     + '.hero{width:100%;display:block;}'
     + '.pad{padding:26px 24px 34px;}'
     + 'h1{font-family:Georgia,serif;font-size:30px;margin:0 0 6px;color:#5C3D2E;unicode-bidi:plaintext;text-align:start;}'
     + '.meta{color:#6F6A60;font-size:13px;margin-bottom:22px;}'
-    + 'h2{font-family:Georgia,serif;font-size:17px;color:#5C3D2E;margin:26px 0 10px;border-bottom:1px solid #eee;padding-bottom:6px;}'
-    + 'ul,ol{padding-inline-start:20px;margin:0;}'
-    + 'ul{list-style:none;padding:0;}'
-    + 'ul li{display:flex;justify-content:space-between;gap:14px;padding:7px 0;border-bottom:1px dashed #eee;unicode-bidi:plaintext;text-align:start;}'
-    + 'ul li b{color:#C1440E;white-space:nowrap;}'
-    + 'ol li{margin-bottom:12px;unicode-bidi:plaintext;text-align:start;}'
-    + '.notes{background:#FFF8E8;border-inline-start:3px solid #D4A843;padding:12px 14px;margin-top:22px;font-size:14px;unicode-bidi:plaintext;text-align:start;}'
+    + 'h2{font-family:Georgia,serif;font-size:17px;color:#5C3D2E;margin:26px 0 10px;border-bottom:1px solid #eee;padding-bottom:6px;text-align:start;}'
+    + 'ul.ing{list-style:none;padding:0;margin:0;}'
+    + 'ul.ing li{display:flex;justify-content:space-between;align-items:baseline;gap:14px;padding:7px 0;border-bottom:1px dashed #eee;}'
+    + 'ul.ing li span{min-width:0;text-align:start;}'
+    + 'ul.ing li b{color:#C1440E;white-space:nowrap;flex:none;}'
+    + 'ol.steps{list-style:none;padding:0;margin:0;}'
+    + 'ol.steps li{display:flex;align-items:flex-start;gap:12px;margin-bottom:12px;}'
+    + 'ol.steps .n{flex:none;min-width:26px;height:26px;padding:0 4px;box-sizing:border-box;border-radius:13px;background:#C1440E;color:#fff;font-size:13px;font-weight:700;line-height:26px;text-align:center;margin-top:1px;}'
+    + 'ol.steps .t{flex:1;min-width:0;unicode-bidi:plaintext;text-align:start;}'
+    + '.notes{background:#FFF8E8;border-inline-start:3px solid #D4A843;padding:12px 14px;margin-top:22px;font-size:14px;white-space:pre-wrap;unicode-bidi:plaintext;text-align:start;}'
     + '.foot{color:#A79E93;font-size:11px;text-align:center;padding:18px;}'
     + '.toc{border:1px solid #eee;border-radius:10px;padding:12px 18px;margin:4px 0 8px;}'
-    + '.toc b{color:#5C3D2E;} .toc ol{margin:6px 0 0;} .toc li{margin:2px 0;}'
+    + '.toc b{color:#5C3D2E;} .toc ol{margin:6px 0 0;padding-inline-start:26px;} .toc li{margin:2px 0;}'
     + 'a{color:#C1440E;} .part{scroll-margin-top:12px;} h3{font-family:Georgia,serif;font-size:21px;color:#5C3D2E;margin:34px 0 2px;unicode-bidi:plaintext;text-align:start;}'
     + '.totop{text-align:end;font-size:12px;margin-top:8px;}'
     + '@media print{body{background:#fff}.wrap{box-shadow:none}.totop{display:none}}'
-    + '</style></head><body dir="auto"><div class="wrap">' + img + '<div class="pad">'
+    + '</style></head><body><div class="wrap">' + img + '<div class="pad">'
     + '<h1 dir="auto"' + langAttr(r.name) + '>' + escH(r.name) + '</h1>'
-    + '<div class="meta">' + escH(r.category) + ' &middot; ' + escH(r.difficulty)
-    + ' &middot; ' + escH(r.prep) + ' &middot; ' + escH(r.servings) + ' servings</div>'
+    + (meta ? '<div class="meta">' + meta + '</div>' : '')
     + recipePageBody(r, ings, steps)
     + (r.notes ? '<div class="notes" dir="auto"' + langAttr(r.notes) + '>' + escH(r.notes) + '</div>' : '')
-    + (r.source ? '<div class="meta" style="margin-top:18px;">Source: ' + escH(r.source) + '</div>' : '')
-    + '</div><div class="foot">Shared from ' + escH(kitchenTitle()) + '</div></div></body></html>';
+    + (r.source ? '<div class="meta" style="margin-top:18px;">Source: <bdi>' + escH(r.source) + '</bdi></div>' : '')
+    + '</div><div class="foot"><bdi>Shared from ' + escH(kitchenTitle()) + '</bdi></div></div></body></html>';
+}
+// v40.21 — a recipe's direction for a page or a picture: right to left when its letters are mostly Hebrew or Arabic.
+function recipePageDir(r) {
+  var sample = [r && r.name || ''].concat(allIngredients(r).slice(0, 12).map(function(i){ return (i && i.n) || ''; }), allSteps(r).slice(0, 6)).join(' ');
+  var rtl = (sample.match(/[֐-׿؀-ۿ]/g) || []).length, ltr = (sample.match(/[A-Za-zÀ-ɏЀ-ӿ]/g) || []).length;
+  return rtl > ltr ? 'rtl' : 'ltr';
+}
+// A number with a fraction kept whole: beside Hebrew, "1½ כוסות" otherwise shows as "½1 כוסות" (the ½ takes the
+// direction of the Hebrew next to it). Left-to-right isolates around it; harmless in a left-to-right recipe.
+function bidiFrac(s) {
+  return String(s == null ? '' : s).replace(/\d+(?:[.,]\d+)?\s?[\u00BC-\u00BE\u2150-\u215E]|[\u00BC-\u00BE\u2150-\u215E]/g, function(m){ return '\u2066' + m + '\u2069'; });
+}
+window.bidiFrac = bidiFrac;
+// One ingredient: its name at the start, its amount at the far side — each isolated, so neither reorders the other.
+function pageIngredientsHtml(list) {
+  return (list || []).map(function(i){ return '<li><span dir="auto">' + bidiFrac(escB(i.n)) + '</span><b dir="auto">' + bidiFrac(escB(i.a)) + '</b></li>'; }).join('');
+}
+// One step: its number as a badge (not the browser's list number, which a narrow margin cuts or the text runs over),
+// then its text.
+function pageStepHtml(n, html) {
+  return '<li><span class="n">' + n + '</span><div class="t" dir="auto">' + html + '</div></li>';
 }
 // v39.52 — a collection's shared page: its contents (each line a link to its recipe on the page), then each recipe
 // under its own name with "↑ Contents"; an ordinary recipe is as it always was.
 function recipePageBody(r, ings, steps) {
   var parts = (isCollection(r) && recipeParts(r).length > 1) ? recipeParts(r) : null;
-  if (!parts) return '<h2>Ingredients</h2><ul>' + ings + '</ul><h2>Method</h2><ol>' + steps + '</ol>';
+  var H = function(t){ return '<h2>' + escH(i18nPhrase(t)) + '</h2>'; };
+  if (!parts) return H('Ingredients') + '<ul class="ing">' + ings + '</ul>' + H('Method') + '<ol class="steps">' + steps + '</ol>';
   var li = function(list){ return (list || []).filter(function(i){ return !isSubLine(i); }); };
-  return '<div class="toc" id="toc"><b>Contents</b><ol>'
+  return '<div class="toc" id="toc"><b>' + escH(i18nPhrase('Contents')) + '</b><ol>'
     + parts.map(function(p, pi){ return '<li><a href="#part' + pi + '" dir="auto">' + escH(p.name) + '</a></li>'; }).join('')
     + '</ol></div>'
     + parts.map(function(p, pi) {
-        return '<div class="part" id="part' + pi + '"><h3 dir="auto"' + langAttr(p.name) + '>' + escH(p.name) + '</h3>'
-          + '<h2>Ingredients</h2><ul>' + li(p.ingredients).map(function(i){ return '<li><span>' + escB(i.n) + '</span><b>' + escB(i.a) + '</b></li>'; }).join('') + '</ul>'
-          + '<h2>Method</h2><ol>' + li(p.steps).map(function(st){ return '<li>' + escB(stepText(st)) + '</li>'; }).join('') + '</ol>'
-          + '<div class="totop"><a href="#toc">\u2191 Contents</a></div></div>';
+        return '<div class="part" id="part' + pi + '" dir="' + recipePageDir(p) + '"><h3 dir="auto"' + langAttr(p.name) + '>' + escH(p.name) + '</h3>'
+          + H('Ingredients') + '<ul class="ing">' + pageIngredientsHtml(li(p.ingredients)) + '</ul>'
+          + H('Method') + '<ol class="steps">' + li(p.steps).map(function(st, si){ return pageStepHtml(si + 1, bidiFrac(escB(stepText(st)))); }).join('') + '</ol>'
+          + '<div class="totop"><a href="#toc">' + escH(i18nPhrase('↑ Contents')) + '</a></div></div>';
       }).join('');
 }
 window.recipePageBody = recipePageBody;
@@ -17927,6 +18113,269 @@ function shareAsPage(id) {
   }
 }
 window.buildRecipePage = buildRecipePage; window.shareAsPage = shareAsPage;
+
+// ─── v40.21 — 🖼️ THE RECIPE CARD AS A PICTURE ──────────────────────────────────────────────────────────────────────
+// Tony, 27 Nov 2026: "Add the picture of the recipe card too, as you've suggested." 📤 Share → 🖼️ Send as a picture: the
+// recipe drawn as one or more pictures 1080 px wide — its photo, name, ingredients and method, in the app's own fonts,
+// right to left for a Hebrew or Arabic recipe — which a chat shows straight away. A page is at most 1920 px tall (a
+// phone screen; WhatsApp shrinks anything taller until it cannot be read), so a long recipe makes several, numbered.
+// On a phone they go to the share menu with the recipe's link and the line for the app as their caption; on a
+// computer they are saved as files.
+var CARD_W = 1080, CARD_MAXH = 1920, CARD_PAD = 72, CARD_CW = CARD_W - 2 * CARD_PAD, CARD_FOOT = 92;
+var CARD_TITLE = "'Playfair Display','Frank Ruhl Libre',Georgia,serif", CARD_BODY = "'DM Sans','Heebo',system-ui,sans-serif";
+async function cardFontsReady(sample) {
+  if (!document.fonts || !document.fonts.load) return;
+  var t = String(sample || '').slice(0, 300) || 'Aa';
+  try {
+    await Promise.race([Promise.all(['700 66px ' + CARD_TITLE, '400 34px ' + CARD_BODY, '700 34px ' + CARD_BODY]
+      .map(function(f){ return document.fonts.load(f, t).catch(function(){}); })), wait(3000)]);
+  } catch(e) {}
+}
+// Lines of `text` no wider than maxW in the context's font: by words, and a word wider than a line (Japanese, Chinese,
+// a long address) by characters.
+function cardWrap(ctx, text, maxW) {
+  var lines = [];
+  String(text == null ? '' : text).split('\n').forEach(function(para){
+    var toks = para.match(/\S+\s*/g) || [''], line = '';
+    var fits = function(t){ return ctx.measureText(t.replace(/\s+$/, '')).width <= maxW; };
+    var push = function(){ lines.push(line.replace(/\s+$/, '')); line = ''; };
+    toks.forEach(function(tok){
+      if (fits(line + tok)) { line += tok; return; }
+      if (line) push();
+      if (fits(tok)) { line = tok; return; }
+      Array.from(tok).forEach(function(ch){ if (line && !fits(line + ch)) push(); line += ch; });
+    });
+    push();
+  });
+  return lines;
+}
+function cardLoadImage(src) {
+  return new Promise(function(resolve){
+    if (!src) return resolve(null);
+    var img = new Image(), done = false, end = function(v){ if (!done) { done = true; resolve(v); } };
+    if (/^https?:/i.test(src)) img.crossOrigin = 'anonymous';    // a photo elsewhere: only if its site allows it, or the picture could not be saved
+    img.onload = function(){ end(img.naturalWidth ? img : null); };
+    img.onerror = function(){ end(null); };
+    setTimeout(function(){ end(null); }, 8000);
+    img.src = src;
+  });
+}
+// The pages, as canvases: [{ canvas, w, h }]. o.photo (a data: address) in place of the recipe's own, for tests.
+async function recipeCardPages(r, o) {
+  o = o || {};
+  var dir = recipePageDir(r), rtl = dir === 'rtl';   // Hebrew or Arabic: right to left, as the web page
+  var photo = o.photo !== undefined ? o.photo : await giftPhotoOf(r);
+  var img = photo ? await cardLoadImage(photo) : null;
+  await cardFontsReady([r.name].concat(allIngredients(r).slice(0, 8).map(function(i){ return i.n + ' ' + i.a; })).join(' '));
+  var meas = document.createElement('canvas').getContext('2d');
+  var font = function(c, weight, size, fam){ c.font = weight + ' ' + size + 'px ' + (fam || CARD_BODY); };
+  var xStart = rtl ? CARD_W - CARD_PAD : CARD_PAD;
+  // every line drawn in the recipe's direction, a number with a fraction kept whole (bidiFrac)
+  var text = function(c, t, x, y, align){ c.direction = dir; c.textAlign = align || (rtl ? 'right' : 'left'); c.textBaseline = 'alphabetic'; c.fillText(bidiFrac(t), x, y); };
+  var blocks = [];   // { h, keep (stays with the next), draw(c, top) }
+  var add = function(h, draw, keep){ blocks.push({ h: h, draw: draw, keep: !!keep }); };
+  var space = function(h){ add(h, function(){}); };
+  // the name, and what it is
+  font(meas, '700', 66, CARD_TITLE);
+  var nameLines = cardWrap(meas, noBold(r.name || ''), CARD_CW);
+  add(nameLines.length * 80 + 8, function(c, y){ c.fillStyle = '#5C3D2E'; font(c, '700', 66, CARD_TITLE);
+    nameLines.forEach(function(l, i){ text(c, l, xStart, y + 66 + i * 80); }); });
+  // each bit kept whole (a Hebrew "3 שעות" beside an English word must not come apart), the app's words translated
+  var metaBits = [r.category ? i18nPhrase(String(r.category)) : '', r.difficulty ? i18nPhrase(String(r.difficulty)) : '', r.prep,
+    r.servings ? i18nPhrase('Servings') + ': ' + r.servings : ''].filter(Boolean).map(function(x){ return '\u2068' + x + '\u2069'; });
+  if (metaBits.length) {
+    font(meas, '400', 32);
+    var metaLines = cardWrap(meas, metaBits.join(' · '), CARD_CW);
+    add(metaLines.length * 44 + 6, function(c, y){ c.fillStyle = '#6F6A60'; font(c, '400', 32); metaLines.forEach(function(l, i){ text(c, l, xStart, y + 34 + i * 44); }); });
+  }
+  var heading = function(t, size){
+    add(size === 48 ? 96 : 104, function(c, y){
+      c.fillStyle = '#5C3D2E'; font(c, '700', size || 44, CARD_TITLE); text(c, t, xStart, y + 70);
+      if (size !== 48) { c.fillStyle = '#EAE3D9'; c.fillRect(CARD_PAD, y + 90, CARD_CW, 3); }
+    }, true);
+  };
+  var ingredients = function(list){
+    (list || []).forEach(function(i){
+      if (isSubLine(i)) {
+        font(meas, '700', 34);
+        var sl = cardWrap(meas, noBold(i.sub), CARD_CW);
+        add(sl.length * 48 + 22, function(c, y){ c.fillStyle = '#5C3D2E'; font(c, '700', 34); sl.forEach(function(l, k){ text(c, l, xStart, y + 44 + k * 48); }); }, true);
+        return;
+      }
+      if (!i || (!i.n && !i.a)) return;
+      var ind = lineIndented(i) ? 30 : 0, amt = noBold(i.a || ''), nm = noBold(i.n || '');
+      font(meas, '700', 34);
+      var aw = amt ? meas.measureText(amt).width : 0, own = aw > CARD_CW * 0.42;
+      var al = own ? cardWrap(meas, amt, CARD_CW - ind) : [];
+      font(meas, '400', 34);
+      var nl = cardWrap(meas, nm, CARD_CW - ind - (own || !amt ? 0 : aw + 28));
+      var h = (nl.length + al.length) * 46 + 20;
+      add(h, function(c, y){
+        font(c, '400', 34); c.fillStyle = '#1C1A18';
+        nl.forEach(function(l, k){ text(c, l, rtl ? xStart - ind : xStart + ind, y + 40 + k * 46); });
+        font(c, '700', 34); c.fillStyle = '#C1440E';
+        if (own) al.forEach(function(l, k){ text(c, l, rtl ? xStart - ind : xStart + ind, y + 40 + (nl.length + k) * 46); });
+        else if (amt) text(c, amt, rtl ? CARD_PAD : CARD_W - CARD_PAD, y + 40, rtl ? 'left' : 'right');
+        c.fillStyle = '#EDE7DF'; for (var x = CARD_PAD; x < CARD_W - CARD_PAD; x += 14) c.fillRect(x, y + h - 4, 7, 2);
+      });
+    });
+  };
+  var stepsOf = function(list){
+    var n = 0;
+    (list || []).forEach(function(st){
+      if (isSubLine(st)) {
+        font(meas, '700', 34);
+        var sl = cardWrap(meas, noBold(st.sub), CARD_CW);
+        add(sl.length * 48 + 20, function(c, y){ c.fillStyle = '#5C3D2E'; font(c, '700', 34); sl.forEach(function(l, k){ text(c, l, xStart, y + 44 + k * 48); }); }, true);
+        return;
+      }
+      var t = noBold(stepText(st)); if (!t) return;
+      var num = ++n;
+      font(meas, '400', 34);
+      var lines = cardWrap(meas, t, CARD_CW - 78);
+      // a step longer than half a page goes line by line, so a page break may fall inside it
+      var chunk = lines.length * 50 > 800 ? 1 : lines.length;
+      for (var from = 0; from < lines.length; from += chunk) (function(part, first){
+        add(part.length * 50 + (from + chunk >= lines.length ? 22 : 0), function(c, y){
+          if (first) {
+            var cx = rtl ? CARD_W - CARD_PAD - 26 : CARD_PAD + 26;
+            c.fillStyle = '#C1440E'; c.beginPath(); c.arc(cx, y + 30, 26, 0, Math.PI * 2); c.fill();
+            c.fillStyle = '#FFFFFF'; font(c, '700', 28); text(c, String(num), cx, y + 40, 'center');
+          }
+          c.fillStyle = '#1C1A18'; font(c, '400', 34);
+          part.forEach(function(l, k){ text(c, l, rtl ? xStart - 78 : xStart + 78, y + 42 + k * 50); });
+        });
+      })(lines.slice(from, from + chunk), from === 0);
+    });
+  };
+  var parts = isCollection(r) ? recipeParts(r) : null;
+  if (parts && parts.length > 1) parts.forEach(function(p){
+    space(24); heading(noBold(p.name || ''), 48);
+    heading(i18nPhrase('Ingredients')); ingredients(p.ingredients);
+    heading(i18nPhrase('Method')); stepsOf(p.steps);
+  });
+  else { var one = parts && parts.length === 1 ? parts[0] : r; heading(i18nPhrase('Ingredients')); ingredients(one.ingredients); heading(i18nPhrase('Method')); stepsOf(one.steps); }
+  if (r.notes && String(r.notes).trim()) {
+    heading(i18nPhrase('Notes'));
+    font(meas, '400', 32);
+    cardWrap(meas, noBold(String(r.notes).trim()), CARD_CW - 40).forEach(function(l){
+      add(50, function(c, y){ c.fillStyle = '#FFF8E8'; c.fillRect(CARD_PAD, y, CARD_CW, 50); c.fillStyle = '#D4A843'; c.fillRect(rtl ? CARD_W - CARD_PAD - 6 : CARD_PAD, y, 6, 50);
+        c.fillStyle = '#3A3530'; font(c, '400', 32); text(c, l, rtl ? xStart - 24 : xStart + 24, y + 36); });
+    });
+  }
+  if (r.source && String(r.source).trim()) {
+    font(meas, '400', 26);
+    var src = cardWrap(meas, i18nPhrase('Source') + ': ' + String(r.source).trim(), CARD_CW);
+    add(src.length * 36 + 30, function(c, y){ c.fillStyle = '#6F6A60'; font(c, '400', 26); src.forEach(function(l, k){ text(c, l, xStart, y + 50 + k * 36); }); });
+  }
+  space(30);
+  // Pages: the photo (or the recipe's emoji) at the top of the first; the name, small, at the top of the others
+  var BRAND = 84, heroH = img ? 560 : 210, contTop = 168;
+  var pages = [], cur = { top: BRAND + heroH + 36, items: [] }, y = cur.top;
+  for (var b = 0; b < blocks.length; b++) {
+    var room = CARD_MAXH - CARD_FOOT, needs = blocks[b].h + (blocks[b].keep && blocks[b + 1] ? blocks[b + 1].h : 0);
+    if (y + needs > room && cur.items.length) { cur.end = y; pages.push(cur); cur = { top: contTop, items: [] }; y = contTop; }
+    cur.items.push({ b: blocks[b], y: y }); y += blocks[b].h;
+  }
+  cur.end = y; pages.push(cur);
+  var kitchen = (typeof _household !== 'undefined' && _household && _household.name) || '';
+  return pages.map(function(pg, pi){
+    var h = Math.min(CARD_MAXH, Math.ceil(pg.end + CARD_FOOT));
+    var cv = document.createElement('canvas'); cv.width = CARD_W; cv.height = h;
+    var c = cv.getContext('2d');
+    c.fillStyle = '#FFFFFF'; c.fillRect(0, 0, CARD_W, h);
+    c.fillStyle = '#5C3D2E'; c.fillRect(0, 0, CARD_W, BRAND);
+    c.fillStyle = '#FFFFFF'; font(c, '700', 34); c.direction = 'ltr'; c.textAlign = 'left'; c.fillText('My Kitchen Notes', CARD_PAD, 56);
+    if (pages.length > 1) { font(c, '400', 28); c.textAlign = 'right'; c.fillText((pi + 1) + ' / ' + pages.length, CARD_W - CARD_PAD, 55); }
+    if (pi === 0) {
+      if (img) {
+        var s = Math.max(CARD_W / img.naturalWidth, heroH / img.naturalHeight), dw = img.naturalWidth * s, dh = img.naturalHeight * s;
+        c.save(); c.beginPath(); c.rect(0, BRAND, CARD_W, heroH); c.clip();
+        c.drawImage(img, (CARD_W - dw) / 2, BRAND + (heroH - dh) / 2, dw, dh); c.restore();
+      } else {
+        c.fillStyle = '#F6EFE6'; c.fillRect(0, BRAND, CARD_W, heroH);
+        c.fillStyle = '#5C3D2E'; font(c, '400', 130); c.textAlign = 'center'; c.direction = 'ltr'; c.fillText(r.emoji || '\u{1F37D}️', CARD_W / 2, BRAND + heroH / 2 + 46);
+      }
+    } else {
+      c.fillStyle = '#8A8278'; font(c, '700', 32, CARD_TITLE);
+      var nm = cardWrap(c, noBold(r.name || ''), CARD_CW)[0] || '';
+      text(c, nm + (nameLines.length > 1 ? '…' : ''), xStart, BRAND + 46);
+      c.fillStyle = '#EAE3D9'; c.fillRect(CARD_PAD, BRAND + 62, CARD_CW, 2);
+    }
+    pg.items.forEach(function(it){ it.b.draw(c, it.y); });
+    c.fillStyle = '#EAE3D9'; c.fillRect(CARD_PAD, h - CARD_FOOT + 10, CARD_CW, 2);
+    c.fillStyle = '#8A8278'; font(c, '400', 26); c.direction = 'ltr'; c.textAlign = 'center';
+    c.fillText((kitchen ? kitchen + ' · ' : '') + 'My Kitchen Notes', CARD_W / 2, h - 34);
+    return { canvas: cv, w: CARD_W, h: h };
+  });
+}
+function cardBlob(cv) {
+  return new Promise(function(resolve, reject){
+    try { cv.toBlob(function(b){ b ? resolve(b) : reject(new Error('The picture could not be made.')); }, 'image/jpeg', 0.9); }
+    catch(e) { reject(e); }
+  });
+}
+async function recipeCardFiles(r, o) {
+  var pages = await recipeCardPages(r, o), base = safeFilename(r.name || 'Recipe'), out = [];
+  for (var i = 0; i < pages.length; i++) {
+    var b = await cardBlob(pages[i].canvas);
+    out.push(new File([b], base + (pages.length > 1 ? ' ' + (i + 1) : '') + '.jpg', { type: 'image/jpeg' }));
+  }
+  return out;
+}
+// 📤 Share → 🖼️ Send as a picture
+async function shareAsPicture(id) {
+  var r = findRecipeRef(id);
+  if (!r) { toast('That recipe is no longer here'); return null; }
+  var btn = document.getElementById('sharePicBtn'), was = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span style="font-size:20px;">⏳</span> Drawing the card…'; }
+  var files = null, caption = '';
+  try {
+    files = await recipeCardFiles(r);
+    var phone = shareMenuHere() && navigator.canShare && navigator.canShare({ files: files });
+    if (phone) {
+      // the caption: the recipe's link, where one can be made, and the line for the app
+      var made = null;
+      if (giftCanSend()) {
+        if (r.secret && await askConfirm({ icon: '\u{1F512}', title: 'Send a secret recipe?',
+            message: '“' + r.name + '” is 🔒 secret — only your own kitchen sees it. Send a picture of it all the same?',
+            okLabel: 'Send it', cancelLabel: 'Cancel' }) !== true) return null;
+        try { made = await giftForShare(r, id, 'whatsapp'); } catch(e) { syncLog('error', 'The recipe’s link could not be made for its picture', { why: giftErrText(e) }); }
+      }
+      caption = (r.emoji || '\u{1F374}') + ' ' + noBold(r.name) + (made ? '\n' + made.page : '') + '\n\n' + await appPitchLine(!!made);
+    }
+    if (!phone) {
+      files.forEach(function(f){ downloadBlob(f, f.name); });
+      if (files.length === 1) toast('\u{1F5BC}\uFE0F Saved as a picture — send it to anyone', 7000);
+      else toast('\u{1F5BC}\uFE0F Saved as ' + files.length + ' pictures — send them to anyone', 7000);
+      closeM('shareRecipeOverlay');
+      return 'saved';
+    }
+  } catch(e) {
+    toast('Could not make the picture: ' + ((e && e.message) || e), 7000);
+    syncLog('error', 'The recipe card picture could not be made', { why: (e && e.message) || String(e) });
+    return null;
+  } finally { if (btn) { btn.disabled = false; btn.innerHTML = was; } }
+  closeM('shareRecipeOverlay');
+  var data = { files: files, text: caption, title: noBold(r.name) };
+  for (var i = 0; i < 2; i++) {
+    try { await navigator.share(data); if (typeof insightCount === 'function') insightCount('share-picture'); return 'shared'; }
+    catch(e) {
+      if (e && e.name === 'AbortError') return null;
+      if (e && e.name === 'NotAllowedError' && i === 0) {
+        var go = await askConfirm({ icon: '\u{1F5BC}️', title: 'Ready to send', message: 'Press the button and choose the app to send the picture with.',
+          okLabel: '\u{1F4E4} Open the share menu', cancelLabel: 'Cancel' });
+        if (go !== true) return null;
+        continue;
+      }
+      break;
+    }
+  }
+  files.forEach(function(f){ downloadBlob(f, f.name); });
+  toast('\u{1F5BC}️ The share menu would not open here — the picture is saved instead.', 8000);
+  return 'saved';
+}
+window.recipeCardPages = recipeCardPages; window.recipeCardFiles = recipeCardFiles; window.shareAsPicture = shareAsPicture; window.cardWrap = cardWrap;
 
 // ─── RECIPE VERSIONS (3.4) ────────────────────────────────────────────────────
 // "I've tweaked this three times and the second version was best." Each edit
@@ -19551,6 +20000,12 @@ var I18N_EXTRA = [
   'Confirm your e-mail address first (the link we sent you), then try again.',
   'Your sign-in could not be checked. Reload the app and try again.',
   'The video\u2019s sign-in has run out. Send the video again.',
+  // v40.21 — the line for the app at the end of a shared recipe (appPitchLine) and the share buttons' busy words
+  '\u{1F4F2} Download My Kitchen Notes and keep the recipe for good — this link lasts 6 months. Ask for an invitation:',
+  '\u{1F4F2} Download My Kitchen Notes and keep the recipe for good — this link lasts 6 months:',
+  '\u{1F4F2} Download My Kitchen Notes and keep your recipes in one place. Ask for an invitation:',
+  '\u{1F4F2} Download My Kitchen Notes and keep your recipes in one place:',
+  'Making the link…', 'Drawing the card…', 'Ready to send',
   // v39.61 — ✉️ Ask for an invitation for someone else (drawn by code)
   '\u2709\uFE0F Ask for an invitation for someone else',
   'Know someone who would enjoy My Kitchen Notes? The beta is by invitation only: ask the app\u2019s owner to invite them. The owner decides, and sends the invitation.',
@@ -25714,6 +26169,8 @@ function toggleShare(id){
     showEmailModal(id);
   };
   document.getElementById('shareWaBtn').onclick     = function(){ doWhatsApp(id); };
+  var picBtn = document.getElementById('sharePicBtn');   // v40.21
+  if (picBtn) picBtn.onclick = function(){ shareAsPicture(id); };
   var giftBtn = document.getElementById('shareGiftBtn');   // v39.10
   if (giftBtn) giftBtn.onclick = function(){ closeM('shareRecipeOverlay'); openSendRecipe(id); };
   var pageBtn = document.getElementById('sharePageBtn');
@@ -26184,10 +26641,19 @@ function rText(r){
 // and difficulty when it inherits them from its collection: partAsRecipe
 // settles `part.category || coll.category` before any of this runs, so the
 // shared text carries real values rather than blanks.
-function doWhatsApp(id){
+// v40.21 — a link to the recipe's own page (WhatsApp shows its photo and name) and a word for the app; the text as before
+// when no link can be made. See recipeShareText.
+async function doWhatsApp(id){
   var r=findRecipeRef(id);
-  if(!r){ toast('That recipe is no longer here'); return; }
-  window.open(`https://wa.me/?text=${encodeURIComponent(rText(r))}`);
+  if(!r){ toast('That recipe is no longer here'); return null; }
+  var btn=document.getElementById('shareWaBtn'), was=btn ? btn.innerHTML : '';
+  if(btn){ btn.disabled=true; btn.innerHTML='<span style="font-size:20px;">⏳</span> Making the link…'; }
+  var text;
+  try { text=await recipeShareText(r, id, 'whatsapp'); }
+  finally { if(btn){ btn.disabled=false; btn.innerHTML=was; } }
+  if(text===null) return null;
+  closeM('shareRecipeOverlay');
+  return await waOpen('https://wa.me/?text='+encodeURIComponent(text));
 }
 function doCopy(id){
   var r=findRecipeRef(id);
@@ -35980,7 +36446,7 @@ function appFeatureSections(all) {
       'Someone who may not delete recipes asks an admin with one tap — 🗑️ Ask an admin to delete.',   // v39.55
       'Know someone who would enjoy it? While the app takes new members by invitation only, the share button asks its owner to invite them.',   // v39.61
       'Ask to join a household, or to link with one, by e-mail or by its identifier (MKN-…) — and accept, decline or block the requests you get.',
-      'Share a recipe on WhatsApp, by e-mail, or as a web page that opens anywhere.' ] },
+      'Share a recipe on WhatsApp as a link that shows its photo, by e-mail, as a picture of the recipe card, or as a web page that opens anywhere.' ] },   // v40.21
     { icon: '\u{1F4E5}', title: 'Save recipes from anywhere', items: [
       'From a website link, a photo of a cookbook page, screenshots, pasted text or a video.',
       'From Facebook, Instagram and TikTok posts.',
@@ -38157,7 +38623,9 @@ var HELP_SYSTEM_PROMPT = [
   "- 📬 LINK REQUESTS: ⚙️ → 🏠 My household → 📬 Link requests — the number in brackets beside it is how many wait for an answer. Every request in one place: Waiting (Accept / Reject / 🚫 Block), Sent by your household (Withdraw), Linked now (Revoke access), and earlier answers. A request may carry a note, and the two households can write to each other there — the latest message shows, highlighted, with ↩ Reply; earlier ones are under 💬 Conversation. Only the household's name is shown, never a person's. Reject is for now: if they ask again — by identifier or by e-mail — their request is back under Waiting. 🚫 Block is for good, until you Unblock it under the earlier answers; they are never told, and on their side it reads “waiting”. A new message or request arrives while the app is open: a red dot (and a short notice with Open) within seconds, no reload needed. A red dot on ⚙️ leads to anything new. The switch there decides whether other households may ask through the app at all.",
   "- 👪 CHAT WITH FAMILY MEMBERS (the people in YOUR household only): ··· More → 🏡 Kitchens and people → 👪 Chat with family members — or 💬 Chat beside a person in 👥 Family Access (someone added by address who has not signed in yet says ⏳ hasn’t signed in yet: their 💬 Chat comes once they do). 📣 Everyone in <your kitchen> is the room for announcements: everyone in the household reads it. Or choose one person: only the two of you read that conversation. Everyone in the household can write, readers too. Messages arrive live: a short notice with Open, and a red dot on ⋯ More until you have read them. Nothing is changed or deleted afterwards; deleting the household deletes them. 🔔 At the foot of the window: Notify me of new messages when the app is closed (see 🔔 CHAT NOTIFICATIONS).",
   "- 🧑‍🍳 FIRST VISIT: a one-time setup on a notebook page — your account (your e-mail and a password you make up; or 'I already have an account', or Continue offline), this device's Save button (the iPhone shortcut, the Android app in the Share menu, or the computer's browser extension — each new device asks this once; later from ⚙️ Settings), the kitchen rules, then a quick tour.",
-  "- 📨 SEND A RECIPE TO ANOTHER KITCHEN: open the recipe → 📤 Share → 📨 Send to another kitchen. Via My Kitchen Notes: type their kitchen's identifier (MKN-…) — it pops up in their app, with a sound, and waits in ··· More → 🏡 Kitchens and people → 📨 Recipes sent to me. Or ✉️ Via Email (type their address: the app e-mails them its photo, your note and a button to save it — no mail program needed; your own mail is offered only if the app cannot send it), Via WhatsApp, 📤 Via another app (on a phone or a tablet: its share menu, with the link — if the phone asks for one more tap, press 📤 Open the share menu), or Copy the link: anyone with the link can open it, even without an account. It is a copy of the recipe as it is now — photo, bold words, notes and all; not your cooking log, ratings or the heart — with a note from you if you like. They tap 📥 Save to my recipes and it is theirs, no AI involved. It keeps for 4 weeks. ··· More → 🏡 Kitchens and people → 📤 Recipes I sent shows whether it was saved, copies a link again, sends it again, and takes one back — tick several (or Select all) to do it for all of them at once: ↩️ Take back, 📨 Send again (to a kitchen: it pops up in their app again for 4 more weeks, the earlier one taken back; a link: new links, good for 4 more weeks, in one message — the earlier ones keep working until they expire), 🔗 Copy the links. A kitchen that gets unwanted recipes can 🚫 Block the sender (the owner or an admin). During the closed beta, someone without an account who opens the link sees the recipe and can ask for an invitation — with their address already filled in when it came by e-mail.",
+  "- 📨 SEND A RECIPE TO ANOTHER KITCHEN: open the recipe → 📤 Share → 📨 Send to another kitchen. Via My Kitchen Notes: type their kitchen's identifier (MKN-…) — it pops up in their app, with a sound, and waits in ··· More → 🏡 Kitchens and people → 📨 Recipes sent to me. Or ✉️ Via Email (type their address: the app e-mails them its photo, your note and a button to save it — no mail program needed; your own mail is offered only if the app cannot send it), Via WhatsApp, 📤 Via another app (on a phone or a tablet: its share menu, with the link — if the phone asks for one more tap, press 📤 Open the share menu), or Copy the link: anyone with the link can open it, even without an account. It is a copy of the recipe as it is now — photo, bold words, notes and all; not your cooking log, ratings or the heart — with a note from you if you like. They tap 📥 Save to my recipes and it is theirs, no AI involved. Sent through the app it waits 4 weeks; a link keeps 6 months (v40.21). ··· More → 🏡 Kitchens and people → 📤 Recipes I sent shows whether it was saved, copies a link again, sends it again, and takes one back — tick several (or Select all) to do it for all of them at once: ↩️ Take back, 📨 Send again (to a kitchen: it pops up in their app again for 4 more weeks, the earlier one taken back; a link: new links, good for 6 more months, in one message — the earlier ones keep working until they expire), 🔗 Copy the links. A kitchen that gets unwanted recipes can 🚫 Block the sender (the owner or an admin). During the closed beta, someone without an account who opens the link sees the recipe and can ask for an invitation — with their address already filled in when it came by e-mail.",
+  "- 💬 SHARE ON WHATSAPP (📤 Share → 💬 Share on WhatsApp; v40.21): WhatsApp opens with the recipe's name and a link to its own page on the app's address (…/r/…), which WhatsApp shows as a card with the recipe's photo and name; tapped, it opens as the whole recipe — photo, ingredients, method, notes — in any browser, no app or account needed, with 📥 Save to my recipes for anyone who has the app. The link keeps 6 months; the same recipe shared again within a week, unchanged, sends the same link. The message ends with a line for the app (📲 Download My Kitchen Notes and keep the recipe for good — this link lasts 6 months) and its link: while new members come by invitation only, that link opens the request for an invitation, which goes to the app's owner. Signed out, offline, or when the link cannot be made, the recipe goes as text, as before, with the same line. A 🔒 secret recipe asks first. If WhatsApp does not open by itself, press 💬 Open WhatsApp.",
+  "- 🖼️ SEND AS A PICTURE (📤 Share → 🖼️ Send as a picture; v40.21): the recipe card drawn as a picture 1080 pixels wide — its photo (or its emoji), name, what it is, ingredients, method, notes — right to left for a Hebrew or Arabic recipe. A long recipe makes several pictures, numbered 1 / 3, 2 / 3…, each no taller than a phone screen, so a chat shows it readably. On a phone or tablet the share menu opens with the pictures and, as their caption, the recipe's link and the line for the app (if the phone asks for one more tap, press 📤 Open the share menu); on a computer the pictures are saved as files to send from anywhere.",
   "- ✉️ E-MAIL A RECIPE (📤 Share → ✉️ Email): type their address and press 📨 Send — the app e-mails the recipe, laid out with its photo, from your kitchen's name via My Kitchen Notes; their reply comes to your own address. Nothing to paste, and no mail program needed (signed in, your address confirmed; up to 15 e-mails a day). On a phone, 📤 Share menu hands the photo and the recipe to the mail app you pick. 📋 Copy copies it, photo and all, to paste anywhere else. (To send a recipe that another kitchen saves with one tap, use 📨 Send to another kitchen.)",
   "- 🔒 SECRET RECIPES: in the editor, tick 🔒 Secret — the recipe (and its photo) is then kept where only your own kitchen can read it; the kitchens you link with do not see it, nor know it exists. Untick it to share it again. A 🔒 shows on its card.",
   "- 🔄 RELOAD A LINKED KITCHEN: beside a linked kitchen's name in your recipe list, 🔄 Reload reads its recipes and photos again from the start — for when something looks missing or out of date.",
@@ -46244,6 +46712,12 @@ window.onHeaderScroll = onHeaderScroll;
       </button>
       <button id="shareWaBtn" style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:#0F7A41;color:white;border:none;border-radius:10px;cursor:pointer;font-size:14px;font-weight:600;font-family:'DM Sans','Heebo',sans-serif;width:100%;">
         <span style="font-size:20px;">💬</span> Share on WhatsApp
+        <span style="font-size:11px;opacity:0.85;">(a link with its photo)</span>
+      </button>
+      <!-- v40.21 — the recipe card as a picture (Tony: "Add the picture of the recipe card too") -->
+      <button id="sharePicBtn" style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:#8B4513;color:white;border:none;border-radius:10px;cursor:pointer;font-size:14px;font-weight:600;font-family:'DM Sans','Heebo',sans-serif;width:100%;">
+        <span style="font-size:20px;">🖼️</span> Send as a picture
+        <span style="font-size:11px;opacity:0.85;">(the recipe card)</span>
       </button>
       <button id="shareMailBtn" style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:#2A6099;color:white;border:none;border-radius:10px;cursor:pointer;font-size:14px;font-weight:600;font-family:'DM Sans','Heebo',sans-serif;width:100%;">
         <span style="font-size:20px;">✉️</span> Send by Email

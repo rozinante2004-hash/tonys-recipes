@@ -1819,7 +1819,7 @@ only if read in the last 30 days, nothing kept shuts the tools — never "off" b
 
 **Sending a recipe to another kitchen (v39.10, Worker v97).** A COPY, not a link to the original (the rules cannot
 check a secret link on a kitchen's own recipes, whose ids are short numbers): `recipeGifts/<24 random characters>` —
-the id is the key; anyone with it may read it, signed out too, until `expireAt` (4 weeks); only the two kitchens may list
+the id is the key; anyone with it may read it, signed out too, until `expireAt` (4 weeks; a link 6 months since v40.21, whose page is `<site>/r/<id>`); only the two kitchens may list
 theirs — and `recipeGiftPhotos/<id>`. Recipe → 📤 Share → 📨 Send to another kitchen: by identifier through the app (a
 listener on `to`, the request chime, a red dot, one pop-up at a time: Save / Look at it first / Not now / Block), or as a
 link by e-mail, WhatsApp or copied (`?recipe=<id>`, saved by any number of kitchens). Save makes a new recipe — no AI.
@@ -3125,6 +3125,82 @@ a record to the new number. A Self Test run keeps `recent_parts` aside (`recentP
 `_selfTestUnpark`). The Privacy Statement's "the recipes you opened last" covers it (a part is a recipe). **And every
 recipe opens at its top now**: `openView` sets `#viewModal.scrollTop = 0` after `drawView` — Chrome shows a window
 again at the scroll it had when hidden, so a recipe opened after one read halfway down came up halfway down.
+**(v40.21) 💬 Share on WhatsApp sends the recipe's own page; 🖼️ Send as a picture** (Tony: "When sending a recipe via
+WhatsApp, it is sent as text. However, I would like to be able to send it fuller and richer, like the web page …";
+of the two ways, "Option 2 seems safer"; "6 months should suffice"; "also send the sales pitch line and link. (While in
+Beta, the link should open an invitation request)"; "Family too"; "Add the picture of the recipe card too").
+THE PAGE: `<site>/r/<id>` — `functions/r/[[path]].js` (a Cloudflare Pages function; Pages reads `functions/` from the
+repository, so `tools/build.js` leaves `functions/` and `share/` out of the copy) hands every `/r/…` request to
+`handleShare` in `share/recipe-page.mjs`. It reads `share-page.json` from the copy itself (`env.ASSETS`; written by
+`tools/build.js` only when the copy's `recipePages` is true — the test and community copies in `tools/environments.json`;
+the family copy on GitHub Pages has `recipePages: false` and its people live in the community copy since move day),
+then `recipeGifts/<id>` from Firestore's REST API WITHOUT a sign-in (the rules let anyone holding the long id read it
+until `expireAt`; 403 = expired → 410 page, 404 = never sent or taken back → 404 page, other → 503 "try again"). It
+draws the page on the server — WhatsApp's preview runs no script, so a link to the app shows no photo — with
+`og:title` (emoji + name), `og:description` (the sender's note and kitchen, or "A recipe from <kitchen>", prep,
+ingredient count when more than one, servings), `og:image` = `/r/<id>/card` (or the copy's `icons/icon-512.png`),
+`twitter:card`, `robots noindex,nofollow` (+ `X-Robots-Tag`), a CSP with no script at all, `Cache-Control` 5 minutes.
+The body is "Save as a web page" grown up: photo (`/r/<id>/photo`), name, category · difficulty · prep · serves, "Sent
+by <kitchen>" and the note, Ingredients (sub-headings, indented lines, **bold**), Method (numbering carried across
+headings), a collection's contents and parts with ↑ Contents, Notes, Source as a link, and a box: "Keep it for good in
+My Kitchen Notes — …", 📥 Save to my recipes (→ `<site>?recipe=<id>`, the app's own gift flow: signed in, save;
+signed out, the closed beta's ✉️ Ask for an invitation), "This link keeps until <date>", What is My Kitchen Notes?.
+The page's own words in 12 languages (WORDS, the app's own terms: he מרכיבים / אופן ההכנה, plural address); the
+language is `?l=` (the sender's) else the browser's `Accept-Language` else English; the page's chrome follows that
+language's direction while the recipe follows its own (`recipeDir`: Hebrew/Arabic letters against Latin/Cyrillic).
+`/card` serves `recipeGiftPhotos/<id>.thumb` (else the photo), `/photo` the photo; a data: address is decoded to bytes
+(1 hour cache), a web address is a 302 to it, anything else 404. The service worker leaves `/r/` alone (it is neither
+the app document nor a pre-cached file). Tested by `tests/share-page.test.mjs` (58 checks, in CI) and once in
+Cloudflare's own runtime (`wrangler pages dev dist` with a stand-in database).
+THE LINK: links keep **6 months** (`GIFT_LINK_DAYS` 183; `giftKeepsMs(via)`: 'app' 28 days, any link 183); the rules'
+`giftExpiryOk(e, via)` allows 29 / 184 days. `giftSend` adds `thumb` (`giftThumbOf`: the photo made ≤ 600 px, ≤ 190 KB,
+through `cardLoadImage`, which gives up on a picture that does not load — `resizeImageForVision` never does) to the
+photo document (rules: optional string ≤ 200 000), and on `permission-denied` (a database whose rules are older) sends
+it again as before: 4 weeks, no thumb. It returns `page: giftShareUrl(id)` — `<site>r/<id>` (+ `?l=<language>` when
+not English) where `APP_CONFIG.recipePages`, else `giftUrl(id)`. Every message that carries a link (📨 Send to another
+kitchen by WhatsApp / another app / copy, 📤 Recipes I sent's Copy the link(s) and Send again) uses `giftShareUrl`;
+e-mails keep `giftUrl` with `#for=<address>`. THE WHATSAPP BUTTON: `doWhatsApp(id)` → `recipeShareText(r, id,
+'whatsapp')`: signed in, in a household (`giftCanSend`) → a 🔒 secret recipe asks first → `giftForShare` (the same
+recipe within 7 days, unchanged since, more than 150 days left and still on the server → the same link;
+`mkn_gift_reuse<hid>`) → "<emoji> <name>\n<page>\n\n<appPitchLine(true)>"; signed out or the link refused → `rText(r)` +
+`appPitchLine(false)` and a toast. `appPitchLine`: "📲 Download My Kitchen Notes and keep the recipe for good — this
+link lasts 6 months. Ask for an invitation: <home>?invite-me" while `hhFoundingOpen()` is false (newcomers by invitation
+only; unknown counts as closed; the home is `APP_CONFIG.movedTo` or the site), else "…6 months: <home>"; without a link
+"📲 Download My Kitchen Notes and keep your recipes in one place…". During a Self Test run it never reads the copy's
+setting (`_pitchOpenForTest`). `waOpen(url)`: `window.open`, and when the browser refused it (the tap ran out while the
+link was made) "Ready to send — 💬 Open WhatsApp" for one more tap. The button says "Making the link…" meanwhile.
+…/?invite-me: `captureInviteMe` keeps it for the visit (sessionStorage `mkn_invite_me`) and takes it out of the address;
+`inviteMeMaybe` (1.7 s after start) waits for the sign-in to settle — signed in: "You already have My Kitchen Notes 🙂";
+signed out: after any recipe window, `giftAskInvitation()` (no recipe: "Thank you! The app’s owner will write to …").
+THE PICTURE: 📤 Share → 🖼️ Send as a picture (`#sharePicBtn`, `shareAsPicture`): `recipeCardPages(r, o)` draws pages
+1080 px wide, each at most 1920 (`CARD_MAXH`; WhatsApp shrinks taller ones unreadably), in the app's fonts
+(`'Playfair Display','Frank Ruhl Libre'` for titles, `'DM Sans','Heebo'` for text; `document.fonts.load` first): a
+brown band "My Kitchen Notes" with "n / m", the photo (560 px, cover) or the emoji, the name, category · difficulty ·
+prep · Servings (each bit isolated with U+2068/U+2069 so a Hebrew "3 שעות" stays whole), Ingredients (amount on the far
+side, an amount wider than 42 % on its own line), Method (numbered circles; a step taller than 800 px goes line by line),
+Notes, Source, a footer "<kitchen> · My Kitchen Notes"; right to left for a Hebrew/Arabic recipe (`recipeIsRTL`).
+Blocks never split except those lines; a heading stays with the next block; later pages start with the name, small.
+`cardWrap` breaks by words and a word wider than the line by characters (Japanese, Chinese). `recipeCardFiles` →
+JPEG files "<name>.jpg" or "<name> 1.jpg"…. A phone (`shareMenuHere` and `canShare({files})`): the share menu with the
+pictures and the caption (name, page link where one can be made, the line for the app); refused for want of a tap →
+"📤 Open the share menu"; any other failure → saved. A computer: saved (`downloadBlob`). Self Tests
+`share_whatsapp_link` and `recipe_card_picture`; `sent_recipes` checks 6 months for a link and the line. Privacy
+Statement **1.21** (all 11 pages, re-keyed): Recipes you send (the smaller copy of the photo; seen as a web page), Whoever
+you send a recipe to (the page anyone with the link can read, which WhatsApp reads for its preview; search engines asked
+not to list it), and how long (4 weeks through the App, 6 months as a link).
+**(v40.21) 🌐 Save as a web page in a recipe's own direction** (Tony: "When creating the web page, the Hebrew is a bit
+messed up. The amounts are on the right, the step numbers are overwritten bu the text"): `buildRecipePage` writes
+`<html lang dir>` from `recipePageDir(r)` (Hebrew/Arabic letters in the name, 12 ingredients and 6 steps against
+Latin/Cyrillic) — never `<body dir="auto">`, which took whatever text came first; ingredients `pageIngredientsHtml`
+(`ul.ing`, a flex row: the name `<span dir="auto">` at the start, the amount `<b dir="auto">` at the far side); steps
+`pageStepHtml(n, html)` in `ol.steps` (no list markers: a terracotta badge `.n` and the text `.t dir="auto"` beside it,
+numbered across a collection's part); the line under the name each bit in `<bdi>`, category, difficulty and "Servings"
+through `i18nPhrase`; headings and Contents translated. `bidiFrac(s)` wraps a number with a vulgar fraction
+(`\d+([.,]\d+)?\s?[¼-¾⅐-⅞]`) in LRI…PDI — beside Hebrew "1½" otherwise shows "½1"; used by the page, the card (every
+`fillText` of `recipeCardPages`, whose direction is `recipePageDir` too) and `share/recipe-page.mjs` (its own copy).
+The `/r/` page draws its steps the same way and reads category/difficulty from `i18n/<lang>.json` through
+`env.ASSETS` (cached per language). Self Test `feat_share_page` lays both a 12-step Hebrew page and an English one out
+in a 390 px frame and measures them; `recipe_card_picture` finds the step circles at the right (Hebrew) or left.
 **Grid** (`#recipeGrid`): a `list` or `grid` view (`setView`). The choice is remembered in
 `tonys_view_mode`; desktop defaults to `list`, **phones default to `grid`** so the layout
 resembles the desktop cube grid. Cards show photo or emoji tile, a category **pill badge**

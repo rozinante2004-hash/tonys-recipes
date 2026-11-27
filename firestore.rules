@@ -636,7 +636,10 @@ service cloud.firestore {
     // saved or declined, once; whoever saves a link adds their kitchen to `saved`. The sending kitchen withdraws it.
     // `recipeGiftPhotos/<id>` is its photo, kept apart so that a list never carries the pictures.
     function giftPath(id) { return /databases/$(database)/documents/recipeGifts/$(id); }
-    function giftExpiryOk(e) { return e is timestamp && e > request.time && e <= request.time + duration.value(29, 'd'); }
+    // v40.21 — a link (WhatsApp, e-mail, copied) keeps 6 months (Tony, 27 Nov 2026: "6 months should suffice"); one sent
+    // to a kitchen through the app still 4 weeks (it waits there, and goes once saved).
+    function giftExpiryOk(e, via) { return e is timestamp && e > request.time
+      && ((via == 'app' && e <= request.time + duration.value(29, 'd')) || (via != 'app' && e <= request.time + duration.value(184, 'd'))); }
     match /recipeGifts/{id} {
       allow get: if id.size() >= 20 && resource.data.expireAt > request.time;
       allow list: if signedIn() && (memberOf(resource.data.get('from', '')) || memberOf(resource.data.get('to', '')));
@@ -659,7 +662,7 @@ service cloud.firestore {
         && request.resource.data.photo is bool
         && request.resource.data.note is string && request.resource.data.note.size() <= 500
         && request.resource.data.at == request.time
-        && giftExpiryOk(request.resource.data.expireAt)
+        && giftExpiryOk(request.resource.data.expireAt, request.resource.data.via)
         && request.resource.data.saved == {};
       allow update: if signedIn() && resource.data.expireAt > request.time && (
           // the kitchen it was sent to (someone who may add recipes there): saved, or declined — once
@@ -681,13 +684,15 @@ service cloud.firestore {
     match /recipeGiftPhotos/{id} {
       allow get: if id.size() >= 20 && resource.data.expireAt > request.time;
       allow create: if signedIn()
-        && request.resource.data.keys().hasOnly(['from', 'data', 'expireAt'])
+        && request.resource.data.keys().hasOnly(['from', 'data', 'expireAt', 'thumb'])
         && existsAfter(giftPath(id))
         && getAfter(giftPath(id)).data.from == request.resource.data.from
         && getAfter(giftPath(id)).data.by == request.auth.uid
         && getAfter(giftPath(id)).data.photo == true
         && request.resource.data.expireAt == getAfter(giftPath(id)).data.expireAt
-        && request.resource.data.data is string && request.resource.data.data.size() <= 950000;
+        && request.resource.data.data is string && request.resource.data.data.size() <= 950000
+        // v40.21 — a small copy for the link's preview card (WhatsApp shows a picture only when it is small)
+        && (!('thumb' in request.resource.data) || (request.resource.data.thumb is string && request.resource.data.thumb.size() <= 200000));
       allow delete: if signedIn() && (memberOf(resource.data.get('from', '')) || appAdmin());
     }
 

@@ -56,7 +56,9 @@ where.
   own `i18n/_farm_<lang>`; v39.94 at 21:40 on db945ab: the
   network Self Tests send the sign-in; v39.93 at 19:55 on 4b688fc: each farm animal in its own recorded voice,
   `docs/farm-voices.md`; Worker v108 since 20 Nov 01:59 (from Test); the jobs are listed near the top of `docs/history/2026-11.md`).
-  **On Test, not released:** nothing beyond v40.20. The test copy
+  **On Test, not released:** v40.21 — 💬 Share on WhatsApp sends the recipe's own page (`<site>/r/<id>`, a Cloudflare
+  Pages function, a card with its photo in WhatsApp), links kept 6 months (rules change), a line for the app with the
+  invitation link; 🖼️ Send as a picture; Privacy Statement 1.21. Release on Tony's yes. The test copy
   (https://tonys-recipes-test.pages.dev, its own database and rules) follows `test`.
 - **The beta has had testers since Sunday 25 Oct 2026** and is **by invitation only**: the owner invites with
   ⚙️ → 👑 → ✉️ Invite testers (the congratulatory wording of v39.60); a tester's share button asks the owner for an
@@ -359,6 +361,12 @@ requirement, not a nice-to-have.
   plain variable added in the dashboard must be added to `worker/wrangler.jsonc`
   too, or the next deploy drops the binding (plain vars are kept: `keep_vars`).
   After a release that changes the Worker, check the "Deploy the Worker" run.
+- `functions/` + `share/` (v40.21) — a sent recipe's own page, `<site>/r/<id>`, served by a **Cloudflare Pages
+  function** in the test and community copies (Pages builds `functions/` from the repository root along with the site;
+  only `/r/*` runs it). A function that does not compile fails that copy's whole Pages deploy — check
+  `npx wrangler@4 pages functions build` and `node tests/share-page.test.mjs` before pushing a change there. It reads
+  `share-page.json` (written by `tools/build.js` when the copy's `recipePages` is true) and Firestore's REST API
+  signed out. The family copy (GitHub Pages) has no functions (`recipePages: false`).
 - `firestore.rules` is the canonical rules file; the app fetches it and substitutes
   `{{READ}}` / `{{WRITE}}` / `{{ADMIN}}`. Edit the structure there, not in `index.html`.
   **It publishes itself** (8 Oct 2026): `.github/workflows/deploy-rules.yml` runs

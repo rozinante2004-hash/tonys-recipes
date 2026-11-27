@@ -150,7 +150,10 @@ if (envName === 'live') {
 
 // ── The site ─────────────────────────────────────────────────────────────────
 // Everything the site serves; not the tooling, tests, docs or dependencies.
-const SKIP = new Set(['.git', '.github', 'node_modules', 'dist', 'tests', 'tools', 'docs', 'package.json', 'package-lock.json']);
+// v40.21 — functions/ and share/ are the server side of a sent recipe's page (Cloudflare Pages reads functions/ from the
+// repository itself, not from the copy), so they are not files of the site.
+const SKIP = new Set(['.git', '.github', 'node_modules', 'dist', 'tests', 'tools', 'docs', 'package.json', 'package-lock.json',
+  'functions', 'share']);
 function copyTree(from, to) {
   fs.mkdirSync(to, { recursive: true });
   for (const name of fs.readdirSync(from)) {
@@ -264,6 +267,16 @@ fs.writeFileSync(path.join(outDir, 'build-info.json'), JSON.stringify({
   environment: envName, builtAt: new Date().toISOString(),
   commit: process.env.CF_PAGES_COMMIT_SHA || process.env.GITHUB_SHA || null
 }, null, 2) + '\n');
+
+// v40.21 — a sent recipe's own page (<address>/r/<id>, functions/r/[[path]].js) reads which database and address are
+// this copy's from here. Only a copy on Cloudflare Pages serves those pages (`recipePages`); the app then sends the
+// /r/ link, which WhatsApp shows with the recipe's photo and name.
+if (cfg.recipePages) {
+  if (cfg.sitePath !== '/') fail('recipePages needs the copy at the root of its address (sitePath "/")');
+  fs.writeFileSync(path.join(outDir, 'share-page.json'), JSON.stringify({
+    projectId: cfg.firebase.projectId, site: cfg.siteOrigin + cfg.sitePath, brand: cfg.brandName || 'My Kitchen Notes'
+  }, null, 2) + '\n');
+}
 
 // ── Google sign-in, served from this copy's own address (v36.78) ────────────
 // On an iPhone, sign-in run on <project>.firebaseapp.com stops half-way with

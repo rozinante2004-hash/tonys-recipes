@@ -5707,7 +5707,11 @@ window.SELF_TESTS = [
         // 2. By WhatsApp: a link, made once, carried in the message.
         ch=['wa']; cf=['']; window.shareDo=async function(how, m){ shared.push([how, m]); return how; };
         var link=await openSendRecipe(rid);
-        if(!link || !shared.length || shared[0][0]!=='wa' || shared[0][1].text.indexOf('?recipe='+link.id)===-1 || !/Kitchen A sent you a recipe for “Hard-boiled eggs”/.test(shared[0][1].text)) throw new Error('the WhatsApp message: '+JSON.stringify(shared));
+        if(!link || !shared.length || shared[0][0]!=='wa' || shared[0][1].text.indexOf(giftShareUrl(link.id))===-1 || !/Kitchen A sent you a recipe for “Hard-boiled eggs”/.test(shared[0][1].text)) throw new Error('the WhatsApp message: '+JSON.stringify(shared));
+        // v40.21 — a link keeps 6 months (one through the app still 4 weeks, above), and the message ends with the line for the app
+        var ldays=(store['recipeGifts/'+link.id].expireAt._ts-Date.now())/864e5;
+        if(!(ldays>182.9 && ldays<183.1)) throw new Error('a link does not keep for 6 months: '+ldays);
+        if(!/the link keeps for 6 months/.test(shared[0][1].text) || !/Download My Kitchen Notes and keep the recipe for good/.test(shared[0][1].text)) throw new Error('the WhatsApp message’s 6 months and the line for the app: '+shared[0][1].text);
         if(store['recipeGifts/'+link.id].to!=='' || store['recipeGifts/'+link.id].via!=='whatsapp') throw new Error('a link is for nobody in particular: '+JSON.stringify(store['recipeGifts/'+link.id]).slice(0,200));
         // 3. In the kitchen it was sent to: it pops up, counted in ⋯ More; saved with one tap, a recipe of its own.
         window._fbUser={ uid:'uB', email:'b@example.com', emailVerified:true };
@@ -5769,7 +5773,7 @@ window.SELF_TESTS = [
         var clipped=[], clipWas=Object.getOwnPropertyDescriptor(navigator,'clipboard');
         Object.defineProperty(navigator,'clipboard',{ configurable:true, value:{ writeText:async function(t){ clipped.push(String(t)); } } });
         try { await giftOutBulk('copy'); } finally { if(clipWas) Object.defineProperty(navigator,'clipboard',clipWas); else delete navigator.clipboard; }
-        if(clipped.length!==1 || clipped[0].indexOf(giftUrl(l1.id))<0 || clipped[0].indexOf(giftUrl(l2.id))<0 || clipped[0].indexOf(giftUrl(a1.id))>-1)
+        if(clipped.length!==1 || clipped[0].indexOf(giftShareUrl(l1.id))<0 || clipped[0].indexOf(giftShareUrl(l2.id))<0 || clipped[0].indexOf(giftShareUrl(a1.id))>-1)
           throw new Error('Copy the links: '+JSON.stringify(clipped));
         // Send again: the one to a kitchen comes anew (the earlier taken back); the links get new links, in one message
         var shareWas=window.shareMessage, msgs=[]; window.shareMessage=async function(o){ msgs.push(o); return 'copy'; };
@@ -5779,7 +5783,7 @@ window.SELF_TESTS = [
         var toB=Object.keys(store).filter(function(k){ return /^recipeGifts\//.test(k) && store[k].to==='hB'; });
         if(toB.length!==1 || store[toB[0]].note!=='Again!' || store[toB[0]].photo!==true || !store['recipeGiftPhotos/'+toB[0].split('/')[1]]) throw new Error('sent again to the kitchen: '+JSON.stringify(toB));
         if(!store['recipeGifts/'+l1.id] || !store['recipeGifts/'+l2.id]) throw new Error('the earlier links stopped working');
-        if(msgs.length!==1 || !/2 recipes/.test(msgs[0].text) || (msgs[0].text.match(/\?recipe=/g)||[]).length!==2 || msgs[0].text.indexOf(giftUrl(l1.id))>-1) throw new Error('the new links, in one message: '+JSON.stringify(msgs).slice(0,300));
+        if(msgs.length!==1 || !/2 recipes/.test(msgs[0].text) || (msgs[0].text.match(APP_CONFIG.recipePages ? /\/r\/[A-Za-z0-9]{20,40}/g : /\?recipe=/g)||[]).length!==2 || msgs[0].text.indexOf(giftShareUrl(l1.id))>-1) throw new Error('the new links, in one message: '+JSON.stringify(msgs).slice(0,300));
         if((_gifts.sent||[]).length!==5 || giftPicked().length) throw new Error('the list after sending again: '+(_gifts.sent||[]).length+' listed, '+giftPicked().length+' still ticked');
         // Take back all ticked, after one question
         giftPickAll(true); cf=[true];
@@ -5836,7 +5840,7 @@ window.SELF_TESTS = [
         var made=await openSendRecipe(rid);
         var tap=said.filter(function(o){ return /Open the share menu/.test(o.okLabel||''); })[0];
         if(!made || !tap) throw new Error('no second tap asked for: '+JSON.stringify(said.map(function(o){ return o.title; })));
-        if(shared.length!==1 || shared[0].text.indexOf('?recipe='+gid)<0 || !/Kitchen A sent you a recipe for “Shakshuka”/.test(shared[0].text)) throw new Error('the share menu did not open with the link: '+JSON.stringify(shared));
+        if(shared.length!==1 || shared[0].text.indexOf(giftShareUrl(gid))<0 || !/Kitchen A sent you a recipe for “Shakshuka”/.test(shared[0].text)) throw new Error('the share menu did not open with the link: '+JSON.stringify(shared));
         if(!toasts.some(function(t){ return /on its way/.test(t); })) throw new Error('not said: '+JSON.stringify(toasts));
         // closed by the person: nothing more, and said so in the send window
         shared=[]; said=[]; toasts=[]; ch=['share']; cf=['']; answers=['AbortError'];
@@ -18268,8 +18272,8 @@ window.SELF_TESTS = [
 
         // Now the buttons themselves, called exactly as toggleShare wires them.
         var opened=null;
-        window.open=function(u){ opened=u; return null; };
-        doWhatsApp(ref);
+        window.open=function(u){ opened=u; return {}; };
+        await doWhatsApp(ref);   // v40.21 — it may make the recipe's link first (none in a Self Test run: giftCanSend)
         if(!opened) throw new Error('WhatsApp did nothing for a recipe inside a collection');
         if(decodeURIComponent(opened).indexOf('Onion soup')===-1)
           throw new Error('WhatsApp sent something that is not this recipe: '+String(opened).slice(0,60));
@@ -18719,8 +18723,11 @@ window.SELF_TESTS = [
       // (without comments) of real features (a collection's contents, links between recipes, Ask an admin to delete,
       // the sent-recipe and invitation flows, the testers' invitation window, the audit's own fixes) and the page
       // reached 1,994 KB. 2300 leaves room for the audit's remaining items (JSON-LD imports, the signed fetches).
+      // Raised to 2400 in v40.21, on purpose: v39.64–v40.20 brought the page to 2,262 KB (the timers, the calculator, the
+      // Work Planner, chat notifications, Recent), and v40.21 adds ~40 KB (the WhatsApp link with its page and the line
+      // for the app, 🖼️ the recipe card drawn as a picture, the saved web page laid out right to left) → 2,302 KB.
       kb = Math.round(lean.length/1024);
-      if(kb > 2300) throw new Error('index.html is '+kb+' KB without its comments (what a device downloads). The suite itself is NOT inlined — that is '
+      if(kb > 2400) throw new Error('index.html is '+kb+' KB without its comments (what a device downloads). The suite itself is NOT inlined — that is '
         + 'checked above — so this is the app growing. Either something large went in that should not '
         + 'have, or the budget needs raising on purpose rather than by accident.');
 
@@ -25680,6 +25687,43 @@ window.SELF_TESTS = [
       if(doc.querySelector('script')) throw new Error('the shared page contains script — it must be inert');
       if(/https?:\/\//.test(html.replace(/Source:[^<]*/g,''))) throw new Error('the page references an external URL — it must work offline forever');
       if(!/unicode-bidi\s*:\s*plaintext/.test(html)) throw new Error('the page has no bidi handling — mixed Hebrew/English would misalign');
+      // v40.21 — Tony: "When creating the web page, the Hebrew is a bit messed up. The amounts are on the right, the step
+      // numbers are overwritten by the text". Laid out as a phone shows it: a Hebrew recipe right to left, its amounts at
+      // the left, each step's number a badge clear of its text (12 steps: two digits), "1½ כוסות" kept whole.
+      var steps=[]; for(var k=1;k<=12;k++) steps.push(k===4 ? 'מתפיחים 1½ שעות.' : 'שלב מספר '+k+' — מערבבים היטב ומחכים כמה דקות עד שהבצק תופח.');
+      var he=normalizeRecipe({id:2,name:'עוגת שמרים',ingredients:[{a:'1½ כוסות',n:'חלב פושר'},{a:'50 גרם',n:'שמרים'}],steps:steps});
+      var en=normalizeRecipe({id:3,name:'Yeast cake',ingredients:[{a:'1½ cups',n:'warm milk'}],steps:['Mix.','Bake.']});
+      var hp=buildRecipePage(he), ep=buildRecipePage(en);
+      if(!/^<!doctype html><html[^>]* dir="rtl"/.test(hp) || !/^<!doctype html><html[^>]* dir="ltr"/.test(ep)) throw new Error('the page is not in the recipe’s own direction');
+      if(hp.indexOf('\u20661½\u2069 כוסות')<0) throw new Error('"1½ כוסות" is not kept whole (it shows as "½1")');
+      var lay=async function(page){
+        var fr=document.createElement('iframe'); fr.style.cssText='position:fixed;left:-3000px;top:0;width:390px;height:900px;border:0;';
+        document.body.appendChild(fr);
+        await new Promise(function(res){ fr.onload=res; fr.srcdoc=page; setTimeout(res,4000); });
+        return fr;
+      };
+      var fr=await lay(hp);
+      try {
+        var d=fr.contentDocument, rows=d.querySelectorAll('ul.ing li'), st=d.querySelectorAll('ol.steps li');
+        if(rows.length!==2 || st.length!==12) throw new Error('the page has '+rows.length+' ingredients and '+st.length+' steps');
+        Array.prototype.forEach.call(rows, function(li){
+          var nm=li.querySelector('span').getBoundingClientRect(), am=li.querySelector('b').getBoundingClientRect();
+          if(!(am.right<=nm.left+1)) throw new Error('Hebrew: an amount is not at the left of its ingredient ('+Math.round(am.left)+'–'+Math.round(am.right)+' vs '+Math.round(nm.left)+')');
+        });
+        Array.prototype.forEach.call(st, function(li, i){
+          var n=li.querySelector('.n'), nb=n.getBoundingClientRect(), tb=li.querySelector('.t').getBoundingClientRect();
+          if(n.textContent!==String(i+1)) throw new Error('step '+(i+1)+' is numbered '+n.textContent);
+          if(!(nb.left>=tb.right-1)) throw new Error('step '+(i+1)+': its text runs over its number ('+Math.round(tb.right)+' > '+Math.round(nb.left)+')');
+          if(nb.right>390 || nb.left<0 || nb.width<24) throw new Error('step '+(i+1)+': its number is cut ('+Math.round(nb.left)+'–'+Math.round(nb.right)+')');
+        });
+        if(getComputedStyle(d.querySelector('ol.steps')).listStyleType!=='none') throw new Error('the browser’s own list numbers are back');
+      } finally { fr.remove(); }
+      fr=await lay(ep);
+      try {
+        var eli=fr.contentDocument.querySelector('ul.ing li'), enm=eli.querySelector('span').getBoundingClientRect(), eam=eli.querySelector('b').getBoundingClientRect();
+        var es=fr.contentDocument.querySelector('ol.steps li'), en1=es.querySelector('.n').getBoundingClientRect(), et1=es.querySelector('.t').getBoundingClientRect();
+        if(!(eam.left>=enm.right-1) || !(en1.right<=et1.left+1)) throw new Error('English: the amount is not at the right, or the number not before the step');
+      } finally { fr.remove(); }
     } },
 
   // ── Batch E ─────────────────────────────────────────────────────────────────
@@ -26112,6 +26156,156 @@ window.SELF_TESTS = [
         if(!document.getElementById('waAskOverlay').classList.contains('open')) throw new Error('ask modal did not open');
         closeM('waAskOverlay');
       } finally { setWaBase(prev); }
+    } },
+  // v40.21 — Tony, 27 Nov 2026: "When sending a recipe via WhatsApp, it is sent as text. However, I would like to be able
+  // to send it fuller and richer, like the web page …" and, of the link: "6 months should suffice … also send the sales
+  // pitch line and link. (While in Beta, the link should open an invitation request)."
+  { id:'share_whatsapp_link', group:'Features', name:'💬 Share on WhatsApp sends the recipe’s own page — a link WhatsApp shows with its photo and name, kept 6 months — then a line for the app whose link opens the invitation request while the beta is by invitation; the text as before when no link can be made (v40.21)',
+    test: async()=>{
+      var real={ send:window.giftSend, open:window.open, confirm:window.askConfirm, db:window._fbDb, user:window._fbUser, hh:window._household,
+        toast:window.toast, signed:window.fbSignedInUser, ask:window.giftAskInvitation, pitch:window._pitchOpenForTest };
+      var reuseKey=GIFT_REUSE_KEY+'hW', keptReuse=null; try{ keptReuse=localStorage.getItem(reuseKey); }catch(e){}
+      var rid=TEST_ID_MIN+41;
+      var r=normalizeRecipe({ id:rid, name:'Shakshuka **hot**', emoji:'🍳', ingredients:[{ a:'6', n:'eggs' }], steps:['Cook.'], updatedAt:Date.now()-60000 });
+      recipes.push(r);
+      try {
+        // the link: the page on this copy's own address where it has them, the app's link where it has not
+        var gid='Abcdefghijklmnopqrstuv12';
+        var want=APP_CONFIG.recipePages ? APP_CONFIG.siteOrigin+APP_CONFIG.sitePath+'r/'+gid : giftUrl(gid);
+        if(giftShareUrl(gid).split('?l=')[0]!==want) throw new Error('the link sent: '+giftShareUrl(gid)+' (expected '+want+')');
+        if(giftKeepsMs('app')!==28*864e5 || giftKeepsMs('whatsapp')!==183*864e5 || giftKeepsMs('link')!==183*864e5 || giftKeepsMs('email')!==183*864e5)
+          throw new Error('how long each keeps: app '+giftKeepsMs('app')/864e5+', a link '+giftKeepsMs('whatsapp')/864e5+' days');
+        // signed in, in a kitchen: the link is made once, its message opens WhatsApp
+        var made=[], opened=[], asked=[];
+        window._fbUser={ uid:'uW', email:'w@example.com' }; window._household=_household={ hid:'hW', name:'Kitchen W', code:'MKN-WWWW-2222', role:'owner' };
+        var docs={}; window._fbDb={ collection:function(c){ return { doc:function(d){ return { get:async function(){ return { exists:!!docs[c+'/'+d], data:function(){ return docs[c+'/'+d]; } }; } }; } }; } };
+        window.giftSend=async function(rr, o){ var id='Gift'+(made.length+1)+'abcdefghijklmnopqrstu'; made.push([rr.name, o.via]); docs['recipeGifts/'+id]={ name:rr.name };
+          return { id:id, url:giftUrl(id), page:giftShareUrl(id), name:rr.name, until:Date.now()+183*864e5 }; };
+        window.open=function(u){ opened.push(String(u)); return {}; };
+        window.askConfirm=async function(o){ asked.push(o); return true; };
+        window._pitchOpenForTest=false;   // the beta: newcomers by invitation only
+        window._giftUnderTest=true;       // the server stood in for above (giftCanSend refuses a Self Test run otherwise)
+        try{ localStorage.removeItem(reuseKey); }catch(e){}
+        if(await doWhatsApp(rid)!=='wa' || opened.length!==1) throw new Error('WhatsApp did not open: '+JSON.stringify(opened));
+        var text=decodeURIComponent(opened[0].replace(/^https:\/\/wa\.me\/\?text=/,''));
+        var home=APP_CONFIG.movedTo || (APP_CONFIG.siteOrigin+APP_CONFIG.sitePath);
+        if(made.length!==1 || made[0][1]!=='whatsapp') throw new Error('the link was not made for WhatsApp: '+JSON.stringify(made));
+        if(text.indexOf('🍳 Shakshuka hot\n'+giftShareUrl('Gift1abcdefghijklmnopqrstu')+'\n\n')!==0) throw new Error('the message does not open with the name and the page: '+text);
+        if(text.indexOf('Download My Kitchen Notes and keep the recipe for good — this link lasts 6 months. Ask for an invitation: '+home+'?invite-me')<0) throw new Error('the line for the app (by invitation): '+text);
+        if(/INGREDIENTS:/.test(text)) throw new Error('the recipe went as text as well');
+        // again within the week, unchanged: the same link, nothing new on the server
+        opened=[];
+        await doWhatsApp(rid);
+        var text2=decodeURIComponent((opened[0]||'').replace(/^https:\/\/wa\.me\/\?text=/,''));
+        if(made.length!==1 || text2.indexOf(giftShareUrl('Gift1abcdefghijklmnopqrstu'))<0) throw new Error('shared again, a second copy was made: '+made.length);
+        // changed since: a new link
+        r.updatedAt=Date.now()+1000; opened=[];
+        await doWhatsApp(rid);
+        if(made.length!==2) throw new Error('a changed recipe reused the old link');
+        // open to everyone: the line leads to the app itself
+        window._pitchOpenForTest=true;
+        var line=await appPitchLine(true);
+        if(line!==i18nPhrase('\u{1F4F2} Download My Kitchen Notes and keep the recipe for good — this link lasts 6 months:')+' '+home) throw new Error('the line when anyone may join: '+line);
+        window._pitchOpenForTest=false;
+        // the tap ran out (the browser refused the window): one more tap opens it
+        var tries=0; opened=[]; asked=[];
+        window.open=function(u){ tries++; if(tries===1) return null; opened.push(String(u)); return {}; };
+        if(await waOpen('https://wa.me/?text=x')!=='wa' || opened.length!==1 || !asked.length || !/Open WhatsApp/.test(asked[0].okLabel)) throw new Error('a refused window is not opened by a second tap: '+JSON.stringify(asked.map(function(a){ return a.okLabel; })));
+        window.open=function(u){ opened.push(String(u)); return {}; };
+        // a secret recipe asks first; Cancel sends nothing
+        r.secret=true; opened=[]; window.askConfirm=async function(o){ asked.push(o); return null; };
+        if(await doWhatsApp(rid)!==null || opened.length) throw new Error('a secret recipe went without asking');
+        r.secret=false; window.askConfirm=async function(o){ asked.push(o); return true; };
+        // the link cannot be made: the text, as before, and a line without "this link"
+        var toasts=[]; window.toast=function(m){ toasts.push(String(m)); };
+        window.giftSend=async function(){ throw new Error('offline'); };
+        try{ localStorage.removeItem(reuseKey); }catch(e){}
+        opened=[]; await doWhatsApp(rid);
+        var t3=decodeURIComponent((opened[0]||'').replace(/^https:\/\/wa\.me\/\?text=/,''));
+        if(!/INGREDIENTS:/.test(t3) || !/• 6 eggs/.test(t3) || t3.indexOf('Download My Kitchen Notes and keep your recipes in one place. Ask for an invitation: '+home+'?invite-me')<0)
+          throw new Error('without a link: '+t3);
+        if(!toasts.some(function(m){ return /could not be made/.test(m); })) throw new Error('nobody was told the link could not be made');
+        // signed out: the text, without trying
+        window._fbUser=null; var calls=0; window.giftSend=async function(){ calls++; throw new Error('x'); };
+        opened=[]; await doWhatsApp(rid);
+        if(calls || !/INGREDIENTS:/.test(decodeURIComponent(opened[0]||''))) throw new Error('signed out, it tried to make a link');
+        // …/?invite-me: signed out, the invitation request; signed in, told so
+        var asks=0; window.giftAskInvitation=async function(){ asks++; return true; };
+        window.fbSignedInUser=function(){ return null; };
+        sessionStorage.setItem(INVITE_ME_KEY,'1');
+        if(await inviteMeMaybe()!=='asked' || asks!==1 || sessionStorage.getItem(INVITE_ME_KEY)) throw new Error('…/?invite-me did not open the invitation request');
+        window.fbSignedInUser=function(){ return { uid:'x' }; };
+        sessionStorage.setItem(INVITE_ME_KEY,'1'); toasts=[];
+        if(await inviteMeMaybe()!=='in' || asks!==1 || !toasts.some(function(m){ return /already have My Kitchen Notes/.test(m); })) throw new Error('someone already in was asked for an address');
+        if(await inviteMeMaybe()!==false) throw new Error('without the link, nothing happens');
+      } finally {
+        window.giftSend=real.send; window.open=real.open; window.askConfirm=real.confirm; window._fbDb=real.db; window._fbUser=real.user;
+        window._household=_household=real.hh; window.toast=real.toast; window.fbSignedInUser=real.signed; window.giftAskInvitation=real.ask;
+        window._pitchOpenForTest=real.pitch; window._giftUnderTest=false;
+        try{ if(keptReuse===null) localStorage.removeItem(reuseKey); else localStorage.setItem(reuseKey, keptReuse); }catch(e){}
+        try{ sessionStorage.removeItem(INVITE_ME_KEY); }catch(e){}
+        var i=recipes.indexOf(r); if(i>-1) recipes.splice(i,1);
+        var ov=document.getElementById('askOverlay'); if(ov) ov.remove();
+      }
+    } },
+
+  // v40.21 — Tony: "Add the picture of the recipe card too, as you've suggested."
+  { id:'recipe_card_picture', group:'Features', name:'🖼️ Send as a picture: the recipe card drawn as pictures 1080 px wide and at most 1920 tall — photo, name, ingredients, method — right to left for a Hebrew recipe; shared with its link and the line for the app, or saved on a computer (v40.21)',
+    test: async()=>{
+      var real={ here:window.shareMenuHere, dl:window.downloadBlob, share:navigator.share, can:navigator.canShare, toast:window.toast, user:window._fbUser, pitch:window._pitchOpenForTest };
+      var ids=[];
+      var pc=document.createElement('canvas'); pc.width=1200; pc.height=800; var g=pc.getContext('2d'); g.fillStyle='#b5651d'; g.fillRect(0,0,1200,800);
+      var photo=pc.toDataURL('image/jpeg',0.8);
+      var ink=function(cv, x0, x1, y0, y1){ var d=cv.getContext('2d').getImageData(x0, y0, x1-x0, y1-y0).data, n=0; for(var i=0;i<d.length;i+=4) if(d[i]<150 && d[i+1]<150) n++; return n; };
+      try {
+        var en=normalizeRecipe({ id:TEST_ID_MIN+42, name:'Soup', ingredients:[{ a:'1 l', n:'water' }, { sub:'Vegetables' }, { a:'2', n:'carrots' }], steps:['Boil.', 'Serve.'] });
+        var pages=await recipeCardPages(en, { photo:photo });
+        if(pages.length!==1 || pages[0].w!==1080 || pages[0].canvas.width!==1080 || pages[0].h>1920 || pages[0].h<900) throw new Error('a short recipe: '+pages.length+' page(s), '+(pages[0]&&pages[0].h)+' tall');
+        var px=pages[0].canvas.getContext('2d').getImageData(540, 300, 1, 1).data;
+        if(Math.abs(px[0]-0xb5)>12 || Math.abs(px[1]-0x65)>12) throw new Error('the photo is not at the top: '+Array.from(px).slice(0,3));
+        // the name, left to right: ink at the left of its line, none at the far right
+        if(ink(pages[0].canvas, 72, 300, 700, 740)<50 || ink(pages[0].canvas, 760, 1008, 700, 740)>0) throw new Error('an English name does not start on the left');
+        // Hebrew: from the right
+        var he=normalizeRecipe({ id:TEST_ID_MIN+43, name:'מרק', ingredients:[{ a:'1 ליטר', n:'מים' }], steps:['מבשלים.'] });
+        var hp=await recipeCardPages(he, { photo:'' });
+        if(hp.length!==1 || ink(hp[0].canvas, 760, 1008, 360, 400)<50 || ink(hp[0].canvas, 72, 600, 360, 400)>0) throw new Error('a Hebrew name does not start on the right');
+        // the steps' numbers: filled circles at the start side — the right for Hebrew, the left for English (the amounts,
+        // thin terracotta text, are at the other side)
+        var terra=function(cv, x0, x1){ var d=cv.getContext('2d').getImageData(x0, 0, x1-x0, cv.height).data, n=0; for(var q=0;q<d.length;q+=4) if(d[q]>170 && d[q+1]<110 && d[q+2]<60) n++; return n; };
+        var he2=normalizeRecipe({ id:TEST_ID_MIN+45, name:'מרק עגבניות', ingredients:[{ a:'1½ כוסות', n:'מים' }], steps:['מבשלים.', 'טועמים.', 'מגישים.'] });
+        var hc=(await recipeCardPages(he2, { photo:'' }))[0].canvas, ec=(await recipeCardPages(en, { photo:'' }))[0].canvas;
+        if(!(terra(hc, 958, 1006)>3000 && terra(hc, 74, 122)<terra(hc, 958, 1006)/2)) throw new Error('Hebrew card: the steps’ numbers are not at the right ('+terra(hc, 958, 1006)+' / '+terra(hc, 74, 122)+')');
+        if(!(terra(ec, 74, 122)>2000 && terra(ec, 958, 1006)<terra(ec, 74, 122))) throw new Error('English card: the steps’ numbers are not at the left');
+        // a long recipe: several pages, none taller than a phone screen; the steps count on across them
+        var ings=[], steps=[];
+        for(var i=1;i<=45;i++) ings.push({ a:i+' g', n:'ingredient '+i });
+        for(var j=1;j<=25;j++) steps.push('Step '+j+' — stir, taste and season, then carry on with the next thing. '.repeat(2));
+        var lg=normalizeRecipe({ id:TEST_ID_MIN+44, name:'Long', ingredients:ings, steps:steps });
+        var lp=await recipeCardPages(lg, { photo:'' });
+        if(lp.length<3 || lp.some(function(p){ return p.h>1920 || p.w!==1080; })) throw new Error('a long recipe: '+lp.map(function(p){ return p.h; }).join(', '));
+        // a word wider than a line (Japanese) breaks between characters, every line within the width
+        var c=document.createElement('canvas').getContext('2d'); c.font='400 34px sans-serif';
+        var jl=cardWrap(c, 'とてもながいにほんごのぶんしょうですくぎりがありません'.repeat(4), 300);
+        if(jl.length<4 || jl.some(function(l){ return c.measureText(l).width>300.5; })) throw new Error('wrapping without spaces: '+jl.length+' lines');
+        // the files: JPEG pictures, numbered when there are several
+        var files=await recipeCardFiles(lg, { photo:'' });
+        if(files.length!==lp.length || files.some(function(f){ return f.type!=='image/jpeg' || !f.size; }) || files[0].name!=='Long 1.jpg') throw new Error('the files: '+files.map(function(f){ return f.name+' '+f.type; }).join(', '));
+        // on a computer: saved
+        recipes.push(en); ids.push(en.id);
+        var saved=[]; window.downloadBlob=function(b, n){ saved.push(n); }; window.shareMenuHere=function(){ return false; }; window.toast=function(){};
+        if(await shareAsPicture(en.id)!=='saved' || saved.length!==1 || saved[0]!=='Soup.jpg') throw new Error('on a computer: '+JSON.stringify(saved));
+        // on a phone: the share menu, with the picture and a caption (signed out here: the line without a link)
+        var got=null; window.shareMenuHere=function(){ return true; }; window._fbUser=null; window._pitchOpenForTest=false;
+        Object.defineProperty(navigator,'canShare',{ configurable:true, value:function(d){ return !!(d && d.files && d.files.length); } });
+        Object.defineProperty(navigator,'share',{ configurable:true, value:async function(d){ got=d; } });
+        if(await shareAsPicture(en.id)!=='shared' || !got || got.files.length!==1 || got.files[0].type!=='image/jpeg') throw new Error('on a phone: '+JSON.stringify(got && { n:got.files && got.files.length, t:got.text }));
+        if(got.text.indexOf('Soup')<0 || got.text.indexOf('Download My Kitchen Notes and keep your recipes in one place')<0) throw new Error('the caption: '+got.text);
+      } finally {
+        window.shareMenuHere=real.here; window.downloadBlob=real.dl; window.toast=real.toast; window._fbUser=real.user; window._pitchOpenForTest=real.pitch;
+        if(real.share) Object.defineProperty(navigator,'share',{ configurable:true, value:real.share }); else delete navigator.share;
+        if(real.can) Object.defineProperty(navigator,'canShare',{ configurable:true, value:real.can }); else delete navigator.canShare;
+        recipes=recipes.filter(function(x){ return ids.indexOf(x.id)<0; });
+      }
     } },
 ];
 

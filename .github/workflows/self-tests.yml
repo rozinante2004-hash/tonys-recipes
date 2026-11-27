@@ -334,6 +334,11 @@ jobs:
       - name: Worker checks (CORS, origin, app key)
         run: node tests/worker-cors.mjs
 
+      # v40.21 — a sent recipe's own page (<address>/r/<id>, the Cloudflare Pages function in functions/r/), against
+      # a stand-in for the database: what WhatsApp reads for its card, the page in each language, every refusal.
+      - name: Recipe page checks (what a WhatsApp link opens)
+        run: node tests/share-page.test.mjs
+
       # extension 1.0 — the "Save recipes from Facebook" extension, installed in a real
       # Chromium, against an imitation Facebook feed and reel page.
       - name: Browser extension (Save recipe under Facebook posts)

@@ -690,6 +690,8 @@ await check('…not in a kitchen he is not in (as gB)',                setDoc(do
 await check('…not under a name other than his kitchen’s',            setDoc(doc(frank, 'recipeGifts/' + GX), gift({ fromName: 'Tony’s Kitchen', photo: false })), false);
 await check('…not in someone else’s name',                           setDoc(doc(frank, 'recipeGifts/' + GX), gift({ by: 'carol', photo: false })), false);
 await check('…not kept longer than 4 weeks',                         setDoc(doc(frank, 'recipeGifts/' + GX), gift({ expireAt: Timestamp.fromMillis(Date.now() + 40 * 864e5), photo: false })), false);
+// v40.21 — a link keeps 6 months; one through the app still 4 weeks
+await check('…a link not longer than 6 months',                     setDoc(doc(frank, 'recipeGifts/' + GX), gift({ to: '', toCode: '', via: 'whatsapp', expireAt: Timestamp.fromMillis(Date.now() + 190 * 864e5), photo: false })), false);
 await check('…not to a kitchen under another kitchen’s identifier',  setDoc(doc(frank, 'recipeGifts/' + GX), gift({ toCode: 'MKN-ZZZZ-9999', photo: false })), false);
 await check('…not "through the app" to nobody',                      setDoc(doc(frank, 'recipeGifts/' + GX), gift({ to: '', toCode: '', photo: false })), false);
 await check('…not already "saved"',                                  setDoc(doc(frank, 'recipeGifts/' + GX), gift({ saved: { gB: 1 }, photo: false })), false);
@@ -698,6 +700,15 @@ await check('…nothing else goes in it',                              setDoc(do
 await check('…a photo only with a gift that says it has one',        sendWithPhoto(frank, GX, gift({ photo: false })), false);
 await check('…and only by whoever sent the gift',                    setDoc(doc(carol, 'recipeGiftPhotos/' + G1 + 'z'), { from: 'gA', data: 'x', expireAt: in28() }), false);
 await check('a link, sent by WhatsApp (to nobody in particular)',    sendWithPhoto(frank, G2, gift({ to: '', toCode: '', via: 'whatsapp', photo: false }), null), true);
+const G4 = 'giftAbcdefghijklmnopqrs4', G5 = 'giftAbcdefghijklmnopqrs5', in183 = () => Timestamp.fromMillis(Date.now() + 183 * 864e5);
+await check('a link for 6 months, with its photo and a small preview', sendWithPhoto(frank, G4, gift({ to: '', toCode: '', via: 'whatsapp', expireAt: in183() }),
+  { from: 'gA', data: 'data:image/jpeg;base64,AAAA', thumb: 'data:image/jpeg;base64,BBBB', expireAt: in183() }), true);
+await check('…its preview read signed out, as the page does',          getDoc(doc(nobody, 'recipeGiftPhotos/' + G4)), true);
+await check('…not a preview too big for one',                          sendWithPhoto(frank, G5, gift({ to: '', toCode: '', via: 'link', expireAt: in183() }),
+  { from: 'gA', data: 'data:image/jpeg;base64,AAAA', thumb: 'x'.repeat(200001), expireAt: in183() }), false);
+await check('…nor a preview that is not text',                         sendWithPhoto(frank, G5, gift({ to: '', toCode: '', via: 'link', expireAt: in183() }),
+  { from: 'gA', data: 'data:image/jpeg;base64,AAAA', thumb: 7, expireAt: in183() }), false);
+await check('one sent through the app: still not 6 months',           sendWithPhoto(frank, G5, gift({ expireAt: in183(), photo: false }), null), false);
 await check('whoever has the link reads it, signed out too',         getDoc(doc(nobody, 'recipeGifts/' + G1)), true);
 await check('…and its photo',                                        getDoc(doc(nobody, 'recipeGiftPhotos/' + G1)), true);
 await check('…but nobody lists them',                                getDocs(collection(nobody, 'recipeGifts')), false);
