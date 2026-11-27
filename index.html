@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v40.19 -->
+<!-- Tony's Recipes Collection v40.20 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -3008,6 +3008,9 @@ async function _selfTestPark() {
   // …and the recipes opened last (v39.83): a test's made-up recipe must not take a real one's place in "Recent:".
   var _recentWas = selfTestRecentKeep();
   try { _selfTestRecentAt = localStorage.getItem('recent_views_at'); } catch(e) { _selfTestRecentAt = null; }
+  // …and the recipe of each collection it was left at (v40.20): a test that scrolls a made-up collection writes its own
+  var _recentPartsWas = null;
+  try { _recentPartsWas = localStorage.getItem('recent_parts'); } catch(e) { _recentPartsWas = null; }
   // …and the order Tony chose on 📊 Households (v39.88): a test that sorts must not change it.
   var _mgSortWas = null;
   try { _mgSortWas = localStorage.getItem('mkn_manage_sort'); } catch(e) {}
@@ -3064,7 +3067,7 @@ async function _selfTestPark() {
   return { langWas: _langWas, waWas: _waWas, dictWas: _dictWas, unitWas: _unitWas, cloudWas: _cloudWas,
            backupWas: _backupWas, spendWas: _spendWas, realDb: _realDb, featuresWas: _featuresWas, hidWas: _hidWas,
            recipesWas: _recipesWas, extMarks: _extMarks, extFolderWas: _extFolderWas, signInWas: _signInWas, recentWas: _recentWas,
-           mgSortWas: _mgSortWas };
+           recentPartsWas: _recentPartsWas, mgSortWas: _mgSortWas };
 }
 function _selfTestSignInBack(s) {
   if (!s) return;
@@ -3121,6 +3124,9 @@ function _selfTestUnpark(p) {
   try { if (p.spendWas === null) localStorage.removeItem(AI_SPEND_KEY); else localStorage.setItem(AI_SPEND_KEY, p.spendWas); } catch(e) {}
   try { if (p.unitWas !== null) localStorage.setItem(VIEW_UNIT_KEY, p.unitWas); } catch(e) {}
   if ('recentWas' in p) selfTestRecentPutBack(p.recentWas);   // v39.83 — the recipes opened last, as they were
+  if ('recentPartsWas' in p) {   // v40.20 — and the recipe of each collection it was left at
+    try { if (p.recentPartsWas === null) localStorage.removeItem('recent_parts'); else localStorage.setItem('recent_parts', p.recentPartsWas); } catch(e) {}
+  }
   if ('mgSortWas' in p) {   // v39.88 — 📊 Households' order, as he chose it
     try { if (p.mgSortWas === null) localStorage.removeItem('mkn_manage_sort'); else localStorage.setItem('mkn_manage_sort', p.mgSortWas); } catch(e) {}
     try { if (window.mknManage && mknManage._sortBack) mknManage._sortBack(); } catch(e) {}
@@ -11738,7 +11744,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v40.19';
+var APP_VERSION = 'v40.20';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -15618,7 +15624,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v40.19</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v40.20</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -15706,7 +15712,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v40.19</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v40.20</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -23602,7 +23608,7 @@ function recentRowIds(q, g) {           // the ids for the row, newest first; []
 // devices. Opening a recipe writes it, 1.5 s later and once; the record is listened to, so a recipe opened on the phone
 // is first in the computer's row at once. The two are merged by time: the newest opening of each recipe wins.
 var RECENT_KEEP = 12, RECENT_AT_KEY = 'recent_views_at';
-var _recentCloud = { key: '', list: null, unsub: null, timer: 0, sent: '' };
+var _recentCloud = { key: '', list: null, parts: null, unsub: null, timer: 0, sent: '' };   // parts: v40.20 (below)
 function recentLocal() {
   var ids = [], at = {};
   try { ids = JSON.parse(localStorage.getItem('recent_views') || '[]'); } catch(e) {}
@@ -23641,22 +23647,28 @@ function recentCloudRef() {
   return hhDb().collection('users').doc(_fbUser.uid).collection('prefs').doc('recent');
 }
 // What the cloud holds for this household, merged into this device's; the row drawn again if that changed it.
+// v40.20 — and the recipe of each collection the person was at (`parts`, merged the same way: the newest wins).
 function recentCloudTake(entry) {
   var list = entry && Array.isArray(entry.list) ? entry.list.filter(function(e){ return e && e.id != null && e.id !== ''; }) : [];
-  _recentCloud.list = list;
+  var cparts = recentPartsClean(entry && entry.parts);
+  _recentCloud.list = list; _recentCloud.parts = cparts;
   var mine = recentLocal(), merged = recentMerge(mine, list);
   if (recentSig(merged) !== recentSig(mine)) {
     recentStoreLocal(merged);
     try { if (typeof recentRowRefresh === 'function') recentRowRefresh(); } catch(e) {}
   }
-  return recentSig(merged) !== recentSig(recentMerge(list, []));   // true: this device knows of openings the cloud does not
+  var myParts = recentPartsLocal(), parts = recentPartsMerge(myParts, cparts, merged);
+  if (recentPartsSig(parts) !== recentPartsSig(myParts)) recentPartsStore(parts);
+  // true: this device knows of openings (or of a recipe a collection was left at) the cloud does not
+  return recentSig(merged) !== recentSig(recentMerge(list, []))
+    || recentPartsSig(parts) !== recentPartsSig(recentPartsMerge(cparts, [], merged));
 }
 function recentCloudStart() {
   var ref = recentCloudRef(); if (!ref || typeof ref.onSnapshot !== 'function') return false;
   var key = _fbUser.uid + '/' + _household.hid, hid = _household.hid;
   if (_recentCloud.unsub && _recentCloud.key === key) return true;
   recentCloudStop();
-  _recentCloud.key = key; _recentCloud.list = null; _recentCloud.sent = '';
+  _recentCloud.key = key; _recentCloud.list = null; _recentCloud.parts = null; _recentCloud.sent = '';
   try {
     _recentCloud.unsub = ref.onSnapshot(function(snap){
       if (_recentCloud.key !== key) return;
@@ -23672,7 +23684,7 @@ function recentCloudStart() {
 function recentCloudStop() {
   if (_recentCloud.unsub) { try { _recentCloud.unsub(); } catch(e) {} }
   clearTimeout(_recentCloud.timer);
-  _recentCloud.unsub = null; _recentCloud.key = ''; _recentCloud.list = null; _recentCloud.sent = '';
+  _recentCloud.unsub = null; _recentCloud.key = ''; _recentCloud.list = null; _recentCloud.parts = null; _recentCloud.sent = '';
 }
 function recentCloudSoon() {
   if (!recentCloudRef()) return;
@@ -23681,20 +23693,191 @@ function recentCloudSoon() {
 }
 async function recentCloudPush() {
   var ref = recentCloudRef(); if (!ref) return false;
-  var hid = _household.hid, list = recentMerge(recentLocal(), _recentCloud.list || []), sig = recentSig(list);
-  if (!list.length || sig === _recentCloud.sent || (_recentCloud.list && sig === recentSig(recentMerge(_recentCloud.list, [])))) return false;
-  var doc = {}; doc[hid] = { list: list.map(function(e){ return { id: e.id, at: e.at }; }), at: Date.now() };
+  var hid = _household.hid, list = recentMerge(recentLocal(), _recentCloud.list || []);
+  var parts = recentPartsMerge(recentPartsLocal(), _recentCloud.parts || [], list);   // v40.20 — one per collection of the list
+  var sig = recentSig(list) + recentPartsSig(parts);
+  var cloudSig = _recentCloud.list ? recentSig(recentMerge(_recentCloud.list, [])) + recentPartsSig(recentPartsMerge(_recentCloud.parts || [], [], list)) : null;
+  if (!list.length || sig === _recentCloud.sent || sig === cloudSig) return false;
+  // `parts` an array, so a write replaces it whole (a map would be merged key by key and keep every collection ever
+  // opened); a device on an older version writes `list` and `at` only, and the merge leaves `parts` as it was
+  var doc = {}; doc[hid] = { list: list.map(function(e){ return { id: e.id, at: e.at }; }),
+    parts: parts.map(function(e){ return { id: e.id, p: e.p, at: e.at }; }), at: Date.now() };
   try { await ref.set(doc, { merge: true }); }
   catch(e) {
     if (typeof hhRulesBehind === 'function' && hhRulesBehind(e, 'The recipes opened on your other devices appear in "Recent:" once the new database rules are published')) return false;
     syncLog('error', 'Could not save which recipes you opened last', String(e && e.message).slice(0, 160));
     return false;
   }
-  _recentCloud.sent = sig; _recentCloud.list = list;
+  _recentCloud.sent = sig; _recentCloud.list = list; _recentCloud.parts = parts;
   return true;
 }
 window.recentMerge = recentMerge; window.recentCloudTake = recentCloudTake; window.recentCloudPush = recentCloudPush;
 window.recentCloudStart = recentCloudStart; window.recentCloudStop = recentCloudStop; window.recentLocal = recentLocal;
+// ─── RECENT: BACK TO THE RECIPE YOU WERE AT IN A COLLECTION (v40.20) ─────────
+// Tony, 27 Nov 2026: "When clicking a collection in Recent, and it's been less than 12 hours sinse it was last opened, it
+// should jump to the last accessed recipe in the collection." While a collection is open in the recipe window, the recipe
+// of it in front of the person is noted: the one at the reading line (a third of the way down the window, 160 px at most)
+// once a scroll settles, and the one a tap lands in (a tick, the line marker, a timer, its own buttons) — written when it
+// is another one than before, and once more, with the time, as the window closes, another recipe takes its place or the
+// app goes to the background. A collection of two recipes or more, tapped in "Recent:" (or in the list 🕐 Recent shows)
+// less than 12 hours after it was last open — opened, or one of its recipes in front — opens at that recipe, as a line of
+// 📑 Contents takes you there (↑ Contents beside its name leads back up). After 12 hours, and anywhere else in the list,
+// it opens at the top as before; so does a collection whose recipe has been taken out of it since. Kept with the recipes
+// opened last, so it is the same on all the person's devices: `recent_parts` here ([{ id, p: the recipe's uid, at }]) and
+// `<hid>.parts` in users/<uid>/prefs/recent — one per collection still among the recipes opened last.
+var RECENT_PARTS_KEY = 'recent_parts', RECENT_RESUME_MS = 12 * 3600 * 1000;
+// cur: { id, p } in front in the window now; sight: the index at the reading line when a scroll last settled (a tap in a
+// recipe lower down stands until a scroll brings another one to the reading line)
+var _recentPart = { cur: null, sight: -1, timer: 0, bound: false };
+function recentPartsClean(list) {
+  return (Array.isArray(list) ? list : []).filter(function(e){
+    return e && e.id != null && e.id !== '' && typeof e.p === 'string' && e.p && e.p.length <= 120;
+  }).map(function(e){ return { id: e.id, p: e.p, at: +e.at || 0 }; });
+}
+function recentPartsLocal() {
+  var list = [];
+  try { list = JSON.parse(localStorage.getItem(RECENT_PARTS_KEY) || '[]'); } catch(e) { list = []; }
+  return recentPartsClean(list);
+}
+// Per collection the newest; when `list` is given (the recipes opened last, as recentMerge gives them) only its collections
+function recentPartsMerge(a, b, list) {
+  var keep = null, by = {};
+  if (Array.isArray(list)) { keep = {}; list.forEach(function(e){ if (e) keep[String(e.id)] = 1; }); }
+  recentPartsClean(a).concat(recentPartsClean(b)).forEach(function(e){
+    var k = String(e.id);
+    if (keep && !keep[k]) return;
+    if (!by[k] || e.at > by[k].at) by[k] = e;
+  });
+  return Object.keys(by).map(function(k){ return by[k]; }).sort(function(x, y){
+    return (y.at - x.at) || (String(x.id) < String(y.id) ? -1 : String(x.id) > String(y.id) ? 1 : 0);
+  });
+}
+function recentPartsSig(parts) { return JSON.stringify((parts || []).map(function(e){ return [String(e.id), e.p, +e.at || 0]; })); }
+function recentPartsStore(parts) {
+  try { localStorage.setItem(RECENT_PARTS_KEY, JSON.stringify((parts || []).map(function(e){ return { id: e.id, p: e.p, at: e.at }; }))); } catch(e) {}
+}
+// The collection `id` was left at its recipe `uid`, now — and the person's other devices are told (1.5 s later, once).
+// Later than what is known of it (from another device whose clock is a little ahead: up to 10 minutes), so the newest wins.
+function recentPartNote(id, uid) {
+  if (id == null || id === '' || !uid) return false;
+  var k = String(id), all = recentPartsLocal(), was = all.filter(function(e){ return String(e.id) === k; })[0], at = Date.now();
+  if (was && was.at >= at && was.at - at < 600000) at = was.at + 1;
+  var parts = all.filter(function(e){ return String(e.id) !== k; });
+  parts.push({ id: id, p: uid, at: at });
+  recentPartsStore(recentPartsMerge(parts, [], recentLocal()));
+  if (!_selfTestRunning && typeof recentCloudSoon === 'function') recentCloudSoon();
+  return true;
+}
+// The recipe to open the collection `id` at, tapped in "Recent:" — its index, or -1 (the top, as before)
+function recentResumePart(id) {
+  var r = recipes.find(function(x){ return x.id === id; }), parts = recipeParts(r);
+  if (!r || parts.length < 2) return -1;
+  var k = String(id), rec = recentPartsLocal().filter(function(e){ return String(e.id) === k; })[0];
+  if (!rec) return -1;
+  var opened = 0;
+  try { opened = +((JSON.parse(localStorage.getItem(RECENT_AT_KEY) || '{}') || {})[k]) || 0; } catch(e) { opened = 0; }
+  if (!(Date.now() - Math.max(rec.at, opened) < RECENT_RESUME_MS)) return -1;   // 12 hours or more since it was last open
+  for (var i = 0; i < parts.length; i++) if (parts[i] && parts[i].uid === rec.p) return i;
+  return -1;                                                                    // taken out of the collection since
+}
+// A card of the list opens its recipe (through here since v40.20). Tapped in "Recent:", or in the list 🕐 Recent shows, a
+// collection may open at the recipe in it the person was at.
+function openCard(ev, id) {
+  var el = ev && (ev.currentTarget || ev.target);
+  if ((el && el.closest && el.closest('.recent-row')) || showRecentOnly) return recentResumeOpen(id);
+  openView(id);
+  return -1;
+}
+function recentResumeOpen(id) {
+  var pi = recentResumePart(id);   // read before openView, which makes "last opened" now
+  openView(id);
+  if (pi >= 0) viewGoToPart(pi);
+  return pi;
+}
+// Puts the collection's recipe `pi` at the top of the open recipe window, as a line of 📑 Contents does, and gives it the
+// focus (quietly) — now, and once more a moment later unless the person has moved since: a translated page puts its
+// words in place in the next frame, which would slide the recipe away from the top.
+function viewGoToPart(pi) {
+  var ov = document.getElementById('viewOverlay'), m = document.getElementById('viewModal');
+  var el = m ? m.querySelector('.collection-part[data-coll-part="' + pi + '"]') : null;
+  if (!ov || !ov.classList.contains('open') || !el) return false;
+  var r = recipes.find(function(x){ return x.id === viewId; }), p = recipeParts(r)[pi];
+  if (p && p.uid) { _recentPart.cur = { id: r.id, p: p.uid }; _recentPart.sight = pi; }
+  var put = function(){ try { el.scrollIntoView({ block: 'start' }); } catch(e) { try { el.scrollIntoView(); } catch(e2) {} } };
+  put(); focusQuietly(el);
+  var id = viewId, moved = false, evs = ['wheel', 'touchstart', 'pointerdown', 'keydown'];
+  var stop = function(){ moved = true; };
+  evs.forEach(function(t){ ov.addEventListener(t, stop, { capture: true, passive: true }); });
+  setTimeout(function(){
+    evs.forEach(function(t){ ov.removeEventListener(t, stop, { capture: true }); });
+    if (!moved && viewId === id && ov.classList.contains('open') && el.isConnected) put();
+  }, 120);
+  return true;
+}
+// The index of the collection's recipe at the reading line of the open recipe window, or -1 (the window's top, the
+// collection's own buttons below its last recipe, or no collection)
+function viewPartInSight() {
+  var ov = document.getElementById('viewOverlay'), m = document.getElementById('viewModal');
+  if (!ov || !m || !ov.classList.contains('open')) return -1;
+  var els = m.querySelectorAll('.collection-part[data-coll-part]');
+  if (els.length < 2) return -1;
+  var b = m.getBoundingClientRect(), top = Math.max(b.top, 0), bottom = Math.min(b.bottom, window.innerHeight || b.bottom);
+  if (!(bottom - top > 40)) return -1;
+  var line = top + Math.min(160, (bottom - top) / 3), at = null;
+  for (var i = 0; i < els.length; i++) {
+    if (els[i].getBoundingClientRect().top > line) break;
+    at = els[i];
+  }
+  if (!at || at.getBoundingClientRect().bottom < top + 24) return -1;
+  var n = parseInt(at.getAttribute('data-coll-part'), 10);
+  return isNaN(n) ? -1 : n;
+}
+function recentPartBind() {   // once, from openView: the recipe window says which of a collection's recipes is in front
+  if (_recentPart.bound) return;
+  var m = document.getElementById('viewModal'); if (!m) return;
+  _recentPart.bound = true;
+  m.addEventListener('scroll', function(){
+    clearTimeout(_recentPart.timer);
+    _recentPart.timer = setTimeout(recentPartSettle, 300);
+  }, { passive: true });
+  m.addEventListener('click', function(e){   // a tap inside one of its recipes: that one
+    var el = e.target && e.target.closest ? e.target.closest('.collection-part[data-coll-part]') : null;
+    if (el && m.contains(el)) recentPartSet(parseInt(el.getAttribute('data-coll-part'), 10), false);
+  }, true);
+  document.addEventListener('visibilitychange', function(){ if (document.visibilityState === 'hidden') recentPartLeave(); });
+  window.addEventListener('pagehide', function(){ recentPartLeave(); });
+}
+function recentPartSettle() {
+  var pi = viewPartInSight();
+  if (pi === _recentPart.sight) return false;   // the same one as when it last settled: a tap since then stands
+  _recentPart.sight = pi;
+  return pi >= 0 ? recentPartSet(pi, false) : false;
+}
+// The recipe `pi` of the collection in the recipe window is the one in front: written when it is another one than before
+// (`stamp`: written anyway — the window is being left, and the time it was last open is now)
+function recentPartSet(pi, stamp) {
+  var r = recipes.find(function(x){ return x.id === viewId; }), parts = recipeParts(r), p = parts[pi];
+  if (!r || parts.length < 2 || !p || !p.uid) return false;
+  var was = _recentPart.cur;
+  _recentPart.cur = { id: r.id, p: p.uid };
+  if (!stamp && was && was.id === r.id && was.p === p.uid) return false;
+  return recentPartNote(r.id, p.uid);
+}
+// Leaving the collection in the recipe window (closed, another recipe in its place, the app sent to the background): the
+// reading line is read now (a scroll may not have settled yet), and the recipe in front is written with this time
+function recentPartLeave() {
+  clearTimeout(_recentPart.timer);
+  var ov = document.getElementById('viewOverlay');
+  if (!ov || !ov.classList.contains('open')) return false;
+  var pi = viewPartInSight();
+  if (pi !== _recentPart.sight) { _recentPart.sight = pi; if (pi >= 0) return recentPartSet(pi, true); }
+  var cur = _recentPart.cur;
+  return (cur && cur.id === viewId) ? recentPartNote(cur.id, cur.p) : false;
+}
+window.openCard = openCard; window.recentResumeOpen = recentResumeOpen; window.recentResumePart = recentResumePart;
+window.viewGoToPart = viewGoToPart; window.viewPartInSight = viewPartInSight; window.recentPartsMerge = recentPartsMerge;
+window.recentPartsLocal = recentPartsLocal; window.recentPartNote = recentPartNote; window.recentPartLeave = recentPartLeave;
+window.recentPartSettle = recentPartSettle;
 function recentRowOf(list, q, g) {      // the recipes of the row, from the list being drawn
   var byId = {}; list.forEach(function(r){ byId[r.id] = r; });
   return recentRowIds(q, g).map(function(id){ return byId[id]; }).filter(Boolean);
@@ -23884,7 +24067,7 @@ function renderGrid() {
     g.className = 'recipe-list';
     var recentRow = recentRowOf(list, q, g), rest = recentRowRest(list, recentRow);
     var itemHtml = r => `
-      <div class="recipe-list-item${selectedIds.has(r.id) ? ' selected' : ''}" data-no-i18n ontouchstart="swipeStart(event,${r.id})" ontouchmove="swipeMove(event)" ontouchend="swipeEnd(event)" onclick="selectMode ? toggleRecipeSelect(event,${r.id}) : openView(${r.id})">
+      <div class="recipe-list-item${selectedIds.has(r.id) ? ' selected' : ''}" data-no-i18n ontouchstart="swipeStart(event,${r.id})" ontouchmove="swipeMove(event)" ontouchend="swipeEnd(event)" onclick="selectMode ? toggleRecipeSelect(event,${r.id}) : openCard(event,${r.id})">
         ${selectHtml(r)}
         <div class="recipe-list-thumb" style="background:${escA(r.bg)};position:relative;overflow:hidden;">
           ${r.photo ? `<img\u0020src="${escA(thumbSrc(r))}" alt="" loading="lazy" decoding="async">` : `<span style="font-size:26px;">${escH(r.emoji)}</span>`}
@@ -23909,7 +24092,7 @@ function renderGrid() {
     g.className = 'recipe-grid';
     var recentRow = recentRowOf(list, q, g), rest = recentRowRest(list, recentRow);
     var cardHtml = r => `
-      <div class="recipe-card${selectedIds.has(r.id) ? ' selected' : ''}" data-no-i18n ontouchstart="swipeStart(event,${r.id})" ontouchmove="swipeMove(event)" ontouchend="swipeEnd(event)" onclick="selectMode ? toggleRecipeSelect(event,${r.id}) : openView(${r.id})">
+      <div class="recipe-card${selectedIds.has(r.id) ? ' selected' : ''}" data-no-i18n ontouchstart="swipeStart(event,${r.id})" ontouchmove="swipeMove(event)" ontouchend="swipeEnd(event)" onclick="selectMode ? toggleRecipeSelect(event,${r.id}) : openCard(event,${r.id})">
         ${selectHtml(r)}
         <div class="card-image" style="background:${escA(r.bg)}">
           ${r.photo ? `<img\u0020src="${escA(thumbSrc(r))}" alt="" loading="lazy" decoding="async">` : `<span style="font-size:52px;line-height:1;">${escH(r.emoji)}</span>`}
@@ -24069,6 +24252,8 @@ function toggleFav(e,id){
 function openView(id){
   if (typeof insightCount === 'function') insightCount('view');   // v38.15 — what the testers use
   if (!_rlMoving) _rlBack = [];   // v39.53 — opened from the list, not by a link: no way "back" to show
+  recentPartLeave();              // v40.20 — a collection in the window before this one: the recipe of it it was left at
+  recentPartBind(); _recentPart.cur = null; _recentPart.sight = -1;
   viewId=id;
   // Restore saved scaling for this recipe
   try { viewMult = parseFloat(localStorage.getItem('scale_'+id)||'1')||1; } catch(e){ viewMult=1; }
@@ -24095,6 +24280,10 @@ function openView(id){
   if (!_selfTestRunning && typeof recentCloudSoon === 'function') recentCloudSoon();
   loadLineMark(id);   // "never lose the line I'm on" — restored per recipe
   drawView();
+  // v40.20 — a recipe opens at its top. Chrome gives a window shown again the scroll it had when it was hidden: a recipe
+  // opened after one read halfway down came up halfway down too (the Self Test saw 518 px). drawView alone (a scale, the
+  // units) keeps the place; a link (rlPlace), the planner and "Recent:" (viewGoToPart) move it after this.
+  var vm = document.getElementById('viewModal'); if (vm) vm.scrollTop = 0;
   trapFocus('viewOverlay');   // 5c.1b — the dialog takes focus, and gives it back on close
   viewSizeApply();            // v38.09 — the size chosen on this computer
 }
@@ -28323,6 +28512,7 @@ function closeM(id){
   if (id === 'planRunOverlay' && typeof planRunClose === 'function') { planRunClose(); return; }
   if (id === 'planAddOverlay') { var pa = document.getElementById(id); if (pa) pa.remove(); return; }
   if (!document.getElementById(id)) return;
+  if (id === 'viewOverlay' && typeof recentPartLeave === 'function') { try { recentPartLeave(); } catch(e) {} }   // v40.20 — while it can still be measured
   document.getElementById(id).classList.remove('open');
   releaseFocus(id);   // 5c.1b — hand focus back to whatever opened THIS one (v36.65)
   if (id === 'playerOverlay') playerStop();   // v39.72 — a closed player plays nothing
@@ -32317,6 +32507,10 @@ async function renumberCollidedRecipe(r, db, why) {
   try {
     var rv = JSON.parse(localStorage.getItem('recent_views') || '[]');
     if (Array.isArray(rv) && rv.indexOf(from) > -1) localStorage.setItem('recent_views', JSON.stringify(rv.map(function (x) { return x === from ? to : x; })));
+  } catch (e) {}
+  try {   // v40.20 — and, for a collection, the recipe of it it was left at
+    var rp = typeof recentPartsLocal === 'function' ? recentPartsLocal() : [];
+    if (rp.some(function (e) { return e.id === from; })) recentPartsStore(rp.map(function (e) { return e.id === from ? { id: to, p: e.p, at: e.at } : e; }));
   } catch (e) {}
   syncLog('save', 'Gave "' + (r.name || ('#' + to)) + '" a new number, ' + from + ' \u2192 ' + to + ' \u2014 ' + from + ' is another recipe in the cloud'
     + (why ? ' ("' + String(why).slice(0, 60) + '")' : ''), { from: from, to: to });
@@ -37935,7 +38129,7 @@ var HELP_SYSTEM_PROMPT = [
   "- 🐄 The farm visitors speak more slowly, and the child and the female a little higher (v39.36)",
   "- 🐄 The farm visitors speak with the voice chosen for everyone: a child or a female is never a man's voice on a device that has another, Microsoft Edge's own child voice speaks for the child, and the owner's farm window says which voice speaks for each choice on that device (v39.35)",
   "- 🕐 Recently Viewed: a 'Recent' chip appears in the filter bar after you open any recipe — shows your last 8 viewed",
-  "- RECENT: (v39.80): the top row of the recipe list shows, in a box titled \"Recent:\", the recipes you opened last (newest first), as many as fit in one row of that screen (three on a phone, more on a wide computer screen — in the List view, three) — opened on ANY of your devices (v39.89): open a recipe on the phone and it is first in \"Recent:\" on the computer too, at once; every device shows the same recipes, from the newest, as many as its row holds. Each person's own: nobody else in the household sees what you opened (it is kept in your own settings; the privacy statement says so). The rest of the list follows in the order chosen with ⇅ Sort, without those. The row is not shown while searching, while a filter is on, or when sorted by 🕐 Recently viewed (then the whole list is in that order). Only your own kitchen's recipes.",
+  "- RECENT: (v39.80): the top row of the recipe list shows, in a box titled \"Recent:\", the recipes you opened last (newest first), as many as fit in one row of that screen (three on a phone, more on a wide computer screen — in the List view, three) — opened on ANY of your devices (v39.89): open a recipe on the phone and it is first in \"Recent:\" on the computer too, at once; every device shows the same recipes, from the newest, as many as its row holds. Each person's own: nobody else in the household sees what you opened (it is kept in your own settings; the privacy statement says so). The rest of the list follows in the order chosen with ⇅ Sort, without those. The row is not shown while searching, while a filter is on, or when sorted by 🕐 Recently viewed (then the whole list is in that order). Only your own kitchen's recipes. A COLLECTION TAPPED IN \"Recent:\" (v40.20) — or in the list the 🕐 Recent filter shows — opens at the recipe in it you were at, when it was open less than 12 hours ago (on any of your devices); after that, and from anywhere else in the list, it opens at the top as usual (📑 Contents, and ↑ Contents beside each recipe's name, to move about in it).",
   "- ⇅ Sort: the recipes start newest first (🆕 Recently added — the button says 🆕 Newest; v39.41). Click the button next to Grid/List to sort by Recently viewed, A–Z, Prep time, Difficulty, Most cooked, or 📋 Saved order (the order they are kept in); each time the app is opened it starts newest first again",
   "- 🍳 COOKED!: open a recipe and tap 🍳 Cooked! — 'How did it go?' asks for a rating (stars) and a Note for next time (e.g. too salty — halve the soy next time): ✅ Save, or Just log it — no note. The recipe then shows 🍳 Cooked N times · last <date> and its average rating, and 📓 Cooking log (N) lists the notes and ratings (✕ removes one). Recipes cooked 3+ times show a 🔥 badge; ⇅ Sort → 🔥 Most cooked. ☑ Select → 🍳 Cooked marks several at once (v39.43)",
   "- 📸 Auto-fetch missing photos: ··· More → 🧹 Tidy up → 📸 Auto-fetch missing photos — AI translates Hebrew names to English and finds a matching photo (Pexels, Unsplash, Pixabay or Wikimedia Commons) for every recipe that has none; a library that asks for a pause (\"too many searches\") is waited for and asked again. Afterwards ⚙️ → 💾 Backups and photos → ↩︎ Undo last auto-fetch takes away the photos it added and puts back what was there before (shown only after a run)",

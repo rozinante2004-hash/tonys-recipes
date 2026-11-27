@@ -23321,8 +23321,8 @@ window.SELF_TESTS = [
       // Tony, 16 Nov 2026: "The "Recent:" frame on the PC and on mobile holds different recipes … display the same recipes
       // on mobile and PC" — as many as the row holds ("on my PC's wide screen it shows 7")
       var keepR=recipes, keepSort=sortMode, keepView=viewMode, si=document.getElementById('searchInput'), keepQ=si?si.value:'';
-      var keepFav=showFavOnly, g=document.getElementById('recipeGrid'), keepRV=null, keepAt=null;
-      try{ keepRV=localStorage.getItem('recent_views'); keepAt=localStorage.getItem('recent_views_at'); }catch(e){}
+      var keepFav=showFavOnly, g=document.getElementById('recipeGrid'), keepRV=null, keepAt=null, keepParts=null;
+      try{ keepRV=localStorage.getItem('recent_views'); keepAt=localStorage.getItem('recent_views_at'); keepParts=localStorage.getItem('recent_parts'); }catch(e){}   // v40.20: + the recipe each collection was left at (the merge keeps only the list's)
       var real={ db:window._fbDb, user:window._fbUser, hh:window._household };
       var N=function(i){ return 'ST everywhere '+i; }, ID=function(i){ return 887000+i; };
       var row=function(){ return Array.prototype.map.call(g.querySelectorAll(':scope > .recent-row > .recipe-card .card-open'), function(b){ return b.textContent; }); };
@@ -23380,9 +23380,147 @@ window.SELF_TESTS = [
         recentCloudStop();
         window._fbDb=real.db; window._fbUser=real.user; window._household=real.hh;
         try{ if(keepRV==null) localStorage.removeItem('recent_views'); else localStorage.setItem('recent_views', keepRV);
-             if(keepAt==null) localStorage.removeItem('recent_views_at'); else localStorage.setItem('recent_views_at', keepAt); }catch(e){}
+             if(keepAt==null) localStorage.removeItem('recent_views_at'); else localStorage.setItem('recent_views_at', keepAt);
+             if(keepParts==null) localStorage.removeItem('recent_parts'); else localStorage.setItem('recent_parts', keepParts); }catch(e){}
         recipes=keepR; sortMode=keepSort; viewMode=keepView; showFavOnly=keepFav; if(si) si.value=keepQ;
         try{ if(document.getElementById('viewOverlay').classList.contains('open')) closeM('viewOverlay'); }catch(e){}
+        renderGrid();
+      }
+    } },
+  { id:'recent_collection_resumes', group:'Features', name:'"Recent:" — a collection tapped there (or with 🕐 Recent on) less than 12 hours after it was last open opens at the recipe in it the person was at: the one in front as it was left, scrolled to or tapped in; after 12 hours, from elsewhere in the list, or with that recipe taken out of it, at the top; the same on all their devices (v40.20)',
+    test: async()=>{
+      // Tony, 27 Nov 2026: "When clicking a collection in Recent, and it's been less than 12 hours sinse it was last opened,
+      // it should jump to the last accessed recipe in the collection."
+      ['openCard','recentResumeOpen','recentResumePart','viewGoToPart','viewPartInSight','recentPartsMerge','recentPartLeave','recentPartNote'].forEach(function(f){ if(typeof window[f]!=='function') throw new Error(f+' is not defined'); });
+      var keepR=recipes, keepSort=sortMode, keepView=viewMode, si=document.getElementById('searchInput'), keepQ=si?si.value:'';
+      var keepFav=showFavOnly, keepRO=showRecentOnly, g=document.getElementById('recipeGrid');
+      var ov=document.getElementById('viewOverlay'), m=document.getElementById('viewModal');
+      var keepLS={}; ['recent_views','recent_views_at','recent_parts'].forEach(function(k){ try{ keepLS[k]=localStorage.getItem(k); }catch(e){ keepLS[k]=null; } });
+      var real={ db:window._fbDb, user:window._fbUser, hh:window._household }, keepRC={ list:_recentCloud.list, parts:_recentCloud.parts, sent:_recentCloud.sent };
+      var CID=885001, H=3600000;
+      var mkPart=function(i){
+        var ings=[], steps=[];
+        for(var j=1;j<=14;j++) ings.push({ a:(j*10)+' g', n:'ST resume thing '+i+'.'+j });
+        for(var k=1;k<=9;k++) steps.push('ST resume step '+i+'.'+k+' — stir it well, then let it rest a moment before the next one.');
+        return { uid:'st-resume-'+i, name:'ST resume recipe '+i, ingredients:ings, steps:steps };
+      };
+      var part=function(i){ return m.querySelector('.collection-part[data-coll-part="'+i+'"]'); };
+      var offset=function(i){ return Math.round(part(i).getBoundingClientRect().top-Math.max(m.getBoundingClientRect().top,0)); };
+      var atTop=function(i){ var o=offset(i); return o>=-2 && o<=100 && viewPartInSight()===i; };   // where a line of 📑 Contents puts it
+      var rec=function(){ return recentPartsLocal().filter(function(e){ return e.id===CID; })[0]||null; };
+      var setTimes=function(partAgo, openedAgo){   // how long ago it was last open: the recipe in front, and the opening
+        var now=Date.now(), at={}; try{ at=JSON.parse(localStorage.getItem('recent_views_at')||'{}')||{}; }catch(e){}
+        at[String(CID)]=now-openedAgo; localStorage.setItem('recent_views_at', JSON.stringify(at));
+        localStorage.setItem('recent_parts', JSON.stringify(recentPartsLocal().map(function(e){ return e.id===CID ? { id:e.id, p:e.p, at:now-partAgo } : e; })));
+      };
+      var tap=async function(where){   // a tap on the collection's card: in "Recent:", or where it is in the list
+        renderGrid();
+        var card=g.querySelector((where==='row' ? ':scope > .recent-row ' : '')+'[onclick*="openCard(event,'+CID+')"]');
+        if(!card) throw new Error('the collection is not '+(where==='row' ? 'in "Recent:"' : 'in the list'));
+        if(where!=='row' && card.closest('.recent-row')) throw new Error('the test meant a card outside "Recent:"');
+        card.querySelector('.card-open').click();
+        await wait(220);
+        if(!ov.classList.contains('open') || viewId!==CID) throw new Error('the collection did not open');
+      };
+      var close=async function(){ closeM('viewOverlay'); await wait(40); };
+      // the person's own settings in the cloud, as in recent_same_on_every_device
+      var PATH='users/uR/prefs/recent', store={}, writes=[];
+      var docAt=function(path){ return {
+        onSnapshot:function(){ return function(){}; },
+        set:async function(data, opts){ var d=JSON.parse(JSON.stringify(data)); writes.push({ path:path, data:d, merge:!!(opts&&opts.merge) });
+          store[path]=Object.assign({}, (opts&&opts.merge&&store[path])||{}, d); } }; };
+      var fakeDb={ collection:function(c){ return { doc:function(u){ return { collection:function(c2){ return { doc:function(p){ return docAt(c+'/'+u+'/'+c2+'/'+p); } }; } }; } }; } };
+      try{
+        window._fbDb=fakeDb; window._fbUser={ uid:'uR', email:'r@example.com' }; window._household={ hid:'hR', role:'owner', name:'R', links:[] };
+        var C=normalizeRecipe({ id:CID, uid:'st-resume', name:'ST resume collection', category:'Soup', parts:[1,2,3,4,5,6,7].map(mkPart) });
+        var plain=normalizeRecipe({ id:CID+1, uid:'st-resume-plain', name:'ST resume plain', ingredients:[{a:'1',n:'x'}], steps:['y'] });
+        var one=normalizeRecipe({ id:CID+2, uid:'st-resume-one', name:'ST resume single', parts:[mkPart(9)] });
+        recipes=[C, plain, one];
+        if(si) si.value=''; showFavOnly=false; showRecentOnly=false; sortMode='added'; viewMode='grid';
+        localStorage.setItem('recent_views', JSON.stringify([CID, CID+1, CID+2])); localStorage.removeItem('recent_views_at'); localStorage.removeItem('recent_parts');
+        // never left at any of its recipes: the top, as always
+        await tap('row');
+        if(m.scrollTop>4) throw new Error('a collection never read opened scrolled down, '+m.scrollTop+' px');
+        if(viewPartInSight()!==-1) throw new Error('at the top of the window a recipe of it counts as the one in front: '+viewPartInSight());
+        // scrolled to its third recipe: noted once the scroll settles
+        part(2).scrollIntoView({ block:'start' }); await wait(450);
+        if(viewPartInSight()!==2) throw new Error('the third recipe, at the top of the window, is not the one in front: '+viewPartInSight());
+        if(!rec() || rec().p!=='st-resume-3') throw new Error('the recipe scrolled to was not noted: '+JSON.stringify(rec()));
+        await close();
+        // tapped in "Recent:" again: it opens at that recipe, which takes the focus
+        await tap('row');
+        if(!atTop(2)) throw new Error('from "Recent:", the collection did not open at the recipe it was left at (it is '+offset(2)+' px down)');
+        if(document.activeElement!==part(2)) throw new Error('the recipe it opened at does not have the focus');
+        // a tap in the fourth (lower down — the third is still at the reading line): that one, and the scroll settling after it does not undo it
+        part(3).firstElementChild.click(); await wait(450);
+        if(!rec() || rec().p!=='st-resume-4') throw new Error('a tap in a recipe of it does not make it the one it was left at: '+JSON.stringify(rec()));
+        await close();
+        await tap('row');
+        if(!atTop(3)) throw new Error('after a tap in the fourth recipe, it did not open there ('+offset(3)+' px down)');
+        // scrolled and closed at once, before the scroll settled: the recipe in front as it closed
+        part(1).scrollIntoView({ block:'start' }); await close();
+        if(!rec() || rec().p!=='st-resume-2') throw new Error('closed before the scroll settled, the recipe in front was not noted: '+JSON.stringify(rec()));
+        // the List view too
+        viewMode='list'; await tap('row');
+        if(!atTop(1)) throw new Error('in the List view, "Recent:" did not open it at the recipe ('+offset(1)+' px down)');
+        await close(); viewMode='grid';
+        // 12 hours: just under — at the recipe; just over — the top
+        setTimes(11.9*H, 12.5*H); await tap('row');
+        if(!atTop(1)) throw new Error('left 11.9 hours ago, it did not open at the recipe');
+        await close();
+        setTimes(12.1*H, 13*H); await tap('row');
+        if(m.scrollTop>4) throw new Error('last open 12.1 hours ago, it still opened at a recipe ('+m.scrollTop+' px down)');
+        await close();
+        // "since it was last opened": opened 2 hours ago (and left at the top) — at the recipe it was last at
+        setTimes(30*H, 2*H); await tap('row');
+        if(!atTop(1)) throw new Error('opened 2 hours ago, it did not open at the recipe it was last at');
+        await close();
+        // 🕐 Recent on (no "Recent:" row then): the same
+        showRecentOnly=true; await tap('list');
+        if(!atTop(1)) throw new Error('with 🕐 Recent on, it did not open at the recipe ('+offset(1)+' px down)');
+        await close(); showRecentOnly=false;
+        // anywhere else in the list (found by a search: no "Recent:" row): the top
+        if(si){
+          si.value='resume collection'; await tap('list');
+          if(m.scrollTop>4) throw new Error('opened from the list, not "Recent:", it opened at a recipe ('+m.scrollTop+' px down)');
+          await close(); si.value='';
+        }
+        // the recipe it was at taken out of it since: the top
+        C.parts.splice(1,1); await tap('row');
+        if(m.scrollTop>4) throw new Error('with the recipe it was at taken out of it, it did not open at the top');
+        await close();
+        // a collection of two recipes or more only — never a plain recipe
+        recentPartNote(CID+1, 'x'); recentPartNote(CID+2, one.parts[0].uid);
+        if(recentResumePart(CID+1)!==-1 || recentResumePart(CID+2)!==-1) throw new Error('a plain recipe or a collection of one has a recipe to open at');
+        // the same on all the person's devices: a newer one from the cloud is taken…
+        recentPartNote(CID, 'st-resume-3');
+        recentCloudTake({ list:[{ id:CID, at:Date.now() }], parts:[{ id:CID, p:'st-resume-5', at:Date.now()+5000 }, { id:999999999, p:'gone', at:Date.now() }] });
+        if(!rec() || rec().p!=='st-resume-5') throw new Error('the recipe it was left at on another device was not taken: '+JSON.stringify(rec()));
+        await tap('row');
+        if(!atTop(3)) throw new Error('left at a recipe on another device, it did not open there here ('+offset(3)+' px down)');
+        await close();
+        // …and this device's goes up for the others: one per collection among the recipes opened last, written once
+        recentPartNote(CID, 'st-resume-4');
+        clearTimeout(_recentCloud.timer); _recentCloud.sent='';
+        if(await recentCloudPush()!==true) throw new Error('the recipe a collection was left at was not written');
+        var w=writes[writes.length-1], ps=(w && w.data && w.data.hR && w.data.hR.parts)||[];
+        if(!w || w.path!==PATH || !w.merge) throw new Error('what was written: '+JSON.stringify(w));
+        var mine=ps.filter(function(e){ return e.id===CID; });
+        if(mine.length!==1 || mine[0].p!=='st-resume-4' || ps.some(function(e){ return e.id===999999999; })) throw new Error('the recipes the collections were left at, as written: '+JSON.stringify(ps));
+        if(!Array.isArray(w.data.hR.list) || !w.data.hR.list.some(function(e){ return e.id===CID; })) throw new Error('the recipes opened last were not written beside them');
+        if(await recentCloudPush()!==false) throw new Error('written twice with nothing new');
+        // a Self Test run keeps them aside, and puts them back
+        if(String(_selfTestPark).indexOf("'recent_parts'")<0 || String(_selfTestUnpark).indexOf('recentPartsWas')<0) throw new Error('a Self Test run does not keep the recipes collections were left at');
+        var k=String(HELP_SYSTEM_PROMPT||'');
+        if(!/A COLLECTION TAPPED IN "Recent:" \(v40\.20\)/.test(k) || !/less than 12 hours ago/.test(k)) throw new Error('Help does not know it');
+        return 'noted when scrolled to, tapped in, or in front as it closed; from "Recent:" (grid and list) and with 🕐 Recent on it opens there within 12 hours of the last opening; at the top after 12.1 hours, from elsewhere in the list, and with that recipe taken out; another device’s taken, this one’s written once';
+      } finally {
+        try{ if(ov.classList.contains('open')) closeM('viewOverlay'); }catch(e){}
+        clearTimeout(_recentCloud.timer);
+        window._fbDb=real.db; window._fbUser=real.user; window._household=real.hh;
+        _recentCloud.list=keepRC.list; _recentCloud.parts=keepRC.parts; _recentCloud.sent=keepRC.sent;
+        Object.keys(keepLS).forEach(function(k){ try{ if(keepLS[k]==null) localStorage.removeItem(k); else localStorage.setItem(k, keepLS[k]); }catch(e){} });
+        recipes=keepR; sortMode=keepSort; viewMode=keepView; showFavOnly=keepFav; showRecentOnly=keepRO; if(si) si.value=keepQ;
         renderGrid();
       }
     } },

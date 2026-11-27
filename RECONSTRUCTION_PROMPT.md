@@ -3096,6 +3096,35 @@ true })`, nothing written when unchanged (`_recentCloud.sent`) — two devices d
 Statement **1.17** (all 11 pages, re-keyed): "the recipes you opened last (only you see them, on all your devices)" in
 Your content; What leaves this device, Firebase: "And which recipes you opened last, so “Recent:” is the same on all
 your devices — for you alone." A Self Test run also keeps `recent_views_at` (`_selfTestRecentAt`).
+**(v40.20) A collection tapped in "Recent:" opens at the recipe in it you were at** (Tony: "When clicking a collection
+in Recent, and it's been less than 12 hours sinse it was last opened, it should jump to the last accessed recipe in the
+collection."). The cards of the list open through `openCard(event, id)`: a card inside `.recent-row`, or any card while
+🕐 Recent is on (`showRecentOnly`), goes to `recentResumeOpen(id)` — `recentResumePart(id)` read BEFORE `openView` (which
+makes "last opened" now), then `openView`, then `viewGoToPart(pi)`; every other card calls `openView` as before.
+`recentResumePart`: −1 unless the recipe is a collection of two or more, it has a record `{ id, p: the part's uid, at }`
+in `recent_parts` (localStorage, an array), `Date.now() − max(record.at, recent_views_at[id]) < RECENT_RESUME_MS` (12 h)
+and a part of it still has that uid (taken out since: −1). `viewGoToPart(pi)`: `scrollIntoView({ block: 'start' })` on
+`.collection-part[data-coll-part=pi]` (its 72 px scroll-margin, as 📑 Contents' lines), `focusQuietly` it, and once more
+120 ms later unless a wheel / touchstart / pointerdown / keydown reached the window meanwhile (a translated page puts its
+words in place a frame later). WHICH PART: while a collection is in the window, `recentPartBind()` (once, from
+`openView`) listens on `#viewModal`: a scroll settles 300 ms → `recentPartSettle` → `viewPartInSight()` = the last
+`.collection-part` whose top is above the reading line (the window's visible top + min(160 px, a third of its visible
+height)) and that has not been scrolled past (bottom ≥ top + 24), else −1 — written (`recentPartSet` →
+`recentPartNote`) only when it differs from the one at the last settle (`_recentPart.sight`), so a click inside a part
+(capture listener: a tick, the line marker, a timer, its buttons — `_recentPart.cur`) stands until a scroll brings
+another part to the reading line. `recentPartLeave()` — in `closeM('viewOverlay')` before the window is hidden, at the
+start of `openView` (another recipe in its place), on `visibilitychange` → hidden and `pagehide` — reads the reading line
+once more and writes the part in front with the time. `recentPartNote(id, uid)`: replaces the collection's record, at =
+now (or the record's at + 1 when that is ahead by under 10 minutes — another device's clock), kept only for ids among
+the recipes opened last (`recentPartsMerge(…, list)`: per id the newest at), then `recentCloudSoon()` (not during a Self
+Test run). In the cloud: `<hid>.parts = [{ id, p, at }]` beside `list` in `users/<uid>/prefs/recent` — an array, so a
+write replaces it whole; a device on an older version writes `list` and `at` with merge and leaves `parts` alone.
+`recentCloudTake` merges the cloud's parts in (and asks for a write when this device knows newer ones);
+`recentCloudPush` writes `parts` and compares them in its signature (`recentPartsSig`). `renumberCollidedRecipe` moves
+a record to the new number. A Self Test run keeps `recent_parts` aside (`recentPartsWas` in `_selfTestPark` /
+`_selfTestUnpark`). The Privacy Statement's "the recipes you opened last" covers it (a part is a recipe). **And every
+recipe opens at its top now**: `openView` sets `#viewModal.scrollTop = 0` after `drawView` — Chrome shows a window
+again at the scroll it had when hidden, so a recipe opened after one read halfway down came up halfway down.
 **Grid** (`#recipeGrid`): a `list` or `grid` view (`setView`). The choice is remembered in
 `tonys_view_mode`; desktop defaults to `list`, **phones default to `grid`** so the layout
 resembles the desktop cube grid. Cards show photo or emoji tile, a category **pill badge**
