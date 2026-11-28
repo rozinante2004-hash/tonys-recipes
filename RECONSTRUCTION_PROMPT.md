@@ -3201,6 +3201,18 @@ through `i18nPhrase`; headings and Contents translated. `bidiFrac(s)` wraps a nu
 The `/r/` page draws its steps the same way and reads category/difficulty from `i18n/<lang>.json` through
 `env.ASSETS` (cached per language). Self Test `feat_share_page` lays both a 12-step Hebrew page and an English one out
 in a 390 px frame and measures them; `recipe_card_picture` finds the step circles at the right (Hebrew) or left.
+**(v40.22) After Tony's test of v40.21.** The invitation link `…/?invite-me` asks first (`inviteMeMaybe`: "New kitchens
+join by invitation", ✉️ Ask for an invitation / I already have it — WhatsApp opens links in its own browser, where
+nobody is signed in); `window._inviteMeVisit` (set by `captureInviteMe`) keeps the first-visit welcome away from such a
+visit (`setupWizMaybeNow`, unless `?setup=1`); the thank-you ends "You can close this page now." `waOpen(url)` on a phone
+(`waIsPhone`) opens the WhatsApp app itself (`waAppUrl`: `https://wa.me/?` → `whatsapp://send?`; one more tap first
+when `navigator.userActivation` says the tap ran out; the web address when the page stays 2.5 s with no blur/hidden —
+`waAppOpened`); a computer the web address, a refused window one more tap. Every WhatsApp opener goes through it
+(`doWhatsApp`, `shareDo('wa')`, `shareAppWhatsApp`, the testers' invitation). The message, the picture's caption and the
+`/r/` page's og:title start with the name — no emoji. Several card pictures are shared without words, then
+`shareCaptionAfter(caption)` ("🔗 Now the link", 📤 Send the link → `navigator.share({ text })`; refused → copied) —
+a share menu gives the words to the first picture. Self Tests `share_whatsapp_link`, `recipe_card_picture`,
+`invite_me_asks_first` (test hooks `_waPhoneForTest`, `_waTapForTest`, `_waGoForTest`, `_waWaitForTest`).
 **Grid** (`#recipeGrid`): a `list` or `grid` view (`setView`). The choice is remembered in
 `tonys_view_mode`; desktop defaults to `list`, **phones default to `grid`** so the layout
 resembles the desktop cube grid. Cards show photo or emoji tile, a category **pill badge**

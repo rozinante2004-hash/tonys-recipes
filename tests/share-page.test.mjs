@@ -45,7 +45,7 @@ let p = await get('/r/' + ID);
 ok(p.r.status === 200, 'the page answers 200 (' + p.r.status + ')');
 ok(/text\/html/.test(p.r.headers.get('Content-Type')), 'it is a web page');
 ok(seen.some(u => u.indexOf('/v1/projects/demo-beta/databases/(default)/documents/recipeGifts/' + ID) > 0), 'it reads the sent copy from this copy’s own database');
-ok(meta(p.text, 'og:title') === '🍳 Shakshuka &lt;script&gt;alert(1)&lt;/script&gt;', 'og:title: the emoji and the name, escaped: ' + meta(p.text, 'og:title'));
+ok(meta(p.text, 'og:title') === 'Shakshuka &lt;script&gt;alert(1)&lt;/script&gt;', 'og:title: the name alone (no emoji), escaped: ' + meta(p.text, 'og:title'));
 ok(meta(p.text, 'og:image') === 'https://mykitchennotes.community/r/' + ID + '/card', 'og:image: the small picture on this address: ' + meta(p.text, 'og:image'));
 ok(/Tony’s Kitchen Notes/.test(meta(p.text, 'og:description') || '') && /The best one/.test(meta(p.text, 'og:description') || ''), 'og:description: the note and the kitchen: ' + meta(p.text, 'og:description'));
 ok(/4 servings|Serves 4/.test(meta(p.text, 'og:description') || '') && /2 ingredients/.test(meta(p.text, 'og:description')), 'og:description: servings and how many ingredients');

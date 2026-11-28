@@ -58,7 +58,9 @@ where.
   `docs/farm-voices.md`; Worker v108 since 20 Nov 01:59 (from Test); the jobs are listed near the top of `docs/history/2026-11.md`).
   **On Test, not released:** v40.21 — 💬 Share on WhatsApp sends the recipe's own page (`<site>/r/<id>`, a Cloudflare
   Pages function, a card with its photo in WhatsApp), links kept 6 months (rules change), a line for the app with the
-  invitation link; 🖼️ Send as a picture; Privacy Statement 1.21. Release on Tony's yes. The test copy
+  invitation link; 🖼️ Send as a picture; Privacy Statement 1.21. v40.22 — after Tony's test: the invitation link asks
+  first and no welcome follows it, WhatsApp opens as the app itself on a phone (no blank page left), no emoji before the
+  name, several pictures go before the link. Release (v40.21 + v40.22) on Tony's yes. The test copy
   (https://tonys-recipes-test.pages.dev, its own database and rules) follows `test`.
 - **The beta has had testers since Sunday 25 Oct 2026** and is **by invitation only**: the owner invites with
   ⚙️ → 👑 → ✉️ Invite testers (the congratulatory wording of v39.60); a tester's share button asks the owner for an

@@ -341,7 +341,7 @@ export function recipePage(g, id, lang, cfg, url, dict) {
     + (g.expireAt ? '<div class="small">' + esc(w(lang, 'keeps', dayText(g.expireAt, lang))) + '</div>' : '')
     + '<div class="small"><a href="' + esc(cfg.site) + '">' + esc(w(lang, 'what')) + '</a></div></div>'
     + '</div>';
-  return shell({ lang: lang, site: cfg.site, title: noBold(name) + ' — My Kitchen Notes', ogTitle: (r.emoji ? r.emoji + ' ' : '') + noBold(name),
+  return shell({ lang: lang, site: cfg.site, title: noBold(name) + ' — My Kitchen Notes', ogTitle: noBold(name),   // v40.22 — no emoji (Tony: "We do not need it")
     description: description || w(lang, 'shared'), url: self, image: card, bigImage: !!g.photo, inner: inner });
 }
 

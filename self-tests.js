@@ -26190,7 +26190,8 @@ window.SELF_TESTS = [
         var text=decodeURIComponent(opened[0].replace(/^https:\/\/wa\.me\/\?text=/,''));
         var home=APP_CONFIG.movedTo || (APP_CONFIG.siteOrigin+APP_CONFIG.sitePath);
         if(made.length!==1 || made[0][1]!=='whatsapp') throw new Error('the link was not made for WhatsApp: '+JSON.stringify(made));
-        if(text.indexOf('🍳 Shakshuka hot\n'+giftShareUrl('Gift1abcdefghijklmnopqrstu')+'\n\n')!==0) throw new Error('the message does not open with the name and the page: '+text);
+        // v40.22 — the name first, no emoji before it (Tony: "keeps the emoji picture placeholder … We do not need it")
+        if(text.indexOf('Shakshuka hot\n'+giftShareUrl('Gift1abcdefghijklmnopqrstu')+'\n\n')!==0) throw new Error('the message does not open with the name and the page: '+text);
         if(text.indexOf('Download My Kitchen Notes and keep the recipe for good — this link lasts 6 months. Ask for an invitation: '+home+'?invite-me')<0) throw new Error('the line for the app (by invitation): '+text);
         if(/INGREDIENTS:/.test(text)) throw new Error('the recipe went as text as well');
         // again within the week, unchanged: the same link, nothing new on the server
@@ -26212,6 +26213,22 @@ window.SELF_TESTS = [
         window.open=function(u){ tries++; if(tries===1) return null; opened.push(String(u)); return {}; };
         if(await waOpen('https://wa.me/?text=x')!=='wa' || opened.length!==1 || !asked.length || !/Open WhatsApp/.test(asked[0].okLabel)) throw new Error('a refused window is not opened by a second tap: '+JSON.stringify(asked.map(function(a){ return a.okLabel; })));
         window.open=function(u){ opened.push(String(u)); return {}; };
+        // v40.22 — a phone: the WhatsApp app itself (whatsapp://send); the web address left a blank page behind (Tony's iPhone)
+        var went=[]; opened=[]; asked=[];
+        window._waPhoneForTest=true; window._waTapForTest=true; window._waWaitForTest=80;
+        window._waGoForTest=function(u){ went.push(String(u)); window.dispatchEvent(new Event('blur')); };   // WhatsApp took over
+        if(await waOpen('https://wa.me/?text=a%20b')!=='wa' || went[0]!=='whatsapp://send?text=a%20b' || opened.length || asked.length)
+          throw new Error('on a phone: '+JSON.stringify({ went:went, opened:opened, asked:asked.length }));
+        went=[]; window._waTapForTest=false;   // the tap ran out while the link was made: one more tap, then the app
+        if(await waOpen('https://wa.me/?text=c')!=='wa' || asked.length!==1 || !/Open WhatsApp/.test(asked[0].okLabel) || went[0]!=='whatsapp://send?text=c' || opened.length)
+          throw new Error('on a phone, after the tap ran out: '+JSON.stringify({ went:went, asked:asked.length, opened:opened }));
+        went=[]; asked=[]; window._waTapForTest=true; window._waGoForTest=function(u){ went.push(String(u)); };   // no WhatsApp app: the page stays
+        if(await waOpen('https://wa.me/?text=d')!=='wa' || went.length!==1 || opened.length!==1 || opened[0]!=='https://wa.me/?text=d')
+          throw new Error('a phone without the WhatsApp app: '+JSON.stringify({ went:went, opened:opened }));
+        window._waPhoneForTest=false; went=[]; opened=[];   // a computer: the web address straight away
+        if(await waOpen('https://wa.me/?text=e')!=='wa' || went.length || opened[0]!=='https://wa.me/?text=e') throw new Error('on a computer: '+JSON.stringify({ went:went, opened:opened }));
+        delete window._waPhoneForTest; delete window._waTapForTest; delete window._waWaitForTest; delete window._waGoForTest;
+        opened=[]; asked=[];
         // a secret recipe asks first; Cancel sends nothing
         r.secret=true; opened=[]; window.askConfirm=async function(o){ asked.push(o); return null; };
         if(await doWhatsApp(rid)!==null || opened.length) throw new Error('a secret recipe went without asking');
@@ -26242,6 +26259,7 @@ window.SELF_TESTS = [
         window.giftSend=real.send; window.open=real.open; window.askConfirm=real.confirm; window._fbDb=real.db; window._fbUser=real.user;
         window._household=_household=real.hh; window.toast=real.toast; window.fbSignedInUser=real.signed; window.giftAskInvitation=real.ask;
         window._pitchOpenForTest=real.pitch; window._giftUnderTest=false;
+        delete window._waPhoneForTest; delete window._waTapForTest; delete window._waWaitForTest; delete window._waGoForTest;
         try{ if(keptReuse===null) localStorage.removeItem(reuseKey); else localStorage.setItem(reuseKey, keptReuse); }catch(e){}
         try{ sessionStorage.removeItem(INVITE_ME_KEY); }catch(e){}
         var i=recipes.indexOf(r); if(i>-1) recipes.splice(i,1);
@@ -26252,7 +26270,7 @@ window.SELF_TESTS = [
   // v40.21 — Tony: "Add the picture of the recipe card too, as you've suggested."
   { id:'recipe_card_picture', group:'Features', name:'🖼️ Send as a picture: the recipe card drawn as pictures 1080 px wide and at most 1920 tall — photo, name, ingredients, method — right to left for a Hebrew recipe; shared with its link and the line for the app, or saved on a computer (v40.21)',
     test: async()=>{
-      var real={ here:window.shareMenuHere, dl:window.downloadBlob, share:navigator.share, can:navigator.canShare, toast:window.toast, user:window._fbUser, pitch:window._pitchOpenForTest };
+      var real={ here:window.shareMenuHere, dl:window.downloadBlob, share:navigator.share, can:navigator.canShare, toast:window.toast, user:window._fbUser, pitch:window._pitchOpenForTest, confirm:window.askConfirm };
       var ids=[];
       var pc=document.createElement('canvas'); pc.width=1200; pc.height=800; var g=pc.getContext('2d'); g.fillStyle='#b5651d'; g.fillRect(0,0,1200,800);
       var photo=pc.toDataURL('image/jpeg',0.8);
@@ -26299,12 +26317,73 @@ window.SELF_TESTS = [
         Object.defineProperty(navigator,'canShare',{ configurable:true, value:function(d){ return !!(d && d.files && d.files.length); } });
         Object.defineProperty(navigator,'share',{ configurable:true, value:async function(d){ got=d; } });
         if(await shareAsPicture(en.id)!=='shared' || !got || got.files.length!==1 || got.files[0].type!=='image/jpeg') throw new Error('on a phone: '+JSON.stringify(got && { n:got.files && got.files.length, t:got.text }));
-        if(got.text.indexOf('Soup')<0 || got.text.indexOf('Download My Kitchen Notes and keep your recipes in one place')<0) throw new Error('the caption: '+got.text);
+        if(got.text.indexOf('Soup\n')!==0 || got.text.indexOf('Download My Kitchen Notes and keep your recipes in one place')<0) throw new Error('the caption (the name first, no emoji): '+got.text);
+        // v40.22 — several pictures: they go on their own, then the link and the line after them (Tony: "attach the links
+        // to the last picture and not the 1st one")
+        recipes.push(lg); ids.push(lg.id);
+        var shares=[], asks=[]; Object.defineProperty(navigator,'share',{ configurable:true, value:async function(d){ shares.push(d); } });
+        window.askConfirm=async function(o){ asks.push(o); return true; };
+        if(await shareAsPicture(lg.id)!=='shared' || shares.length!==2) throw new Error('several pictures: '+shares.length+' share(s)');
+        if(shares[0].files.length!==lp.length || shares[0].text) throw new Error('the pictures went with words: '+JSON.stringify(shares[0].text));
+        if(shares[1].files || String(shares[1].text||'').indexOf('Long\n')!==0 || shares[1].text.indexOf('Download My Kitchen Notes')<0) throw new Error('the link after the pictures: '+JSON.stringify(shares[1]));
+        if(!asks.length || !/Send the link/.test(asks[0].okLabel)) throw new Error('no tap for the link after the pictures');
+        shares=[]; window.askConfirm=async function(){ return null; };   // Not now: the pictures alone
+        if(await shareAsPicture(lg.id)!=='shared' || shares.length!==1) throw new Error('Not now still sent the link');
       } finally {
-        window.shareMenuHere=real.here; window.downloadBlob=real.dl; window.toast=real.toast; window._fbUser=real.user; window._pitchOpenForTest=real.pitch;
+        window.shareMenuHere=real.here; window.downloadBlob=real.dl; window.toast=real.toast; window._fbUser=real.user; window._pitchOpenForTest=real.pitch; window.askConfirm=real.confirm;
         if(real.share) Object.defineProperty(navigator,'share',{ configurable:true, value:real.share }); else delete navigator.share;
         if(real.can) Object.defineProperty(navigator,'canShare',{ configurable:true, value:real.can }); else delete navigator.canShare;
         recipes=recipes.filter(function(x){ return ids.indexOf(x.id)<0; });
+      }
+    } },
+
+  // v40.22 — Tony, 28 Nov: "I clicked the link for the invitation while I was logged in. It allowed me to send an
+  // invitation request … and proceeded to the next screen … I'm not sure this is the exacted flow". WhatsApp opens the
+  // link in its own browser, where nobody is signed in.
+  { id:'invite_me_asks_first', group:'Features', name:'📲 The invitation link at the end of a shared recipe asks first — ✉️ Ask for an invitation, or I already have it — and no first-visit welcome follows the request (v40.22)',
+    test: async()=>{
+      var real={ confirm:window.askConfirm, signed:window.fbSignedInUser, ask:window.giftAskInvitation, toast:window.toast, visit:window._inviteMeVisit,
+        run:_selfTestRunning, wiz:window._setupWizTest, settled:window._fbAuthSettled };
+      var keys=[SETUP_SEEN_KEY, TOUR_DONE_KEY, TESTER_WELCOME_KEY], kept={};
+      keys.forEach(function(k){ kept[k]=localStorage.getItem(k); });
+      var terms=[]; for(var i=0;i<localStorage.length;i++){ var k=String(localStorage.key(i)||''); if(k.indexOf(TERMS_OK_KEY)===0) terms.push([k, localStorage.getItem(k)]); }
+      var force=null; try{ force=sessionStorage.getItem('mkn_setup_force'); }catch(e){}
+      var ls=document.getElementById('loginScreen'), lsWas=ls ? ls.style.display : '';
+      try {
+        var asked=[], asks=0, answer=null;
+        window.askConfirm=async function(o){ asked.push(o); return answer; };
+        window.giftAskInvitation=async function(){ asks++; return true; };
+        window.fbSignedInUser=function(){ return null; }; window.toast=function(){};
+        // asked first; "I already have it" asks for no address
+        sessionStorage.setItem(INVITE_ME_KEY,'1');
+        var got=await inviteMeMaybe();
+        if(got!=='has' || asks || asked.length!==1) throw new Error('not asked first: '+got+', '+asks+' address(es) asked, '+asked.length+' question(s)');
+        if(!/Ask for an invitation/.test(asked[0].okLabel) || !/already have it/.test(asked[0].cancelLabel) || !/not signed in on this page/.test(asked[0].message))
+          throw new Error('the question: '+JSON.stringify({ ok:asked[0].okLabel, no:asked[0].cancelLabel, m:asked[0].message }));
+        // ✉️ Ask for an invitation: the address
+        answer=true; asked=[]; sessionStorage.setItem(INVITE_ME_KEY,'1');
+        if(await inviteMeMaybe()!=='asked' || asks!==1) throw new Error('✉️ Ask for an invitation did not ask for the address');
+        // no welcome after it, on a device otherwise new (signed out, nothing kept): the welcome itself is shown without the link
+        if(APP_CONFIG.dataLayout==='households' && ls){
+          keys.forEach(function(k){ localStorage.removeItem(k); }); terms.forEach(function(t){ localStorage.removeItem(t[0]); });
+          try{ sessionStorage.removeItem('mkn_setup_force'); }catch(e){}
+          ls.style.display='flex'; window._setupWizTest=true; window._fbAuthSettled=true;
+          window._inviteMeVisit=true; _selfTestRunning=false;
+          var shown; try{ shown=await setupWizMaybeNow(); } finally { _selfTestRunning=true; }
+          if(shown || document.getElementById('setupWiz')) throw new Error('the first-visit welcome followed the invitation request');
+          window._inviteMeVisit=false; _selfTestRunning=false;
+          var shown2; try{ shown2=await setupWizMaybeNow(); } finally { _selfTestRunning=true; }
+          if(!shown2 || !document.getElementById('setupWiz')) throw new Error('without the invitation link the welcome does not come either, so the check above shows nothing');
+        }
+        if(!/You can close this page now/.test(String(real.ask))) throw new Error('the thank-you does not say the page can be closed');
+      } finally {
+        window.askConfirm=real.confirm; window.fbSignedInUser=real.signed; window.giftAskInvitation=real.ask; window.toast=real.toast;
+        window._inviteMeVisit=real.visit; _selfTestRunning=real.run; window._setupWizTest=real.wiz; window._fbAuthSettled=real.settled;
+        if(typeof setupWizClose==='function') setupWizClose();
+        keys.forEach(function(k){ if(kept[k]===null) localStorage.removeItem(k); else localStorage.setItem(k, kept[k]); });
+        terms.forEach(function(t){ localStorage.setItem(t[0], t[1]); });
+        try{ if(force===null) sessionStorage.removeItem('mkn_setup_force'); else sessionStorage.setItem('mkn_setup_force', force); sessionStorage.removeItem(INVITE_ME_KEY); }catch(e){}
+        if(ls) ls.style.display=lsWas;
       }
     } },
 ];
