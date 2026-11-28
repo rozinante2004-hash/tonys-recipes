@@ -65,7 +65,9 @@ where.
   made) with a turning wheel and its step; "I already have it" ends on a closing screen too. v40.25 — the closing
   screen from the tap on Send ("Sending your request…"), not the sign-in screen while the server answers. v40.26 —
   the closing words on the sign-in screen itself, in place of its card (a layer over it never showed on Tony's iPhone).
-  Release (v40.21–v40.26) on Tony's yes. The test copy
+  v40.27 — the TEST copy shows the invitation's steps at the bottom of the screen (inviteTrace) to find where it stops
+  on Tony's iPhone; "already asked" wording (the server keeps one request per address a day). Release (v40.21–v40.27)
+  on Tony's yes — take the step panel out first or leave it (test copy only). The test copy
   (https://tonys-recipes-test.pages.dev, its own database and rules) follows `test`.
 - **The beta has had testers since Sunday 25 Oct 2026** and is **by invitation only**: the owner invites with
   ⚙️ → 👑 → ✉️ Invite testers (the congratulatory wording of v39.60); a tester's share button asks the owner for an

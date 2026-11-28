@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v40.26 -->
+<!-- Tony's Recipes Collection v40.27 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -8136,6 +8136,32 @@ var GIFT_FOR_KEY = 'mkn_gift_for';
 // (Tony: "While in Beta, the link should open an invitation request"). Kept for this visit and taken out of the address
 // bar; signed out, the invitation request opens (inviteMeMaybe).
 var INVITE_ME_KEY = 'mkn_invite_me';
+// v40.27 — the invitation's steps, on the screen of the TEST copy only, for a visit from …/?invite-me: on Tony's iPhone in
+// WhatsApp's browser the request ends on the sign-in screen and cannot be followed from here (no WebKit on this machine;
+// the server sets aside a second request from the same address within a day, so nothing arriving says nothing). A
+// screenshot of these lines says where it stops. Nothing of it reaches the family's or the community's copy.
+var _inviteTrace = [], _inviteT0 = Date.now();
+function inviteTraceOn() {
+  try { return APP_CONFIG.environment === 'test' && (!!window._inviteMeVisit || /[?&]invite-debug\b/.test(location.search)) && !window._selfTestRunning; } catch(e) { return false; }
+}
+function inviteTrace(step) {
+  var line = ((Date.now() - _inviteT0) / 1000).toFixed(1) + 's ' + String(step).slice(0, 140);
+  _inviteTrace.push(line);
+  try { if (typeof syncLog === 'function') syncLog('system', 'Invitation: ' + String(step).slice(0, 140)); } catch(e) {}
+  if (!inviteTraceOn() || !document.body) return;
+  var box = document.getElementById('inviteTrace');
+  if (!box) {
+    box = document.createElement('div'); box.id = 'inviteTrace'; box.setAttribute('aria-hidden', 'true'); box.setAttribute('data-no-i18n', '');
+    box.style.cssText = 'position:fixed;left:6px;right:6px;bottom:calc(6px + env(safe-area-inset-bottom, 0px));z-index:2147483001;pointer-events:none;'
+      + 'background:rgba(20,20,20,0.82);color:#fff;font:11px/1.35 ui-monospace,Menlo,monospace;padding:6px 8px;border-radius:8px;max-height:32vh;overflow:hidden;opacity:0.92;'
+      + 'white-space:pre-wrap;direction:ltr;text-align:left;';
+    document.body.appendChild(box);
+  }
+  box.textContent = 'TEST · ' + (typeof APP_VERSION !== 'undefined' ? APP_VERSION : '') + ' · invitation steps\n' + _inviteTrace.slice(-16).join('\n');
+}
+window.inviteTrace = inviteTrace;
+window.addEventListener('error', function(e){ if (window._inviteMeVisit) inviteTrace('ERROR ' + ((e && e.message) || e)); });
+window.addEventListener('unhandledrejection', function(e){ if (window._inviteMeVisit) inviteTrace('ERROR (promise) ' + ((e && e.reason && (e.reason.message || e.reason)) || e)); });
 (function captureInviteMe() {
   try {
     if (!/[?&]invite-me(?:=[^&]*)?(?=&|$)/.test(location.search)) return;
@@ -8715,12 +8741,16 @@ async function inviteMeMaybe() {
   var on = '';
   try { on = sessionStorage.getItem(INVITE_ME_KEY) || ''; } catch(e) {}
   if (!on) return false;
+  inviteTrace('the link is here; waiting for the sign-in');
   for (var i = 0; i < 40 && !window._fbAuthSettled; i++) await wait(250);
   try { sessionStorage.removeItem(INVITE_ME_KEY); } catch(e) {}
+  inviteTrace('sign-in known: ' + (window._fbAuthSettled ? 'yes' : 'not after 10 s') + '; signed in: ' + (fbSignedInUser() ? 'yes' : 'no'));
   if (fbSignedInUser()) { toast('You already have My Kitchen Notes 🙂', 5000); return 'in'; }
   var busy = function(){ var lv = document.getElementById('linkedViewOverlay'); return !!document.getElementById('askOverlay') || !!(lv && lv.classList.contains('open')); };
   for (var w = 0; w < 300 && busy(); w++) await wait(200);
+  if (w) inviteTrace('waited ' + (w / 5) + ' s for another window');
   if (fbSignedInUser()) return 'in';
+  inviteTrace('the question');
   // v40.22 — asked first: WhatsApp opens the link in its own browser, where nobody is signed in, so someone who has the
   // app was taken for a newcomer and asked for an address (Tony, 28 Nov)
   var pick = await askConfirm({ icon: '\u{1F4F2}', title: 'New kitchens join by invitation', z: 10200,
@@ -8729,8 +8759,13 @@ async function inviteMeMaybe() {
     okLabel: '✉️ Ask for an invitation', cancelLabel: 'I already have it' });
   // v40.24 — "I already have it" ends on a closing screen too, not the sign-in screen (Tony, 28 Nov: "I'm still getting
   // the login screen and not the closing screen")
+  inviteTrace('its answer: ' + (pick === true ? 'Ask for an invitation' : String(pick)));
   if (pick !== true) { inviteHaveScreen(); return 'has'; }
-  return (await giftAskInvitation()) ? 'asked' : 'not';
+  var asked = false;
+  try { asked = await giftAskInvitation(); }
+  catch(e) { inviteTrace('ERROR in the request: ' + ((e && e.message) || e)); throw e; }
+  inviteTrace('the request ' + (asked ? 'went' : 'did not go'));
+  return asked ? 'asked' : 'not';
 }
 window.inviteMeMaybe = inviteMeMaybe;
 function giftSignInInstead() {
@@ -8747,21 +8782,25 @@ async function giftAskInvitation() {
   var em = await askConfirm({ icon: '✉️', title: 'Ask for an invitation', z: 10200,
     message: 'Your e-mail address goes to the app’s owner, who sends invitations by e-mail. It is used for nothing else.',
     input: known, inputType: 'email', placeholder: 'name@example.com', okLabel: 'Send', cancelLabel: 'Cancel' });
+  inviteTrace('the e-mail window answered: ' + (typeof em === 'string' ? 'text, ' + em.trim().length + ' letters' : String(em)));
   if (typeof em !== 'string') return false;
   em = em.trim().toLowerCase();
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(em)) { toast('That does not look like an e-mail address.', 6000); return false; }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(em)) { inviteTrace('not an e-mail address'); toast('That does not look like an e-mail address.', 6000); return false; }
   // v40.25 — on the screen from the tap on Send: the request goes to the server, which writes to the app's owner, and
   // that takes some seconds; until it answered, the window was gone and the sign-in screen showed as if that were the
   // end (Tony, 28 Nov: "Still getting the login screen and not the Request sent screen after I push sent").
   var sending = inviteDoneScreen(em, 'sending');
+  var j = {};
   try {
     var r = await fetch(WORKER_ENDPOINT, { method: 'POST', headers: workerHeaders(), signal: AbortSignal.timeout(20000),
       body: workerBody({ action: 'invite-ask', email: em, project: APP_CONFIG.firebase.projectId, env: APP_CONFIG.environment || '',
         from: String(d.fromName || '').slice(0, 120), recipe: String(d.name || '').slice(0, 200), lang: (navigator.language || '').slice(0, 10),
         device: navigator.userAgent.slice(0, 300), version: APP_VERSION }) });
-    var j = {}; try { j = await r.json(); } catch(e) {}
+    try { j = await r.json(); } catch(e) {}
+    inviteTrace('the server answered ' + r.status + (j.already ? ' (asked already today: not recorded again)' : ''));
     if (!r.ok) throw new Error(j.error || ('the server answered ' + r.status));
   } catch(e) {
+    inviteTrace('not sent: ' + ((e && e.message) || e));
     if (sending) inviteDoneGone(sending);
     await askConfirm({ icon: '✉️', title: 'Not sent', z: 10200, message: 'It could not be sent just now: ' + ((e && e.message) || e) + '\n\nTry again in a moment.', okLabel: 'OK' });
     return false;
@@ -8769,13 +8808,13 @@ async function giftAskInvitation() {
   if (d.name && sending) inviteDoneGone(sending);   // a recipe's own window is behind it: "Sent", and back to the recipe
   if (d.name) await askConfirm({ icon: '✉️', title: 'Sent', z: 10200,
     message: 'Thank you! The app’s owner will write to ' + em + ' with an invitation. Keep this link: once you are in, it saves the recipe to your new kitchen (until ' + giftDay(d.expireAt) + ').', okLabel: 'OK' });
-  else inviteDoneScreen(em);      // v40.21 — from …/?invite-me, no recipe; v40.23 — a closing screen
+  else inviteDoneScreen(em, false, !!j.already);      // v40.21 — from …/?invite-me, no recipe; v40.23 — a closing screen
   return true;
 }
 // v40.23 — after the request from …/?invite-me: a closing screen over the page, not the sign-in screen it fell back to
 // (Tony, 28 Nov: "it allowed me to send the request and then gave me the sign in screen. Is that the expected flow?").
 // Someone who asked cannot sign in yet; someone who has an account after all signs in from the link under it.
-function inviteDoneScreen(em, have) {
+function inviteDoneScreen(em, have, already) {
   var sendingNow = have === 'sending'; if (sendingNow) have = false;   // v40.25 — while the request is on its way
   var prev = document.getElementById('inviteDone'); if (prev) inviteDoneGone(prev);
   // v40.26 — on the sign-in screen itself, in place of its own card: a layer over it never showed on Tony's iPhone in
@@ -8805,7 +8844,9 @@ function inviteDoneScreen(em, have) {
         + '<div class="ask-body" dir="auto">Open it the way you always do — you are not signed in on this page.</div>'
       : '<div class="ask-icon">✉️</div>'
         + '<div class="ask-title" id="idTitle">Request sent</div>'
-        + '<div class="ask-body" dir="auto" data-no-i18n>' + escH(i18nAsk('Thank you! The app’s owner will write to ' + em + ' with an invitation.')) + '</div>')
+        + '<div class="ask-body" dir="auto" data-no-i18n>' + escH(i18nAsk(already   // v40.27 — asked again within a day
+            ? 'Thank you! Your request is already with the app’s owner, who will write to ' + em + ' with an invitation.'
+            : 'Thank you! The app’s owner will write to ' + em + ' with an invitation.')) + '</div>')
     + '<div class="ask-body" dir="auto" style="margin-top:8px;">You can close this page now.</div>'
     + '<div class="ask-actions">'
     + '<button type="button" class="ask-btn ghost" id="idSignIn">' + (have ? 'Sign in on this page' : 'I already have an account — sign in') + '</button>'
@@ -8813,6 +8854,10 @@ function inviteDoneScreen(em, have) {
     + '</div></div>');
   if (onSignIn) { signCard.parentNode.insertBefore(ov, signCard); try { ov.scrollIntoView({ block: 'center' }); } catch(e) {} }
   else document.body.appendChild(ov);
+  var kind = sendingNow ? 'sending' : have ? 'already-have-it' : already ? 'sent (asked before)' : 'sent';
+  inviteTrace(kind + ' card: ' + (onSignIn ? 'on the sign-in screen' : 'as a layer') + ', ' + ov.offsetWidth + '×' + ov.offsetHeight);
+  setTimeout(function(){ inviteTrace('1 s later the ' + kind + ' card is ' + (ov.isConnected ? (ov.offsetHeight ? 'there' : 'there but has no height')
+    : (document.getElementById('inviteDone') ? 'replaced' : 'GONE')) + '; the sign-in card ' + (signCard && getComputedStyle(signCard).display === 'none' ? 'hidden' : 'showing')); }, 1000);
   if (sendingNow) return ov;
   ov.querySelector('#idSignIn').onclick = function(){
     inviteDoneGone(ov);
@@ -12022,7 +12067,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v40.26';
+var APP_VERSION = 'v40.27';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -15909,7 +15954,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v40.26</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v40.27</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -15997,7 +16042,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v40.26</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v40.27</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">

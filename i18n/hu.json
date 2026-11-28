@@ -1,7 +1,7 @@
 {
  "lang": "hu",
  "updatedAt": 1795707178962,
- "count": 2935,
+ "count": 2936,
  "strings": {
   "\"Add to Home Screen\"": "Hozzáadás a kezdőképernyőhöz",
   "\"Open Bring!\"": "Bring! megnyitása",
@@ -1319,6 +1319,7 @@
   "Thank you! The app’s owner will write to {1} with an invitation.": "Köszönjük! Az alkalmazás tulajdonosa meghívót küld {1} címére.",
   "Thank you! The app’s owner will write to {1} with an invitation. Keep this link: once you are in, it saves the recipe to your new kitchen (for 4 weeks).": "Köszönjük! Az alkalmazás tulajdonosa meghívót küld {1} címére. Őrizd meg ezt a linket: ha beléptél, elmenti a receptet az új konyhádba (4 hétig érvényes).",
   "Thank you! The app’s owner will write to {1} with an invitation. Keep this link: once you are in, it saves the recipe to your new kitchen (until {2}).": "Köszönjük! Az alkalmazás tulajdonosa meghívót küld {1} címére. Őrizd meg ezt a linket: ha beléptél, elmenti a receptet az új konyhádba (eddig: {2}).",
+  "Thank you! Your request is already with the app’s owner, who will write to {1} with an invitation.": "Köszönjük! A kérésed már az alkalmazás tulajdonosánál van, aki meghívót küld {1} címére.",
   "That backup contains no photos at all, so there is nothing to restore.": "Ebben a biztonsági mentésben egyáltalán nincsenek fotók, így nincs mit visszaállítani.",
   "That chat is already in the cloud": "Ez a beszélgetés már a felhőben van",
   "That collection is no longer here": "Ez a gyűjtemény már nincs itt",

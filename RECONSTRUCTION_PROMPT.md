@@ -3234,6 +3234,11 @@ it before "Not sent", and from a recipe's own window it goes before "Sent".
 (hidden with `data-invite-hid`; class `invite-done-in`) — a layer over the sign-in screen never showed on Tony's iPhone in
 WhatsApp's browser; `inviteDoneGone()` removes it and shows the sign-in card again. Without the sign-in screen: a layer
 (z 10300) as before.
+**(v40.27)** `inviteTrace(step)` notes each step of the invitation in the log and, on the TEST copy only (a visit from
+…/?invite-me or ?invite-debug, never in a Self Test), in a small panel at the bottom of the screen (`#inviteTrace`), with
+script errors and refused promises during such a visit. The server keeps one request per address a day (`already: true`);
+the closing card then reads "Thank you! Your request is already with the app’s owner, who will write to … with an
+invitation." (`inviteDoneScreen(em, false, already)`).
 **Grid** (`#recipeGrid`): a `list` or `grid` view (`setView`). The choice is remembered in
 `tonys_view_mode`; desktop defaults to `list`, **phones default to `grid`** so the layout
 resembles the desktop cube grid. Cards show photo or emoji tile, a category **pill badge**

@@ -1,7 +1,7 @@
 {
  "lang": "ar",
  "updatedAt": 1795707178962,
- "count": 3157,
+ "count": 3158,
  "strings": {
   "\"Add to Home Screen\"": "إضافة إلى الشاشة الرئيسية",
   "\"Open Bring!\"": "فتح Bring!",
@@ -1426,6 +1426,7 @@
   "Thank you! The app’s owner will write to {1} with an invitation.": "شكرًا! سيراسل مالك التطبيق {1} بدعوة.",
   "Thank you! The app’s owner will write to {1} with an invitation. Keep this link: once you are in, it saves the recipe to your new kitchen (for 4 weeks).": "شكرًا! سيراسل مالك التطبيق {1} بدعوة. احتفظ بهذا الرابط: بعد انضمامك، سيحفظ الوصفة في مطبخك الجديد (لمدة 4 أسابيع).",
   "Thank you! The app’s owner will write to {1} with an invitation. Keep this link: once you are in, it saves the recipe to your new kitchen (until {2}).": "شكرًا! سيراسل مالك التطبيق {1} بدعوة. احتفظ بهذا الرابط: بعد انضمامك، سيحفظ الوصفة في مطبخك الجديد (حتى {2}).",
+  "Thank you! Your request is already with the app’s owner, who will write to {1} with an invitation.": "شكرًا! طلبك موجود بالفعل لدى مالك التطبيق، وسيراسل {1} بدعوة.",
   "That backup contains no photos at all, so there is nothing to restore.": "هذه النسخة الاحتياطية لا تحتوي على أي صور، فلا يوجد شيء لاستعادته.",
   "That chat is already in the cloud": "هذه المحادثة موجودة بالفعل في السحابة",
   "That code did not match — try the newest one.": "الرمز غير مطابق — جرّب أحدث رمز.",

@@ -1,7 +1,7 @@
 {
  "lang": "ru",
  "updatedAt": 1795707178962,
- "count": 3455,
+ "count": 3456,
  "strings": {
   "\"Add to Home Screen\"": "Добавить на главный экран",
   "\"One item away\" filter ({1}f.{2})": "Фильтр «Не хватает одного» ({1}ф.{2})",
@@ -1646,6 +1646,7 @@
   "Thank you! The app’s owner will write to {1} with an invitation.": "Спасибо! Владелец приложения напишет {1} с приглашением.",
   "Thank you! The app’s owner will write to {1} with an invitation. Keep this link: once you are in, it saves the recipe to your new kitchen (for 4 weeks).": "Спасибо! Владелец приложения напишет {1} с приглашением. Сохраните эту ссылку: как только вы войдёте, рецепт сохранится в вашей новой кухне (на 4 недели).",
   "Thank you! The app’s owner will write to {1} with an invitation. Keep this link: once you are in, it saves the recipe to your new kitchen (until {2}).": "Спасибо! Владелец приложения напишет {1} с приглашением. Сохраните эту ссылку: как только вы войдёте, рецепт сохранится в вашей новой кухне (до {2}).",
+  "Thank you! Your request is already with the app’s owner, who will write to {1} with an invitation.": "Спасибо! Ваш запрос уже у владельца приложения, он напишет {1} с приглашением.",
   "That backup contains no photos at all, so there is nothing to restore.": "В этой резервной копии вообще нет фото, так что восстанавливать нечего.",
   "That chat is already in the cloud": "Этот чат уже в облаке",
   "That code did not match — try the newest one.": "Код не подошёл — попробуйте самый новый.",

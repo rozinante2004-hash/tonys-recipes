@@ -26450,6 +26450,13 @@ window.SELF_TESTS = [
         if(asked.some(function(o){ return o.title==='Sent'; })) throw new Error('a "Sent" window came as well');
         if(!/Sending your request/.test(whileSending) || !document.querySelector('#inviteDone .ask-title') || /Sending/.test(done.textContent))
           throw new Error('while the request was on its way: '+JSON.stringify(whileSending));
+        if(!(window._inviteTrace||_inviteTrace).some(function(l){ return /the server answered 200/.test(l); })) throw new Error('the steps were not noted: '+_inviteTrace.slice(-4).join(' | '));
+        // v40.27 — asked again within a day: the server keeps the first request, and the closing words say so
+        inviteDoneGone(done);
+        window.fetch=async function(){ return { ok:true, status:200, json:async function(){ return { ok:true, already:true }; } }; };
+        try { await giftAskInvitation(); } finally { window.fetch=realFetch; }
+        done=document.getElementById('inviteDone');
+        if(!done || !/already with the app’s owner/.test(done.textContent)) throw new Error('asked again: '+(done ? done.textContent : 'no closing screen'));
         // the server refuses: the sending screen goes, and "Not sent" says so
         inviteDoneGone(done); asked=[];
         window.fetch=async function(){ throw new Error('offline'); };
@@ -26482,6 +26489,7 @@ window.SELF_TESTS = [
         window._inviteMeVisit=real.visit; _selfTestRunning=real.run; window._setupWizTest=real.wiz; window._fbAuthSettled=real.settled;
         if(typeof setupWizClose==='function') setupWizClose();
         if(typeof inviteDoneGone==='function') inviteDoneGone(); else { var idv=document.getElementById('inviteDone'); if(idv) idv.remove(); }
+        var itb=document.getElementById('inviteTrace'); if(itb) itb.remove();
         keys.forEach(function(k){ if(kept[k]===null) localStorage.removeItem(k); else localStorage.setItem(k, kept[k]); });
         terms.forEach(function(t){ localStorage.setItem(t[0], t[1]); });
         try{ if(force===null) sessionStorage.removeItem('mkn_setup_force'); else sessionStorage.setItem('mkn_setup_force', force); sessionStorage.removeItem(INVITE_ME_KEY); }catch(e){}

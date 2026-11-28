@@ -1,7 +1,7 @@
 {
  "lang": "ja",
  "updatedAt": 1795707178962,
- "count": 3460,
+ "count": 3461,
  "strings": {
   "\"Add to Home Screen\"": "ホーム画面に追加",
   "\"One item away\" filter ({1}f.{2})": "「あと1品」フィルター（{1}f.{2}）",
@@ -1648,6 +1648,7 @@
   "Thank you! The app’s owner will write to {1} with an invitation.": "ありがとうございます！アプリのオーナーが{1}に招待状を送ります。",
   "Thank you! The app’s owner will write to {1} with an invitation. Keep this link: once you are in, it saves the recipe to your new kitchen (for 4 weeks).": "ありがとうございます！アプリのオーナーが{1}に招待状を送ります。このリンクは保存しておいてください。参加すると、レシピが新しいキッチンに保存されます（4週間有効）。",
   "Thank you! The app’s owner will write to {1} with an invitation. Keep this link: once you are in, it saves the recipe to your new kitchen (until {2}).": "ありがとうございます！アプリのオーナーが{1}に招待状を送ります。このリンクは保存しておいてください。参加すると、レシピが新しいキッチンに保存されます（{2}まで有効）。",
+  "Thank you! Your request is already with the app’s owner, who will write to {1} with an invitation.": "ありがとうございます！リクエストはすでにアプリのオーナーに届いています。{1}に招待状を送ります。",
   "That backup contains no photos at all, so there is nothing to restore.": "そのバックアップには写真が1枚も含まれていないため、復元できるものがありません。",
   "That chat is already in the cloud": "そのチャットはすでにクラウドにあります",
   "That code did not match — try the newest one.": "コードが一致しませんでした。最新のものをお試しください。",

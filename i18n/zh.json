@@ -1,7 +1,7 @@
 {
  "lang": "zh",
  "updatedAt": 1795707178962,
- "count": 3159,
+ "count": 3160,
  "strings": {
   "\"Add to Home Screen\"": "添加到主屏幕",
   "\"Open Bring!\"": "打开 Bring!",
@@ -1426,6 +1426,7 @@
   "Thank you! The app’s owner will write to {1} with an invitation.": "谢谢！应用的所有者会给 {1} 写邀请信。",
   "Thank you! The app’s owner will write to {1} with an invitation. Keep this link: once you are in, it saves the recipe to your new kitchen (for 4 weeks).": "谢谢！应用的所有者会给 {1} 写邀请信。保留好这个链接：进入后，它会把菜谱保存到你的新厨房（有效期 4 周）。",
   "Thank you! The app’s owner will write to {1} with an invitation. Keep this link: once you are in, it saves the recipe to your new kitchen (until {2}).": "谢谢！应用的所有者会给 {1} 写邀请信。保留好这个链接：进入后，它会把菜谱保存到你的新厨房（有效期至 {2}）。",
+  "Thank you! Your request is already with the app’s owner, who will write to {1} with an invitation.": "谢谢！你的请求已经在应用的所有者那里了，他们会给 {1} 写邀请信。",
   "That backup contains no photos at all, so there is nothing to restore.": "这个备份里完全没有照片，因此无法恢复。",
   "That chat is already in the cloud": "该对话已经在云端",
   "That code did not match — try the newest one.": "验证码不匹配 — 请试试最新的那一个。",

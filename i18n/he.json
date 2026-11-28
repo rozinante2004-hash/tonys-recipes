@@ -1,7 +1,7 @@
 {
  "lang": "he",
  "updatedAt": 1795707178962,
- "count": 3583,
+ "count": 3584,
  "strings": {
   "\"Add to Home Screen\"": "הוספה למסך הבית",
   "\"One item away\" filter ({1}f.{2})": "פילטר \"פריט אחד חסר\" ({1}f.{2})",
@@ -1702,6 +1702,7 @@
   "Thank you! The app’s owner will write to {1} with an invitation.": "תודה! מנהל האפליקציה ישלח ל-{1} הזמנה.",
   "Thank you! The app’s owner will write to {1} with an invitation. Keep this link: once you are in, it saves the recipe to your new kitchen (for 4 weeks).": "תודה! מנהל האפליקציה ישלח ל-{1} הזמנה. שמרו את הקישור הזה: ברגע שתצטרף, הוא יוסיף את המתכון למטבח החדש שלכם (למשך 4 שבועות).",
   "Thank you! The app’s owner will write to {1} with an invitation. Keep this link: once you are in, it saves the recipe to your new kitchen (until {2}).": "תודה! מנהל האפליקציה ישלח ל-{1} הזמנה. שמרו את הקישור הזה: ברגע שתצטרפו, הוא ישמור את המתכון במטבח החדש שלכם (עד {2}).",
+  "Thank you! Your request is already with the app’s owner, who will write to {1} with an invitation.": "תודה! הבקשה שלכם כבר אצל מנהל האפליקציה, שישלח ל-{1} הזמנה.",
   "That backup contains no photos at all, so there is nothing to restore.": "הגיבוי הזה לא מכיל תמונות בכלל, אז אין מה לשחזר.",
   "That chat is already in the cloud": "השיחה הזו כבר נמצאת בענן",
   "That code did not match — try the newest one.": "הקוד לא תאם — נסו את האחרון שקיבלתם.",

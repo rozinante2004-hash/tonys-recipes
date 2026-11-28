@@ -1,7 +1,7 @@
 {
  "lang": "es",
  "updatedAt": 1795707178962,
- "count": 3154,
+ "count": 3155,
  "strings": {
   "\"Add to Home Screen\"": "Añadir a pantalla de inicio",
   "\"Open Bring!\"": "Abrir Bring!",
@@ -1426,6 +1426,7 @@
   "Thank you! The app’s owner will write to {1} with an invitation.": "¡Gracias! El dueño de la app le escribirá a {1} con una invitación.",
   "Thank you! The app’s owner will write to {1} with an invitation. Keep this link: once you are in, it saves the recipe to your new kitchen (for 4 weeks).": "¡Gracias! El dueño de la app le escribirá a {1} con una invitación. Guarda este enlace: en cuanto entre, guardará la receta en tu nueva cocina (durante 4 semanas).",
   "Thank you! The app’s owner will write to {1} with an invitation. Keep this link: once you are in, it saves the recipe to your new kitchen (until {2}).": "¡Gracias! El dueño de la app le escribirá a {1} con una invitación. Guarda este enlace: en cuanto entres, guardará la receta en tu nueva cocina (hasta el {2}).",
+  "Thank you! Your request is already with the app’s owner, who will write to {1} with an invitation.": "¡Gracias! Tu solicitud ya la tiene el dueño de la app, que le escribirá a {1} con una invitación.",
   "That backup contains no photos at all, so there is nothing to restore.": "Esa copia de seguridad no contiene ninguna foto, así que no hay nada que restaurar.",
   "That chat is already in the cloud": "Ese chat ya está en la nube",
   "That code did not match — try the newest one.": "Ese código no coincidió — prueba con el más reciente.",
