@@ -26268,7 +26268,7 @@ window.SELF_TESTS = [
     } },
 
   // v40.21 — Tony: "Add the picture of the recipe card too, as you've suggested."
-  { id:'recipe_card_picture', group:'Features', name:'🖼️ Send as a picture: the recipe card drawn as pictures 1080 px wide and at most 1920 tall — photo, name, ingredients, method — right to left for a Hebrew recipe; shared with its link and the line for the app, or saved on a computer (v40.21)',
+  { id:'recipe_card_picture', group:'Features', name:'🖼️ Send as a picture: the recipe card drawn as pictures 1080 px wide and at most 1920 tall — photo, name, ingredients, method — right to left for a Hebrew recipe; shared in one send with its link and the line for the app (several pictures after a cover), or saved on a computer (v40.21, v40.23)',
     test: async()=>{
       var real={ here:window.shareMenuHere, dl:window.downloadBlob, share:navigator.share, can:navigator.canShare, toast:window.toast, user:window._fbUser, pitch:window._pitchOpenForTest, confirm:window.askConfirm };
       var ids=[];
@@ -26318,17 +26318,26 @@ window.SELF_TESTS = [
         Object.defineProperty(navigator,'share',{ configurable:true, value:async function(d){ got=d; } });
         if(await shareAsPicture(en.id)!=='shared' || !got || got.files.length!==1 || got.files[0].type!=='image/jpeg') throw new Error('on a phone: '+JSON.stringify(got && { n:got.files && got.files.length, t:got.text }));
         if(got.text.indexOf('Soup\n')!==0 || got.text.indexOf('Download My Kitchen Notes and keep your recipes in one place')<0) throw new Error('the caption (the name first, no emoji): '+got.text);
-        // v40.22 — several pictures: they go on their own, then the link and the line after them (Tony: "attach the links
-        // to the last picture and not the 1st one")
+        // v40.23 — several pictures go in ONE send (Tony: "I'm finding the double sending for the photo very cumbersome"):
+        // a cover first — the photo, the name, how many pictures follow — so the words the share menu gives the first
+        // picture sit under the cover, and the recipe's pages follow undisturbed
+        var cp=await recipeCardPages(lg, { photo:photo, cover:true });
+        if(!cp[0].cover || cp.slice(1).some(function(p){ return p.cover; }) || cp[0].h>1920 || cp[0].w!==1080) throw new Error('no cover first: '+cp.map(function(p){ return (p.cover?'cover ':'')+p.h; }).join(', '));
+        var cpx=cp[0].canvas.getContext('2d').getImageData(540, 400, 1, 1).data;
+        if(Math.abs(cpx[0]-0xb5)>12 || Math.abs(cpx[1]-0x65)>12) throw new Error('the cover does not show the photo');
+        if(ink(cp[0].canvas, 72, 600, 84+760+40+10, 84+760+40+90)<50) throw new Error('the cover has no name under the photo');
+        // the pages after a cover: no photo again, the name small at the top of each
+        var p1=cp[1].canvas.getContext('2d').getImageData(540, 300, 1, 1).data;
+        if(Math.abs(p1[0]-0xb5)<=12 && Math.abs(p1[1]-0x65)<=12) throw new Error('the first page after the cover shows the photo again');
+        if((await recipeCardPages(en, { photo:photo, cover:true })).some(function(p){ return p.cover; })) throw new Error('a recipe of one picture got a cover');
         recipes.push(lg); ids.push(lg.id);
-        var shares=[], asks=[]; Object.defineProperty(navigator,'share',{ configurable:true, value:async function(d){ shares.push(d); } });
-        window.askConfirm=async function(o){ asks.push(o); return true; };
-        if(await shareAsPicture(lg.id)!=='shared' || shares.length!==2) throw new Error('several pictures: '+shares.length+' share(s)');
-        if(shares[0].files.length!==lp.length || shares[0].text) throw new Error('the pictures went with words: '+JSON.stringify(shares[0].text));
-        if(shares[1].files || String(shares[1].text||'').indexOf('Long\n')!==0 || shares[1].text.indexOf('Download My Kitchen Notes')<0) throw new Error('the link after the pictures: '+JSON.stringify(shares[1]));
-        if(!asks.length || !/Send the link/.test(asks[0].okLabel)) throw new Error('no tap for the link after the pictures');
-        shares=[]; window.askConfirm=async function(){ return null; };   // Not now: the pictures alone
-        if(await shareAsPicture(lg.id)!=='shared' || shares.length!==1) throw new Error('Not now still sent the link');
+        var shares=[]; Object.defineProperty(navigator,'share',{ configurable:true, value:async function(d){ shares.push(d); } });
+        window.askConfirm=async function(){ return true; };
+        if(await shareAsPicture(lg.id)!=='shared' || shares.length!==1) throw new Error('several pictures: '+shares.length+' sends, not one');
+        var sh=shares[0], n=sh.files.length;
+        if(n<3 || sh.files[0].name!=='Long.jpg' || sh.files[1].name!=='Long 1.jpg' || sh.files[n-1].name!=='Long '+(n-1)+'.jpg')
+          throw new Error('the pictures sent: '+sh.files.map(function(f){ return f.name; }).join(', '));
+        if(String(sh.text||'').indexOf('Long\n')!==0 || sh.text.indexOf('Download My Kitchen Notes')<0) throw new Error('the words with the pictures: '+JSON.stringify(sh.text));
       } finally {
         window.shareMenuHere=real.here; window.downloadBlob=real.dl; window.toast=real.toast; window._fbUser=real.user; window._pitchOpenForTest=real.pitch; window.askConfirm=real.confirm;
         if(real.share) Object.defineProperty(navigator,'share',{ configurable:true, value:real.share }); else delete navigator.share;
@@ -26340,7 +26349,7 @@ window.SELF_TESTS = [
   // v40.22 — Tony, 28 Nov: "I clicked the link for the invitation while I was logged in. It allowed me to send an
   // invitation request … and proceeded to the next screen … I'm not sure this is the exacted flow". WhatsApp opens the
   // link in its own browser, where nobody is signed in.
-  { id:'invite_me_asks_first', group:'Features', name:'📲 The invitation link at the end of a shared recipe asks first — ✉️ Ask for an invitation, or I already have it — and no first-visit welcome follows the request (v40.22)',
+  { id:'invite_me_asks_first', group:'Features', name:'📲 The invitation link at the end of a shared recipe asks first — ✉️ Ask for an invitation, or I already have it — and the request ends on a closing screen, with no first-visit welcome or sign-in screen after it (v40.22, v40.23)',
     test: async()=>{
       var real={ confirm:window.askConfirm, signed:window.fbSignedInUser, ask:window.giftAskInvitation, toast:window.toast, visit:window._inviteMeVisit,
         run:_selfTestRunning, wiz:window._setupWizTest, settled:window._fbAuthSettled };
@@ -26375,11 +26384,27 @@ window.SELF_TESTS = [
           var shown2; try{ shown2=await setupWizMaybeNow(); } finally { _selfTestRunning=true; }
           if(!shown2 || !document.getElementById('setupWiz')) throw new Error('without the invitation link the welcome does not come either, so the check above shows nothing');
         }
-        if(!/You can close this page now/.test(String(real.ask))) throw new Error('the thank-you does not say the page can be closed');
+        // v40.23 — after the request a closing screen, not the sign-in screen (Tony: "it allowed me to send the request and
+        // then gave me the sign in screen. Is that the expected flow?")
+        window.giftAskInvitation=real.ask;
+        var realFetch=window.fetch, sentBody=null; asked=[];
+        window.fetch=async function(u, o){ sentBody=o && o.body; return { ok:true, status:200, json:async function(){ return { ok:true }; } }; };
+        window.askConfirm=async function(o){ asked.push(o); return o.inputType==='email' ? 'new@example.com' : true; };
+        var lookWas=_gifts.lookAt; _gifts.lookAt=null;   // from …/?invite-me: no recipe
+        try { sessionStorage.setItem(INVITE_ME_KEY,'1'); var r2=await inviteMeMaybe(); } finally { window.fetch=realFetch; _gifts.lookAt=lookWas; }
+        var done=document.getElementById('inviteDone');
+        if(r2!=='asked' || !sentBody || !/invite-ask/.test(String(sentBody))) throw new Error('the request did not go: '+r2);
+        if(!done || !/Request sent/.test(done.textContent) || done.textContent.indexOf('new@example.com')<0 || !/You can close this page now/.test(done.textContent))
+          throw new Error('no closing screen after the request: '+(done ? done.textContent : 'none'));
+        if(asked.some(function(o){ return o.title==='Sent'; })) throw new Error('a "Sent" window came as well');
+        if(+getComputedStyle(done).zIndex<=9999 || getComputedStyle(done).backgroundColor==='rgba(0, 0, 0, 0)') throw new Error('the sign-in screen shows through the closing screen');
+        done.querySelector('#idSignIn').click();
+        if(document.getElementById('inviteDone')) throw new Error('I already have an account — sign in left the closing screen up');
       } finally {
         window.askConfirm=real.confirm; window.fbSignedInUser=real.signed; window.giftAskInvitation=real.ask; window.toast=real.toast;
         window._inviteMeVisit=real.visit; _selfTestRunning=real.run; window._setupWizTest=real.wiz; window._fbAuthSettled=real.settled;
         if(typeof setupWizClose==='function') setupWizClose();
+        var idv=document.getElementById('inviteDone'); if(idv) idv.remove();
         keys.forEach(function(k){ if(kept[k]===null) localStorage.removeItem(k); else localStorage.setItem(k, kept[k]); });
         terms.forEach(function(t){ localStorage.setItem(t[0], t[1]); });
         try{ if(force===null) sessionStorage.removeItem('mkn_setup_force'); else sessionStorage.setItem('mkn_setup_force', force); sessionStorage.removeItem(INVITE_ME_KEY); }catch(e){}

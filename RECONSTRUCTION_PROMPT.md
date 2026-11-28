@@ -3213,6 +3213,12 @@ when `navigator.userActivation` says the tap ran out; the web address when the p
 `shareCaptionAfter(caption)` ("🔗 Now the link", 📤 Send the link → `navigator.share({ text })`; refused → copied) —
 a share menu gives the words to the first picture. Self Tests `share_whatsapp_link`, `recipe_card_picture`,
 `invite_me_asks_first` (test hooks `_waPhoneForTest`, `_waTapForTest`, `_waGoForTest`, `_waWaitForTest`).
+**(v40.23)** That second share is gone (Tony found it cumbersome): for the share menu `recipeCardPages(r, { cover: true })`
+puts a **cover** first when the recipe needs several pictures (the photo 760 px or the emoji, the name in 72 px, what it
+is, "The recipe follows, in N pictures ↓"; `pages[0].cover`), the pages after it without the photo, numbered 1 / N; the
+caption goes with the cover in ONE `navigator.share({ files, text })`; files `Name.jpg`, `Name 1.jpg`…; one picture or
+a computer: no cover. After the request from `…/?invite-me`, `inviteDoneScreen(em)` — a closing screen above the
+sign-in screen (✉️ Request sent, the thank-you, "You can close this page now.", I already have an account — sign in).
 **Grid** (`#recipeGrid`): a `list` or `grid` view (`setView`). The choice is remembered in
 `tonys_view_mode`; desktop defaults to `list`, **phones default to `grid`** so the layout
 resembles the desktop cube grid. Cards show photo or emoji tile, a category **pill badge**
