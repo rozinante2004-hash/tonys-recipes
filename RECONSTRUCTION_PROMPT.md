@@ -3239,6 +3239,12 @@ WhatsApp's browser; `inviteDoneGone()` removes it and shows the sign-in card aga
 script errors and refused promises during such a visit. The server keeps one request per address a day (`already: true`);
 the closing card then reads "Thank you! Your request is already with the app’s owner, who will write to … with an
 invitation." (`inviteDoneScreen(em, false, already)`).
+**(v40.28)** `askConfirm` takes `validate(value)` (what is wrong → `.ask-error` under the box, `role="alert"`, the window
+stays open) and, for `inputType: 'email'`, gives the box `type="email" inputmode="email" autocomplete="email"
+autocapitalize="off" autocorrect="off" spellcheck="false"`. `giftAskInvitation` cleans the address first
+(`inviteEmailClean`: spaces, direction marks and capitals out — the iPhone's suggestions add a space) and checks it
+(`inviteEmailOk`) in the window. The toast (`.toast`) is at z-index 10500, above the sign-in screen (9999) — at 999 every
+message on the sign-in screen stayed behind it.
 **Grid** (`#recipeGrid`): a `list` or `grid` view (`setView`). The choice is remembered in
 `tonys_view_mode`; desktop defaults to `list`, **phones default to `grid`** so the layout
 resembles the desktop cube grid. Cards show photo or emoji tile, a category **pill badge**

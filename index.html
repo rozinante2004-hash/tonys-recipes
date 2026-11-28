@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v40.27 -->
+<!-- Tony's Recipes Collection v40.28 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -8781,11 +8781,14 @@ async function giftAskInvitation() {
   var known = ''; try { known = sessionStorage.getItem(GIFT_FOR_KEY) || ''; } catch(e) {}   // v39.11 — the address it was e-mailed to
   var em = await askConfirm({ icon: '✉️', title: 'Ask for an invitation', z: 10200,
     message: 'Your e-mail address goes to the app’s owner, who sends invitations by e-mail. It is used for nothing else.',
-    input: known, inputType: 'email', placeholder: 'name@example.com', okLabel: 'Send', cancelLabel: 'Cancel' });
+    input: known, inputType: 'email', placeholder: 'name@example.com', okLabel: 'Send', cancelLabel: 'Cancel',
+    // v40.28 — checked in the window, which stays open with the words under the box: the message went to a toast behind
+    // the sign-in screen, and nobody saw why nothing was sent (Tony, 28 Nov: "I did not get any error message")
+    validate: function(v){ return inviteEmailOk(inviteEmailClean(v)) ? '' : 'That does not look like an e-mail address.'; } });
   inviteTrace('the e-mail window answered: ' + (typeof em === 'string' ? 'text, ' + em.trim().length + ' letters' : String(em)));
   if (typeof em !== 'string') return false;
-  em = em.trim().toLowerCase();
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(em)) { inviteTrace('not an e-mail address'); toast('That does not look like an e-mail address.', 6000); return false; }
+  em = inviteEmailClean(em);
+  if (!inviteEmailOk(em)) { inviteTrace('not an e-mail address'); toast('That does not look like an e-mail address.', 6000); return false; }
   // v40.25 — on the screen from the tap on Send: the request goes to the server, which writes to the app's owner, and
   // that takes some seconds; until it answered, the window was gone and the sign-in screen showed as if that were the
   // end (Tony, 28 Nov: "Still getting the login screen and not the Request sent screen after I push sent").
@@ -8811,6 +8814,11 @@ async function giftAskInvitation() {
   else inviteDoneScreen(em, false, !!j.already);      // v40.21 — from …/?invite-me, no recipe; v40.23 — a closing screen
   return true;
 }
+// v40.28 — an address as typed on a phone: spaces (the iPhone's word suggestions add one), invisible direction marks and
+// capitals out — none belongs in an address
+function inviteEmailClean(v) { return String(v == null ? '' : v).replace(/[\s\u200B-\u200F\u202A-\u202E\u2066-\u2069\uFEFF]+/g, '').toLowerCase(); }
+function inviteEmailOk(v) { return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(String(v || '')); }
+window.inviteEmailClean = inviteEmailClean; window.inviteEmailOk = inviteEmailOk;
 // v40.23 — after the request from …/?invite-me: a closing screen over the page, not the sign-in screen it fell back to
 // (Tony, 28 Nov: "it allowed me to send the request and then gave me the sign in screen. Is that the expected flow?").
 // Someone who asked cannot sign in yet; someone who has an account after all signs in from the link under it.
@@ -12067,7 +12075,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v40.27';
+var APP_VERSION = 'v40.28';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -14412,6 +14420,8 @@ li.line-sub-indent { padding-inline-start: 22px; }
 .explore-loading { text-align: center; padding: 2rem; color: var(--muted); font-size: 14px; }
 .ai-spinner { display: inline-block; width: 22px; height: 22px; border: 3px solid var(--border); border-top-color: var(--terracotta); border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 6px; }
 @keyframes spin { to { transform: rotate(360deg); } }
+/* v40.28 — what is wrong with what was typed, under the box (askConfirm's validate) */
+.ask-error { margin: 8px 2px 0; color: var(--danger, #B03030); font-size: 13px; font-weight: 600; line-height: 1.4; text-align: start; }
 /* v40.26 — the invitation's closing words on the sign-in screen itself, in place of its card */
 .invite-done-in { width: 100%; max-width: 420px; margin: 0 auto 16px; }
 .invite-done-in .ask-card { margin: 0 auto; max-width: 100%; animation: none; }
@@ -14483,7 +14493,7 @@ button.share-busy { cursor: progress; opacity: 0.95; }
 
 /* EMPTY / TOAST */
 .empty-state { text-align: center; padding: 3rem 2rem; color: var(--muted); grid-column: 1/-1; }
-.toast { position: fixed; bottom: 2rem; left: 50%; transform: translateX(-50%) translateY(120px); background: var(--card-bg); color: var(--ink); padding: 10px 16px 10px 10px; border-radius: 14px; font-size: 13px; font-weight: 500; z-index: 999; transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1); pointer-events: none; white-space: nowrap; border: 1px solid var(--border); box-shadow: 0 4px 20px rgba(0,0,0,0.12); display: flex; align-items: center; gap: 10px; }
+.toast { position: fixed; bottom: 2rem; left: 50%; transform: translateX(-50%) translateY(120px); background: var(--card-bg); color: var(--ink); padding: 10px 16px 10px 10px; border-radius: 14px; font-size: 13px; font-weight: 500; z-index: 10500; /* v40.28 — was 999: on the sign-in screen (9999) every message stayed behind it */ transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1); pointer-events: none; white-space: nowrap; border: 1px solid var(--border); box-shadow: 0 4px 20px rgba(0,0,0,0.12); display: flex; align-items: center; gap: 10px; }
 .toast.show { transform: translateX(-50%) translateY(0); }
 /* v39.25 — the audit (3 Nov 2026): on a phone "💾 No backup has been taken yet" stood one word to a line beside its
    button. Centred with left:50%, a notice is laid out in what is left to the right of the middle — half the screen.
@@ -15954,7 +15964,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v40.27</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v40.28</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -16042,7 +16052,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v40.27</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v40.28</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -29306,7 +29316,11 @@ function askConfirm(opts) {
       + (opts.input !== undefined
           ? '<input id="askInput" class="ask-input" dir="auto" value="' + escA(opts.input) + '"'
             + (opts.inputType === 'password' ? ' type="password" autocomplete="current-password"' : '')
+            // v40.28 — an address: the phone's e-mail keyboard (@ and .), no capitals and no corrections — the iPhone's
+            // word suggestions put a space into the address, and the request never went (Tony, 28 Nov)
+            + (opts.inputType === 'email' ? ' type="email" inputmode="email" autocomplete="email" autocapitalize="off" autocorrect="off" spellcheck="false"' : '')
             + ' placeholder="' + escA(opts.placeholder || '') + '">'
+            + (typeof opts.validate === 'function' ? '<div class="ask-error" id="askError" role="alert" dir="auto" hidden></div>' : '')
           : '')
       // v36.18 — an optional "don't ask again" tick. Only a caller that passes
       // `checkbox` gets the {ok, checked} return shape; everyone else still
@@ -29349,6 +29363,14 @@ function askConfirm(opts) {
       resolve(v);
     }
     function accept() {
+      // v40.28 — opts.validate(value) → what is wrong (shown under the box, the window stays open) or nothing
+      if (input && typeof opts.validate === 'function') {
+        var wrong = '';
+        try { wrong = opts.validate(input.value) || ''; } catch(e) { wrong = ''; }
+        var er = ov.querySelector('#askError');
+        if (wrong) { if (er) { er.textContent = i18nAsk(wrong); er.hidden = false; } try { input.focus(); } catch(e) {} return; }
+        if (er) er.hidden = true;
+      }
       if (input) { done(input.value); return; }
       if (checks) { done({ ok:true, checks:ticks() }); return; }
       done(check ? { ok:true, checked:check.checked } : true);

@@ -26462,6 +26462,32 @@ window.SELF_TESTS = [
         window.fetch=async function(){ throw new Error('offline'); };
         try { var r3=await giftAskInvitation(); } finally { window.fetch=realFetch; }
         if(r3!==false || document.getElementById('inviteDone') || !asked.some(function(o){ return o.title==='Not sent'; })) throw new Error('a refused request: '+r3);
+        // v40.28 — Tony: "I did not get any error message though that the address is invalid. This needs to change." The
+        // address is checked in the window, which stays open with the words under the box; spaces (the iPhone's word
+        // suggestions add one) and capitals are taken out; the box asks for the phone's e-mail keyboard, no corrections
+        window.askConfirm=real.confirm; _gifts.lookAt=null;
+        var sentEm=null;
+        window.fetch=async function(u, o){ try{ sentEm=JSON.parse(o.body).email; }catch(e){ sentEm=String(o && o.body); } return { ok:true, status:200, json:async function(){ return { ok:true }; } }; };
+        try {
+          var pend=giftAskInvitation();
+          for(var q=0; q<40 && !document.querySelector('#askOverlay #askInput'); q++) await new Promise(function(r){ setTimeout(r, 25); });
+          var box=document.querySelector('#askOverlay #askInput');
+          if(!box || box.type!=='email' || box.getAttribute('autocorrect')!=='off' || box.getAttribute('autocapitalize')!=='off' || box.getAttribute('inputmode')!=='email')
+            throw new Error('the address box: '+(box ? box.outerHTML.slice(0, 200) : 'none'));
+          box.value='tester @gmail'; document.querySelector('#askOverlay #askOk').click();
+          await new Promise(function(r){ setTimeout(r, 30); });
+          var er=document.querySelector('#askOverlay #askError');
+          if(!document.querySelector('#askOverlay #askInput') || !er || er.hidden || !/does not look like an e-mail address/.test(er.textContent))
+            throw new Error('a wrong address: the window did not stay open with the words under the box');
+          if(sentEm!==null) throw new Error('a wrong address was sent');
+          box.value='Tester @ Gmail.com '; document.querySelector('#askOverlay #askOk').click();
+          await pend;
+        } finally { window.fetch=realFetch; window.askConfirm=async function(o){ asked.push(o); return true; }; }
+        if(sentEm!=='tester@gmail.com') throw new Error('the address sent: '+JSON.stringify(sentEm));
+        inviteDoneGone();
+        // and any message on the sign-in screen is seen: the toast above it (it was under it, 999 against 9999)
+        var tz=+getComputedStyle(document.getElementById('toast')).zIndex, lz=+getComputedStyle(document.getElementById('loginScreen')).zIndex;
+        if(!(tz>lz)) throw new Error('a message stays behind the sign-in screen: toast '+tz+', sign-in '+lz);
         // where it shows: without the sign-in screen, a layer over the page; with it, on the sign-in screen itself in place
         // of its card (v40.26 — a layer over the sign-in screen never showed on Tony's iPhone in WhatsApp's browser)
         var lsT=document.getElementById('loginScreen'), lsWasT=lsT ? lsT.style.display : '';

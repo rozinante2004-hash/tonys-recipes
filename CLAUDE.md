@@ -67,7 +67,10 @@ where.
   the closing words on the sign-in screen itself, in place of its card (a layer over it never showed on Tony's iPhone).
   v40.27 — the TEST copy shows the invitation's steps at the bottom of the screen (inviteTrace) to find where it stops
   on Tony's iPhone; "already asked" wording (the server keeps one request per address a day). Release (v40.21–v40.27)
-  on Tony's yes — take the step panel out first or leave it (test copy only). The test copy
+  on Tony's yes — take the step panel out first or leave it (test copy only). v40.28 — the panel found it: the
+  address failed the check (the iPhone's suggestions add a space) and the message went to a toast BEHIND the sign-in
+  screen (toast 999 < 9999); now spaces are taken out, a wrong address keeps the window open with the words under the
+  box, the box asks for the e-mail keyboard, and toasts sit above the sign-in screen (10500). The test copy
   (https://tonys-recipes-test.pages.dev, its own database and rules) follows `test`.
 - **The beta has had testers since Sunday 25 Oct 2026** and is **by invitation only**: the owner invites with
   ⚙️ → 👑 → ✉️ Invite testers (the congratulatory wording of v39.60); a tester's share button asks the owner for an
