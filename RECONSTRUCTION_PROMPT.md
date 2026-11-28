@@ -3230,6 +3230,10 @@ menu…), also on 💬's "Making the link…".
 takes a few seconds.") from the tap on Send until the server answers — the server writes to the owner and takes some
 seconds, and the sign-in screen behind looked like the end; the answer replaces it with Request sent, a refusal removes
 it before "Not sent", and from a recipe's own window it goes before "Sent".
+**(v40.26)** With the sign-in screen up, `inviteDoneScreen` puts its card ON the sign-in screen in place of `.login-card`
+(hidden with `data-invite-hid`; class `invite-done-in`) — a layer over the sign-in screen never showed on Tony's iPhone in
+WhatsApp's browser; `inviteDoneGone()` removes it and shows the sign-in card again. Without the sign-in screen: a layer
+(z 10300) as before.
 **Grid** (`#recipeGrid`): a `list` or `grid` view (`setView`). The choice is remembered in
 `tonys_view_mode`; desktop defaults to `list`, **phones default to `grid`** so the layout
 resembles the desktop cube grid. Cards show photo or emoji tile, a category **pill badge**

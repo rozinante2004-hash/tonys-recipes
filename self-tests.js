@@ -26389,7 +26389,7 @@ window.SELF_TESTS = [
   // v40.22 — Tony, 28 Nov: "I clicked the link for the invitation while I was logged in. It allowed me to send an
   // invitation request … and proceeded to the next screen … I'm not sure this is the exacted flow". WhatsApp opens the
   // link in its own browser, where nobody is signed in.
-  { id:'invite_me_asks_first', group:'Features', name:'📲 The invitation link at the end of a shared recipe asks first — ✉️ Ask for an invitation, or I already have it — and the request ends on a closing screen, with no first-visit welcome or sign-in screen after it (v40.22, v40.23)',
+  { id:'invite_me_asks_first', group:'Features', name:'📲 The invitation link at the end of a shared recipe asks first — ✉️ Ask for an invitation, or I already have it — and the request ends on a closing screen (on the sign-in screen itself when it shows), with no first-visit welcome or sign-in card after it (v40.22–v40.26)',
     test: async()=>{
       var real={ confirm:window.askConfirm, signed:window.fbSignedInUser, ask:window.giftAskInvitation, toast:window.toast, visit:window._inviteMeVisit,
         run:_selfTestRunning, wiz:window._setupWizTest, settled:window._fbAuthSettled };
@@ -26451,19 +26451,37 @@ window.SELF_TESTS = [
         if(!/Sending your request/.test(whileSending) || !document.querySelector('#inviteDone .ask-title') || /Sending/.test(done.textContent))
           throw new Error('while the request was on its way: '+JSON.stringify(whileSending));
         // the server refuses: the sending screen goes, and "Not sent" says so
-        done.remove(); asked=[];
+        inviteDoneGone(done); asked=[];
         window.fetch=async function(){ throw new Error('offline'); };
         try { var r3=await giftAskInvitation(); } finally { window.fetch=realFetch; }
         if(r3!==false || document.getElementById('inviteDone') || !asked.some(function(o){ return o.title==='Not sent'; })) throw new Error('a refused request: '+r3);
-        done=inviteDoneScreen('new@example.com');
-        if(+getComputedStyle(done).zIndex<=9999 || getComputedStyle(done).backgroundColor==='rgba(0, 0, 0, 0)') throw new Error('the sign-in screen shows through the closing screen');
-        done.querySelector('#idSignIn').click();
-        if(document.getElementById('inviteDone')) throw new Error('I already have an account — sign in left the closing screen up');
+        // where it shows: without the sign-in screen, a layer over the page; with it, on the sign-in screen itself in place
+        // of its card (v40.26 — a layer over the sign-in screen never showed on Tony's iPhone in WhatsApp's browser)
+        var lsT=document.getElementById('loginScreen'), lsWasT=lsT ? lsT.style.display : '';
+        try {
+          if(lsT) lsT.style.display='none';
+          done=inviteDoneScreen('new@example.com');
+          if(done.parentNode!==document.body || +getComputedStyle(done).zIndex<=9999 || getComputedStyle(done).backgroundColor==='rgba(0, 0, 0, 0)') throw new Error('without the sign-in screen: not a layer over the page');
+          done.querySelector('#idSignIn').click();
+          if(document.getElementById('inviteDone')) throw new Error('I already have an account — sign in left the closing screen up');
+          if(lsT && lsT.querySelector('.login-card')){
+            lsT.style.display='flex';
+            var sc=lsT.querySelector('.login-card');
+            done=inviteDoneScreen('new@example.com');
+            if(!lsT.contains(done) || getComputedStyle(sc).display!=='none' || !done.offsetHeight || !/Request sent/.test(done.textContent))
+              throw new Error('on the sign-in screen: the closing words are not in place of its card');
+            inviteDoneScreen('new@example.com', 'sending');   // the sending words, then the answer: one card, the sign-in card hidden
+            if(document.querySelectorAll('#inviteDone').length!==1 || getComputedStyle(sc).display!=='none') throw new Error('the sending card and the answer were not one card');
+            document.querySelector('#inviteDone').remove(); done=inviteDoneScreen('new@example.com');
+            done.querySelector('#idSignIn').click();
+            if(document.getElementById('inviteDone') || getComputedStyle(sc).display==='none') throw new Error('I already have an account — sign in did not bring the sign-in card back');
+          }
+        } finally { if(lsT) lsT.style.display=lsWasT; }
       } finally {
         window.askConfirm=real.confirm; window.fbSignedInUser=real.signed; window.giftAskInvitation=real.ask; window.toast=real.toast;
         window._inviteMeVisit=real.visit; _selfTestRunning=real.run; window._setupWizTest=real.wiz; window._fbAuthSettled=real.settled;
         if(typeof setupWizClose==='function') setupWizClose();
-        var idv=document.getElementById('inviteDone'); if(idv) idv.remove();
+        if(typeof inviteDoneGone==='function') inviteDoneGone(); else { var idv=document.getElementById('inviteDone'); if(idv) idv.remove(); }
         keys.forEach(function(k){ if(kept[k]===null) localStorage.removeItem(k); else localStorage.setItem(k, kept[k]); });
         terms.forEach(function(t){ localStorage.setItem(t[0], t[1]); });
         try{ if(force===null) sessionStorage.removeItem('mkn_setup_force'); else sessionStorage.setItem('mkn_setup_force', force); sessionStorage.removeItem(INVITE_ME_KEY); }catch(e){}
