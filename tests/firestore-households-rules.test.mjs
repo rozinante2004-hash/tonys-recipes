@@ -701,13 +701,16 @@ await check('…a photo only with a gift that says it has one',        sendWithP
 await check('…and only by whoever sent the gift',                    setDoc(doc(carol, 'recipeGiftPhotos/' + G1 + 'z'), { from: 'gA', data: 'x', expireAt: in28() }), false);
 await check('a link, sent by WhatsApp (to nobody in particular)',    sendWithPhoto(frank, G2, gift({ to: '', toCode: '', via: 'whatsapp', photo: false }), null), true);
 const G4 = 'giftAbcdefghijklmnopqrs4', G5 = 'giftAbcdefghijklmnopqrs5', in183 = () => Timestamp.fromMillis(Date.now() + 183 * 864e5);
-await check('a link for 6 months, with its photo and a small preview', sendWithPhoto(frank, G4, gift({ to: '', toCode: '', via: 'whatsapp', expireAt: in183() }),
-  { from: 'gA', data: 'data:image/jpeg;base64,AAAA', thumb: 'data:image/jpeg;base64,BBBB', expireAt: in183() }), true);
+// v40.22 — the same moment for the gift and its photo (the rules want them equal): two calls to in183() a millisecond
+// apart were refused (CI, 28 Nov)
+const t4 = in183(), t5 = in183();
+await check('a link for 6 months, with its photo and a small preview', sendWithPhoto(frank, G4, gift({ to: '', toCode: '', via: 'whatsapp', expireAt: t4 }),
+  { from: 'gA', data: 'data:image/jpeg;base64,AAAA', thumb: 'data:image/jpeg;base64,BBBB', expireAt: t4 }), true);
 await check('…its preview read signed out, as the page does',          getDoc(doc(nobody, 'recipeGiftPhotos/' + G4)), true);
-await check('…not a preview too big for one',                          sendWithPhoto(frank, G5, gift({ to: '', toCode: '', via: 'link', expireAt: in183() }),
-  { from: 'gA', data: 'data:image/jpeg;base64,AAAA', thumb: 'x'.repeat(200001), expireAt: in183() }), false);
-await check('…nor a preview that is not text',                         sendWithPhoto(frank, G5, gift({ to: '', toCode: '', via: 'link', expireAt: in183() }),
-  { from: 'gA', data: 'data:image/jpeg;base64,AAAA', thumb: 7, expireAt: in183() }), false);
+await check('…not a preview too big for one',                          sendWithPhoto(frank, G5, gift({ to: '', toCode: '', via: 'link', expireAt: t5 }),
+  { from: 'gA', data: 'data:image/jpeg;base64,AAAA', thumb: 'x'.repeat(200001), expireAt: t5 }), false);
+await check('…nor a preview that is not text',                         sendWithPhoto(frank, G5, gift({ to: '', toCode: '', via: 'link', expireAt: t5 }),
+  { from: 'gA', data: 'data:image/jpeg;base64,AAAA', thumb: 7, expireAt: t5 }), false);
 await check('one sent through the app: still not 6 months',           sendWithPhoto(frank, G5, gift({ expireAt: in183(), photo: false }), null), false);
 await check('whoever has the link reads it, signed out too',         getDoc(doc(nobody, 'recipeGifts/' + G1)), true);
 await check('…and its photo',                                        getDoc(doc(nobody, 'recipeGiftPhotos/' + G1)), true);
