@@ -1,7 +1,7 @@
 {
  "lang": "de",
  "updatedAt": 1795707178962,
- "count": 3149,
+ "count": 3152,
  "strings": {
   "\"Add to Home Screen\"": "Zum Home-Bildschirm hinzufügen",
   "\"Open Bring!\"": "Bring! öffnen",
@@ -964,6 +964,7 @@
   "Open GitHub": "GitHub öffnen",
   "Open WhatsApp settings": "WhatsApp-Einstellungen öffnen",
   "Open deployed app": "Bereitgestellte App öffnen",
+  "Open it the way you always do — you are not signed in on this page.": "Öffne die App wie immer – auf dieser Seite bist du nicht angemeldet.",
   "Open link in Safari or Chrome → tap Share → \"Add to Home Screen\"{2} {3} Open link in Chrome → tap menu → \"Add to Home Screen\"{4} {5} Open link in Chrome → click ⊕ in address bar": "Link in Safari oder Chrome öffnen → auf Teilen tippen → „Zum Home-Bildschirm“{2} {3} Link in Chrome öffnen → Menü öffnen → „Zum Startbildschirm“{4} {5} Link in Chrome öffnen → auf ⊕ in der Adressleiste klicken",
   "Open link in Safari → tap Share → \"Add to Home Screen\"{2} {3} Open link in Chrome → tap menu → \"Add to Home Screen\"{4} {5} Open link in Chrome → click ⊕ in address bar": "Link in Safari öffnen → auf Teilen tippen → „Zum Home-Bildschirm“{2} {3} Link in Chrome öffnen → Menü öffnen → „Zum Home-Bildschirm“{4} {5} Link in Chrome öffnen → auf ⊕ in der Adressleiste klicken",
   "Open links in other apps": "Links in anderen Apps öffnen",
@@ -975,6 +976,7 @@
   "Opening Bring! relay...": "Bring!-Relay wird geöffnet …",
   "Opening each panel in turn…": "Öffne jedes Feld nacheinander …",
   "Opening recipe {3} of {4}…": "Öffne Rezept {3} von {4}…",
+  "Opening the share menu…": "Das Teilen-Menü wird geöffnet…",
   "Opens it for you": "Öffnet es für dich",
   "Or e-mail me a one-time sign-in link (no password)": "Oder per Login-Link per E-Mail anmelden (ohne Passwort)",
   "Other equipment": "Weitere Geräte",
@@ -1307,6 +1309,7 @@
   "Sign in first.": "Melde dich zuerst an.",
   "Sign in first: importing from web pages, reading videos and searching for photos need a signed-in account.": "Bitte zuerst anmelden: Für den Import von Webseiten, das Auslesen von Videos und die Fotosuche ist ein angemeldetes Konto nötig.",
   "Sign in from the pill at the top right. Local changes are queued and go up on the next successful sync.": "Melde dich über das Pill-Icon oben rechts an. Lokale Änderungen werden gesammelt und beim nächsten erfolgreichen Sync hochgeladen.",
+  "Sign in on this page": "Auf dieser Seite anmelden",
   "Sign in once more": "Noch einmal anmelden",
   "Sign in to change this.": "Melde dich an, um das zu ändern.",
   "Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.": "Melde dich an, um deine Rezepte sicher in der Cloud zu speichern. Deine Daten bleiben in deinem Konto — niemand sonst hat Zugriff darauf.",

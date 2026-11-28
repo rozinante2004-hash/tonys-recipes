@@ -1,7 +1,7 @@
 {
  "lang": "it",
  "updatedAt": 1795707178962,
- "count": 3057,
+ "count": 3060,
  "strings": {
   "\"Add to Home Screen\"": "Aggiungi a Home",
   "\"Open Bring!\"": "Apri Bring!",
@@ -933,6 +933,7 @@
   "Open GitHub": "Apri GitHub",
   "Open WhatsApp settings": "Apri le impostazioni di WhatsApp",
   "Open deployed app": "Apri l'app pubblicata",
+  "Open it the way you always do — you are not signed in on this page.": "Aprila come fai sempre — in questa pagina non hai effettuato l’accesso.",
   "Open link in Safari or Chrome → tap Share → \"Add to Home Screen\"{2} {3} Open link in Chrome → tap menu → \"Add to Home Screen\"{4} {5} Open link in Chrome → click ⊕ in address bar": "Apri il link in Safari o Chrome → tocca Condividi → \"Aggiungi alla schermata Home\"{2} {3} Apri il link in Chrome → tocca il menu → \"Aggiungi alla schermata Home\"{4} {5} Apri il link in Chrome → clicca su ⊕ nella barra degli indirizzi",
   "Open link in Safari → tap Share → \"Add to Home Screen\"{2} {3} Open link in Chrome → tap menu → \"Add to Home Screen\"{4} {5} Open link in Chrome → click ⊕ in address bar": "Apri il link in Safari → tocca Condividi → \"Aggiungi a Home\"{2} {3} Apri il link in Chrome → tocca il menu → \"Aggiungi a Home\"{4} {5} Apri il link in Chrome → clicca su ⊕ nella barra degli indirizzi",
   "Open links in other apps": "Apri i link in altre app",
@@ -944,6 +945,7 @@
   "Opening Bring! relay...": "Apertura relay Bring!...",
   "Opening each panel in turn…": "Apertura di ogni pannello…",
   "Opening recipe {3} of {4}…": "Apertura ricetta {3} di {4}…",
+  "Opening the share menu…": "Apro il menu di condivisione…",
   "Opens it for you": "Lo apre per te",
   "Or e-mail me a one-time sign-in link (no password)": "Oppure inviami un link di accesso temporaneo via e-mail (senza password)",
   "Other equipment": "Altra attrezzatura",
@@ -1268,6 +1270,7 @@
   "Sign in first.": "Accedi prima.",
   "Sign in first: importing from web pages, reading videos and searching for photos need a signed-in account.": "Accedi prima: importare da pagine web, leggere video e cercare foto richiede un account con accesso effettuato.",
   "Sign in from the pill at the top right. Local changes are queued and go up on the next successful sync.": "Accedi dal pulsante in alto a destra. Le modifiche locali vengono messe in coda e caricate alla prossima sincronizzazione riuscita.",
+  "Sign in on this page": "Accedi da questa pagina",
   "Sign in once more": "Accedi ancora una volta",
   "Sign in to change this.": "Accedi per modificarlo.",
   "Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.": "Accedi per salvare le tue ricette in modo sicuro nel cloud. I tuoi dati restano nel tuo account — nessun altro può accedervi.",

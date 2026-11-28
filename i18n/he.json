@@ -1,7 +1,7 @@
 {
  "lang": "he",
  "updatedAt": 1795707178962,
- "count": 3578,
+ "count": 3581,
  "strings": {
   "\"Add to Home Screen\"": "הוספה למסך הבית",
   "\"One item away\" filter ({1}f.{2})": "פילטר \"פריט אחד חסר\" ({1}f.{2})",
@@ -1151,6 +1151,7 @@
   "Open WhatsApp settings": "פתיחת הגדרות WhatsApp",
   "Open deployed app": "פתחו את האפליקציה הפרוסה",
   "Open in a new tab ↗": "פתיחה בכרטיסייה חדשה ↗",
+  "Open it the way you always do — you are not signed in on this page.": "פתחו את האפליקציה כמו תמיד — בדף הזה אינכם מחוברים.",
   "Open link in Safari or Chrome → tap Share → \"Add to Home Screen\"{2} {3} Open link in Chrome → tap menu → \"Add to Home Screen\"{4} {5} Open link in Chrome → click ⊕ in address bar": "פתחו קישור ב-Safari או Chrome ← הקישו על שיתוף ← \"הוספה למסך הבית\"{2} {3} פתחו קישור ב-Chrome ← הקישו על התפריט ← \"הוספה למסך הבית\"{4} {5} פתחו קישור ב-Chrome ← לחצו על ⊕ בשורת הכתובת",
   "Open link in Safari → tap Share → \"Add to Home Screen\"{2} {3} Open link in Chrome → tap menu → \"Add to Home Screen\"{4} {5} Open link in Chrome → click ⊕ in address bar": "פתחו את הקישור ב-Safari ← הקישו על שיתוף ← \"הוספה למסך הבית\"{2} {3} פתחו את הקישור ב-Chrome ← הקישו על התפריט ← \"הוספה למסך הבית\"{4} {5} פתחו את הקישור ב-Chrome ← לחצו על ⊕ בשורת הכתובת",
   "Open links in other apps": "פתיחת קישורים באפליקציות אחרות",
@@ -1162,6 +1163,7 @@
   "Opening Bring! relay...": "פותח ממסר Bring!...",
   "Opening each panel in turn…": "פותח כל פאנל בתורו…",
   "Opening recipe {3} of {4}…": "פותח מתכון {3} מתוך {4}…",
+  "Opening the share menu…": "פותח את תפריט השיתוף…",
   "Opens it for you": "פותח את זה בשבילכם",
   "Or e-mail me a one-time sign-in link (no password)": "או שלחו לי קישור כניסה חד-פעמי (בלי סיסמה)",
   "Orphaned photo documents can be swept ({1}d.{2})": "אפשר לנקות מסמכי תמונות יתומים ({1}d.{2})",
@@ -1567,6 +1569,7 @@
   "Sign in first: importing from web pages, reading videos and searching for photos need a signed-in account.": "קודם התחברו: ייבוא מדפי אינטרנט, קריאת סרטונים וחיפוש תמונות דורשים חשבון מחובר.",
   "Sign in from the pill at the top right. Local changes are queued and go up on the next successful sync.": "התחברו מהתגית בפינה הימנית העליונה. שינויים מקומיים ממתינים בתור ועולים בסנכרון המוצלח הבא.",
   "Sign in is never unclickable text (v{1})": "כניסה אף פעם לא טקסט שאי אפשר ללחוץ עליו (v{1})",
+  "Sign in on this page": "התחברות בדף הזה",
   "Sign in once more": "התחברו שוב",
   "Sign in to change this.": "יש להתחבר כדי לשנות את זה.",
   "Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.": "התחברו כדי לשמור את המתכונים שלכם בבטחה בענן. הנתונים שלכם נשארים בחשבון שלכם — אף אחד אחר לא יכול לגשת אליהם.",

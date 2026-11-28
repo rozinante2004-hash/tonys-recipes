@@ -1,7 +1,7 @@
 {
  "lang": "hu",
  "updatedAt": 1795707178962,
- "count": 2930,
+ "count": 2933,
  "strings": {
   "\"Add to Home Screen\"": "Hozzáadás a kezdőképernyőhöz",
   "\"Open Bring!\"": "Bring! megnyitása",
@@ -893,6 +893,7 @@
   "Open GitHub": "GitHub megnyitása",
   "Open WhatsApp settings": "WhatsApp-beállítások megnyitása",
   "Open deployed app": "Telepített alkalmazás megnyitása",
+  "Open it the way you always do — you are not signed in on this page.": "Nyisd meg úgy, ahogy mindig — ezen az oldalon nem vagy bejelentkezve.",
   "Open link in Safari or Chrome → tap Share → \"Add to Home Screen\"{2} {3} Open link in Chrome → tap menu → \"Add to Home Screen\"{4} {5} Open link in Chrome → click ⊕ in address bar": "Nyisd meg a linket Safariban vagy Chrome-ban → koppints a Megosztásra → „Hozzáadás a kezdőképernyőhöz”{2} {3} Nyisd meg a linket Chrome-ban → koppints a menüre → „Hozzáadás a kezdőképernyőhöz”{4} {5} Nyisd meg a linket Chrome-ban → kattints a ⊕ ikonra a címsorban",
   "Open links in other apps": "Linkek megnyitása más alkalmazásokban",
   "Open the recipe. The red banner at the top has \"↻ Take the other device’s version\", which fetches that one recipe on its own — your copy is kept in its 🕘 Version history so you can compare and restore it.": "Nyisd meg a receptet. A fenti piros sávon található a „↻ A másik eszköz verziójának átvétele” gomb, ami lehívja azt az egy receptet — a te példányod megmarad a 🕘 Verzióelőzmények között, így összehasonlíthatod és visszaállíthatod.",
@@ -900,6 +901,7 @@
   "Open ↗": "Megnyitás ↗",
   "Opening Bring! relay...": "Bring! kapcsolat megnyitása…",
   "Opening each panel in turn…": "Panelek megnyitása sorban…",
+  "Opening the share menu…": "A megosztás menü megnyitása…",
   "Opens it for you": "Megnyitja neked",
   "Or e-mail me a one-time sign-in link (no password)": "Vagy kérek egy egyszeri bejelentkezési linket e-mailben (jelszó nélkül)",
   "Other equipment": "Más eszközök",
@@ -1210,6 +1212,7 @@
   "Sign in first.": "Előbb jelentkezz be.",
   "Sign in first: importing from web pages, reading videos and searching for photos need a signed-in account.": "Előbb jelentkezzen be: weboldalak importálásához, videók feldolgozásához és fotók kereséséhez bejelentkezett fiók szükséges.",
   "Sign in from the pill at the top right. Local changes are queued and go up on the next successful sync.": "Jelentkezz be a jobb felső sarokban lévő gombbal. A helyi változtatások várakozási sorba kerülnek, és a következő sikeres szinkronizáláskor kerülnek fel.",
+  "Sign in on this page": "Bejelentkezés ezen az oldalon",
   "Sign in once more": "Jelentkezz be még egyszer",
   "Sign in to change this.": "Jelentkezz be, hogy megváltoztathasd.",
   "Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.": "Jelentkezz be, hogy biztonságosan mentsd a recepteidet a felhőbe. Az adataid a fiókodban maradnak — senki más nem fér hozzájuk.",

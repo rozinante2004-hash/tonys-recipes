@@ -1,7 +1,7 @@
 {
  "lang": "ru",
  "updatedAt": 1795707178962,
- "count": 3450,
+ "count": 3453,
  "strings": {
   "\"Add to Home Screen\"": "Добавить на главный экран",
   "\"One item away\" filter ({1}f.{2})": "Фильтр «Не хватает одного» ({1}ф.{2})",
@@ -1119,6 +1119,7 @@
   "Open GitHub": "Открыть GitHub",
   "Open WhatsApp settings": "Открыть настройки WhatsApp",
   "Open deployed app": "Открыть развёрнутое приложение",
+  "Open it the way you always do — you are not signed in on this page.": "Откройте приложение как обычно — на этой странице вы не вошли в аккаунт.",
   "Open link in Safari or Chrome → tap Share → \"Add to Home Screen\"{2} {3} Open link in Chrome → tap menu → \"Add to Home Screen\"{4} {5} Open link in Chrome → click ⊕ in address bar": "Откройте ссылку в Safari или Chrome → нажмите «Поделиться» → «На экран «Домой»{2} {3} Откройте ссылку в Chrome → нажмите на меню → «Добавить на главный экран»{4} {5} Откройте ссылку в Chrome → нажмите ⊕ в адресной строке",
   "Open link in Safari → tap Share → \"Add to Home Screen\"{2} {3} Open link in Chrome → tap menu → \"Add to Home Screen\"{4} {5} Open link in Chrome → click ⊕ in address bar": "Откройте ссылку в Safari → нажмите «Поделиться» → «На экран “Домой”»{2} {3} Откройте ссылку в Chrome → нажмите меню → «Добавить на главный экран»{4} {5} Откройте ссылку в Chrome → нажмите ⊕ в адресной строке",
   "Open links in other apps": "Открывать ссылки в других приложениях",
@@ -1130,6 +1131,7 @@
   "Opening Bring! relay...": "Подключение к Bring!...",
   "Opening each panel in turn…": "Открываем панели одну за другой…",
   "Opening recipe {3} of {4}…": "Открываем рецепт {3} из {4}…",
+  "Opening the share menu…": "Открываем меню «Поделиться»…",
   "Opens it for you": "Откроет это за вас",
   "Or e-mail me a one-time sign-in link (no password)": "Или отправить ссылку для входа на почту (без пароля)",
   "Orphaned photo documents can be swept ({1}d.{2})": "Осиротевшие фото можно удалить ({1}шт.{2})",
@@ -1513,6 +1515,7 @@
   "Sign in first: importing from web pages, reading videos and searching for photos need a signed-in account.": "Сначала войдите в аккаунт: для импорта с веб-страниц, чтения видео и поиска фотографий нужен вход в аккаунт.",
   "Sign in from the pill at the top right. Local changes are queued and go up on the next successful sync.": "Войдите через кнопку в правом верхнем углу. Локальные изменения встанут в очередь и синхронизируются при следующем подключении.",
   "Sign in is never unclickable text (v{1})": "Кнопка входа никогда не бывает некликабельным текстом (v{1})",
+  "Sign in on this page": "Войти на этой странице",
   "Sign in once more": "Войдите ещё раз",
   "Sign in to change this.": "Войдите, чтобы это изменить.",
   "Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.": "Войдите, чтобы надёжно сохранить рецепты в облаке. Данные остаются в вашем аккаунте — никто другой не получит к ним доступ.",

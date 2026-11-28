@@ -3219,6 +3219,13 @@ is, "The recipe follows, in N pictures ↓"; `pages[0].cover`), the pages after 
 caption goes with the cover in ONE `navigator.share({ files, text })`; files `Name.jpg`, `Name 1.jpg`…; one picture or
 a computer: no cover. After the request from `…/?invite-me`, `inviteDoneScreen(em)` — a closing screen above the
 sign-in screen (✉️ Request sent, the thank-you, "You can close this page now.", I already have an account — sign in).
+**(v40.24)** "I already have it" ends on `inviteHaveScreen()` (📲 You already have My Kitchen Notes 🙂, open it as always,
+"You can close this page now.", Sign in on this page, ✉️ Ask for an invitation). Faster pictures: `giftPhotoOnce(r)` (one
+load of the photo per recipe and edit, 5 minutes, for the card and the link); `cardWarm(r)` from `toggleShare` starts the
+photo and the fonts; `shareAsPicture` asks the secret question first, then starts `giftForShare` and draws
+(`cardFilesFor`, kept 10 minutes per recipe/edit/cover/language/kitchen) at the same time; `shareBusy(btn, step)` /
+`shareBusyEnd` — a turning wheel (`.share-spin`) and the step (Drawing the card… / Making the link… / Opening the share
+menu…), also on 💬's "Making the link…".
 **Grid** (`#recipeGrid`): a `list` or `grid` view (`setView`). The choice is remembered in
 `tonys_view_mode`; desktop defaults to `list`, **phones default to `grid`** so the layout
 resembles the desktop cube grid. Cards show photo or emoji tile, a category **pill badge**

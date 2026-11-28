@@ -1,7 +1,7 @@
 {
  "lang": "ar",
  "updatedAt": 1795707178962,
- "count": 3152,
+ "count": 3155,
  "strings": {
   "\"Add to Home Screen\"": "إضافة إلى الشاشة الرئيسية",
   "\"Open Bring!\"": "فتح Bring!",
@@ -964,6 +964,7 @@
   "Open GitHub": "فتح GitHub",
   "Open WhatsApp settings": "فتح إعدادات واتساب",
   "Open deployed app": "فتح التطبيق المنشور",
+  "Open it the way you always do — you are not signed in on this page.": "افتحه كما تفعل دائمًا — أنت غير مسجّل الدخول في هذه الصفحة.",
   "Open link in Safari or Chrome → tap Share → \"Add to Home Screen\"{2} {3} Open link in Chrome → tap menu → \"Add to Home Screen\"{4} {5} Open link in Chrome → click ⊕ in address bar": "افتح الرابط في Safari أو Chrome ← اضغط على مشاركة ← \"إضافة إلى الشاشة الرئيسية\"{2} {3} افتح الرابط في Chrome ← اضغط على القائمة ← \"إضافة إلى الشاشة الرئيسية\"{4} {5} افتح الرابط في Chrome ← انقر على ⊕ في شريط العنوان",
   "Open link in Safari → tap Share → \"Add to Home Screen\"{2} {3} Open link in Chrome → tap menu → \"Add to Home Screen\"{4} {5} Open link in Chrome → click ⊕ in address bar": "افتح الرابط في Safari ← اضغط مشاركة ← \"إضافة إلى الشاشة الرئيسية\"{2} {3} افتح الرابط في Chrome ← اضغط القائمة ← \"إضافة إلى الشاشة الرئيسية\"{4} {5} افتح الرابط في Chrome ← اضغط ⊕ في شريط العنوان",
   "Open links in other apps": "فتح الروابط في تطبيقات أخرى",
@@ -975,6 +976,7 @@
   "Opening Bring! relay...": "جارٍ فتح وسيط Bring!...",
   "Opening each panel in turn…": "جارٍ فتح كل لوحة بدورها…",
   "Opening recipe {3} of {4}…": "جاري فتح الوصفة {3} من {4}…",
+  "Opening the share menu…": "جارٍ فتح قائمة المشاركة…",
   "Opens it for you": "يفتحه لك",
   "Or e-mail me a one-time sign-in link (no password)": "أو أرسل لي رابط دخول لمرة واحدة (بدون كلمة مرور)",
   "Other equipment": "معدات أخرى",
@@ -1307,6 +1309,7 @@
   "Sign in first.": "سجّل الدخول أولاً.",
   "Sign in first: importing from web pages, reading videos and searching for photos need a signed-in account.": "سجّل الدخول أولًا: استيراد صفحات الويب وقراءة الفيديوهات والبحث عن الصور تتطلب حسابًا مسجّل الدخول.",
   "Sign in from the pill at the top right. Local changes are queued and go up on the next successful sync.": "سجّل الدخول من الكبسولة أعلى الشاشة على اليمين. التغييرات المحلية تُحفظ في قائمة الانتظار وتُرفع عند نجاح المزامنة التالية.",
+  "Sign in on this page": "تسجيل الدخول في هذه الصفحة",
   "Sign in once more": "سجّل الدخول مرة أخرى",
   "Sign in to change this.": "سجّل الدخول لتغيير هذا.",
   "Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.": "سجّل الدخول لحفظ وصفاتك بأمان على السحابة. تبقى بياناتك في حسابك — لا يمكن لأحد آخر الوصول إليها.",

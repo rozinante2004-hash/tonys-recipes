@@ -1,7 +1,7 @@
 {
  "lang": "ja",
  "updatedAt": 1795707178962,
- "count": 3455,
+ "count": 3458,
  "strings": {
   "\"Add to Home Screen\"": "ホーム画面に追加",
   "\"One item away\" filter ({1}f.{2})": "「あと1品」フィルター（{1}f.{2}）",
@@ -1120,6 +1120,7 @@
   "Open GitHub": "GitHubを開く",
   "Open WhatsApp settings": "WhatsAppの設定を開く",
   "Open deployed app": "デプロイ済みアプリを開く",
+  "Open it the way you always do — you are not signed in on this page.": "いつものように開いてください — このページではサインインしていません。",
   "Open link in Safari or Chrome → tap Share → \"Add to Home Screen\"{2} {3} Open link in Chrome → tap menu → \"Add to Home Screen\"{4} {5} Open link in Chrome → click ⊕ in address bar": "Safari または Chrome でリンクを開く → 共有をタップ → 「ホーム画面に追加」{2} {3}Chrome でリンクを開く → メニューをタップ → 「ホーム画面に追加」{4} {5}Chrome でリンクを開く → アドレスバーの ⊕ をクリック",
   "Open link in Safari → tap Share → \"Add to Home Screen\"{2} {3} Open link in Chrome → tap menu → \"Add to Home Screen\"{4} {5} Open link in Chrome → click ⊕ in address bar": "リンクをSafariで開く → 共有をタップ → 「ホーム画面に追加」{2} {3} リンクをChromeで開く → メニューをタップ → 「ホーム画面に追加」{4} {5} リンクをChromeで開く → アドレスバーの⊕をクリック",
   "Open links in other apps": "他のアプリでリンクを開く",
@@ -1131,6 +1132,7 @@
   "Opening Bring! relay...": "Bring!リレーを開いています...",
   "Opening each panel in turn…": "パネルを順番に開いています…",
   "Opening recipe {3} of {4}…": "レシピ {3}/{4} を開いています…",
+  "Opening the share menu…": "共有メニューを開いています…",
   "Opens it for you": "代わりに開きます",
   "Or e-mail me a one-time sign-in link (no password)": "または、ワンタイムサインインリンクをメールで受け取る(パスワード不要)",
   "Orphaned photo documents can be swept ({1}d.{2})": "孤立した写真データは一括削除できます（{1}件。{2}）",
@@ -1515,6 +1517,7 @@
   "Sign in first: importing from web pages, reading videos and searching for photos need a signed-in account.": "先にサインインしてください：ウェブページからの取り込み、動画の読み取り、写真の検索にはサインインしたアカウントが必要です。",
   "Sign in from the pill at the top right. Local changes are queued and go up on the next successful sync.": "右上のピルからサインインしてください。ローカルの変更は保留され、次回の同期成功時に反映されます。",
   "Sign in is never unclickable text (v{1})": "サインインはクリック不可なテキストにならない（v{1}）",
+  "Sign in on this page": "このページでサインイン",
   "Sign in once more": "もう一度サインイン",
   "Sign in to change this.": "変更するにはサインインしてください。",
   "Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.": "サインインすると、レシピを安全にクラウドへ保存できます。データはあなたのアカウント内にとどまり、他の人はアクセスできません。",

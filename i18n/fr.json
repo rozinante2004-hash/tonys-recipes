@@ -1,7 +1,7 @@
 {
  "lang": "fr",
  "updatedAt": 1795707178962,
- "count": 3150,
+ "count": 3153,
  "strings": {
   "\"Add to Home Screen\"": "Ajouter à l'écran d'accueil",
   "\"Open Bring!\"": "Ouvrir Bring!",
@@ -964,6 +964,7 @@
   "Open GitHub": "Ouvrir GitHub",
   "Open WhatsApp settings": "Ouvrir les réglages WhatsApp",
   "Open deployed app": "Ouvrir l'app déployée",
+  "Open it the way you always do — you are not signed in on this page.": "Ouvrez l’app comme d’habitude — sur cette page, vous n’êtes pas connecté.",
   "Open link in Safari or Chrome → tap Share → \"Add to Home Screen\"{2} {3} Open link in Chrome → tap menu → \"Add to Home Screen\"{4} {5} Open link in Chrome → click ⊕ in address bar": "Ouvrir le lien dans Safari ou Chrome → appuyer sur Partager → « Ajouter à l'écran d'accueil »{2} {3} Ouvrir le lien dans Chrome → appuyer sur le menu → « Ajouter à l'écran d'accueil »{4} {5} Ouvrir le lien dans Chrome → cliquer sur ⊕ dans la barre d'adresse",
   "Open link in Safari → tap Share → \"Add to Home Screen\"{2} {3} Open link in Chrome → tap menu → \"Add to Home Screen\"{4} {5} Open link in Chrome → click ⊕ in address bar": "Ouvrir le lien dans Safari → appuyer sur Partager → « Sur l'écran d'accueil »{2} {3} Ouvrir le lien dans Chrome → appuyer sur le menu → « Ajouter à l'écran d'accueil »{4} {5} Ouvrir le lien dans Chrome → cliquer sur ⊕ dans la barre d'adresse",
   "Open links in other apps": "Ouvrir les liens dans d'autres applis",
@@ -975,6 +976,7 @@
   "Opening Bring! relay...": "Ouverture du relais Bring!...",
   "Opening each panel in turn…": "Ouverture de chaque panneau l'un après l'autre…",
   "Opening recipe {3} of {4}…": "Ouverture de la recette {3} sur {4}…",
+  "Opening the share menu…": "Ouverture du menu de partage…",
   "Opens it for you": "L'ouvre pour vous",
   "Or e-mail me a one-time sign-in link (no password)": "Ou recevoir un lien de connexion par e-mail (sans mot de passe)",
   "Other equipment": "Autre équipement",
@@ -1307,6 +1309,7 @@
   "Sign in first.": "Connecte-toi d'abord.",
   "Sign in first: importing from web pages, reading videos and searching for photos need a signed-in account.": "Connectez-vous d’abord : importer des pages web, lire des vidéos et rechercher des photos nécessitent un compte connecté.",
   "Sign in from the pill at the top right. Local changes are queued and go up on the next successful sync.": "Connecte-toi depuis la pastille en haut à droite. Les modifications locales sont mises en attente et envoyées à la prochaine synchro réussie.",
+  "Sign in on this page": "Se connecter sur cette page",
   "Sign in once more": "Reconnectez-vous",
   "Sign in to change this.": "Connecte-toi pour changer ça.",
   "Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.": "Connectez-vous pour sauvegarder vos recettes en toute sécurité dans le cloud. Vos données restent dans votre compte — personne d'autre n'y a accès.",

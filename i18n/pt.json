@@ -1,7 +1,7 @@
 {
  "lang": "pt",
  "updatedAt": 1795707178962,
- "count": 2917,
+ "count": 2920,
  "strings": {
   "\"Add to Home Screen\"": "Adicionar à tela inicial",
   "\"Open Bring!\"": "Abrir Bring!",
@@ -890,6 +890,7 @@
   "Open GitHub": "Abrir o GitHub",
   "Open WhatsApp settings": "Abrir as definições do WhatsApp",
   "Open deployed app": "Abrir a app publicada",
+  "Open it the way you always do — you are not signed in on this page.": "Abra o app como sempre — nesta página você não está conectado.",
   "Open link in Safari or Chrome → tap Share → \"Add to Home Screen\"{2} {3} Open link in Chrome → tap menu → \"Add to Home Screen\"{4} {5} Open link in Chrome → click ⊕ in address bar": "Abra o link no Safari ou Chrome → toque em Compartilhar → \"Adicionar à Tela de Início\"{2} {3} Abra o link no Chrome → toque no menu → \"Adicionar à Tela de Início\"{4} {5} Abra o link no Chrome → clique em ⊕ na barra de endereço",
   "Open links in other apps": "Abrir links em outros apps",
   "Open the recipe. The red banner at the top has \"↻ Take the other device’s version\", which fetches that one recipe on its own — your copy is kept in its 🕘 Version history so you can compare and restore it.": "Abra a receita. O banner vermelho no topo tem \"↻ Usar a versão do outro dispositivo\", que busca só essa receita — sua cópia fica guardada no 🕘 Histórico de versões para você comparar e restaurar.",
@@ -897,6 +898,7 @@
   "Open ↗": "Abrir ↗",
   "Opening Bring! relay...": "Abrindo o relay do Bring!...",
   "Opening each panel in turn…": "Abrindo cada painel, um de cada vez…",
+  "Opening the share menu…": "Abrindo o menu de compartilhamento…",
   "Opens it for you": "Abre isso para você",
   "Or e-mail me a one-time sign-in link (no password)": "Ou envie-me um link de acesso único por e-mail (sem senha)",
   "Other equipment": "Outro equipamento",
@@ -1206,6 +1208,7 @@
   "Sign in first.": "Entre primeiro.",
   "Sign in first: importing from web pages, reading videos and searching for photos need a signed-in account.": "Inicie sessão primeiro: importar de páginas web, ler vídeos e procurar fotografias requer uma conta com sessão iniciada.",
   "Sign in from the pill at the top right. Local changes are queued and go up on the next successful sync.": "Entre pelo botão no canto superior direito. As alterações locais ficam na fila e são enviadas na próxima sincronização bem-sucedida.",
+  "Sign in on this page": "Entrar nesta página",
   "Sign in once more": "Entre mais uma vez",
   "Sign in to change this.": "Entre para alterar isso.",
   "Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.": "Entre para salvar suas receitas com segurança na nuvem. Seus dados ficam na sua conta — ninguém mais tem acesso a eles.",

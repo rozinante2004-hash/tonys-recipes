@@ -1,7 +1,7 @@
 {
  "lang": "zh",
  "updatedAt": 1795707178962,
- "count": 3154,
+ "count": 3157,
  "strings": {
   "\"Add to Home Screen\"": "添加到主屏幕",
   "\"Open Bring!\"": "打开 Bring!",
@@ -964,6 +964,7 @@
   "Open GitHub": "打开GitHub",
   "Open WhatsApp settings": "打开 WhatsApp 设置",
   "Open deployed app": "打开已部署的应用",
+  "Open it the way you always do — you are not signed in on this page.": "像平时一样打开它 — 你在这个页面上没有登录。",
   "Open link in Safari or Chrome → tap Share → \"Add to Home Screen\"{2} {3} Open link in Chrome → tap menu → \"Add to Home Screen\"{4} {5} Open link in Chrome → click ⊕ in address bar": "在 Safari 或 Chrome 中打开链接 → 点击「分享」→「添加到主屏幕」{2} {3}在 Chrome 中打开链接 → 点击菜单 →「添加到主屏幕」{4} {5}在 Chrome 中打开链接 → 点击地址栏中的 ⊕",
   "Open link in Safari → tap Share → \"Add to Home Screen\"{2} {3} Open link in Chrome → tap menu → \"Add to Home Screen\"{4} {5} Open link in Chrome → click ⊕ in address bar": "在 Safari 中打开链接 → 点按分享 → “添加到主屏幕”{2} {3} 在 Chrome 中打开链接 → 点按菜单 → “添加到主屏幕”{4} {5} 在 Chrome 中打开链接 → 点击地址栏中的 ⊕",
   "Open links in other apps": "在其他应用中打开链接",
@@ -975,6 +976,7 @@
   "Opening Bring! relay...": "正在打开 Bring! 中转…",
   "Opening each panel in turn…": "正在依次打开每个面板…",
   "Opening recipe {3} of {4}…": "正在打开第 {3} 个食谱，共 {4} 个…",
+  "Opening the share menu…": "正在打开分享菜单…",
   "Opens it for you": "帮你打开",
   "Or e-mail me a one-time sign-in link (no password)": "或给我发一个一次性登录链接（无需密码）",
   "Other equipment": "其他厨具",
@@ -1307,6 +1309,7 @@
   "Sign in first.": "请先登录。",
   "Sign in first: importing from web pages, reading videos and searching for photos need a signed-in account.": "请先登录：从网页导入、读取视频和搜索照片都需要已登录的账户。",
   "Sign in from the pill at the top right. Local changes are queued and go up on the next successful sync.": "点击右上角的按钮登录。本地修改会先保存，等下次同步成功后自动上传。",
+  "Sign in on this page": "在此页面登录",
   "Sign in once more": "再登录一次",
   "Sign in to change this.": "登录后才能修改。",
   "Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.": "登录后可将食谱安全保存到云端。你的数据只保存在你的账户里，其他人无法访问。",

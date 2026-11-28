@@ -1,4 +1,4 @@
-<!-- Tony's Recipes Collection v40.23 -->
+<!-- Tony's Recipes Collection v40.24 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -8194,9 +8194,20 @@ async function giftPhotoOf(r) {
   }
   return p.length <= 900000 ? p : '';
 }
+// v40.24 — the photo for a share, loaded once: the card and the link both want it, and the share window starts it as
+// it opens (Tony, 28 Nov: "it is stuck for a very long time on drawing the card"). Kept 5 minutes per recipe and edit.
+var _giftPhotoMemo = { key: '', at: 0, p: null };
+function giftPhotoOnce(r) {
+  var key = String(r && r.id) + '|' + (+(r && r.updatedAt) || 0) + '|' + String((r && r.photo) || '').length;
+  if (_giftPhotoMemo.p && _giftPhotoMemo.key === key && Date.now() - _giftPhotoMemo.at < 5 * 60e3) return _giftPhotoMemo.p;
+  var p = Promise.resolve().then(function(){ return giftPhotoOf(r); }).catch(function(){ return ''; });
+  _giftPhotoMemo = { key: key, at: Date.now(), p: p };
+  return p;
+}
+window.giftPhotoOnce = giftPhotoOnce;
 async function giftSend(r, o) {
   var db = hhDb(), me = _household;
-  var id = giftNewId(), photo = await giftPhotoOf(r);
+  var id = giftNewId(), photo = await giftPhotoOnce(r);
   var recipe = giftPayload(r);
   if (JSON.stringify(recipe).length > 700000) throw new Error('This recipe is too long to send.');
   // v40.21 — a link keeps 6 months, and its photo travels with a small copy for the link's preview card (WhatsApp
@@ -8716,7 +8727,9 @@ async function inviteMeMaybe() {
     message: 'Ask for an invitation, and the app’s owner sends one to your e-mail.\n\n'
       + 'Already have My Kitchen Notes? Open it the way you always do — you are not signed in on this page.',
     okLabel: '✉️ Ask for an invitation', cancelLabel: 'I already have it' });
-  if (pick !== true) return 'has';
+  // v40.24 — "I already have it" ends on a closing screen too, not the sign-in screen (Tony, 28 Nov: "I'm still getting
+  // the login screen and not the closing screen")
+  if (pick !== true) { inviteHaveScreen(); return 'has'; }
   return (await giftAskInvitation()) ? 'asked' : 'not';
 }
 window.inviteMeMaybe = inviteMeMaybe;
@@ -8756,27 +8769,37 @@ async function giftAskInvitation() {
 // v40.23 — after the request from …/?invite-me: a closing screen over the page, not the sign-in screen it fell back to
 // (Tony, 28 Nov: "it allowed me to send the request and then gave me the sign in screen. Is that the expected flow?").
 // Someone who asked cannot sign in yet; someone who has an account after all signs in from the link under it.
-function inviteDoneScreen(em) {
+function inviteDoneScreen(em, have) {
   var prev = document.getElementById('inviteDone'); if (prev) prev.remove();
   var ov = document.createElement('div');
   ov.id = 'inviteDone'; ov.className = 'modal-overlay';
   ov.style.cssText = 'display:flex;z-index:10300;background:var(--cream);';
   ov.innerHTML = '<div class="ask-card" role="dialog" aria-modal="true" aria-labelledby="idTitle">'
-    + '<div class="ask-icon">✉️</div>'
-    + '<div class="ask-title" id="idTitle">Request sent</div>'
-    + '<div class="ask-body" dir="auto" data-no-i18n>' + escH(i18nAsk('Thank you! The app’s owner will write to ' + em + ' with an invitation.')) + '</div>'
+    + (have
+      ? '<div class="ask-icon">\u{1F4F2}</div>'
+        + '<div class="ask-title" id="idTitle">You already have My Kitchen Notes 🙂</div>'
+        + '<div class="ask-body" dir="auto">Open it the way you always do — you are not signed in on this page.</div>'
+      : '<div class="ask-icon">✉️</div>'
+        + '<div class="ask-title" id="idTitle">Request sent</div>'
+        + '<div class="ask-body" dir="auto" data-no-i18n>' + escH(i18nAsk('Thank you! The app’s owner will write to ' + em + ' with an invitation.')) + '</div>')
     + '<div class="ask-body" dir="auto" style="margin-top:8px;">You can close this page now.</div>'
-    + '<div class="ask-actions"><button type="button" class="ask-btn ghost" id="idSignIn">I already have an account — sign in</button></div>'
-    + '</div>';
+    + '<div class="ask-actions">'
+    + '<button type="button" class="ask-btn ghost" id="idSignIn">' + (have ? 'Sign in on this page' : 'I already have an account — sign in') + '</button>'
+    + (have ? '<button type="button" class="ask-btn ghost" id="idAsk">✉️ Ask for an invitation</button>' : '')
+    + '</div></div>';
   document.body.appendChild(ov);
   ov.querySelector('#idSignIn').onclick = function(){
     ov.remove();
     var ls = document.getElementById('loginScreen');
     if (ls && getComputedStyle(ls).display === 'none') ls.style.display = 'flex';
   };
+  var ask = ov.querySelector('#idAsk');
+  if (ask) ask.onclick = function(){ ov.remove(); giftAskInvitation(); };   // pressed by mistake: the request after all
   return ov;
 }
-window.inviteDoneScreen = inviteDoneScreen;
+// v40.24 — "I already have it": open the app as always; this page is not signed in
+function inviteHaveScreen() { return inviteDoneScreen('', true); }
+window.inviteDoneScreen = inviteDoneScreen; window.inviteHaveScreen = inviteHaveScreen;
 // ── ··· More → 🏡 Kitchens and people → 📨 Recipes sent to me ──────────────────────────────────────────
 async function openGiftsIn() {
   if (!_household || !window._fbUser || !hhDb()) { toast('Sign in first.', 5000); return null; }
@@ -11965,7 +11988,7 @@ function copyAccessRules() {
 window.copyAccessRules = copyAccessRules;
 
 
-var APP_VERSION = 'v40.23';
+var APP_VERSION = 'v40.24';
 // v39.23 — each opening, in the log: a member's report had "Signed in" twice a minute apart — two openings, unsaid.
 try { syncLog('system', 'App opened \u2014 ' + APP_VERSION + ', ' + (setupStandalone() ? 'the installed app' : 'a browser tab')); } catch(e) {}
 
@@ -14310,6 +14333,10 @@ li.line-sub-indent { padding-inline-start: 22px; }
 .explore-loading { text-align: center; padding: 2rem; color: var(--muted); font-size: 14px; }
 .ai-spinner { display: inline-block; width: 22px; height: 22px; border: 3px solid var(--border); border-top-color: var(--terracotta); border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 6px; }
 @keyframes spin { to { transform: rotate(360deg); } }
+/* v40.24 — a share button at work: a turning wheel beside the step it is on */
+.share-spin { display: inline-block; flex: 0 0 auto; width: 18px; height: 18px; border: 3px solid rgba(255,255,255,0.35); border-top-color: #FFFFFF; border-radius: 50%; animation: spin 0.8s linear infinite; }
+button.share-busy { cursor: progress; opacity: 0.95; }
+@media (prefers-reduced-motion: reduce) { .share-spin { animation-duration: 2.4s; } }
 .chip { display: inline-block; background: #FFF0E8; color: var(--terracotta); border: 1px solid #f0c8b0; border-radius: 14px; padding: 3px 10px; font-size: 12px; margin: 2px; cursor: pointer; }
 .chip:hover { background: var(--terracotta-fill); color: white; }
 
@@ -15845,7 +15872,7 @@ body.banner-shown .header {
   </div>
   <div class="login-logo">Tony's <span>Recipes</span></div>
   <div class="login-subtitle">Your personal recipe collection,<br>synced across all your devices.</div>
-  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v40.23</div>
+  <div style="font-size:12px;font-weight:600;color:var(--terracotta);margin-bottom:16px;font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v40.24</div>
   <div class="login-card">
     <h2>Sign in</h2>
     <p>Sign in to save your recipes securely to the cloud. Your data stays in your account — nobody else can access it.</p>
@@ -15933,7 +15960,7 @@ body.banner-shown .header {
       </svg>
       <div class="logo">Tony's <span>Recipes</span> Collection</div>
       <button type="button" id="recipeBadge" class="recipe-badge" hidden onclick="openRecipeBadge()" aria-label="Recipes in this collection"></button>
-      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v40.23</div>
+      <div id="appVersionBadge" style="font-size:10px;color:rgba(255,255,255,0.68);font-family:'DM Sans','Heebo',sans-serif;letter-spacing:0.5px;">v40.24</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div id="driveStatus" title="Sync status">
@@ -18229,7 +18256,7 @@ function cardLoadImage(src) {
 async function recipeCardPages(r, o) {
   o = o || {};
   var dir = recipePageDir(r), rtl = dir === 'rtl';   // Hebrew or Arabic: right to left, as the web page
-  var photo = o.photo !== undefined ? o.photo : await giftPhotoOf(r);
+  var photo = o.photo !== undefined ? o.photo : await giftPhotoOnce(r);
   var img = photo ? await cardLoadImage(photo) : null;
   await cardFontsReady([r.name].concat(allIngredients(r).slice(0, 8).map(function(i){ return i.n + ' ' + i.a; })).join(' '));
   var meas = document.createElement('canvas').getContext('2d');
@@ -18432,27 +18459,66 @@ async function recipeCardFiles(r, o) {
   }
   return out;
 }
+// v40.24 — a button at work: a turning wheel and the step it is on (Tony: "please add some kind of animation to
+// indicate the process is working and not stuck").
+function shareBusy(btn, text) {
+  if (!btn) return;
+  if (btn._was == null) btn._was = btn.innerHTML;
+  btn.disabled = true; btn.classList.add('share-busy'); btn.setAttribute('aria-busy', 'true');
+  btn.innerHTML = '<span class="share-spin" aria-hidden="true"></span> <span>' + escH(text) + '</span>';
+}
+function shareBusyEnd(btn) {
+  if (!btn || btn._was == null) return;
+  btn.innerHTML = btn._was; btn._was = null; btn.disabled = false;
+  btn.classList.remove('share-busy'); btn.removeAttribute('aria-busy');
+}
+// The pictures, drawn once per recipe and edit, language and kitchen (10 minutes): a second tap does not draw again.
+var _cardDrawn = { key: '', at: 0, p: null };
+function cardFilesFor(r, cover) {
+  var key = [r.id, +r.updatedAt || 0, cover ? 1 : 0, (typeof _i18nLang !== 'undefined' && _i18nLang) || 'en',
+             (typeof _household !== 'undefined' && _household && _household.name) || ''].join('|');
+  if (_cardDrawn.p && _cardDrawn.key === key && Date.now() - _cardDrawn.at < 10 * 60e3) return _cardDrawn.p;
+  var p = recipeCardFiles(r, cover ? { cover: true } : undefined);
+  _cardDrawn = { key: key, at: Date.now(), p: p };
+  p.catch(function(){ if (_cardDrawn.p === p) _cardDrawn = { key: '', at: 0, p: null }; });
+  return p;
+}
+// The share window, as it opens: the recipe's photo and the card's fonts start loading, so a tap on 🖼️ finds them ready
+// (nothing is drawn or sent until the tap).
+function cardWarm(r) {
+  if (!r || (typeof _selfTestRunning !== 'undefined' && _selfTestRunning && !window._cardWarmTest)) return false;
+  giftPhotoOnce(r);
+  cardFontsReady(r.name).catch(function(){});
+  return true;
+}
+window.cardWarm = cardWarm; window.cardFilesFor = cardFilesFor; window.shareBusy = shareBusy; window.shareBusyEnd = shareBusyEnd;
 // 📤 Share → 🖼️ Send as a picture
 async function shareAsPicture(id) {
   var r = findRecipeRef(id);
   if (!r) { toast('That recipe is no longer here'); return null; }
-  var btn = document.getElementById('sharePicBtn'), was = btn ? btn.innerHTML : '';
-  if (btn) { btn.disabled = true; btn.innerHTML = '<span style="font-size:20px;">⏳</span> Drawing the card…'; }
+  var btn = document.getElementById('sharePicBtn');
   var files = null, caption = '';
+  // a phone's share menu that takes pictures: a cover first (v40.23), and the recipe's link as the caption
+  var phone = false;
+  try { phone = shareMenuHere() && !!navigator.canShare && navigator.canShare({ files: [new File([new Blob(['x'], { type: 'image/jpeg' })], 'x.jpg', { type: 'image/jpeg' })] }); } catch(e) { phone = false; }
+  var withLink = phone && giftCanSend();
+  if (withLink && r.secret && await askConfirm({ icon: '\u{1F512}', title: 'Send a secret recipe?',
+      message: '“' + r.name + '” is 🔒 secret — only your own kitchen sees it. Send a picture of it all the same?',
+      okLabel: 'Send it', cancelLabel: 'Cancel' }) !== true) return null;
+  shareBusy(btn, 'Drawing the card…');
   try {
-    var menu = shareMenuHere() && !!navigator.canShare;
-    files = await recipeCardFiles(r, menu ? { cover: true } : undefined);   // v40.23 — for the share menu, a cover first
-    var phone = menu && navigator.canShare({ files: files });
+    // v40.24 — the card is drawn while the link is made, not one after the other
+    var linkP = withLink ? giftForShare(r, id, 'whatsapp').catch(function(e){
+      syncLog('error', 'The recipe’s link could not be made for its picture', { why: giftErrText(e) }); return null; }) : Promise.resolve(null);
+    files = await cardFilesFor(r, phone);
     if (phone) {
-      // the caption: the recipe's link, where one can be made, and the line for the app
-      var made = null;
-      if (giftCanSend()) {
-        if (r.secret && await askConfirm({ icon: '\u{1F512}', title: 'Send a secret recipe?',
-            message: '“' + r.name + '” is 🔒 secret — only your own kitchen sees it. Send a picture of it all the same?',
-            okLabel: 'Send it', cancelLabel: 'Cancel' }) !== true) return null;
-        try { made = await giftForShare(r, id, 'whatsapp'); } catch(e) { syncLog('error', 'The recipe’s link could not be made for its picture', { why: giftErrText(e) }); }
-      }
+      var linkDone = false; linkP.then(function(){ linkDone = true; });
+      await null;
+      if (!linkDone) shareBusy(btn, 'Making the link…');
+      var made = await linkP;
+      // the caption: the recipe's link, where one could be made, and the line for the app
       caption = noBold(r.name) + (made ? '\n' + made.page : '') + '\n\n' + await appPitchLine(!!made);   // v40.22 — no emoji first
+      shareBusy(btn, 'Opening the share menu…');
     }
     if (!phone) {
       files.forEach(function(f){ downloadBlob(f, f.name); });
@@ -18465,7 +18531,7 @@ async function shareAsPicture(id) {
     toast('Could not make the picture: ' + ((e && e.message) || e), 7000);
     syncLog('error', 'The recipe card picture could not be made', { why: (e && e.message) || String(e) });
     return null;
-  } finally { if (btn) { btn.disabled = false; btn.innerHTML = was; } }
+  } finally { shareBusyEnd(btn); }
   closeM('shareRecipeOverlay');
   // One send (v40.23): the share menu gives the words to the first picture — the recipe's only one, or the cover before
   // its pages — so the recipe reads on undisturbed (v40.22 sent the words in a second share; Tony found it cumbersome).
@@ -26287,6 +26353,7 @@ function toggleShare(id){
   document.getElementById('shareWaBtn').onclick     = function(){ doWhatsApp(id); };
   var picBtn = document.getElementById('sharePicBtn');   // v40.21
   if (picBtn) picBtn.onclick = function(){ shareAsPicture(id); };
+  setTimeout(function(){ try { cardWarm(r); } catch(e) {} }, 150);   // v40.24 — the photo and fonts, ahead of a tap
   var giftBtn = document.getElementById('shareGiftBtn');   // v39.10
   if (giftBtn) giftBtn.onclick = function(){ closeM('shareRecipeOverlay'); openSendRecipe(id); };
   var pageBtn = document.getElementById('sharePageBtn');
@@ -26762,11 +26829,11 @@ function rText(r){
 async function doWhatsApp(id){
   var r=findRecipeRef(id);
   if(!r){ toast('That recipe is no longer here'); return null; }
-  var btn=document.getElementById('shareWaBtn'), was=btn ? btn.innerHTML : '';
-  if(btn){ btn.disabled=true; btn.innerHTML='<span style="font-size:20px;">⏳</span> Making the link…'; }
+  var btn=document.getElementById('shareWaBtn');
+  shareBusy(btn, 'Making the link…');   // v40.24 — a turning wheel while it works
   var text;
   try { text=await recipeShareText(r, id, 'whatsapp'); }
-  finally { if(btn){ btn.disabled=false; btn.innerHTML=was; } }
+  finally { shareBusyEnd(btn); }
   if(text===null) return null;
   closeM('shareRecipeOverlay');
   return await waOpen('https://wa.me/?text='+encodeURIComponent(text));
@@ -38740,8 +38807,8 @@ var HELP_SYSTEM_PROMPT = [
   "- 👪 CHAT WITH FAMILY MEMBERS (the people in YOUR household only): ··· More → 🏡 Kitchens and people → 👪 Chat with family members — or 💬 Chat beside a person in 👥 Family Access (someone added by address who has not signed in yet says ⏳ hasn’t signed in yet: their 💬 Chat comes once they do). 📣 Everyone in <your kitchen> is the room for announcements: everyone in the household reads it. Or choose one person: only the two of you read that conversation. Everyone in the household can write, readers too. Messages arrive live: a short notice with Open, and a red dot on ⋯ More until you have read them. Nothing is changed or deleted afterwards; deleting the household deletes them. 🔔 At the foot of the window: Notify me of new messages when the app is closed (see 🔔 CHAT NOTIFICATIONS).",
   "- 🧑‍🍳 FIRST VISIT: a one-time setup on a notebook page — your account (your e-mail and a password you make up; or 'I already have an account', or Continue offline), this device's Save button (the iPhone shortcut, the Android app in the Share menu, or the computer's browser extension — each new device asks this once; later from ⚙️ Settings), the kitchen rules, then a quick tour.",
   "- 📨 SEND A RECIPE TO ANOTHER KITCHEN: open the recipe → 📤 Share → 📨 Send to another kitchen. Via My Kitchen Notes: type their kitchen's identifier (MKN-…) — it pops up in their app, with a sound, and waits in ··· More → 🏡 Kitchens and people → 📨 Recipes sent to me. Or ✉️ Via Email (type their address: the app e-mails them its photo, your note and a button to save it — no mail program needed; your own mail is offered only if the app cannot send it), Via WhatsApp, 📤 Via another app (on a phone or a tablet: its share menu, with the link — if the phone asks for one more tap, press 📤 Open the share menu), or Copy the link: anyone with the link can open it, even without an account. It is a copy of the recipe as it is now — photo, bold words, notes and all; not your cooking log, ratings or the heart — with a note from you if you like. They tap 📥 Save to my recipes and it is theirs, no AI involved. Sent through the app it waits 4 weeks; a link keeps 6 months (v40.21). ··· More → 🏡 Kitchens and people → 📤 Recipes I sent shows whether it was saved, copies a link again, sends it again, and takes one back — tick several (or Select all) to do it for all of them at once: ↩️ Take back, 📨 Send again (to a kitchen: it pops up in their app again for 4 more weeks, the earlier one taken back; a link: new links, good for 6 more months, in one message — the earlier ones keep working until they expire), 🔗 Copy the links. A kitchen that gets unwanted recipes can 🚫 Block the sender (the owner or an admin). During the closed beta, someone without an account who opens the link sees the recipe and can ask for an invitation — with their address already filled in when it came by e-mail.",
-  "- 💬 SHARE ON WHATSAPP (📤 Share → 💬 Share on WhatsApp; v40.21): WhatsApp opens with the recipe's name and a link to its own page on the app's address (…/r/…), which WhatsApp shows as a card with the recipe's photo and name; tapped, it opens as the whole recipe — photo, ingredients, method, notes — in any browser, no app or account needed, with 📥 Save to my recipes for anyone who has the app. The link keeps 6 months; the same recipe shared again within a week, unchanged, sends the same link. The message ends with a line for the app (📲 Download My Kitchen Notes and keep the recipe for good — this link lasts 6 months) and its link: while new members come by invitation only, that link opens the request for an invitation, which goes to the app's owner. Signed out, offline, or when the link cannot be made, the recipe goes as text, as before, with the same line. A 🔒 secret recipe asks first. On a phone the WhatsApp app itself opens, with nothing left behind (v40.22); if WhatsApp does not open by itself, press 💬 Open WhatsApp. The invitation link asks first — ✉️ Ask for an invitation, or I already have it: WhatsApp opens links in its own browser, where nobody is signed in, so someone who already has the app opens it the way they always do. After the request a closing screen says it was sent and that the page can be closed (with I already have an account — sign in under it); no welcome pages and no sign-in screen follow it.",
-  "- 🖼️ SEND AS A PICTURE (📤 Share → 🖼️ Send as a picture; v40.21): the recipe card drawn as a picture 1080 pixels wide — its photo (or its emoji), name, what it is, ingredients, method, notes — right to left for a Hebrew or Arabic recipe. A long recipe makes several pictures, numbered 1 / 3, 2 / 3…, each no taller than a phone screen, so a chat shows it readably. On a phone or tablet the share menu opens with the picture and, as its caption, the recipe's link and the line for the app (if the phone asks for one more tap, press 📤 Open the share menu). Several pictures go in one send with a cover first — the photo, the name, what it is and how many pictures follow — and the link and the line under the cover, so the recipe's own pictures read on undisturbed (a share menu gives the words to the first picture; v40.23). On a computer the pictures are saved as files to send from anywhere.",
+  "- 💬 SHARE ON WHATSAPP (📤 Share → 💬 Share on WhatsApp; v40.21): WhatsApp opens with the recipe's name and a link to its own page on the app's address (…/r/…), which WhatsApp shows as a card with the recipe's photo and name; tapped, it opens as the whole recipe — photo, ingredients, method, notes — in any browser, no app or account needed, with 📥 Save to my recipes for anyone who has the app. The link keeps 6 months; the same recipe shared again within a week, unchanged, sends the same link. The message ends with a line for the app (📲 Download My Kitchen Notes and keep the recipe for good — this link lasts 6 months) and its link: while new members come by invitation only, that link opens the request for an invitation, which goes to the app's owner. Signed out, offline, or when the link cannot be made, the recipe goes as text, as before, with the same line. A 🔒 secret recipe asks first. On a phone the WhatsApp app itself opens, with nothing left behind (v40.22); if WhatsApp does not open by itself, press 💬 Open WhatsApp. The invitation link asks first — ✉️ Ask for an invitation, or I already have it: WhatsApp opens links in its own browser, where nobody is signed in, so someone who already has the app opens it the way they always do. After the request a closing screen says it was sent and that the page can be closed (with I already have an account — sign in under it); I already have it ends on a closing screen too (open the app as always; Sign in on this page, or ✉️ Ask for an invitation after all). No welcome pages and no sign-in screen follow either (v40.24).",
+  "- 🖼️ SEND AS A PICTURE (📤 Share → 🖼️ Send as a picture; v40.21): the recipe card drawn as a picture 1080 pixels wide — its photo (or its emoji), name, what it is, ingredients, method, notes — right to left for a Hebrew or Arabic recipe. A long recipe makes several pictures, numbered 1 / 3, 2 / 3…, each no taller than a phone screen, so a chat shows it readably. On a phone or tablet the share menu opens with the picture and, as its caption, the recipe's link and the line for the app (if the phone asks for one more tap, press 📤 Open the share menu). Several pictures go in one send with a cover first — the photo, the name, what it is and how many pictures follow — and the link and the line under the cover, so the recipe's own pictures read on undisturbed (a share menu gives the words to the first picture; v40.23). The button shows a turning wheel and the step it is on (Drawing the card…, Making the link…, Opening the share menu…); the photo starts loading as the share window opens, and the card is drawn while the link is made (v40.24). On a computer the pictures are saved as files to send from anywhere.",
   "- ✉️ E-MAIL A RECIPE (📤 Share → ✉️ Email): type their address and press 📨 Send — the app e-mails the recipe, laid out with its photo, from your kitchen's name via My Kitchen Notes; their reply comes to your own address. Nothing to paste, and no mail program needed (signed in, your address confirmed; up to 15 e-mails a day). On a phone, 📤 Share menu hands the photo and the recipe to the mail app you pick. 📋 Copy copies it, photo and all, to paste anywhere else. (To send a recipe that another kitchen saves with one tap, use 📨 Send to another kitchen.)",
   "- 🔒 SECRET RECIPES: in the editor, tick 🔒 Secret — the recipe (and its photo) is then kept where only your own kitchen can read it; the kitchens you link with do not see it, nor know it exists. Untick it to share it again. A 🔒 shows on its card.",
   "- 🔄 RELOAD A LINKED KITCHEN: beside a linked kitchen's name in your recipe list, 🔄 Reload reads its recipes and photos again from the start — for when something looks missing or out of date.",

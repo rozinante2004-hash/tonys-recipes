@@ -26270,7 +26270,8 @@ window.SELF_TESTS = [
   // v40.21 — Tony: "Add the picture of the recipe card too, as you've suggested."
   { id:'recipe_card_picture', group:'Features', name:'🖼️ Send as a picture: the recipe card drawn as pictures 1080 px wide and at most 1920 tall — photo, name, ingredients, method — right to left for a Hebrew recipe; shared in one send with its link and the line for the app (several pictures after a cover), or saved on a computer (v40.21, v40.23)',
     test: async()=>{
-      var real={ here:window.shareMenuHere, dl:window.downloadBlob, share:navigator.share, can:navigator.canShare, toast:window.toast, user:window._fbUser, pitch:window._pitchOpenForTest, confirm:window.askConfirm };
+      var real={ here:window.shareMenuHere, dl:window.downloadBlob, share:navigator.share, can:navigator.canShare, toast:window.toast, user:window._fbUser, pitch:window._pitchOpenForTest, confirm:window.askConfirm,
+        files:window.recipeCardFiles, gfs:window.giftForShare, gpo:window.giftPhotoOf, db:window._fbDb, hh:window._household, warm:window._cardWarmTest };
       var ids=[];
       var pc=document.createElement('canvas'); pc.width=1200; pc.height=800; var g=pc.getContext('2d'); g.fillStyle='#b5651d'; g.fillRect(0,0,1200,800);
       var photo=pc.toDataURL('image/jpeg',0.8);
@@ -26338,7 +26339,46 @@ window.SELF_TESTS = [
         if(n<3 || sh.files[0].name!=='Long.jpg' || sh.files[1].name!=='Long 1.jpg' || sh.files[n-1].name!=='Long '+(n-1)+'.jpg')
           throw new Error('the pictures sent: '+sh.files.map(function(f){ return f.name; }).join(', '));
         if(String(sh.text||'').indexOf('Long\n')!==0 || sh.text.indexOf('Download My Kitchen Notes')<0) throw new Error('the words with the pictures: '+JSON.stringify(sh.text));
+        // v40.24 — Tony: "it is stuck for a very long time on drawing the card … please add some kind of animation to
+        // indicate the process is working and not stuck". The button turns while it works, and says the step it is on.
+        var bt=document.getElementById('sharePicBtn'), btWas=bt.innerHTML;
+        var pr=shareAsPicture(en.id);
+        if(!bt.classList.contains('share-busy') || !bt.querySelector('.share-spin') || !bt.disabled || !/Drawing the card/.test(bt.textContent)) throw new Error('no turning wheel while the card is drawn: '+bt.textContent);
+        if(getComputedStyle(bt.querySelector('.share-spin')).animationName==='none') throw new Error('the wheel does not turn');
+        await pr;
+        if(bt.classList.contains('share-busy') || bt.disabled || bt.innerHTML!==btWas) throw new Error('the button was not put back after');
+        // the card is drawn while the link is made, not after it; the step shown follows
+        var lg2=normalizeRecipe({ id:TEST_ID_MIN+46, name:'Long two', ingredients:ings, steps:steps });
+        recipes.push(lg2); ids.push(lg2.id);
+        var order=[], labels=[];
+        window.recipeCardFiles=async function(rr, o){ order.push('draw-start'); var f=await real.files(rr, o); order.push('draw-end'); return f; };
+        window.giftForShare=async function(){ order.push('link-start');
+          for(var w=0; w<200 && order.indexOf('draw-end')<0; w++) await new Promise(function(r){ setTimeout(r, 25); });
+          await new Promise(function(r){ setTimeout(r, 60); }); labels.push(bt.textContent);
+          order.push('link-end'); return { id:'L2', page:'https://example.com/r/L2', name:'Long two' }; };
+        window._fbUser={ uid:'uP' }; window._household=_household={ hid:'hP', name:'Kitchen P', code:'MKN-PPPP-1111', role:'owner' };
+        window._fbDb={ collection:function(){ return {}; } }; window._giftUnderTest=true;
+        if(APP_CONFIG.dataLayout==='households'){   // links are sent from the households layout only
+          shares=[];
+          if(await shareAsPicture(lg2.id)!=='shared' || shares.length!==1) throw new Error('with a link: '+shares.length+' sends');
+          if(!(order.indexOf('link-start')>-1 && order.indexOf('link-start')<order.indexOf('draw-end'))) throw new Error('the link waited for the drawing: '+order.join(' → '));
+          if(!/Making the link/.test(labels[0]||'')) throw new Error('the step shown while the link was made: '+labels[0]);
+          if(shares[0].text.indexOf('https://example.com/r/L2')<0) throw new Error('the link is not under the cover: '+shares[0].text);
+        }
+        window._giftUnderTest=false;
+        // the photo is loaded once for the card and the link, and the share window starts it as it opens
+        var loads=0; window.giftPhotoOf=async function(){ loads++; return photo; };
+        var pr3={ id:TEST_ID_MIN+47, name:'Once', updatedAt:Date.now() };
+        await giftPhotoOnce(pr3); await giftPhotoOnce(pr3);
+        if(loads!==1) throw new Error('the photo was loaded '+loads+' times for one recipe');
+        var pr4={ id:TEST_ID_MIN+48, name:'Warm', updatedAt:Date.now() };
+        window._cardWarmTest=true;
+        if(!cardWarm(pr4)) throw new Error('the share window did not start the photo');
+        await giftPhotoOnce(pr4);
+        if(loads!==2) throw new Error('opening the share window and the tap loaded the photo '+(loads-1)+' times');
       } finally {
+        window.recipeCardFiles=real.files; window.giftForShare=real.gfs; window.giftPhotoOf=real.gpo; window._fbDb=real.db;
+        window._household=_household=real.hh; window._giftUnderTest=false; window._cardWarmTest=real.warm;
         window.shareMenuHere=real.here; window.downloadBlob=real.dl; window.toast=real.toast; window._fbUser=real.user; window._pitchOpenForTest=real.pitch; window.askConfirm=real.confirm;
         if(real.share) Object.defineProperty(navigator,'share',{ configurable:true, value:real.share }); else delete navigator.share;
         if(real.can) Object.defineProperty(navigator,'canShare',{ configurable:true, value:real.can }); else delete navigator.canShare;
@@ -26369,6 +26409,14 @@ window.SELF_TESTS = [
         if(got!=='has' || asks || asked.length!==1) throw new Error('not asked first: '+got+', '+asks+' address(es) asked, '+asked.length+' question(s)');
         if(!/Ask for an invitation/.test(asked[0].okLabel) || !/already have it/.test(asked[0].cancelLabel) || !/not signed in on this page/.test(asked[0].message))
           throw new Error('the question: '+JSON.stringify({ ok:asked[0].okLabel, no:asked[0].cancelLabel, m:asked[0].message }));
+        // v40.24 — "I already have it" ends on a closing screen too (Tony: "I'm still getting the login screen and not the
+        // closing screen"); ✉️ Ask for an invitation on it, for a tap by mistake
+        var hv=document.getElementById('inviteDone');
+        if(!hv || !/You already have My Kitchen Notes/.test(hv.textContent) || !/You can close this page now/.test(hv.textContent) || !hv.querySelector('#idSignIn') || !hv.querySelector('#idAsk'))
+          throw new Error('no closing screen after I already have it: '+(hv ? hv.textContent : 'none'));
+        hv.querySelector('#idAsk').click(); await new Promise(function(r){ setTimeout(r, 0); });
+        if(asks!==1 || document.getElementById('inviteDone')) throw new Error('✉️ Ask for an invitation on it did not ask');
+        asks=0;
         // ✉️ Ask for an invitation: the address
         answer=true; asked=[]; sessionStorage.setItem(INVITE_ME_KEY,'1');
         if(await inviteMeMaybe()!=='asked' || asks!==1) throw new Error('✉️ Ask for an invitation did not ask for the address');
