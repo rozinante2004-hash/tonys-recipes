@@ -1,7 +1,7 @@
 {
  "lang": "it",
  "updatedAt": 1795707178962,
- "count": 3060,
+ "count": 3062,
  "strings": {
   "\"Add to Home Screen\"": "Aggiungi a Home",
   "\"Open Bring!\"": "Apri Bring!",
@@ -653,6 +653,7 @@
   "It has been {1} days since a backup": "Sono passati {1} giorni dall'ultimo backup",
   "It is deleted from “{1}” and is NOT kept as a recipe of its own. {2} The collection’s previous state is kept in 🕘 Version history, so this can be undone.": "Viene eliminata da “{1}” e NON resta come ricetta a sé stante. {2} Lo stato precedente della raccolta resta nella 🕘 Cronologia versioni, quindi puoi annullare.",
   "It is now in the Chrome store, where it keeps itself up to date. Add it from there, then remove the copy you loaded from a folder (on {1}, press {2} on the old My Kitchen Notes).": "Ora è nel Chrome Store, dove si aggiorna da solo. Aggiungila da lì, poi rimuovi la copia caricata da una cartella (su {1}, premi {2} sulla vecchia My Kitchen Notes).",
+  "It takes a few seconds.": "Ci vuole qualche secondo.",
   "It tells you when a new version is out — and pulling the list down checks at once.": "Ti avvisa quando esce una nuova versione — e tirando giù la lista controlla subito.",
   "It waits in ··· More → 🏡 Kitchens and people → 📨 Recipes sent to me until {1}.": "Resta in ··· Altro → 🏡 Cucine e persone → 📨 Ricette che mi hanno inviato finché {1}.",
   "Italian": "Italiano",
@@ -1202,6 +1203,7 @@
   "Send {1} photo{2} to the cloud?": "Inviare {1} foto{2} al cloud?",
   "Sending ingredients to Bring!...": "Invio ingredienti a Bring!...",
   "Sending the restored photos to the cloud…": "Invio delle foto ripristinate al cloud…",
+  "Sending your request…": "Invio la tua richiesta…",
   "Sending ×{1} amounts (metric) — matching what you had scaled the recipe to": "Invio quantità ×{1} (metriche) — corrispondenti alla scala della ricetta",
   "Sending…": "Invio…",
   "Sends it through the app, and copies a message (with the link to accept it) to paste wherever you like": "La invia tramite l'app e copia un messaggio (con il link per accettarla) da incollare dove vuoi",

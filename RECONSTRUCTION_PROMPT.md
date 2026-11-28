@@ -3226,6 +3226,10 @@ photo and the fonts; `shareAsPicture` asks the secret question first, then start
 (`cardFilesFor`, kept 10 minutes per recipe/edit/cover/language/kitchen) at the same time; `shareBusy(btn, step)` /
 `shareBusyEnd` — a turning wheel (`.share-spin`) and the step (Drawing the card… / Making the link… / Opening the share
 menu…), also on 💬's "Making the link…".
+**(v40.25)** `giftAskInvitation` shows `inviteDoneScreen(em, 'sending')` (a turning wheel, "Sending your request…", "It
+takes a few seconds.") from the tap on Send until the server answers — the server writes to the owner and takes some
+seconds, and the sign-in screen behind looked like the end; the answer replaces it with Request sent, a refusal removes
+it before "Not sent", and from a recipe's own window it goes before "Sent".
 **Grid** (`#recipeGrid`): a `list` or `grid` view (`setView`). The choice is remembered in
 `tonys_view_mode`; desktop defaults to `list`, **phones default to `grid`** so the layout
 resembles the desktop cube grid. Cards show photo or emoji tile, a category **pill badge**

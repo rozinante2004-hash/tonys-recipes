@@ -1,7 +1,7 @@
 {
  "lang": "zh",
  "updatedAt": 1795707178962,
- "count": 3157,
+ "count": 3159,
  "strings": {
   "\"Add to Home Screen\"": "添加到主屏幕",
   "\"Open Bring!\"": "打开 Bring!",
@@ -674,6 +674,7 @@
   "It has been {1} days since a backup": "距离上次备份已 {1} 天",
   "It is deleted from “{1}” and is NOT kept as a recipe of its own. {2} The collection’s previous state is kept in 🕘 Version history, so this can be undone.": "它已从「{1}」中删除，不会作为独立菜谱保留。{2} 该合集之前的状态保存在🕘版本历史中，可以撤销此操作。",
   "It is now in the Chrome store, where it keeps itself up to date. Add it from there, then remove the copy you loaded from a folder (on {1}, press {2} on the old My Kitchen Notes).": "它现在已上架 Chrome 商店，会自动保持更新。请从那里添加，然后删除你从文件夹加载的副本（在 {1} 上，对旧版 My Kitchen Notes 按 {2}）。",
+  "It takes a few seconds.": "需要几秒钟。",
   "It tells you when a new version is out — and pulling the list down checks at once.": "有新版本时会通知你——下拉列表也能立即检查。",
   "It waits in ··· More → 🏡 Kitchens and people → 📨 Recipes sent to me until {1}.": "它会留在 ··· 更多 → 🏡 厨房和成员 → 📨 别人发给我的食谱 里，直到 {1}。",
   "Italian": "意大利语",
@@ -1241,6 +1242,7 @@
   "Send {1} photo{2} to the cloud?": "将 {1} 张照片{2}发送到云端？",
   "Sending ingredients to Bring!...": "正在将食材发送到 Bring!…",
   "Sending the restored photos to the cloud…": "正在将恢复的照片发送到云端…",
+  "Sending your request…": "正在发送你的请求…",
   "Sending ×{1} amounts (metric) — matching what you had scaled the recipe to": "发送 ×{1} 份量（公制）——与你调整后的食谱份量一致",
   "Sending…": "发送中…",
   "Sends it through the app, and copies a message (with the link to accept it) to paste wherever you like": "通过应用发送，并复制一条消息（含接受链接），可粘贴到任何地方",

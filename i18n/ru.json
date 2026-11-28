@@ -1,7 +1,7 @@
 {
  "lang": "ru",
  "updatedAt": 1795707178962,
- "count": 3453,
+ "count": 3455,
  "strings": {
   "\"Add to Home Screen\"": "Добавить на главный экран",
   "\"One item away\" filter ({1}f.{2})": "Фильтр «Не хватает одного» ({1}ф.{2})",
@@ -815,6 +815,7 @@
   "It has been {1} days since a backup": "С последнего бэкапа прошло {1} дн.",
   "It is deleted from “{1}” and is NOT kept as a recipe of its own. {2} The collection’s previous state is kept in 🕘 Version history, so this can be undone.": "Он удаляется из «{1}» и НЕ сохраняется как отдельный рецепт. {2} Предыдущее состояние коллекции хранится в 🕘 Истории версий, так что это можно отменить.",
   "It is now in the Chrome store, where it keeps itself up to date. Add it from there, then remove the copy you loaded from a folder (on {1}, press {2} on the old My Kitchen Notes).": "Теперь оно есть в Chrome Store, где обновляется само. Добавьте его оттуда, а затем удалите копию, загруженную из папки (на {1} нажмите {2} на старом My Kitchen Notes).",
+  "It takes a few seconds.": "Это займёт несколько секунд.",
   "It tells you when a new version is out — and pulling the list down checks at once.": "Оповещает, когда выходит новая версия — а потянув список вниз, можно проверить сразу.",
   "It waits in ··· More → 🏡 Kitchens and people → 📨 Recipes sent to me until {1}.": "Он будет ждать в ··· Ещё → 🏡 Кухни и участники → 📨 Присланные мне рецепты, пока {1}.",
   "Italian": "Итальянская",
@@ -1442,6 +1443,7 @@
   "Send {1} photo{2} to the cloud?": "Отправить {1} фото{2} в облако?",
   "Sending ingredients to Bring!...": "Отправка ингредиентов в Bring!...",
   "Sending the restored photos to the cloud…": "Отправка восстановленных фото в облако…",
+  "Sending your request…": "Отправляем ваш запрос…",
   "Sending ×{1} amounts (metric) — matching what you had scaled the recipe to": "Отправка ×{1} количеств (метрических) — соответствуют тому, до чего вы пересчитали рецепт",
   "Sending…": "Отправка…",
   "Sends it through the app, and copies a message (with the link to accept it) to paste wherever you like": "Отправляет его через приложение и копирует сообщение (со ссылкой для подтверждения), которое можно вставить куда угодно",

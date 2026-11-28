@@ -1,7 +1,7 @@
 {
  "lang": "fr",
  "updatedAt": 1795707178962,
- "count": 3153,
+ "count": 3155,
  "strings": {
   "\"Add to Home Screen\"": "Ajouter à l'écran d'accueil",
   "\"Open Bring!\"": "Ouvrir Bring!",
@@ -674,6 +674,7 @@
   "It has been {1} days since a backup": "Il n'y a pas eu de sauvegarde depuis {1} jours",
   "It is deleted from “{1}” and is NOT kept as a recipe of its own. {2} The collection’s previous state is kept in 🕘 Version history, so this can be undone.": "Il est supprimé de « {1} » et n'est PAS conservé comme recette à part entière. {2} L'état précédent de la collection est conservé dans 🕘 l'historique des versions, donc c'est réversible.",
   "It is now in the Chrome store, where it keeps itself up to date. Add it from there, then remove the copy you loaded from a folder (on {1}, press {2} on the old My Kitchen Notes).": "Elle est maintenant sur le Chrome Store, où elle se met à jour toute seule. Ajoutez-la depuis là, puis supprimez la copie chargée depuis un dossier (sur {1}, appuyez sur {2} sur l'ancienne version de My Kitchen Notes).",
+  "It takes a few seconds.": "Cela prend quelques secondes.",
   "It tells you when a new version is out — and pulling the list down checks at once.": "Il te prévient quand une nouvelle version est disponible — et tirer la liste vers le bas vérifie aussitôt.",
   "It waits in ··· More → 🏡 Kitchens and people → 📨 Recipes sent to me until {1}.": "Elle patiente dans ··· Plus → 🏡 Cuisines et personnes → 📨 Recettes reçues jusqu'à {1}.",
   "Italian": "Italian",
@@ -1241,6 +1242,7 @@
   "Send {1} photo{2} to the cloud?": "Envoyer {1} photo{2} vers le cloud ?",
   "Sending ingredients to Bring!...": "Envoi des ingrédients vers Bring!...",
   "Sending the restored photos to the cloud…": "Envoi des photos restaurées vers le cloud…",
+  "Sending your request…": "Envoi de votre demande…",
   "Sending ×{1} amounts (metric) — matching what you had scaled the recipe to": "Envoi des quantités ×{1} (métrique) — correspondant à l'échelle appliquée à la recette",
   "Sending…": "Envoi…",
   "Sends it through the app, and copies a message (with the link to accept it) to paste wherever you like": "L'envoie via l'app, et copie un message (avec le lien pour l'accepter) à coller où tu veux",

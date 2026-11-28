@@ -1,7 +1,7 @@
 {
  "lang": "he",
  "updatedAt": 1795707178962,
- "count": 3581,
+ "count": 3583,
  "strings": {
   "\"Add to Home Screen\"": "הוספה למסך הבית",
   "\"One item away\" filter ({1}f.{2})": "פילטר \"פריט אחד חסר\" ({1}f.{2})",
@@ -838,6 +838,7 @@
   "It has been {1} days since a backup": "עברו {1} ימים מהגיבוי האחרון",
   "It is deleted from “{1}” and is NOT kept as a recipe of its own. {2} The collection’s previous state is kept in 🕘 Version history, so this can be undone.": "הוא נמחק מ-{1} ולא נשמר כמתכון בפני עצמו. {2} המצב הקודם של האוסף נשמר בהיסטוריית הגרסאות 🕘, כך שאפשר לבטל את זה.",
   "It is now in the Chrome store, where it keeps itself up to date. Add it from there, then remove the copy you loaded from a folder (on {1}, press {2} on the old My Kitchen Notes).": "האפליקציה נמצאת עכשיו בחנות Chrome, שם היא מתעדכנת אוטומטית. הוסיפו אותה משם, ואז הסירו את העותק שטענתם מתיקייה (ב-{1}, לחצו על {2} בגרסה הישנה של My Kitchen Notes).",
+  "It takes a few seconds.": "זה לוקח כמה שניות.",
   "It tells you when a new version is out — and pulling the list down checks at once.": "האפליקציה מודיעה כשיש גרסה חדשה — ומשיכת הרשימה למטה בודקת מייד.",
   "It waits in ··· More → 🏡 Kitchens and people → 📨 Recipes sent to me until {1}.": "היא מחכה ב··· עוד → 🏡 מטבחים ואנשים → 📨 מתכונים שנשלחו אליי עד {1}.",
   "Italian": "איטלקי",
@@ -1495,6 +1496,7 @@
   "Send {1} photo{2} to the cloud?": "לשלוח {1} תמונה{2} לענן?",
   "Sending ingredients to Bring!...": "שולח מצרכים ל-Bring!...",
   "Sending the restored photos to the cloud…": "שולח את התמונות המשוחזרות לענן…",
+  "Sending your request…": "שולח את הבקשה שלכם…",
   "Sending ×{1} amounts (imperial) — matching what you had scaled the recipe to": "שולח כמויות ×{1} (יחידות אימפריאליות) — בהתאם לקנה המידה שהתאמת למתכון",
   "Sending ×{1} amounts (metric) — matching what you had scaled the recipe to": "שליחת כמויות ×{1} (מטרי) — בהתאם למה שהתאמת את המתכון אליו",
   "Sending…": "שולח…",

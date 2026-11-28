@@ -62,8 +62,9 @@ where.
   first and no welcome follows it, WhatsApp opens as the app itself on a phone (no blank page left), no emoji before the
   name. v40.23 — the invitation request ends on a closing screen (not the sign-in screen); several card pictures go
   in one send, a cover first carrying the link. v40.24 — 🖼️ faster (the photo once and ahead, drawn while the link is
-  made) with a turning wheel and its step; "I already have it" ends on a closing screen too. Release (v40.21–v40.24) on
-  Tony's yes. The test copy
+  made) with a turning wheel and its step; "I already have it" ends on a closing screen too. v40.25 — the closing
+  screen from the tap on Send ("Sending your request…"), not the sign-in screen while the server answers. Release
+  (v40.21–v40.25) on Tony's yes. The test copy
   (https://tonys-recipes-test.pages.dev, its own database and rules) follows `test`.
 - **The beta has had testers since Sunday 25 Oct 2026** and is **by invitation only**: the owner invites with
   ⚙️ → 👑 → ✉️ Invite testers (the congratulatory wording of v39.60); a tester's share button asks the owner for an

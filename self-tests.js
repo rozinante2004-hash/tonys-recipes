@@ -26435,8 +26435,11 @@ window.SELF_TESTS = [
         // v40.23 — after the request a closing screen, not the sign-in screen (Tony: "it allowed me to send the request and
         // then gave me the sign in screen. Is that the expected flow?")
         window.giftAskInvitation=real.ask;
-        var realFetch=window.fetch, sentBody=null; asked=[];
-        window.fetch=async function(u, o){ sentBody=o && o.body; return { ok:true, status:200, json:async function(){ return { ok:true }; } }; };
+        var realFetch=window.fetch, sentBody=null, whileSending=''; asked=[];
+        // v40.25 — from the tap on Send, "Sending your request…" on the screen, not the sign-in screen (Tony: "Still
+        // getting the login screen and not the Request sent screen after I push sent"; the server takes some seconds)
+        window.fetch=async function(u, o){ sentBody=o && o.body; var sc=document.getElementById('inviteDone'); whileSending=sc ? sc.textContent : '';
+          return { ok:true, status:200, json:async function(){ return { ok:true }; } }; };
         window.askConfirm=async function(o){ asked.push(o); return o.inputType==='email' ? 'new@example.com' : true; };
         var lookWas=_gifts.lookAt; _gifts.lookAt=null;   // from …/?invite-me: no recipe
         try { sessionStorage.setItem(INVITE_ME_KEY,'1'); var r2=await inviteMeMaybe(); } finally { window.fetch=realFetch; _gifts.lookAt=lookWas; }
@@ -26445,6 +26448,14 @@ window.SELF_TESTS = [
         if(!done || !/Request sent/.test(done.textContent) || done.textContent.indexOf('new@example.com')<0 || !/You can close this page now/.test(done.textContent))
           throw new Error('no closing screen after the request: '+(done ? done.textContent : 'none'));
         if(asked.some(function(o){ return o.title==='Sent'; })) throw new Error('a "Sent" window came as well');
+        if(!/Sending your request/.test(whileSending) || !document.querySelector('#inviteDone .ask-title') || /Sending/.test(done.textContent))
+          throw new Error('while the request was on its way: '+JSON.stringify(whileSending));
+        // the server refuses: the sending screen goes, and "Not sent" says so
+        done.remove(); asked=[];
+        window.fetch=async function(){ throw new Error('offline'); };
+        try { var r3=await giftAskInvitation(); } finally { window.fetch=realFetch; }
+        if(r3!==false || document.getElementById('inviteDone') || !asked.some(function(o){ return o.title==='Not sent'; })) throw new Error('a refused request: '+r3);
+        done=inviteDoneScreen('new@example.com');
         if(+getComputedStyle(done).zIndex<=9999 || getComputedStyle(done).backgroundColor==='rgba(0, 0, 0, 0)') throw new Error('the sign-in screen shows through the closing screen');
         done.querySelector('#idSignIn').click();
         if(document.getElementById('inviteDone')) throw new Error('I already have an account — sign in left the closing screen up');

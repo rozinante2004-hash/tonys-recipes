@@ -1,7 +1,7 @@
 {
  "lang": "pt",
  "updatedAt": 1795707178962,
- "count": 2920,
+ "count": 2922,
  "strings": {
   "\"Add to Home Screen\"": "Adicionar à tela inicial",
   "\"Open Bring!\"": "Abrir Bring!",
@@ -620,6 +620,7 @@
   "It goes from this list, unsaved.": "Sai desta lista, sem ser salvo.",
   "It has been {1} days since a backup": "Já passaram {1} dias desde a última cópia de segurança",
   "It is deleted from “{1}” and is NOT kept as a recipe of its own. {2} The collection’s previous state is kept in 🕘 Version history, so this can be undone.": "É eliminada de \"{1}\" e NÃO fica guardada como receita própria. {2} O estado anterior da coleção fica guardado no histórico de versões 🕘, por isso isto pode ser desfeito.",
+  "It takes a few seconds.": "Leva alguns segundos.",
   "It tells you when a new version is out — and pulling the list down checks at once.": "Ele avisa quando sai uma versão nova — e arrastar a lista para baixo verifica na hora.",
   "It waits in ··· More → 🏡 Kitchens and people → 📨 Recipes sent to me until {1}.": "Fica em ··· Mais → 🏡 Cozinhas e pessoas → 📨 Receitas enviadas para mim até {1}.",
   "Italian": "Italiano",
@@ -1148,6 +1149,7 @@
   "Send {1} photo{2} to the cloud?": "Enviar {1} foto{2} para a nuvem?",
   "Sending ingredients to Bring!...": "Enviando ingredientes para o Bring!...",
   "Sending the restored photos to the cloud…": "Enviando as fotos restauradas para a nuvem…",
+  "Sending your request…": "Enviando seu pedido…",
   "Sending…": "Enviando…",
   "Sends it through the app, and copies a message (with the link to accept it) to paste wherever you like": "Envia pelo app e copia uma mensagem (com o link para aceitar) para colar onde quiser",
   "Sends it through the app, and opens WhatsApp to tell them too": "Envia pelo app e abre o WhatsApp para avisar também",

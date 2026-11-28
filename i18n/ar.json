@@ -1,7 +1,7 @@
 {
  "lang": "ar",
  "updatedAt": 1795707178962,
- "count": 3155,
+ "count": 3157,
  "strings": {
   "\"Add to Home Screen\"": "إضافة إلى الشاشة الرئيسية",
   "\"Open Bring!\"": "فتح Bring!",
@@ -674,6 +674,7 @@
   "It has been {1} days since a backup": "مرت {1} يومًا منذ آخر نسخة احتياطية",
   "It is deleted from “{1}” and is NOT kept as a recipe of its own. {2} The collection’s previous state is kept in 🕘 Version history, so this can be undone.": "تم حذفها من ”{1}“ ولن تُحفظ كوصفة مستقلة. {2} تبقى الحالة السابقة للمجموعة محفوظة في 🕘 سجل الإصدارات، لذا يمكن التراجع عن هذا.",
   "It is now in the Chrome store, where it keeps itself up to date. Add it from there, then remove the copy you loaded from a folder (on {1}, press {2} on the old My Kitchen Notes).": "أصبح الآن في متجر Chrome، حيث يُحدّث نفسه تلقائيًا. أضفه من هناك، ثم احذف النسخة التي حمّلتها من مجلد (في {1}، اضغط {2} على My Kitchen Notes القديم).",
+  "It takes a few seconds.": "يستغرق ذلك بضع ثوانٍ.",
   "It tells you when a new version is out — and pulling the list down checks at once.": "يخبرك عند صدور نسخة جديدة — وسحب القائمة للأسفل يتحقق من ذلك فورًا.",
   "It waits in ··· More → 🏡 Kitchens and people → 📨 Recipes sent to me until {1}.": "تبقى في ··· المزيد ← 🏡 المطابخ والأشخاص ← 📨 الوصفات المُرسَلة إليّ حتى {1}.",
   "Italian": "الإيطالية",
@@ -1241,6 +1242,7 @@
   "Send {1} photo{2} to the cloud?": "إرسال {1} صورة {2} إلى السحابة؟",
   "Sending ingredients to Bring!...": "جارٍ إرسال المكونات إلى Bring!...",
   "Sending the restored photos to the cloud…": "جارٍ إرسال الصور المستعادة إلى السحابة…",
+  "Sending your request…": "جارٍ إرسال طلبك…",
   "Sending ×{1} amounts (metric) — matching what you had scaled the recipe to": "إرسال الكميات ×{1} (متري) — بتطابق المقياس اللي كبّرت بيه الوصفة",
   "Sending…": "جارٍ الإرسال…",
   "Sends it through the app, and copies a message (with the link to accept it) to paste wherever you like": "يرسلها عبر التطبيق، وينسخ رسالة (تتضمن رابط القبول) لتلصقها أينما تريد",

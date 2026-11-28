@@ -1,7 +1,7 @@
 {
  "lang": "ja",
  "updatedAt": 1795707178962,
- "count": 3458,
+ "count": 3460,
  "strings": {
   "\"Add to Home Screen\"": "ホーム画面に追加",
   "\"One item away\" filter ({1}f.{2})": "「あと1品」フィルター（{1}f.{2}）",
@@ -816,6 +816,7 @@
   "It has been {1} days since a backup": "バックアップから{1}日経過しています",
   "It is deleted from “{1}” and is NOT kept as a recipe of its own. {2} The collection’s previous state is kept in 🕘 Version history, so this can be undone.": "「{1}」から削除され、独立したレシピとしては保存されません。{2} コレクションの以前の状態は🕘バージョン履歴に残るので、元に戻せます。",
   "It is now in the Chrome store, where it keeps itself up to date. Add it from there, then remove the copy you loaded from a folder (on {1}, press {2} on the old My Kitchen Notes).": "Chromeストアに公開されているので、そこから最新版が自動で更新されます。ストアから追加して、フォルダから読み込んだコピーは削除してください（{1}で、古いMy Kitchen Notesの{2}を押します）。",
+  "It takes a few seconds.": "数秒かかります。",
   "It tells you when a new version is out — and pulling the list down checks at once.": "新しいバージョンが出たら知らせます。リストを下に引っ張ると、その場で確認できます。",
   "It waits in ··· More → 🏡 Kitchens and people → 📨 Recipes sent to me until {1}.": "{1}まで、··· その他 → 🏡 キッチンと仲間 → 📨 届いたレシピ に残ります。",
   "Italian": "イタリア料理",
@@ -1444,6 +1445,7 @@
   "Send {1} photo{2} to the cloud?": "{1}枚の写真{2}をクラウドに送信しますか？",
   "Sending ingredients to Bring!...": "材料をBring!に送信中…",
   "Sending the restored photos to the cloud…": "復元した写真をクラウドに送信中…",
+  "Sending your request…": "リクエストを送信しています…",
   "Sending ×{1} amounts (metric) — matching what you had scaled the recipe to": "×{1}の分量（メートル法）を送信 — レシピを調整した倍率と同じです",
   "Sending…": "送信中…",
   "Sends it through the app, and copies a message (with the link to accept it) to paste wherever you like": "アプリ経由で送信し、承認用リンク付きのメッセージをコピーして好きな場所に貼り付けられます",

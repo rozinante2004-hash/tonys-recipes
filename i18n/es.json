@@ -1,7 +1,7 @@
 {
  "lang": "es",
  "updatedAt": 1795707178962,
- "count": 3152,
+ "count": 3154,
  "strings": {
   "\"Add to Home Screen\"": "Añadir a pantalla de inicio",
   "\"Open Bring!\"": "Abrir Bring!",
@@ -674,6 +674,7 @@
   "It has been {1} days since a backup": "Han pasado {1} días desde la última copia de seguridad",
   "It is deleted from “{1}” and is NOT kept as a recipe of its own. {2} The collection’s previous state is kept in 🕘 Version history, so this can be undone.": "Se elimina de “{1}” y NO se conserva como receta propia. {2} El estado anterior de la colección se guarda en 🕘 Historial de versiones, así que esto se puede deshacer.",
   "It is now in the Chrome store, where it keeps itself up to date. Add it from there, then remove the copy you loaded from a folder (on {1}, press {2} on the old My Kitchen Notes).": "Ya está en la tienda de Chrome, donde se mantiene actualizada sola. Añádela desde ahí y luego elimina la copia que cargaste desde una carpeta (en {1}, pulsa {2} en la antigua My Kitchen Notes).",
+  "It takes a few seconds.": "Tarda unos segundos.",
   "It tells you when a new version is out — and pulling the list down checks at once.": "Te avisa cuando sale una versión nueva — y deslizar la lista hacia abajo lo comprueba al instante.",
   "It waits in ··· More → 🏡 Kitchens and people → 📨 Recipes sent to me until {1}.": "Espera en ··· Más → 🏡 Cocinas y gente → 📨 Recetas que me enviaron hasta {1}.",
   "Italian": "Italiano",
@@ -1241,6 +1242,7 @@
   "Send {1} photo{2} to the cloud?": "¿Enviar {1} foto{2} a la nube?",
   "Sending ingredients to Bring!...": "Enviando ingredientes a Bring!...",
   "Sending the restored photos to the cloud…": "Enviando las fotos restauradas a la nube…",
+  "Sending your request…": "Enviando tu solicitud…",
   "Sending ×{1} amounts (metric) — matching what you had scaled the recipe to": "Enviando cantidades ×{1} (métrico) — según la escala que le diste a la receta",
   "Sending…": "Enviando…",
   "Sends it through the app, and copies a message (with the link to accept it) to paste wherever you like": "La envía por la app y copia un mensaje (con el enlace para aceptarla) para que lo pegues donde quieras",
